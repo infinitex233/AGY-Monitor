@@ -17,6 +17,7 @@ import {
   speedReasonText,
 } from '../src/core/formatters.js';
 import { createReactiveStore } from '../src/core/reactive.js';
+import { i18nStore, setI18nLanguage } from '../src/i18n/index.js';
 import { buildBundle, stripModuleSyntax } from '../scripts/build-bundle.mjs';
 
 const nowMs = Date.now();
@@ -417,7 +418,10 @@ test('BUG-04 & BUG-10: failed RUNNING trajectory fetch enters cooldown instead o
   assert.equal(h.state.calls.filter((c) => c.method === 'RetrieveUserQuotaSummary').length, 2);
 });
 
-test('BUG-09, BUG-14 & BUG-15: SemVer 2.0 prerelease/build ordering, future-only exhausted quota inference, and <6h dual-bucket classification', async () => {
+test('BUG-09, BUG-14 & BUG-15: SemVer 2.0 prerelease/build ordering, future-only exhausted quota inference, and <6h dual-bucket classification', async (t) => {
+  const prevLocale = i18nStore.getState().locale;
+  setI18nLanguage('zh-CN');
+  t.after(() => setI18nLanguage(prevLocale));
   const h = backendHarness({
     quotaSummary: {
       groups: [

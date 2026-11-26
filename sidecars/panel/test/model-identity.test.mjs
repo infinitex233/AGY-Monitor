@@ -189,7 +189,10 @@ test('empty session does not invent an Argon model or a model quota pool', async
   assert.equal(p.quotas.activePool.isAvailable,false); assert.equal(p.quotas.activePool.family,'Unknown');
 });
 
-test('unknown single-step cost renders as pending while aggregate subtotals omit pending suffix', () => {
+test('unknown single-step cost renders as pending while aggregate subtotals omit pending suffix', (t) => {
+  const prevLocale = i18nStore.getState().locale;
+  setI18nLanguage('zh-CN');
+  t.after(() => setI18nLanguage(prevLocale));
   assert.equal(formatUsd(null),'待定'); assert.equal(formatUsd(0),'$0.00');
   assert.equal(formatUsd(0.1,{unpricedCalls:1}),'$0.10');
 });
@@ -796,7 +799,10 @@ test('new Carbon (M427/M437/M438) and Hydrogen XHigh/High/Medium/Low (M525-M528)
   assert.equal(getBaseModelLabel('Orchestrator Worker (Hydrogen)'), 'Orchestrator Worker (Hydrogen)');
 });
 
-test('orchestratorIdMode defaults to compact, persists via settings action, and controls Orchestrator series independently of showUpstreamModel', () => {
+test('orchestratorIdMode defaults to compact, persists via settings action, and controls Orchestrator series independently of showUpstreamModel', (t) => {
+  const prevLocale = i18nStore.getState().locale;
+  setI18nLanguage('zh-CN');
+  t.after(() => setI18nLanguage(prevLocale));
   const h = backendHarness();
   assert.equal(h.loadSettings().orchestratorIdMode, 'compact');
 
