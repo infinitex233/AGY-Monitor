@@ -12,6 +12,7 @@
 [![License](https://img.shields.io/github/license/infinitex233/antigravity-usage-monitor?style=flat-square&color=3b82f6)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20npm-10b981?style=flat-square)](#本地开发)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-6366f1?style=flat-square)](#多端支持)
+[![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-1f2937?style=flat-square&logo=linux&logoColor=white)](https://linux.do)
 
 简体中文 · [English](README.md)
 
@@ -184,4 +185,5 @@ npm run pack:release
 ## 致谢与许可
 
 - **上游项目**：本项目基于 [yuhuan-dev/antigravity-usage-monitor](https://github.com/yuhuan-dev/antigravity-usage-monitor) 二次开发与深度精简，衷心感谢原作者优秀的底层采集、协议解析与基础架构设计。
+- **社区支持**：认可并感谢 [LINUX DO](https://linux.do) 社区提供开放、友善的技术交流平台，欢迎交流与反馈。
 - **开源协议**：遵循 [GNU General Public License v3.0](LICENSE) 发布。

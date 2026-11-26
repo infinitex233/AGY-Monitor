@@ -12,6 +12,7 @@ Lightweight local telemetry and token analytics plugin for Google Antigravity �
 [![License](https://img.shields.io/github/license/infinitex233/antigravity-usage-monitor?style=flat-square&color=3b82f6)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20npm-10b981?style=flat-square)](#local-development)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-6366f1?style=flat-square)](#client-support)
+[![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-1f2937?style=flat-square&logo=linux&logoColor=white)](https://linux.do)
 
 [简体中文](README.zh-CN.md) · English
 
@@ -183,4 +184,5 @@ npm run pack:release
 ## Acknowledgments & License
 
 - **Upstream Attribution**: Forked and streamlined from [yuhuan-dev/antigravity-usage-monitor](https://github.com/yuhuan-dev/antigravity-usage-monitor). Huge thanks to the upstream author for the foundational telemetry collector, protobuf/SQLite readers, and overlay bridge architecture.
+- **Community**: Thanks to the [LINUX DO](https://linux.do) community for providing an open and welcoming space for technical discussion and feedback.
 - **License**: Distributed under the [GNU General Public License v3.0](LICENSE).
