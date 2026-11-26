@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/agy-monitor-icon.png" alt="AGY Monitor icon" width="128" height="128" />
+
 # AGY Monitor
 
 Lightweight local telemetry and token analytics plugin for Google Antigravity — zero external dependencies, zero credential access, built for clarity.

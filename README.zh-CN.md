@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/agy-monitor-icon.png" alt="AGY Monitor 图标" width="128" height="128" />
+
 # AGY Monitor
 
 专注于本地实时性能指标与 Token 用量分析的 Google Antigravity 监控插件 —— 零外部依赖、零账号权限触碰、即装即用
