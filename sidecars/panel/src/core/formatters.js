@@ -654,6 +654,23 @@ function extractDynamicOrchVariant(fields = []) {
   return '';
 }
 
+const GEMINI_SHORT_ALIAS_RE =
+  /^(argon|carbon|neon|hydrogen|helix|flash|pro)-(\d+(?:\.\d+)?)(-[a-z0-9.-]+)?$/i;
+
+/**
+ * 将 Gemini 系列精简代号格式化为版本号前置（如 `neon-4-high` -> `4-neon-high`），符合 Gemini 命名习惯。
+ *
+ * @param {string} name
+ * @returns {string}
+ */
+export function formatGeminiShortAlias(name) {
+  const raw = String(name ?? '').trim();
+  if (!raw) return raw;
+  const match = raw.match(GEMINI_SHORT_ALIAS_RE);
+  if (!match) return raw;
+  return `${match[2]}-${match[1]}${match[3] || ''}`;
+}
+
 /**
  * 统一解析步骤、会话摘要或模型汇总行面向用户的模型显示文本及悬停提示。
  *
@@ -849,7 +866,9 @@ export function resolveModelDisplayInfo(target, settings = {}, options = {}) {
   const baseText =
     modelDisplayMode === 'upstream_compact'
       ? stripVendorModelPrefix(cleanRawBase) || cleanRawBase
-      : cleanRawBase;
+      : modelDisplayMode === 'short' && !preferLabelInShort
+        ? formatGeminiShortAlias(cleanRawBase)
+        : cleanRawBase;
   const text = `${baseText}${compactionSuffix}`;
   const fullUpstreamWithSuffix = `${cleanRawBase}${compactionSuffix}`;
   const standardTitle =

@@ -31,7 +31,6 @@ import {
   WINDOW_OVERLAY_KEY,
   WINDOW_OVERLAY_METHODS,
 } from '../shared/window-bridge-protocol.mjs';
-import { HOST_I18N_GLOBAL_KEY } from '../shared/host-i18n-protocol.mjs';
 import {
   DATA_DIR,
   computeRuntimeCodeVersion,
@@ -46,13 +45,6 @@ import {
   getContextWindowModels,
   resolveContextWindowRules,
 } from './context-windows.mjs';
-import {
-  createHostI18nApplyExpression,
-  createHostI18nCollectExpression,
-  createHostI18nDisposeExpression,
-  createHostI18nHeartbeatExpression,
-  getHostI18nBridgeDescriptor,
-} from './host-i18n/index.mjs';
 import {
   ensureDesktopLaunchEntriesConfigured,
   resolveDesktopHostExecutable,
@@ -72,7 +64,6 @@ import { getDefaultCloudCodeProxy } from './cloudcode-proxy.mjs';
 const windowBridgeRef = `window[${JSON.stringify(WINDOW_BRIDGE_KEY)}]`;
 const windowOverlayRef = `window[${JSON.stringify(WINDOW_OVERLAY_KEY)}]`;
 const windowContextWindowsRef = `window[${JSON.stringify(CONTEXT_WINDOWS_GLOBAL_KEY)}]`;
-const windowHostI18nRef = `window[${JSON.stringify(HOST_I18N_GLOBAL_KEY)}]`;
 const windowBridgeRouteKey = JSON.stringify(WINDOW_BRIDGE_ROUTE_KEY);
 const windowBridgeEndpointKey = JSON.stringify(WINDOW_BRIDGE_ENDPOINT_KEY);
 const overlayMethods = Object.fromEntries(
@@ -1159,10 +1150,6 @@ export function createWindowBridgeController(options) {
     cloudCodeProxy = null,
     manageCloudCodeProxy = false,
     resolveLocalContextRulesFn = null,
-    getHostI18nDescriptorFn =
-      options?.env === undefined && options?.homeDir === undefined
-        ? getHostI18nBridgeDescriptor
-        : () => ({ active: false, revision: '', getPayload: null }),
   } = options || {};
 
   const activeCloudCodeProxy =
@@ -1223,10 +1210,6 @@ export function createWindowBridgeController(options) {
   };
   let hadContextWindows = false;
   let contextWindowBootId = `${process.pid}:${Date.now()}`;
-  let hadHostI18n = false;
-  let hostI18nBootId = `hi18n:${process.pid}:${Date.now()}`;
-  let lastHostI18nAppliedCount = 0;
-  let cachedHostI18nApply = { revision: '', bootId: '', expr: '' };
   const cachedBackendCtxModelsByEndpoint = new Map();
   const targetClassifyCache = new Map();
   let nodeDepsPromise = null;
@@ -1896,18 +1879,11 @@ export function createWindowBridgeController(options) {
     const needsMainCdpContext = hasContextWindows && ctxMainEnabled;
     const needsCloudCodeProxy = hasContextWindows && ctxSwarmEnabled;
     const needsAnyCdpContext = hasContextWindows && (ctxMainEnabled || ctxSwarmEnabled);
-    const hostI18nDesc =
-      typeof getHostI18nDescriptorFn === 'function' ? getHostI18nDescriptorFn() : null;
-    const needsHostI18n = Boolean(
-      hostI18nDesc?.active &&
-        hostI18nDesc?.revision &&
-        typeof hostI18nDesc?.getPayload === 'function'
-    );
 
     let leasedBySelf = false;
     let currentLease = null;
     if (
-      (enabled || needsAnyCdpContext || needsCloudCodeProxy || needsHostI18n) &&
+      (enabled || needsAnyCdpContext || needsCloudCodeProxy) &&
       leaseFilePath &&
       !forceReinject
     ) {
@@ -1979,7 +1955,7 @@ export function createWindowBridgeController(options) {
     }
 
     const shouldCheckLaunchers =
-      (enabled || needsMainCdpContext || needsHostI18n) &&
+      (enabled || needsMainCdpContext) &&
       autoConfigureIdeArgv &&
       (lastLauncherProvisionAtMs === 0 ||
         Date.now() - lastLauncherProvisionAtMs >= launcherRecheckIntervalMs);
@@ -1995,7 +1971,7 @@ export function createWindowBridgeController(options) {
         await provPending.catch(() => {});
       }
       updateBridgeStatus(
-        enabled || needsMainCdpContext || needsHostI18n ? 'no_devtools_port' : 'disabled',
+        enabled || needsMainCdpContext ? 'no_devtools_port' : 'disabled',
         {
           enabled,
           leasedBySelf,
@@ -2016,7 +1992,7 @@ export function createWindowBridgeController(options) {
         await provPending.catch(() => {});
       }
       updateBridgeStatus(
-        enabled || needsMainCdpContext || needsHostI18n ? 'cdp_unreachable' : 'disabled',
+        enabled || needsMainCdpContext ? 'cdp_unreachable' : 'disabled',
         {
           enabled,
           leasedBySelf,
@@ -2046,8 +2022,6 @@ export function createWindowBridgeController(options) {
       !enabled &&
       !needsAnyCdpContext &&
       !hadContextWindows &&
-      !needsHostI18n &&
-      !hadHostI18n &&
       !hadInjectedTargets &&
       !hadInjectedChatFrames &&
       !forceReinject
@@ -2285,66 +2259,6 @@ export function createWindowBridgeController(options) {
       }
       await Promise.allSettled(ctxEvalTasks);
       hadContextWindows = needsAnyCdpContext;
-    }
-
-    if (needsHostI18n || hadHostI18n) {
-      const hostI18nWsUrls = new Set();
-      for (const target of targets) {
-        if (target.isIdeWorkbench) continue;
-        const wsUrl = String(target.webSocketDebuggerUrl || '').trim();
-        if (wsUrl) hostI18nWsUrls.add(wsUrl);
-      }
-      for (const chatUrl of collectAllChatDebuggerUrls(targets)) {
-        if (chatUrl) hostI18nWsUrls.add(chatUrl);
-      }
-
-      if (!needsHostI18n) {
-        const disposeHostI18nExpr = createHostI18nDisposeExpression();
-        await Promise.allSettled(
-          Array.from(hostI18nWsUrls).map((wsUrl) => evaluateOnTarget(wsUrl, disposeHostI18nExpr))
-        );
-        hadHostI18n = false;
-        lastHostI18nAppliedCount = 0;
-        cachedHostI18nApply = { revision: '', bootId: '', expr: '' };
-      } else {
-        const heartbeatExpr = createHostI18nHeartbeatExpression(
-          hostI18nBootId,
-          hostI18nDesc.revision
-        );
-        let appliedTargets = 0;
-        await Promise.allSettled(
-          Array.from(hostI18nWsUrls).map(async (wsUrl) => {
-            try {
-              const hbRes = await evaluateOnTarget(wsUrl, heartbeatExpr, 1800);
-              const hbVal = hbRes?.result?.result?.value;
-              if (hbVal?.alive === true && hbVal?.needsApply === false) {
-                appliedTargets += 1;
-                return;
-              }
-            } catch {
-              // 心跳异常时回退完整注入
-            }
-            if (
-              !cachedHostI18nApply.expr ||
-              cachedHostI18nApply.revision !== hostI18nDesc.revision ||
-              cachedHostI18nApply.bootId !== hostI18nBootId
-            ) {
-              const payload = hostI18nDesc.getPayload();
-              cachedHostI18nApply = {
-                revision: hostI18nDesc.revision,
-                bootId: hostI18nBootId,
-                expr: createHostI18nApplyExpression(payload, hostI18nBootId),
-              };
-            }
-            const applyRes = await evaluateOnTarget(wsUrl, cachedHostI18nApply.expr, 8000);
-            if (applyRes?.result?.result?.value?.applied) {
-              appliedTargets += 1;
-            }
-          })
-        );
-        hadHostI18n = true;
-        lastHostI18nAppliedCount = appliedTargets;
-      }
     }
 
     const disposeExpr = `(() => {
@@ -2882,7 +2796,7 @@ export function createWindowBridgeController(options) {
     }
     if (
       disposeWindows &&
-      (hadInjectedTargets || hadInjectedChatFrames || hadContextWindows || hadHostI18n)
+      (hadInjectedTargets || hadInjectedChatFrames || hadContextWindows)
     ) {
       const prevStopped = stopped;
       stopped = false;
@@ -2894,7 +2808,6 @@ export function createWindowBridgeController(options) {
           }));
           const disposeExpr = `(() => {
             try {
-              ${windowHostI18nRef}?.dispose?.();
               ${windowContextWindowsRef}?.dispose?.();
               ${windowOverlayRef}?.[${overlayMethods.dispose}]?.();
               delete ${windowOverlayRef};
@@ -2920,9 +2833,6 @@ export function createWindowBridgeController(options) {
     hadInjectedTargets = false;
     hadInjectedChatFrames = false;
     hadContextWindows = false;
-    hadHostI18n = false;
-    lastHostI18nAppliedCount = 0;
-    cachedHostI18nApply = { revision: '', bootId: '', expr: '' };
     if (activeCloudCodeProxy) {
       await activeCloudCodeProxy.stop().catch(() => {});
     }
@@ -2945,10 +2855,7 @@ export function createWindowBridgeController(options) {
       const hasCtx =
         Object.keys(cur.modelContextWindows || {}).length > 0 &&
         cur.contextWindowMainEnabled !== false;
-      const hasHostI18n = Boolean(
-        typeof getHostI18nDescriptorFn === 'function' && getHostI18nDescriptorFn()?.active
-      );
-      if (!hasCtx && !hasHostI18n && autoConfigureIdeArgv) {
+      if (!hasCtx && autoConfigureIdeArgv) {
         launcherConfigured = false;
         hasReadOnlyShortcuts = false;
         lastLauncherProvisionAtMs = 0;
@@ -2976,12 +2883,9 @@ export function createWindowBridgeController(options) {
     const hasCtx =
       Object.keys(cur.modelContextWindows || {}).length > 0 &&
       cur.contextWindowMainEnabled !== false;
-    const hasHostI18n = Boolean(
-      typeof getHostI18nDescriptorFn === 'function' && getHostI18nDescriptorFn()?.active
-    );
     if (hasCtx) {
       lastLauncherProvisionAtMs = 0;
-    } else if (!overlayOn && !hasHostI18n && autoConfigureIdeArgv) {
+    } else if (!overlayOn && autoConfigureIdeArgv) {
       launcherConfigured = false;
       hasReadOnlyShortcuts = false;
       lastLauncherProvisionAtMs = 0;
@@ -2998,96 +2902,17 @@ export function createWindowBridgeController(options) {
     return syncAllWindows({ forceReinject: false }).catch(() => ({ ok: false }));
   }
 
-  function notifyHostI18nChanged() {
-    const cur = getSettingsFn() || {};
-    const mountMode = normalizeWindowMountMode(cur.windowMountMode, cur.enableWindowOverlay);
-    const overlayOn = Boolean(cur.enableWindowOverlay !== false && mountMode !== 'sidebar');
-    const hasCtx =
-      Object.keys(cur.modelContextWindows || {}).length > 0 &&
-      cur.contextWindowMainEnabled !== false;
-    const hasHostI18n = Boolean(
-      typeof getHostI18nDescriptorFn === 'function' && getHostI18nDescriptorFn()?.active
-    );
-    if (hasHostI18n) {
-      lastLauncherProvisionAtMs = 0;
-    } else {
-      hadHostI18n = true;
-      if (!overlayOn && !hasCtx && autoConfigureIdeArgv) {
-        launcherConfigured = false;
-        hasReadOnlyShortcuts = false;
-        lastLauncherProvisionAtMs = 0;
-        void ensureDesktopLaunchEntriesConfigured({
-          enabled: false,
-          env,
-          platform,
-          homeDir,
-          execFileFn: launcherExecFileFn,
-          fsOps: launcherFsOps,
-          allowInTest: allowDesktopLauncherInTest,
-        }).catch(() => {});
-      }
-    }
-    return syncAllWindows({ forceReinject: false }).catch(() => ({ ok: false }));
-  }
-
-  async function collectHostI18nUntranslatedFromTargets() {
-    const cdpPorts = findActiveDevToolsPorts();
-    if (!cdpPorts.length) {
-      return { targets: 0, items: [] };
-    }
-    const { targets } = await collectAllMainWindowTargets(cdpPorts).catch(() => ({ targets: [] }));
-    const wsUrls = new Set();
-    for (const target of targets) {
-      if (target.isIdeWorkbench) continue;
-      const wsUrl = String(target.webSocketDebuggerUrl || '').trim();
-      if (wsUrl) wsUrls.add(wsUrl);
-    }
-    for (const chatUrl of collectAllChatDebuggerUrls(targets)) {
-      if (chatUrl) wsUrls.add(chatUrl);
-    }
-    if (wsUrls.size === 0) {
-      return { targets: 0, items: [] };
-    }
-    const collectExpr = createHostI18nCollectExpression();
-    const settled = await Promise.allSettled(
-      Array.from(wsUrls).map((wsUrl) => evaluateOnTarget(wsUrl, collectExpr, 3500))
-    );
-    const mergedCounts = new Map();
-    const mergedKinds = new Map();
-    let scannedTargets = 0;
-    for (const res of settled) {
-      if (res.status !== 'fulfilled') continue;
-      const val = res.value?.result?.result?.value;
-      if (!val || !Array.isArray(val.items)) continue;
-      scannedTargets += 1;
-      for (const item of val.items) {
-        const text = String(item?.text || '').trim();
-        if (!text) continue;
-        mergedCounts.set(text, (mergedCounts.get(text) || 0) + (Number(item?.count || 1) || 1));
-        if (!mergedKinds.has(text)) mergedKinds.set(text, String(item?.kind || 'text'));
-      }
-    }
-    const items = Array.from(mergedCounts.entries())
-      .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
-      .slice(0, 200)
-      .map(([text, count]) => ({ text, kind: mergedKinds.get(text) || 'text', count }));
-    return { targets: scannedTargets, items };
-  }
-
   return {
     ensureBridgeServer,
     syncAllWindows,
     invokeRemoteWindowRpc,
     notifySettingChanged,
     notifyContextWindowsChanged,
-    notifyHostI18nChanged,
-    collectHostI18nUntranslatedFromTargets,
     start,
     stop,
     getBridgeInfo: () => ({ port: bridgePort, token: bridgeToken, running: Boolean(server) }),
     getBridgeStatus: () => ({
       ...lastBridgeStatus,
-      hostI18nAppliedCount: lastHostI18nAppliedCount,
     }),
   };
 }
@@ -3146,16 +2971,4 @@ export function notifyWindowOverlaySetting(enabled) {
 export function notifyModelContextWindowsChanged() {
   if (!defaultBridgeController) return Promise.resolve({ ok: false });
   return defaultBridgeController.notifyContextWindowsChanged();
-}
-
-export function notifyHostI18nChanged() {
-  if (!defaultBridgeController) return Promise.resolve({ ok: false });
-  return defaultBridgeController.notifyHostI18nChanged();
-}
-
-export function collectHostI18nUntranslatedFromActiveTargets() {
-  if (!defaultBridgeController) {
-    return Promise.resolve({ targets: 0, items: [] });
-  }
-  return defaultBridgeController.collectHostI18nUntranslatedFromTargets();
 }

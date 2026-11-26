@@ -84,6 +84,19 @@ const FLOATING_CARD_WIDTH = 522;
 const POPOVER_BASE_WIDTH = 540;
 const POPOVER_MAX_AUTO_WIDTH = 960;
 const MULTI_PANEL_WIDTH = 464;
+const LEGACY_TOPBAR_SLOTS_SIG = 'tps,ttft,context';
+const REALTIME_TOPBAR_SLOTS = Object.freeze(['tps', 'ttft', 'cache_hit', 'context']);
+
+function resolveEffectiveTopbarSlots(rawSlots) {
+  const normalized = normalizeClientTopbarSlots(rawSlots);
+  return normalized.join(',') === LEGACY_TOPBAR_SLOTS_SIG
+    ? [...REALTIME_TOPBAR_SLOTS]
+    : normalized;
+}
+
+function resolveEffectiveHoverModules(rawModules) {
+  return normalizeClientHoverModules(rawModules).filter((key) => key !== 'quotas');
+}
 
 
 export function mountWindowOverlay() {
@@ -527,7 +540,7 @@ export function mountWindowOverlay() {
     containerEl: hoverWidgetsContainer,
     mode: 'hover',
     isVisibleFn: () => Boolean(tooltipOpen && !disposed),
-    initialModuleKeys: DEFAULT_CLIENT_HOVER_MODULES,
+    initialModuleKeys: resolveEffectiveHoverModules(DEFAULT_CLIENT_HOVER_MODULES),
     getCtxAgentId: () =>
       resolveOverlayCtxInspectorAgentId(
         telemetryStore.getState().telemetry,
@@ -1268,7 +1281,7 @@ export function mountWindowOverlay() {
       curTel?.settings?.autoUpdatePlugin
     );
     const hasUpdate = Boolean(curTel?.cloudStatus?.updateAvailable) && curUpdateMode !== 'off';
-    const slotCount = normalizeClientTopbarSlots(curTel?.settings?.topbarCapsuleSlots).length;
+    const slotCount = resolveEffectiveTopbarSlots(curTel?.settings?.topbarCapsuleSlots).length;
     const nextMode = computeCapsuleLayoutMode(avail, layoutMode, {
       showMulti,
       hasUpdate,
@@ -1427,16 +1440,15 @@ export function mountWindowOverlay() {
   function refreshActiveViewScrollbars() {
     if (!appInstance) return;
     const activeView = uiStore.getState().activeView;
+    const targetView = activeView === 'steps' ? 'overview' : activeView;
     const refs = appInstance.refs;
-    if (activeView === 'overview') {
+    if (targetView === 'overview') {
       refs?.overviewView?.refs?.viewScrollbar?.refresh();
-    } else if (activeView === 'consumption') {
-      refs?.consumptionView?.refs?.viewScrollbar?.refresh();
-    } else if (activeView === 'steps') {
       refs?.stepsView?.refs?.refreshStepTableViewport?.();
       refs?.stepsView?.refs?.stepsScroll?.refresh();
-      refs?.stepsView?.refs?.modelsScroll?.refresh();
-    } else if (activeView === 'settings') {
+    } else if (targetView === 'consumption') {
+      refs?.consumptionView?.refs?.viewScrollbar?.refresh();
+    } else if (targetView === 'settings') {
       refs?.settingsView?.refs?.viewScrollbar?.refresh();
     }
   }
@@ -1477,7 +1489,7 @@ export function mountWindowOverlay() {
 
   function canOpenHoverTooltip() {
     const curTel = telemetryStore.getState().telemetry;
-    const hoverMods = normalizeClientHoverModules(curTel?.settings?.hoverModules);
+    const hoverMods = resolveEffectiveHoverModules(curTel?.settings?.hoverModules);
     const curUpdateMode = normalizeClientUpdateMode(
       curTel?.settings?.pluginUpdateMode,
       curTel?.settings?.autoUpdatePlugin
@@ -1581,7 +1593,7 @@ export function mountWindowOverlay() {
   function renderHoverWidgets() {
     const { telemetry, minuteTick } = telemetryStore.getState();
     hoverWidgetHost.update({
-      moduleKeys: normalizeClientHoverModules(telemetry?.settings?.hoverModules),
+      moduleKeys: resolveEffectiveHoverModules(telemetry?.settings?.hoverModules),
       data: telemetry,
       minuteTick: Number(minuteTick || Math.floor(Date.now() / 30000)),
     });
@@ -1605,7 +1617,7 @@ export function mountWindowOverlay() {
       setMultiOpen(false);
     }
 
-    const slotKeys = normalizeClientTopbarSlots(telemetry?.settings?.topbarCapsuleSlots);
+    const slotKeys = resolveEffectiveTopbarSlots(telemetry?.settings?.topbarCapsuleSlots);
     const layoutInputsChanged =
       showMulti !== lastShowMulti || slotKeys.length !== lastSlotCount;
     if (layoutInputsChanged) {
@@ -1712,7 +1724,7 @@ export function mountWindowOverlay() {
     }
 
     // --- 同步动态悬停组件宿主（0 项且无更新提示时自动关闭悬停窗，点击完整浮窗不受影响） ---
-    const hoverModuleKeys = normalizeClientHoverModules(telemetry.settings?.hoverModules);
+    const hoverModuleKeys = resolveEffectiveHoverModules(telemetry.settings?.hoverModules);
     patchAttr(hoverWidgetsContainer, 'hidden', hoverModuleKeys.length === 0);
     if (hoverModuleKeys.length === 0 && !showUpdatePrompt && tooltipOpen) {
       setTooltipOpen(false);

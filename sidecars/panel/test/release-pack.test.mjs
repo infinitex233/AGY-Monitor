@@ -20,7 +20,6 @@ test('pack-release-zip ships only runtime-essential files, excludes dev bloat, a
     'mcp_config.json',
     'pricing-catalog.json',
     'LICENSE',
-    'assets/logo.svg',
     'sidecars/panel/sidecar.json',
     'sidecars/panel/index.html',
     'sidecars/panel/app.js',
@@ -32,17 +31,17 @@ test('pack-release-zip ships only runtime-essential files, excludes dev bloat, a
     'sidecars/panel/cli-statusline.mjs',
     'sidecars/panel/trajectory-metrics.mjs',
     'sidecars/panel/backend/api-actions.mjs',
-    'sidecars/panel/backend/host-i18n/index.mjs',
-    'sidecars/panel/backend/account-credentials.ps1',
     'sidecars/panel/shared/settings-normalization.mjs',
-    'sidecars/panel/shared/host-i18n-protocol.mjs',
   ]) {
     assert.ok(relFiles.includes(mustHave), `Release whitelist must include ${mustHave}`);
   }
 
-  // Non-runtime dev/doc/test/preview files and standalone repository language packs must NEVER enter the release ZIP
+  // Non-runtime dev/doc/test/preview files and removed dead/sensitive modules must NEVER enter the release ZIP
   for (const rel of relFiles) {
     assert.doesNotMatch(rel, /^host-i18n\//);
+    assert.doesNotMatch(rel, /^sidecars\/panel\/backend\/host-i18n\//);
+    assert.doesNotMatch(rel, /account-.*\.mjs$|account-credentials\.ps1$/i);
+    assert.doesNotMatch(rel, /(?:quota-reservation|session-migrator)\.mjs$/);
     assert.doesNotMatch(rel, /^sidecars\/panel\/(?:src|test|scripts)\//);
     assert.doesNotMatch(rel, /\.png$/i);
     assert.doesNotMatch(rel, /^README/i);
@@ -92,7 +91,9 @@ test('pack-release-zip ships only runtime-essential files, excludes dev bloat, a
   assert.ok(existsSync(join(pluginRoot, 'plugin.json')));
   const manifest = JSON.parse(readFileSync(join(pluginRoot, 'plugin.json'), 'utf8'));
   assert.equal(manifest.name, 'usage-monitor');
-  assert.ok(existsSync(join(pluginRoot, manifest.logo)));
+  assert.equal(manifest.displayName, 'AGY Monitor');
+  assert.equal(manifest.version, '1.0.0');
+  assert.equal(manifest.logo, undefined);
 
   // Verify zero broken syntax and clean standalone ESM load from the extracted clean tree (no src/, test/, package.json)
   for (const rel of relFiles) {

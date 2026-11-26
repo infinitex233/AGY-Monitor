@@ -643,7 +643,7 @@ test('trendSeries preserves 1-day-per-slot granularity for >90 day spans and rec
 
   const pAll = await h.buildTelemetryPayloadInternal('cLong', false, { range: 'all' });
   const trendAll = pAll.consumption.trendSeries;
-  assert.ok(trendAll.length >= 120 && trendAll.length <= 122, `Expected ~121 daily slots, got ${trendAll.length}`);
+  assert.ok(trendAll.length >= 176 && trendAll.length <= 183, `Expected ~6-month daily slots, got ${trendAll.length}`);
   assert.equal(trendAll[0].granularity, 'day');
   assert.match(trendAll[0].fullLabel, /^\d{4}年\d+月\d+日 \(周[日一二三四五六]\)$/);
   assert.equal(trendAll.reduce((sum, b) => sum + b.tokens, 0), 30700 + 37800);
@@ -836,72 +836,8 @@ test('cached usage follows rolling boundaries and reprices unchanged steps', asy
   assert.equal(repriced.activeConversation.recentSteps[0].costUsd, 0.92);
 });
 
-test('modelBreakdown exposes avgTtftSec, cacheHitPct, and subagent scoped breakdowns + fit math helpers', async () => {
-  const {
-    computeLinearFit,
-    computePublicationFit,
-    getStepModelGroupKey,
-    toChronologicalSteps,
-  } = await import('../src/components/charts/SessionStepCharts.js');
-
-  // 1. Verify OLS + publication LOESS + 95% CI confidence band & [0, 100] cache bounds
-  const olsExact = computeLinearFit([10, 20, 30, 40]);
-  assert.ok(Math.abs(olsExact.slope - 10) < 1e-9);
-  assert.ok(Math.abs(olsExact.r - 1) < 1e-9);
-  assert.ok(Math.abs(olsExact.r2 - 1) < 1e-9);
-  assert.deepEqual(
-    olsExact.values.map((v) => +v.toFixed(4)),
-    [10, 20, 30, 40]
-  );
-
-  // Verify bimodal / high-peak TPS series is NOT crushed flat by Bisquare and builds valid 95% CI band
-  const waveXs = Array.from({ length: 20 }, (_, idx) => idx * 5 + 1);
-  const waveYs = [
-    22, 26, 48, 78, 92, 85, 64, 34, 24, 28,
-    55, 84, 76, 42, 25, 22, 26, 32, 38, 44,
-  ];
-  const pubWave = computePublicationFit(waveXs, waveYs, { minVal: 0 });
-  assert.equal(pubWave.method, 'LOESS');
-  assert.equal(pubWave.grid.length, 64);
-  assert.ok(
-    pubWave.grid.every((g) => g.ciLow <= g.fit + 1e-9 && g.fit <= g.ciHigh + 1e-9),
-    'Every grid point satisfies ciLow <= fit <= ciHigh'
-  );
-  // Around peak x ~ 21 (index 4), fitted conditional expectation must rise well above overall mean (~47)
-  assert.ok(pubWave.sampleFits[4] > 55, `Expected peak conditional mean > 55, got ${pubWave.sampleFits[4]}`);
-
-  // Warmup cache curve stays clamped within [0, 100]
-  const cacheSeries = [0, 90, 92, 93, 94, 95, 95];
-  const loessCache = computePublicationFit(
-    cacheSeries.map((_, index) => index),
-    cacheSeries,
-    { minVal: 0, maxVal: 100 }
-  ).sampleFits;
-  assert.equal(loessCache.length, cacheSeries.length);
-  assert.ok(
-    loessCache.every((v) => v >= 0 && v <= 100),
-    'Fitted cache values must stay clamped within [0, 100]'
-  );
-  assert.ok(loessCache[6] > 90, 'Tail fit tracks steady warm cache region');
-
-  // Group key strips [自动压缩] and thinking tier suffixes
-  assert.equal(getStepModelGroupKey({ modelLabel: 'Gemini 3.1 Pro (High) [自动压缩]' }), 'Gemini 3.1 Pro');
-  assert.equal(getStepModelGroupKey({ modelLabel: 'Orchestrator (Carbon)' }), 'Orchestrator (Carbon)');
-
-  const chrono = toChronologicalSteps(
-    [
-      { stepIndex: 3, createdAtMs: 3000 },
-      { stepIndex: 1, createdAtMs: 1000 },
-      { stepIndex: 2, createdAtMs: 2000 },
-    ],
-    true
-  );
-  assert.deepEqual(
-    chrono.map((s) => s.stepIndex),
-    [1, 2, 3]
-  );
-
-  // 2. Verify backend modelBreakdown enriches avgTtftSec and cacheHitPct for main & subagents
+test('modelBreakdown exposes avgTtftSec, cacheHitPct, and subagent scoped breakdowns', async () => {
+  // Verify backend modelBreakdown enriches avgTtftSec and cacheHitPct for main & subagents
   const h = backendHarness({
     trajectories: {
       'root-fit': {
@@ -1086,7 +1022,7 @@ test('preferences schema defaults match pre-refactor UI, migrate legacy none slo
   assert.equal(def.showStepAgentBadge, true);
   assert.equal(def.showStepSpeedColor, false);
   assert.equal(def.showStepFilterToolbar, false);
-  assert.deepEqual([...def.stepTableColumns], ['step', 'model', 'tps', 'ttft', 'tokens_combo', 'cache', 'cost']);
+  assert.deepEqual([...def.stepTableColumns], ['step', 'model', 'tps', 'ttft', 'cache', 'cost']);
   assert.deepEqual({ ...def.modelContextWindows }, {});
 
   // 2. Legacy 3-slot ['context', 'none', 'quota_auto'] migrates cleanly to 2-item ['context', 'quota_auto']

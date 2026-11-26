@@ -539,23 +539,6 @@ export function createStandaloneWebServer(options = {}) {
           return;
         }
         const remoteAddr = String(req.socket?.remoteAddress || '').trim();
-        const isLoopbackClient =
-          !remoteAddr ||
-          remoteAddr === '127.0.0.1' ||
-          remoteAddr === '::1' ||
-          remoteAddr === '::ffff:127.0.0.1';
-        if (pathname === '/api/host-i18n' && method === 'POST' && !isLoopbackClient) {
-          sendResponse(
-            res,
-            403,
-            'application/json; charset=utf-8',
-            JSON.stringify({
-              ok: false,
-              error: 'Host I18n mutations are only allowed from loopback clients',
-            })
-          );
-          return;
-        }
         let data = undefined;
         if (method === 'GET') {
           data = Object.fromEntries(urlObj.searchParams.entries());
@@ -576,25 +559,6 @@ export function createStandaloneWebServer(options = {}) {
             }
           } else {
             data = {};
-          }
-          if (
-            pathname === '/api/settings' &&
-            data &&
-            typeof data === 'object' &&
-            typeof data.__hostI18nAction === 'string' &&
-            data.__hostI18nAction !== 'get' &&
-            !isLoopbackClient
-          ) {
-            sendResponse(
-              res,
-              403,
-              'application/json; charset=utf-8',
-              JSON.stringify({
-                ok: false,
-                error: 'Host I18n mutations are only allowed from loopback clients',
-              })
-            );
-            return;
           }
           if (
             pathname === '/api/settings' &&

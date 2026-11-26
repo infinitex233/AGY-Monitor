@@ -29,7 +29,6 @@ const BACKEND_MODULE_FILES = [
   '../shared/settings-normalization.mjs',
   '../shared/telemetry-display-rules.mjs',
   '../shared/window-bridge-protocol.mjs',
-  '../shared/host-i18n-protocol.mjs',
   '../shared/workspace-uri.mjs',
   '../shared/prompt-clean.mjs',
   '../backend/fs-atomic.mjs',
@@ -40,28 +39,17 @@ const BACKEND_MODULE_FILES = [
   '../backend/trajectory-sqlite-ledger.mjs',
   '../backend/trajectory-cache-store.mjs',
   '../backend/config.mjs',
-  '../backend/account-quota-history.mjs',
-  '../backend/account-oauth.mjs',
-  '../backend/account-login.mjs',
-  '../backend/account-vault-crypto.mjs',
-  '../backend/account-switch.mjs',
   '../backend/endpoint-registry.mjs',
   '../backend/proto-wire.mjs',
   '../backend/cli-sqlite-reader.mjs',
   '../backend/cli-statusline-config.mjs',
-  '../backend/session-migrator.mjs',
   '../backend/ls-discovery.mjs',
   '../backend/pricing-catalog.mjs',
   '../backend/plugin-updater.mjs',
   '../backend/ls-rpc.mjs',
   '../backend/cloudcode-proxy.mjs',
-  '../backend/host-i18n/http-fetch.mjs',
-  '../backend/host-i18n/pack-manager.mjs',
-  '../backend/host-i18n/runtime-translator.mjs',
-  '../backend/host-i18n/index.mjs',
   '../backend/model-pricing.mjs',
   '../backend/quota-pools.mjs',
-  '../backend/quota-reservation.mjs',
   '../backend/transcript-fallback.mjs',
   '../backend/local-scanner.mjs',
   '../backend/usage-aggregator.mjs',
@@ -254,6 +242,6 @@ export function backendHarness({
       return {ok:true,json:async()=>data};
     },
   };
-  vm.runInNewContext(source+'\n globalThis.api={buildTelemetryPayloadInternal,executeTelemetryAction,dispatchBridgeApiRequest,executeAccountCredentialAction,callLsRpc,getDefaultCloudCodeProxyStatus,computeStepCost,resolveModelInfo,resolvePricingAt,inferFamilyFromProviderOrKey,isNeonModelIdentifier,isArgonModelIdentifier,isCarbonModelIdentifier,getBaseModelLabel,formatUpstreamModelId,PLACEHOLDER_MAP,normalizeQuotaFraction,classifyOfficialBucketWindow,classifyQuotaPoolIdentity,buildOfficialQuotaPools,resolveTimeWindow,sanitizeCatalogPayload,rebuildActiveCatalog,getPricingPhaseEpoch,detectCustomGitForkRepo,persistTrajectoryCacheIfNeeded,flushTrajectoryCacheNow,getCachedTrajectory,listCachedTrajectoryEntries,hasPendingTrajectoryCacheSave,syncCloudCatalog,getCloudStatus,isValidSemver,compareSemver,performPluginUpdate,resolveMigratedGitRemoteUrl,loadSettings,executeSettingsAction,executeModelContextWindowAction,executeResetSettingsAction,executeRebuildCacheAction,clearRuntimeCaches,normalizeTopbarCapsuleSlots,normalizeContextAgentMode,normalizeCliStatusLineSlots,resolveEffectiveCliStatusLineSlots,normalizeHoverModules,normalizeOverviewModules,normalizeOverviewMetrics,normalizeStepTableColumns,normalizeStepTokenComboFormat,parseStepTokenComboSegments,normalizeModelDisplayMode,normalizePopoverWidthMode,normalizePopoverWidth,normalizeStandalonePort,setStandalonePortListener,parseAnnotationPbtxtTitle,readLocalSummarySnapshot,readLocalSqliteTrajectory,computeSqliteWalSig,buildCliStatusSnapshot,buildCliStatusLineCommand,isManagedCliStatusLineCommand,extractManagedCliStatusLineFlags,getCliStatusLineRuntimeStatus,applyCliStatusLineToSettingsObject,cliDisplayWidth,parseCliModelAndEffort,formatCliStatusLineCapsule,registerRemoteEndpoint,getRegisteredRemoteEndpoint,resolveEndpointContext,clearRemoteEndpointCaches,clearRemoteEndpointRegistry,setRemoteWindowRpcInvoker,setLoopbackHttpsRequester,getEndpointCacheStore,pruneStaleRemoteEndpoints,trackEndpointRequestStart,trackEndpointRequestEnd,shouldRemoteEndpointPreferTier2,markRemoteEndpointPreferTier2};',ctx);
+  vm.runInNewContext(source+'\n globalThis.api={buildTelemetryPayloadInternal,executeTelemetryAction,dispatchBridgeApiRequest,callLsRpc,getDefaultCloudCodeProxyStatus,computeStepCost,resolveModelInfo,resolvePricingAt,inferFamilyFromProviderOrKey,isNeonModelIdentifier,isArgonModelIdentifier,isCarbonModelIdentifier,getBaseModelLabel,formatUpstreamModelId,PLACEHOLDER_MAP,normalizeQuotaFraction,classifyOfficialBucketWindow,classifyQuotaPoolIdentity,buildOfficialQuotaPools,resolveTimeWindow,sanitizeCatalogPayload,rebuildActiveCatalog,getPricingPhaseEpoch,detectCustomGitForkRepo,persistTrajectoryCacheIfNeeded,flushTrajectoryCacheNow,getCachedTrajectory,listCachedTrajectoryEntries,hasPendingTrajectoryCacheSave,syncCloudCatalog,getCloudStatus,isValidSemver,compareSemver,performPluginUpdate,resolveMigratedGitRemoteUrl,loadSettings,executeSettingsAction,executeModelContextWindowAction,executeResetSettingsAction,executeRebuildCacheAction,clearRuntimeCaches,normalizeTopbarCapsuleSlots,normalizeContextAgentMode,normalizeCliStatusLineSlots,resolveEffectiveCliStatusLineSlots,normalizeHoverModules,normalizeOverviewModules,normalizeOverviewMetrics,normalizeStepTableColumns,normalizeStepTokenComboFormat,parseStepTokenComboSegments,normalizeModelDisplayMode,normalizePopoverWidthMode,normalizePopoverWidth,normalizeStandalonePort,setStandalonePortListener,parseAnnotationPbtxtTitle,readLocalSummarySnapshot,readLocalSqliteTrajectory,computeSqliteWalSig,buildCliStatusSnapshot,buildCliStatusLineCommand,isManagedCliStatusLineCommand,extractManagedCliStatusLineFlags,getCliStatusLineRuntimeStatus,applyCliStatusLineToSettingsObject,cliDisplayWidth,parseCliModelAndEffort,formatCliStatusLineCapsule,registerRemoteEndpoint,getRegisteredRemoteEndpoint,resolveEndpointContext,clearRemoteEndpointCaches,clearRemoteEndpointRegistry,setRemoteWindowRpcInvoker,setLoopbackHttpsRequester,getEndpointCacheStore,pruneStaleRemoteEndpoints,trackEndpointRequestStart,trackEndpointRequestEnd,shouldRemoteEndpointPreferTier2,markRemoteEndpointPreferTier2};',ctx);
   return {...ctx.api,state};
 }

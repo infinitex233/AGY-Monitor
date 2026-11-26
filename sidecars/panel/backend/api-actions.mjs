@@ -10,12 +10,6 @@ import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { BRIDGE_API_ROUTE_DEFS, LOCAL_ENDPOINT_ID } from '../shared/window-bridge-protocol.mjs';
 import {
-  getAccountQuotaHistoryPayload,
-  getLatestRecordedHostEmail,
-} from './account-quota-history.mjs';
-import { handleAccountCredentialAction, warmAccountPublicListCache } from './account-switch.mjs';
-import { issueAccountActionNonce, verifyAccountActionNonce } from './account-vault-crypto.mjs';
-import {
   clearRemoteEndpointCaches,
   resolveEndpointContext,
   trackEndpointRequestEnd,
@@ -66,21 +60,13 @@ import {
   triggerDesktopHostRelaunch,
 } from './desktop-launcher-config.mjs';
 import {
-  collectHostI18nUntranslatedFromActiveTargets,
   ensureIdeRemoteDebuggingArgv,
   getDefaultWindowBridgeStatus,
-  notifyHostI18nChanged,
   notifyModelContextWindowsChanged,
   notifyWindowOverlaySetting,
   resolveDevToolsPortCandidates,
   startDefaultWindowBridge,
 } from './window-bridge.mjs';
-import {
-  handleHostI18nGetRequest,
-  handleHostI18nPostAction,
-} from './host-i18n/index.mjs';
-import { getQuotaReservationLogSnapshot } from './quota-reservation.mjs';
-import { getSessionMigrationCatalog, migrateSessions } from './session-migrator.mjs';
 import {
   ensureCliStatusLineConfigured,
   getCliStatusLineRuntimeStatus,
@@ -626,114 +612,6 @@ export async function executePluginUpdateAction() {
   };
 }
 
-const NONCE_PROTECTED_ACCOUNT_ACTIONS = new Set([
-  'save',
-  'capture',
-  'switch',
-  'remove',
-  'loginStart',
-  'setPassword',
-  'unlockVault',
-  'lockVault',
-  'changePassword',
-  'disablePassword',
-  'resetVault',
-]);
-
-export async function executeAccountCredentialAction(data, opts = {}) {
-  const epCtx = resolveActionEndpoint(data, opts);
-  if (!epCtx.ok) {
-    return buildEndpointErrorResponse(epCtx);
-  }
-  if (epCtx.isRemote) {
-    return {
-      status: 200,
-      contentType: 'application/json',
-      headers: { 'Cache-Control': 'no-store' },
-      body: JSON.stringify({ supported: false, accounts: [], error: 'unsupported' }),
-    };
-  }
-  const cleanData = stripEndpointField(data);
-  const action = cleanData?.action || 'list';
-  const riskAccepted =
-    opts?.bypassRiskCheck === true || loadSettings().accountSwitchRiskAccepted === true;
-  if (!riskAccepted) {
-    if (action !== 'list') {
-      return {
-        status: 200,
-        contentType: 'application/json',
-        headers: { 'Cache-Control': 'no-store' },
-        body: JSON.stringify({
-          error: 'riskNotAccepted',
-          actionNonce: issueAccountActionNonce(),
-        }),
-      };
-    }
-    const hostEmail = getLatestRecordedHostEmail();
-    return {
-      status: 200,
-      contentType: 'application/json',
-      headers: { 'Cache-Control': 'no-store' },
-      body: JSON.stringify({
-        supported: process.platform === 'win32',
-        riskLocked: true,
-        accounts: [],
-        selectedEmail: '',
-        quotas: {},
-        quotaHistory: getAccountQuotaHistoryPayload({
-          allowedEmails: hostEmail ? [hostEmail] : [],
-        }),
-        actionNonce: issueAccountActionNonce(),
-      }),
-    };
-  }
-  if (NONCE_PROTECTED_ACCOUNT_ACTIONS.has(action) && !verifyAccountActionNonce(cleanData?.actionNonce)) {
-    return {
-      status: 200,
-      contentType: 'application/json',
-      headers: { 'Cache-Control': 'no-store' },
-      body: JSON.stringify({
-        error: 'invalidActionNonce',
-        actionNonce: issueAccountActionNonce(),
-      }),
-    };
-  }
-  const result = await handleAccountCredentialAction({
-    ...(isPlainObject(cleanData) ? cleanData : {}),
-    action,
-    includeSecurity: true,
-  });
-  if (action === 'switch' && !result?.error) {
-    clearTelemetryBuilderMemo(LOCAL_ENDPOINT_ID);
-  }
-  const hostEmail = getLatestRecordedHostEmail();
-  const allowedHistoryEmails = Array.isArray(result?.accounts)
-    ? [...new Set([...result.accounts, ...(hostEmail ? [hostEmail] : [])])]
-    : hostEmail
-      ? [hostEmail]
-      : null;
-  const enriched =
-    result && typeof result === 'object'
-      ? {
-          ...result,
-          ...(action === 'list' || Array.isArray(result.accounts)
-            ? {
-                quotaHistory: getAccountQuotaHistoryPayload({
-                  allowedEmails: allowedHistoryEmails,
-                }),
-              }
-            : {}),
-          actionNonce: issueAccountActionNonce(),
-        }
-      : result;
-  return {
-    status: 200,
-    contentType: 'application/json',
-    headers: { 'Cache-Control': 'no-store' },
-    body: JSON.stringify(enriched),
-  };
-}
-
 export async function executeBridgeRelaunchAction() {
   ensureIdeRemoteDebuggingArgv({ enabled: true });
   const launchConfig = await ensureDesktopLaunchEntriesConfigured({ enabled: true }).catch(
@@ -794,62 +672,6 @@ export function executeCliStatusLineAction(rawAction) {
   };
 }
 
-export function executeSessionMigrationCatalogAction(data = undefined, opts = {}) {
-  const epCtx = resolveActionEndpoint(data, opts);
-  if (!epCtx.ok) {
-    return buildEndpointErrorResponse(epCtx);
-  }
-  if (epCtx.isRemote) {
-    return {
-      status: 200,
-      contentType: 'application/json',
-      headers: { 'Cache-Control': 'no-store' },
-      body: JSON.stringify({
-        available: false,
-        sqliteSupported: false,
-        clients: [],
-        sessionsByClient: {},
-        desktopProjects: [],
-        error: 'unsupported_remote',
-      }),
-    };
-  }
-  const catalog = getSessionMigrationCatalog();
-  return {
-    status: 200,
-    contentType: 'application/json',
-    headers: { 'Cache-Control': 'no-store' },
-    body: JSON.stringify(catalog),
-  };
-}
-
-export function executeSessionMigrationMigrateAction(data = undefined, opts = {}) {
-  const epCtx = resolveActionEndpoint(data, opts);
-  if (!epCtx.ok) {
-    return buildEndpointErrorResponse(epCtx);
-  }
-  if (epCtx.isRemote) {
-    return {
-      status: 400,
-      contentType: 'application/json',
-      headers: { 'Cache-Control': 'no-store' },
-      body: JSON.stringify({ ok: false, error: 'unsupported_remote', results: [] }),
-    };
-  }
-  const cleanData = stripEndpointField(data);
-  const result = migrateSessions(cleanData);
-  if (result.migratedCount > 0) {
-    clearScannerRuntimeMemos(LOCAL_ENDPOINT_ID);
-    clearTelemetryBuilderMemo(LOCAL_ENDPOINT_ID);
-  }
-  return {
-    status: Number(result.status || (result.ok ? 200 : 400)),
-    contentType: 'application/json',
-    headers: { 'Cache-Control': 'no-store' },
-    body: JSON.stringify(result),
-  };
-}
-
 export function executeExportFileAction(data, opts = {}) {
   const result = writeLocalExportFile(data || {}, {
     ...(opts?.exportDir ? { overrideDir: opts.exportDir } : {}),
@@ -861,47 +683,6 @@ export function executeExportFileAction(data, opts = {}) {
     contentType: 'application/json',
     headers: { 'Cache-Control': 'no-store' },
     body: JSON.stringify(result),
-  };
-}
-
-export function executeQuotaReservationLogAction() {
-  const snapshot = getQuotaReservationLogSnapshot();
-  return {
-    status: 200,
-    contentType: 'application/json',
-    headers: { 'Cache-Control': 'no-store' },
-    body: JSON.stringify({ ok: true, ...snapshot }),
-  };
-}
-
-export async function executeHostI18nGetAction(opts = {}) {
-  const result = await handleHostI18nGetRequest({
-    bridgeStatus: getDefaultWindowBridgeStatus(),
-    ...(opts?.hostI18nManager ? { manager: opts.hostI18nManager } : {}),
-  });
-  return {
-    status: 200,
-    contentType: 'application/json',
-    headers: { 'Cache-Control': 'no-store' },
-    body: JSON.stringify(result),
-  };
-}
-
-export async function executeHostI18nPostAction(data = {}, opts = {}) {
-  const out = await handleHostI18nPostAction(isPlainObject(data) ? data : {}, {
-    bridgeStatus: getDefaultWindowBridgeStatus(),
-    onChanged: typeof opts?.onHostI18nChanged === 'function' ? opts.onHostI18nChanged : notifyHostI18nChanged,
-    collectFromTargets:
-      typeof opts?.collectHostI18nUntranslated === 'function'
-        ? opts.collectHostI18nUntranslated
-        : collectHostI18nUntranslatedFromActiveTargets,
-    ...(opts?.hostI18nManager ? { manager: opts.hostI18nManager } : {}),
-  });
-  return {
-    status: Number(out?.status || 200),
-    contentType: 'application/json',
-    headers: { 'Cache-Control': 'no-store' },
-    body: JSON.stringify(out?.payload || { ok: false, error: 'Invalid host-i18n response' }),
   };
 }
 
@@ -934,35 +715,13 @@ export async function dispatchBridgeApiRequest(pathname, method, data, opts = un
       if (isPlainObject(data) && typeof data.__cliStatusLineAction === 'string') {
         return executeCliStatusLineAction(data.__cliStatusLineAction);
       }
-      if (isPlainObject(data) && data.__sessionMigrationAction === 'catalog') {
-        return executeSessionMigrationCatalogAction(data, opts);
-      }
-      if (isPlainObject(data) && data.__sessionMigrationAction === 'migrate') {
-        return executeSessionMigrationMigrateAction(data.payload || data, opts);
-      }
       if (isPlainObject(data) && data.__exportFileAction === 'save') {
         return executeExportFileAction(data.payload || data, opts);
       }
       if (isPlainObject(data) && data.__exportFileAction === 'reveal') {
         return executeRevealFileAction(data.payload || data, opts);
       }
-      if (isPlainObject(data) && data.__quotaReservationAction === 'log') {
-        return executeQuotaReservationLogAction();
-      }
-      if (isPlainObject(data) && typeof data.__hostI18nAction === 'string') {
-        if (data.__hostI18nAction === 'get') {
-          return executeHostI18nGetAction(opts);
-        }
-        return executeHostI18nPostAction(
-          { ...(isPlainObject(data.payload) ? data.payload : {}), action: data.__hostI18nAction },
-          opts
-        );
-      }
       return executeSettingsAction(data);
-    case 'accounts_get':
-      return executeAccountCredentialAction(undefined, opts);
-    case 'accounts_update':
-      return executeAccountCredentialAction(data, opts);
     case 'context_window':
       return executeModelContextWindowAction(data, opts);
     case 'settings_reset':
@@ -975,20 +734,10 @@ export async function dispatchBridgeApiRequest(pathname, method, data, opts = un
       return executePluginUpdateAction();
     case 'bridge_relaunch':
       return executeBridgeRelaunchAction();
-    case 'session_migration_catalog':
-      return executeSessionMigrationCatalogAction(data, opts);
-    case 'session_migration_migrate':
-      return executeSessionMigrationMigrateAction(data, opts);
     case 'export_file':
       return executeExportFileAction(data, opts);
     case 'reveal_file':
       return executeRevealFileAction(data, opts);
-    case 'quota_reservation_log':
-      return executeQuotaReservationLogAction();
-    case 'host_i18n_get':
-      return executeHostI18nGetAction(opts);
-    case 'host_i18n_action':
-      return executeHostI18nPostAction(data, opts);
     default:
       return {
         status: 404,
@@ -1009,11 +758,6 @@ export function bootWindowBridgeRuntime({ allowDynamicLs = false, onRestart = nu
 
   const bootSettings = loadSettings();
   ensureCliStatusLineConfigured({ enabled: bootSettings.enableCliStatusLine !== false });
-  if (allowDynamicLs && bootSettings.accountSwitchRiskAccepted === true) {
-    setTimeout(() => {
-      void warmAccountPublicListCache();
-    }, 80).unref?.();
-  }
 
   const triggerRestart =
     typeof onRestart === 'function' ? onRestart : () => scheduleSidecarRestart(150);

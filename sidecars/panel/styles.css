@@ -13,8 +13,8 @@
 
   /* Architectural Geometry: Only Top Nav uses --radius-pill */
   --radius-pill: 999px;
-  --radius-sm: 4px;
-  --radius-xs: 2px;
+  --radius-sm: 8px;
+  --radius-xs: 5px;
 
   /* Host-Bridged Surfaces (Antigravity 2.0 + Antigravity IDE --vscode-* + safe fallback) */
   --surface-bg: var(--background, var(--vscode-sideBar-background, var(--vscode-editor-background, hsl(0 0% 100%))));
@@ -55,8 +55,8 @@
   --fs-base-sm: calc(12.5px * var(--ui-font-scale, 1));
   --fs-base: calc(13px * var(--ui-font-scale, 1));
   --fs-body: calc(13px * var(--ui-font-scale, 1));
-  --fs-lg: calc(15px * var(--ui-font-scale, 1));
-  --fs-hero: calc(18px * var(--ui-font-scale, 1));
+  --fs-lg: calc(16px * var(--ui-font-scale, 1));
+  --fs-hero: calc(20px * var(--ui-font-scale, 1));
 
   --text-primary: var(--foreground, var(--vscode-foreground, var(--vscode-editor-foreground, hsl(215 22% 15%))));
   --text-secondary: var(--muted-foreground, var(--vscode-descriptionForeground, hsl(215 12% 44%)));
@@ -123,9 +123,9 @@
 
   /* Spacing & Density */
   --space-2: 6px;
-  --space-3: 8px;
-  --space-4: 10px;
-  --space-5: 12px;
+  --space-3: 10px;
+  --space-4: 12px;
+  --space-5: 14px;
 }
 
 :root[data-color-scheme="dark"],
@@ -181,8 +181,8 @@
   --fs-base-sm: calc(12.5px * var(--ui-font-scale, 1));
   --fs-base: calc(13px * var(--ui-font-scale, 1));
   --fs-body: calc(13px * var(--ui-font-scale, 1));
-  --fs-lg: calc(15px * var(--ui-font-scale, 1));
-  --fs-hero: calc(18px * var(--ui-font-scale, 1));
+  --fs-lg: calc(16px * var(--ui-font-scale, 1));
+  --fs-hero: calc(20px * var(--ui-font-scale, 1));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1850,12 +1850,12 @@ html[data-standalone="true"] .app-shell {
 .quota-pool-row {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .quota-pool-row.has-divider {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-hairline);
 }
 
@@ -1902,6 +1902,7 @@ html[data-standalone="true"] .app-shell {
 
 .quota-win-meta {
   font-size: var(--fs-md);
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -2182,8 +2183,8 @@ html[data-standalone="true"] .app-shell {
 .matrix-cell {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 7px 9px;
+  gap: 5px;
+  padding: 11px 12px;
   background: var(--surface-panel);
   min-width: 0;
 }
@@ -2193,12 +2194,15 @@ html[data-standalone="true"] .app-shell {
   align-items: center;
   justify-content: space-between;
   font-size: var(--fs-md);
-  color: var(--text-secondary);
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
 .cell-value {
   font-size: var(--fs-lg);
   font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -2249,9 +2253,9 @@ html[data-standalone="true"] .app-shell {
 /* --- 3. 10 段上下文进度条与配额池填充条 (Context Segment Meter & Quota Progress Bars) --- */
 .progress-track {
   width: 100%;
-  height: 6px;
+  height: 7px;
   background: var(--surface-track);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-pill);
   overflow: hidden;
   display: flex;
 }
@@ -2270,10 +2274,10 @@ html[data-standalone="true"] .app-shell {
     width var(--dur-normal) var(--ease-fast) 0.05s;
 }
 
-/* 块状微圆角风格上下文进度条（保持 6px 紧凑高度 + 色块间 2px 轻间隙 + 每段 2px 边缘圆润处理） */
+/* 块状微圆角风格上下文进度条（7px 紧凑高度 + 色块间 2px 轻间隙 + 胶囊两端） */
 .progress-track.ctx-segment-meter {
-  height: 6px;
-  border-radius: 3px;
+  height: 7px;
+  border-radius: var(--radius-pill);
   align-items: stretch;
 }
 
@@ -2687,6 +2691,39 @@ html[data-standalone="true"] .app-shell {
 }
 
 /* --- 4. 上下文双列图例网格 (Context 10-Channel Legend Grid) --- */
+.ctx-legend-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color var(--dur-instant) var(--ease-fast),
+    background-color var(--dur-instant) var(--ease-fast);
+}
+
+.ctx-legend-toggle:hover,
+.ctx-legend-toggle:focus-visible {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+  outline: none;
+}
+
+.ctx-legend-toggle .svg-icon {
+  transition: transform var(--dur-fast) var(--ease-fast);
+}
+
+.ctx-legend-toggle.is-expanded .svg-icon {
+  transform: rotate(180deg);
+}
+
 .ctx-legend-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2695,6 +2732,11 @@ html[data-standalone="true"] .app-shell {
   background: transparent;
   border: none;
   font-size: var(--fs-base-sm);
+}
+
+.ctx-legend-grid[hidden],
+.legend-item[hidden] {
+  display: none;
 }
 
 .legend-item {
@@ -2871,6 +2913,65 @@ html[data-standalone="true"] .app-shell {
   }
 }
 
+/* 上下文窗口头部主次分明排版：加粗百分比 + 括号弱化数值 */
+.ctx-summary-meta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.ctx-summary-pct {
+  font-weight: 700;
+  font-size: var(--fs-lg);
+}
+
+.ctx-summary-pct:not(.tone-warn):not(.tone-danger) {
+  color: var(--text-primary);
+}
+
+.ctx-summary-ratio {
+  font-weight: 400;
+  font-size: var(--fs-base);
+  color: var(--text-muted);
+}
+
+/* 实时监控与调用明细合并容器 */
+.overview-merged-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* 会话总览卡片：无嵌套底框、清爽四列横排 */
+.telemetry-matrix.is-flat-summary {
+  border: none;
+  background: transparent;
+  gap: var(--space-3);
+}
+
+.telemetry-matrix.is-flat-summary .matrix-cell {
+  background: transparent;
+  align-items: center;
+  text-align: center;
+  padding: 6px 0 4px;
+  gap: 6px;
+}
+
+.telemetry-matrix.is-flat-summary .cell-label {
+  justify-content: center;
+  font-size: var(--fs-base);
+  color: var(--text-muted);
+}
+
+.telemetry-matrix.is-flat-summary .cell-value {
+  font-size: var(--fs-hero);
+  line-height: 1.2;
+}
+
+.telemetry-matrix.is-flat-summary .cell-label .svg-icon {
+  display: none;
+}
+
 /* --- src/styles/views-consumption.css --- */
 /*
  * 全景消耗统计视图样式表 (views-consumption.css).
@@ -2996,6 +3097,57 @@ html[data-standalone="true"] .app-shell {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.cons-split-4 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) repeat(3, minmax(0, 1fr));
+}
+
+.cons-hero-sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 10px;
+  row-gap: 2px;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.cons-hero-sub-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cons-hero-speed {
+  font-size: var(--fs-hero);
+  font-weight: 700;
+  color: var(--metric-speed);
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 520px) {
+  .cons-split-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cons-split-4 .cons-col {
+    padding: 8px 10px;
+  }
+  .cons-split-4 .cons-col:nth-child(odd) {
+    padding-left: 0;
+  }
+  .cons-split-4 .cons-col:nth-child(even) {
+    padding-right: 0;
+  }
+  .cons-split-4 .cons-col:nth-child(3) {
+    border-left: none;
+  }
+  .cons-split-4 .cons-col:nth-child(n + 3) {
+    border-top: 1px solid var(--border-hairline);
+  }
+}
+
 .cons-matrix-bottom {
   border-top: 1px solid var(--border-hairline);
 }
@@ -3021,8 +3173,8 @@ html[data-standalone="true"] .app-shell {
 .cons-col {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 8px 10px;
+  gap: 5px;
+  padding: 10px 12px;
   min-width: 0;
 }
 
@@ -3153,13 +3305,13 @@ html[data-standalone="true"] .app-shell {
   justify-content: center;
   min-height: calc(20px * var(--ui-font-scale, 1));
   line-height: 1.2;
-  padding: 1px 6px;
-  font-size: var(--fs-base);
+  padding: 1px 7px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--metric-ok);
   background: color-mix(in srgb, var(--metric-ok) 11%, transparent);
   border: none;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-pill);
   box-sizing: border-box;
 }
 
@@ -3184,7 +3336,8 @@ html[data-standalone="true"] .app-shell {
 }
 
 .cons-seg-bar {
-  height: 5px;
+  height: 6px;
+  border-radius: var(--radius-pill);
 }
 
 .cons-seg-bar[hidden],
@@ -3595,9 +3748,9 @@ html[data-standalone="true"] .app-shell {
 @supports (width: 1cqi) {
   .trend-heatmap-body {
     --hm-cell: clamp(
-      11px,
-      calc((100cqi - 18px - (var(--hm-weeks) - 1) * var(--hm-gap)) / var(--hm-weeks)),
-      20px
+      6px,
+      calc((100cqi - 15px * var(--ui-font-scale, 1) - 10px - (var(--hm-weeks) - 1) * var(--hm-gap)) / var(--hm-weeks)),
+      18px
     );
   }
 }
@@ -3626,8 +3779,8 @@ html[data-standalone="true"] .app-shell {
 .trend-hm-scroll {
   flex: 1;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: hidden;
+  padding: 2px 2px;
 }
 
 .trend-hm-track {
@@ -3666,7 +3819,7 @@ html[data-standalone="true"] .app-shell {
 .trend-hm-cell {
   width: var(--hm-cell);
   height: var(--hm-cell);
-  border-radius: 2px;
+  border-radius: 3px;
   box-sizing: border-box;
   cursor: pointer;
   transition:
@@ -3786,24 +3939,40 @@ html[data-standalone="true"] .app-shell {
 .cons-item-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 12px;
 }
 
 .cons-item-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
+  padding: 5px 7px;
+  margin: -5px -7px;
+  border-radius: var(--radius-xs);
+  transition: background-color var(--dur-instant) var(--ease-fast);
+}
+
+.cons-item-row:hover {
+  background: var(--surface-hover);
 }
 
 .cons-top-conv-row {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  width: 100%;
+  gap: 7px;
+  padding: 5px 7px;
+  margin: -5px -7px;
+  width: calc(100% + 14px);
   container-type: inline-size;
   background: transparent;
   border-radius: var(--radius-xs);
-  transition: opacity var(--dur-instant) var(--ease-fast);
+  transition:
+    background-color var(--dur-instant) var(--ease-fast),
+    opacity var(--dur-instant) var(--ease-fast);
+}
+
+.cons-top-conv-row:hover {
+  background: var(--surface-hover);
 }
 
 .cons-top-conv-row.is-jumpable {
@@ -4388,6 +4557,81 @@ html[data-standalone="true"] .app-shell {
   color: var(--text-secondary);
 }
 
+/* --- 7. Magpie 风格模型用量明细表 (.cons-models-table) --- */
+.cons-models-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.cons-models-table-wrap[hidden],
+.cons-models-empty[hidden] {
+  display: none !important;
+}
+
+.cons-models-empty {
+  padding: var(--space-4) 0;
+  text-align: center;
+  font-size: var(--fs-md);
+}
+
+.cons-models-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.cons-models-table thead th {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: left;
+  padding: 4px 4px 8px;
+  border-bottom: 1px solid var(--border-hairline);
+  white-space: nowrap;
+}
+
+.cons-models-table thead th.col-model,
+.cons-models-table tbody td.col-model {
+  text-align: left;
+  padding-left: 2px;
+}
+
+.cons-models-table thead th:last-child,
+.cons-models-table tbody td:last-child {
+  padding-right: 2px;
+}
+
+.cons-models-table thead th.is-num,
+.cons-models-table tbody td.is-num {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cons-models-table tbody td {
+  padding: 9px 4px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-hairline);
+  transition: background-color var(--dur-instant) var(--ease-fast);
+}
+
+.cons-models-table tbody td.col-model {
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cons-models-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.cons-models-table tbody tr:hover td {
+  background: var(--surface-hover);
+}
+
 /* --- src/styles/views-tables.css --- */
 /*
  * 步骤明细与模型汇总数据表样式表 (views-tables.css).
@@ -4440,7 +4684,7 @@ html[data-standalone="true"] .app-shell {
 
 .data-table th,
 .data-table td {
-  padding: calc(5px * var(--ui-font-scale, 1)) calc(4px * var(--ui-font-scale, 1));
+  padding: calc(8px * var(--ui-font-scale, 1)) calc(8px * var(--ui-font-scale, 1));
   text-align: left;
   font-size: var(--fs-base-sm);
   border-bottom: 1px solid var(--border-hairline);
@@ -4481,8 +4725,9 @@ html[data-standalone="true"] .app-shell {
   top: 0;
   z-index: 2;
   background: var(--surface-panel);
-  color: var(--text-secondary);
-  font-weight: 600;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+  font-weight: 500;
 }
 
 .data-table th.is-sortable {
@@ -4506,8 +4751,38 @@ html[data-standalone="true"] .app-shell {
   vertical-align: middle;
 }
 
-.data-table th:last-child .step-th-inner {
+.data-table th:last-child .step-th-inner,
+.data-table th.is-right .step-th-inner {
   justify-content: flex-end;
+}
+
+.steps-data-table th[data-col="step"],
+.steps-data-table td[data-col="step"] {
+  width: 1%;
+  padding-right: calc(24px * var(--ui-font-scale, 1));
+}
+
+.steps-data-table th[data-col="time"],
+.steps-data-table td[data-col="time"] {
+  width: 1%;
+  padding-right: calc(20px * var(--ui-font-scale, 1));
+}
+
+.steps-data-table th[data-col="model"],
+.steps-data-table td[data-col="model"] {
+  padding-right: calc(16px * var(--ui-font-scale, 1));
+}
+
+.steps-data-table th.is-right,
+.steps-data-table td.is-right {
+  width: 14%;
+  padding-left: calc(16px * var(--ui-font-scale, 1));
+  padding-right: calc(8px * var(--ui-font-scale, 1));
+}
+
+.steps-data-table th.is-right:last-child,
+.steps-data-table td.is-right:last-child {
+  padding-right: 4px;
 }
 
 .step-sort-icon {
@@ -5768,6 +6043,27 @@ html[data-standalone="true"] .app-shell {
   background: var(--modern-surface-subtle);
 }
 
+/* 嵌入实时监控视图时的调用明细面板：自适应虚拟表格高，汇总分析融入外层滚动 */
+.steps-embedded-panel {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.steps-embedded-panel > .table-scroll-host {
+  flex: 0 1 auto;
+  max-height: clamp(320px, 56vh, 600px);
+}
+
+.steps-embedded-panel > .table-scroll-host.is-models-scroll {
+  max-height: none;
+}
+
+.steps-embedded-panel .models-analytics-pane {
+  overflow-y: visible;
+}
+
 /* --- src/styles/views-settings.css --- */
 /*
  * 模块化偏好设置样式表 (views-settings.css).
@@ -5897,6 +6193,13 @@ html[data-standalone="true"] .app-shell {
   font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--text-muted);
+}
+
+.settings-compact-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* --- 主题色色卡选择器 (ThemeColorPicker) --- */
@@ -8878,8 +9181,22 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   background: var(--modern-surface-card);
   box-shadow: var(--modern-card-shadow);
   border-radius: var(--radius-sm);
-  padding: 8px 10px;
+  padding: 11px 13px;
+  gap: 5px;
   transition: background-color 160ms var(--ease-modern);
+}
+
+[data-modern-ui="true"] .matrix-cell:hover {
+  background: color-mix(in srgb, var(--modern-surface-card) 94%, var(--text-primary) 6%);
+}
+
+[data-modern-ui="true"] .ctx-legend-toggle {
+  border-radius: var(--radius-pill);
+}
+
+[data-modern-ui="true"] .ctx-legend-toggle:hover,
+[data-modern-ui="true"] .ctx-legend-toggle:focus-visible {
+  background: var(--modern-surface-hover);
 }
 
 /* 面板内的双栏信息项（如版本更新中的「价格表 / 当前版本」）不套二层背景 */
@@ -8888,6 +9205,15 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   box-shadow: none;
   border-radius: 0;
   padding: 2px 0;
+}
+
+/* 实时监控「会话总览」面板内部 4 格保持扁平无二层卡片阴影 */
+[data-modern-ui="true"] .session-summary-panel .matrix-cell,
+[data-modern-ui="true"] .session-summary-panel .matrix-cell:hover {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 6px 0 4px;
 }
 
 /* 结构页预览画布内的测速卡与任务卡保持轻微层次以呈现真实预览布局 */
@@ -8926,8 +9252,8 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 }
 
 [data-modern-ui="true"] .progress-track.ctx-segment-meter {
-  height: 6px;
-  border-radius: 3px;
+  height: 7px;
+  border-radius: var(--radius-pill);
   background: var(--modern-progress-track);
 }
 
@@ -8949,12 +9275,19 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 [data-modern-ui="true"] .cons-unified-matrix {
   border: none;
   background: transparent;
-  gap: 10px 12px;
-  padding: 2px 0;
+  gap: 14px 16px;
+  padding: 4px 0;
   overflow: visible;
 }
 
-[data-modern-ui="true"] .cons-split-3 {
+[data-modern-ui="true"] .cons-item-row:hover,
+[data-modern-ui="true"] .cons-top-conv-row:hover,
+[data-modern-ui="true"] .cons-source-row:hover {
+  background: var(--modern-surface-hover);
+}
+
+[data-modern-ui="true"] .cons-split-3,
+[data-modern-ui="true"] .cons-split-4 {
   gap: 12px;
 }
 
@@ -8968,6 +9301,22 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   background: transparent;
   border-radius: 0;
   padding: 2px 0;
+}
+
+[data-modern-ui="true"] .cons-models-table thead th {
+  border-bottom-color: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
+[data-modern-ui="true"] .cons-models-table tbody td {
+  border-bottom-color: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+[data-modern-ui="true"] .cons-models-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+[data-modern-ui="true"] .cons-models-table tbody tr:hover td {
+  background: var(--modern-surface-hover);
 }
 
 [data-modern-ui="true"] .trend-peak-pill,
@@ -9040,6 +9389,16 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 [data-modern-ui="true"] .data-table tbody tr:not(.step-vspacer):not(.step-vsizer):hover,
 [data-modern-ui="true"] .data-table.is-virtualized tbody tr.is-stripe-even:hover {
   background: var(--modern-surface-hover);
+}
+
+[data-modern-ui="true"] .data-table tbody tr:not(.step-vspacer):not(.step-vsizer) td:first-child {
+  border-top-left-radius: var(--radius-xs);
+  border-bottom-left-radius: var(--radius-xs);
+}
+
+[data-modern-ui="true"] .data-table tbody tr:not(.step-vspacer):not(.step-vsizer) td:last-child {
+  border-top-right-radius: var(--radius-xs);
+  border-bottom-right-radius: var(--radius-xs);
 }
 
 [data-modern-ui="true"] .data-table tbody tr.is-compaction,

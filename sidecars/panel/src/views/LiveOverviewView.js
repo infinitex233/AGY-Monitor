@@ -16,32 +16,42 @@ import {
 } from '../store/telemetryStore.js';
 import { getVisibleMonitorView, uiStore } from '../store/uiStore.js';
 import { CustomScrollbar } from '../components/ui/CustomScrollbar.js';
+import { StepsDetailView } from './StepsDetailView.js';
 
 export { CTX_CHANNEL_DEFS } from '../components/widgets/ContextWindowWidget.js';
-export {
-  buildQuotaPoolItems,
-  createPoolQuotaRow,
-  formatQuotaSummaryFooter,
-  quotaPoolRowSig,
-  syncPoolQuotaRow,
-} from '../components/widgets/QuotaPoolsWidget.js';
+
+function resolveOverviewModules(raw) {
+  const filtered = normalizeClientOverviewModules(raw).filter((k) => k !== 'quotas');
+  return filtered.length > 0 ? filtered : ['metrics', 'context', 'live_tasks'];
+}
 
 export const LiveOverviewView = defineComponent({
   name: 'LiveOverviewView',
   setup({ onCleanup }) {
-    const overviewInner = h('div', {
+    const overviewModulesEl = h('div', {
       className: 'overview-modules-host',
     });
 
     const widgetHost = createDynamicWidgetHost({
-      containerEl: overviewInner,
+      containerEl: overviewModulesEl,
       mode: 'overview',
       isVisibleFn: () => getVisibleMonitorView() === 'overview',
-      initialModuleKeys: DEFAULT_CLIENT_OVERVIEW_MODULES,
+      initialModuleKeys: resolveOverviewModules(DEFAULT_CLIENT_OVERVIEW_MODULES),
     });
 
-    const viewScrollbar = CustomScrollbar({
-      contentEl: overviewInner,
+    let viewScrollbar = null;
+    const stepsView = StepsDetailView({
+      embedded: true,
+      onLayoutChange: () => viewScrollbar?.refresh(),
+    });
+
+    const overviewContentEl = h('div', { className: 'overview-merged-stack' }, [
+      overviewModulesEl,
+      stepsView.el,
+    ]);
+
+    viewScrollbar = CustomScrollbar({
+      contentEl: overviewContentEl,
       className: 'view-pane',
     });
 
@@ -72,7 +82,7 @@ export const LiveOverviewView = defineComponent({
 
     function renderData(data) {
       if (!data) return;
-      const moduleKeys = normalizeClientOverviewModules(data.settings?.overviewModules);
+      const moduleKeys = resolveOverviewModules(data.settings?.overviewModules);
       const minuteTick = Math.floor(Date.now() / 30000);
       widgetHost.update({
         moduleKeys,
@@ -140,7 +150,7 @@ export const LiveOverviewView = defineComponent({
           // Refresh initial skeleton labels even before telemetry arrives
           if (!latestData) {
             widgetHost.update({
-              moduleKeys: DEFAULT_CLIENT_OVERVIEW_MODULES,
+              moduleKeys: resolveOverviewModules(DEFAULT_CLIENT_OVERVIEW_MODULES),
               data: null,
             });
           }
@@ -150,7 +160,7 @@ export const LiveOverviewView = defineComponent({
           renderData(latestData);
         } else {
           widgetHost.update({
-            moduleKeys: DEFAULT_CLIENT_OVERVIEW_MODULES,
+            moduleKeys: resolveOverviewModules(DEFAULT_CLIENT_OVERVIEW_MODULES),
             data: null,
           });
         }
@@ -163,12 +173,13 @@ export const LiveOverviewView = defineComponent({
       unsubView();
       unsubI18n();
       widgetHost.destroy();
+      stepsView.destroy();
       viewScrollbar.destroy();
     });
 
     return {
       el: viewScrollbar.el,
-      refs: { viewScrollbar, widgetHost },
+      refs: { viewScrollbar, widgetHost, stepsView },
     };
   },
 });

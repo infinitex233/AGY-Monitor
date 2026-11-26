@@ -664,7 +664,7 @@ test('httpClient attaches X-Usage-Monitor-Endpoint and does NOT downgrade to CDP
   }
 });
 
-test('Remote executeModelContextWindowAction & executeAccountCredentialAction enforce strict endpoint boundaries', async () => {
+test('Remote executeModelContextWindowAction enforces strict endpoint boundaries', async () => {
   const carbon = 'MODEL_PLACEHOLDER_M427';
   const h = backendHarness({
     availableModels: {
@@ -736,26 +736,12 @@ test('Remote executeModelContextWindowAction & executeAccountCredentialAction en
   );
   assert.equal(fallbackRes.status, 200);
 
-  // 4. Unregistered / invalid endpoints on modelContextWindow and account credentials -> 503 / 400 (zero local leak)
+  // 4. Unregistered endpoint on modelContextWindow -> 503 (zero local leak)
   const pendingCtx = await h.executeModelContextWindowAction(
     { modelId: 'model:gemini-4-carbon', option: '256K' },
     { endpointId: 'remote:ssh-missing-1111' }
   );
   assert.equal(pendingCtx.status, 503);
-
-  const remoteAcct = await h.executeAccountCredentialAction(undefined, { endpointId: ep.id });
-  assert.equal(remoteAcct.status, 200);
-  assert.equal(JSON.parse(remoteAcct.body).supported, false);
-
-  const pendingAcct = await h.executeAccountCredentialAction(undefined, {
-    endpointId: 'remote:ssh-missing-1111',
-  });
-  assert.equal(pendingAcct.status, 503);
-
-  const invalidAcct = await h.executeAccountCredentialAction(undefined, {
-    endpointId: 'remote:../bad',
-  });
-  assert.equal(invalidAcct.status, 400);
 
   // 5. Authoritative 'local' in opts cannot be spoofed by body/query endpointId
   const spoofedRes = await h.dispatchBridgeApiRequest(

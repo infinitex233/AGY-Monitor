@@ -5,13 +5,8 @@ import { createMockDom } from './mock-dom.mjs';
 import { CustomSelect, filterSelectOptionsByQuery } from '../src/components/ui/CustomSelect.js';
 import { App } from '../src/App.js';
 import { sortStepsByColumn } from '../src/registries/stepColumnRegistry.js';
-import {
-  buildExportableSettingsJson,
-  parseImportedSettingsJson,
-} from '../src/core/settingsBackup.js';
 import { StepsDetailView } from '../src/views/StepsDetailView.js';
 import { ConsumptionView } from '../src/views/ConsumptionView.js';
-import { SettingsOtherTab } from '../src/views/settings/SettingsOtherTab.js';
 import { createTrendAreaChart } from '../src/components/charts/TrendAreaChart.js';
 import { backendHarness } from './backend-harness.mjs';
 import { i18nStore, setI18nLanguage } from '../src/i18n/index.js';
@@ -134,7 +129,7 @@ test('Feature 1: CustomSelect searchable mode filters by multi-term query, respe
   });
 });
 
-test('Feature 1: App panel keyboard shortcuts switch tabs (1-4), trigger refresh (r), open search (/), and ignore editable inputs', (t) => {
+test('Feature 1: App panel keyboard shortcuts switch tabs (1-3), trigger refresh (r), open search (/), and ignore editable inputs', (t) => {
   const prevDoc = globalThis.document;
   const prevWin = globalThis.window;
   const prevUi = { ...uiStore.getState() };
@@ -170,12 +165,10 @@ test('Feature 1: App panel keyboard shortcuts switch tabs (1-4), trigger refresh
   app = App();
   document.body.appendChild(app.el);
 
-  // Keys 2, 3, 4, 1 switch activeView
+  // Keys 2, 3, 1 switch activeView across the 3 tabs
   app.el.dispatchEvent({ type: 'keydown', key: '2', target: app.el, preventDefault() {} });
   assert.equal(uiStore.getState().activeView, 'consumption');
   app.el.dispatchEvent({ type: 'keydown', key: '3', target: app.el, preventDefault() {} });
-  assert.equal(uiStore.getState().activeView, 'steps');
-  app.el.dispatchEvent({ type: 'keydown', key: '4', target: app.el, preventDefault() {} });
   assert.equal(uiStore.getState().activeView, 'settings');
   app.el.dispatchEvent({ type: 'keydown', key: '1', target: app.el, preventDefault() {} });
   assert.equal(uiStore.getState().activeView, 'overview');
@@ -565,55 +558,19 @@ test('Feature 5: TrendAreaChart drill-down click and unified Models/Sessions seg
   // Period delta pills removed
   assert.equal(view.el.querySelectorAll('.cons-delta-pill').length, 0);
 
-  // Unified ranking panel starts on Models tab and hides Sessions list
-  const rankingPanel = view.el.querySelector('.cons-ranking-panel');
-  const rankingTabBtns = rankingPanel.querySelector('.cons-ranking-head > .segmented').querySelectorAll('.seg-btn');
-  assert.equal(rankingTabBtns.length, 2);
-  assert.match(rankingTabBtns[0].textContent, /模型排行/);
-  assert.match(rankingTabBtns[1].textContent, /会话排行 \(2\)/);
-
-  const listContainers = rankingPanel.querySelectorAll('.cons-item-list');
-  assert.equal(listContainers[0].hasAttribute('hidden'), false, 'Models list visible by default');
-  assert.equal(listContainers[1].hasAttribute('hidden'), true, 'Sessions list hidden by default');
-
-  // Switch ranking tab to Sessions -> models list hides, sessions list reveals
-  rankingTabBtns[1].dispatchEvent({ type: 'click', stopPropagation: () => {} });
-  assert.equal(listContainers[0].hasAttribute('hidden'), true);
-  assert.equal(listContainers[1].hasAttribute('hidden'), false);
-
-  // Top sessions default sorted by cost: Costly Session first with cost-share % and multi-model bar
-  let convRows = view.el.querySelectorAll('.cons-top-conv-row');
-  assert.equal(convRows.length, 2);
-  assert.equal(convRows[0].querySelector('.cons-row-title-text').textContent, 'Costly Session');
-  assert.equal(convRows[0].querySelector('.cons-share-pill').textContent, '72.0%');
-  assert.equal(convRows[0].querySelectorAll('.cons-model-seg').length, 2, 'Session bar splits by model colors');
-  assert.equal(convRows[0].querySelectorAll('.cons-source-top-item').length, 2, 'Session footer shows top models');
-  assert.equal(convRows[0].querySelector('.cons-source-top-name').textContent, '4-neon');
-
-  // Switch sessions sort to Tokens: Heavy Cache Session moves to first and share switches to token % (66.7%)
-  const sortSwitches = rankingPanel.querySelectorAll('.cons-ranking-sort-wrap > .segmented');
-  assert.equal(sortSwitches[0].hasAttribute('hidden'), true, 'Models sort switch hidden on Sessions tab');
-  assert.equal(sortSwitches[1].hasAttribute('hidden'), false, 'Sessions sort switch visible on Sessions tab');
-  const topConvSortBtns = sortSwitches[1].querySelectorAll('.seg-btn');
-  topConvSortBtns[1].dispatchEvent({ type: 'click', stopPropagation: () => {} });
-  convRows = view.el.querySelectorAll('.cons-top-conv-row');
-  assert.equal(convRows[0].querySelector('.cons-row-title-text').textContent, 'Heavy Cache Session');
-  assert.equal(convRows[0].querySelector('.cons-share-pill').textContent, '66.7%');
-
-  // Click a monthly bar (May, index 4) to drill down to May 2026 custom range
-  const monthCols = view.el.querySelectorAll('.month-col');
-  monthCols[4].dispatchEvent({ type: 'click' });
-  assert.equal(telemetryStore.getState().selectedTimeRange, 'custom');
-  assert.equal(new Date(telemetryStore.getState().customStartMs).getMonth(), 4);
-  assert.equal(new Date(telemetryStore.getState().customEndMs).getMonth(), 4);
-
-  // Click top session row to jump to steps view with that conversation selected
-  convRows[0].dispatchEvent({ type: 'click' });
-  assert.equal(uiStore.getState().activeView, 'steps');
-  assert.equal(telemetryStore.getState().selectedConversationId, 'cid-heavy-tok');
+  // Magpie-style unified Models table without ranking/sort switchers or duplicate bottom heatmap
+  const modelsPanel = view.el.querySelector('.cons-models-panel');
+  assert.ok(modelsPanel, 'Models table panel rendered');
+  assert.equal(modelsPanel.querySelector('.segmented'), null, 'No ranking tabs or sort switchers inside Models panel');
+  assert.equal(view.el.querySelector('.cons-heatmap-panel'), null, 'No duplicate bottom heatmap panel');
+  const modelHeaders = modelsPanel.querySelectorAll('thead th');
+  assert.deepEqual(
+    modelHeaders.map((th) => th.textContent),
+    ['模型', '占比', 'Token', '费用', '缓存', '速度', '首字', '调用']
+  );
 });
 
-test('Feature 6: model ranking multi-metric sort with efficiency footer & validated settings JSON backup/restore', async (t) => {
+test('Feature 6: model table default sorted by tokens desc', async (t) => {
   const prevDoc = globalThis.document;
   const prevWin = globalThis.window;
   const prevFetch = globalThis.fetch;
@@ -719,98 +676,19 @@ test('Feature 6: model ranking multi-metric sort with efficiency footer & valida
   consView = ConsumptionView();
   document.body.appendChild(consView.el);
 
-  // Default sorted by Tokens -> model-high-tok first with Token share (66.7%) & full info
-  let rows = consView.el.querySelectorAll('.cons-item-row');
+  // Default sorted by Tokens descending with all key metrics in a single Magpie-style table row
+  const rows = consView.el.querySelectorAll('.cons-model-tr');
   assert.equal(rows.length, 2);
-  assert.equal(rows[0].querySelector('.cons-row-title-text').textContent, 'model-high-tok');
-  assert.equal(rows[0].querySelector('.cons-share-pill').textContent, '66.7%');
-  const perfFoot = rows[0].querySelector('.cons-model-perf-foot');
-  assert.equal(perfFoot.hasAttribute('hidden'), false);
-  assert.match(perfFoot.querySelector('.cons-model-perf-main').textContent, /32\.5 tok\/s/);
-  assert.match(perfFoot.querySelector('.cons-model-perf-main').textContent, /2\.1s/);
-  assert.equal(perfFoot.querySelector('.cons-model-anom-tag'), null);
-  assert.match(perfFoot.querySelector('.cons-model-unit-cost').textContent, /\$0\.75\/1M/);
-  assert.equal(rows[0].querySelector('.cons-model-focus-foot').hasAttribute('hidden'), true);
-
-  // Switch model ranking sort to Speed -> model-fast-costly first, pct becomes relative speed (100%), focuses on speed
-  const modelsHeaderBtns = consView.el
-    .querySelector('.cons-ranking-sort-wrap > .segmented')
-    .querySelectorAll('.seg-btn');
-  assert.equal(modelsHeaderBtns.length, 4);
-  modelsHeaderBtns[2].dispatchEvent({ type: 'click', stopPropagation: () => {} });
-  rows = consView.el.querySelectorAll('.cons-item-row');
-  assert.equal(rows[0].querySelector('.cons-row-title-text').textContent, 'model-fast-costly');
-  assert.equal(rows[0].querySelector('.cons-share-pill').textContent, '100%');
-  assert.equal(rows[0].querySelector('.cons-row-cost').textContent, '88.4 tok/s');
-  assert.equal(rows[0].querySelector('.cons-model-perf-foot').hasAttribute('hidden'), true);
-  assert.equal(rows[0].querySelector('.cons-model-focus-foot').hasAttribute('hidden'), false);
-  assert.equal(rows[1].querySelector('.cons-share-pill').textContent, '37%');
-
-  // Switch to Cost -> model-fast-costly ($3.50 / $5.00 = 70.0%), focuses on cost
-  modelsHeaderBtns[1].dispatchEvent({ type: 'click', stopPropagation: () => {} });
-  rows = consView.el.querySelectorAll('.cons-item-row');
-  assert.equal(rows[0].querySelector('.cons-row-title-text').textContent, 'model-fast-costly');
-  assert.equal(rows[0].querySelector('.cons-share-pill').textContent, '70.0%');
-  assert.equal(rows[0].querySelector('.cons-row-cost').textContent, '$3.50');
-  assert.equal(rows[0].querySelector('.cons-model-focus-foot').hasAttribute('hidden'), false);
-
-  // Switch to Calls -> model-fast-costly (20 / 30 = 66.7%), focuses on calls
-  modelsHeaderBtns[3].dispatchEvent({ type: 'click', stopPropagation: () => {} });
-  rows = consView.el.querySelectorAll('.cons-item-row');
-  assert.equal(rows[0].querySelector('.cons-row-title-text').textContent, 'model-fast-costly');
-  assert.equal(rows[0].querySelector('.cons-share-pill').textContent, '66.7%');
-  assert.equal(rows[0].querySelector('.cons-row-cost').textContent, '20 次');
-
-  // 2. Settings JSON Export & Safe Validated Import
-  const exportedJson = buildExportableSettingsJson({
-    language: 'en-US',
-    themeAccent: 'emerald',
-    fontScale: 'lg',
-    modernUi: true,
-    stepTableColumns: ['step', 'model', 'cost'],
-    contextWindowRiskAccepted: true,
-    modelContextWindows: { 'model:foo': '1000000' },
-  });
-  const parsedRaw = JSON.parse(exportedJson);
-  assert.equal(parsedRaw.schema, 'antigravity-usage-monitor.settings');
-  assert.equal(parsedRaw.settings.themeAccent, 'emerald');
-  assert.equal(parsedRaw.settings.contextWindowRiskAccepted, undefined, 'Risk flag must not be exported');
-  assert.equal(parsedRaw.settings.modelContextWindows, undefined, 'Context overrides must not be exported');
-
-  // Import strips unknown/dangerous keys and normalizes valid keys
-  const imported = parseImportedSettingsJson(
-    JSON.stringify({
-      schema: 'antigravity-usage-monitor.settings',
-      settings: {
-        language: 'en-US',
-        themeAccent: 'violet',
-        fontScale: 'INVALID_SCALE',
-        popoverWidth: 99999,
-        contextWindowRiskAccepted: true,
-        unknownSecret: 'nope',
-      },
-    })
-  );
-  assert.equal(imported.ok, true);
-  assert.equal(imported.patch.language, 'en-US');
-  assert.equal(imported.patch.themeAccent, 'violet');
-  assert.equal(imported.patch.fontScale, 'md', 'Invalid scale normalizes safely');
-  assert.equal(imported.patch.popoverWidth, 1080, 'Oversized popover width clamps safely');
-  assert.equal(imported.patch.contextWindowRiskAccepted, undefined);
-  assert.equal(imported.patch.unknownSecret, undefined);
-
-  // Rejects bad JSON and foreign schema
-  assert.equal(parseImportedSettingsJson('{bad json').ok, false);
-  assert.equal(parseImportedSettingsJson(JSON.stringify({ schema: 'other.app', settings: {} })).ok, false);
-
-  // SettingsOtherTab wires import end-to-end
-  otherTab = SettingsOtherTab();
-  otherTab.refs.renderSettings({ language: 'zh-CN', themeAccent: 'host' }, []);
-  const applied = await otherTab.refs.applyImportedSettingsText(exportedJson);
-  assert.equal(applied, true);
-  assert.equal(savedPatches.length, 1);
-  assert.equal(savedPatches[0].themeAccent, 'emerald');
-  assert.equal(i18nStore.getState().locale, 'en-US');
+  assert.equal(rows[0].children[0].textContent, 'model-high-tok');
+  assert.equal(rows[0].children[1].textContent, '66.7%');
+  assert.equal(rows[0].children[2].textContent, '2.00M');
+  assert.equal(rows[0].children[3].textContent, '$1.50');
+  assert.equal(rows[0].children[4].textContent, '94.7%');
+  assert.equal(rows[0].children[5].textContent, '32.5 tok/s');
+  assert.equal(rows[0].children[6].textContent, '2.1s');
+  assert.equal(rows[0].children[7].textContent, '10');
+  assert.equal(rows[1].children[0].textContent, 'model-fast-costly');
+  assert.equal(rows[1].children[1].textContent, '33.3%');
 });
 
 test('Feature 7: telemetry exposes all local conversations beyond 30 and recovers missing/hex titles from turn prompts', async () => {
@@ -876,102 +754,6 @@ test('Feature 7: telemetry exposes all local conversations beyond 30 and recover
   const recoveredConv = payload.conversations.find((c) => c.cascadeId.startsWith('00000035-'));
   assert.ok(recoveredConv);
   assert.equal(recoveredConv.title, '排查热力图悬浮提示抖动问题');
-});
-
-test('Feature 8: StepsDetailView model summary cards align with Model Ranking (proportional 4-seg bar + left-aligned perf sub-row + unit cost)', (t) => {
-  const prevDoc = globalThis.document;
-  const prevWin = globalThis.window;
-  const prevLocale = i18nStore.getState().locale;
-  const prevUi = uiStore.getState();
-  const prevTel = telemetryStore.getState();
-
-  const { document } = createMockDom();
-  globalThis.document = document;
-  globalThis.window = {
-    location: { pathname: '/' },
-    addEventListener() {},
-    removeEventListener() {},
-    requestAnimationFrame: (cb) => setTimeout(cb, 0),
-    cancelAnimationFrame: (id) => clearTimeout(id),
-  };
-
-  let view = null;
-  t.after(() => {
-    if (view) view.destroy();
-    setI18nLanguage(prevLocale);
-    uiStore.setState(prevUi, { sync: true });
-    telemetryStore.setState(prevTel, { sync: true });
-    globalThis.document = prevDoc;
-    globalThis.window = prevWin;
-  });
-
-  setI18nLanguage('zh-CN');
-  uiStore.setState(
-    { monitorVisible: true, activeView: 'steps', stepsSubTab: 'models', selectedAgentScope: 'all' },
-    { sync: true }
-  );
-  telemetryStore.setState(
-    {
-      telemetry: {
-        settings: { language: 'zh-CN', modelDisplayMode: 'upstream', showUpstreamModel: true },
-        activeConversation: {
-          cascadeId: 'steps-summary-align',
-          stepCount: 10,
-          recentSteps: [],
-          modelBreakdown: [
-            {
-              label: '4-neon',
-              shortName: '4-neon',
-              upstreamName: '4-neon',
-              calls: 8,
-              inputTokens: 100_000,
-              cacheReadTokens: 600_000,
-              thinkingTokens: 50_000,
-              responseTokens: 50_000,
-              outputTokens: 100_000,
-              totalTokens: 800_000,
-              costUsd: 2.4,
-              avgTokPerSec: 45.2,
-              avgTtftSec: 12.1,
-              cacheHitPct: 85.7,
-            },
-            {
-              label: '4-carbon',
-              shortName: '4-carbon',
-              upstreamName: '4-carbon',
-              calls: 2,
-              inputTokens: 40_000,
-              cacheReadTokens: 140_000,
-              thinkingTokens: 10_000,
-              responseTokens: 10_000,
-              outputTokens: 20_000,
-              totalTokens: 200_000,
-              costUsd: 0.4,
-              avgTokPerSec: 22.0,
-              avgTtftSec: 18.4,
-              cacheHitPct: 77.8,
-            },
-          ],
-        },
-      },
-    },
-    { sync: true }
-  );
-
-  view = StepsDetailView();
-  document.body.appendChild(view.el);
-
-  const cards = view.el.querySelectorAll('.smodel-card');
-  assert.equal(cards.length, 2);
-  const sumBarPct = (card) =>
-    card
-      .querySelectorAll('.progress-seg')
-      .reduce((acc, el) => acc + (Number.parseFloat(el.style.getPropertyValue('--seg-w')) || 0), 0);
-
-  assert.ok(Math.abs(sumBarPct(cards[0]) - 80) < 0.2, `Expected 80% bar width for 4-neon, got ${sumBarPct(cards[0])}`);
-  assert.ok(Math.abs(sumBarPct(cards[1]) - 20) < 0.2, `Expected 20% bar width for 4-carbon, got ${sumBarPct(cards[1])}`);
-  assert.ok(cards[0].querySelector('.smodel-perf-foot > .smodel-perf'), 'Perf metrics live in dedicated left-aligned sub-row');
-  assert.match(cards[0].querySelector('.smodel-unit-cost')?.textContent || '', /均价 \$3\.00\/1M/);
 });
 
 test('Feature 9: workspace/project cost aggregation (full + fast paths) and Projects ranking tab in ConsumptionView', async (t) => {
@@ -1206,31 +988,9 @@ test('Feature 9: workspace/project cost aggregation (full + fast paths) and Proj
   view = ConsumptionView();
   document.body.appendChild(view.el);
 
-  const rankingPanel = view.el.querySelector('.cons-ranking-panel');
-  const rankingTabBtns = rankingPanel.querySelector('.cons-ranking-head > .segmented').querySelectorAll('.seg-btn');
-  assert.equal(rankingTabBtns.length, 3);
-  assert.match(rankingTabBtns[1].textContent, /项目排行 \(2\)/);
-
-  // Switch to Projects tab
-  rankingTabBtns[1].dispatchEvent({ type: 'click', stopPropagation: () => {} });
-  const wsRows = view.el.querySelectorAll('.cons-workspace-row');
-  assert.equal(wsRows.length, 2);
-  assert.equal(wsRows[0].querySelector('.cons-row-title-text').textContent, 'usage-monitor');
-  assert.equal(wsRows[0].querySelector('.cons-ws-sessions-tag').textContent, '4 会话');
-
-  // Switch sort to Tokens -> docs-site (600k) moves first
-  const sortSwitches = rankingPanel.querySelectorAll('.cons-ranking-sort-wrap > .segmented');
-  sortSwitches[1].querySelectorAll('.seg-btn')[1].dispatchEvent({ type: 'click', stopPropagation: () => {} });
-  const wsRowsAfterSort = view.el.querySelectorAll('.cons-workspace-row');
-  assert.equal(wsRowsAfterSort[0].querySelector('.cons-row-title-text').textContent, 'docs-site');
-
-  // Project rows are read-only breakdown cards and must not jump on click
-  assert.equal(wsRowsAfterSort[0].classList.contains('is-jumpable'), false);
-  const prevView = uiStore.getState().activeView;
-  const prevSelectedCid = telemetryStore.getState().selectedConversationId;
-  wsRowsAfterSort[0].dispatchEvent({ type: 'click' });
-  assert.equal(uiStore.getState().activeView, prevView);
-  assert.equal(telemetryStore.getState().selectedConversationId, prevSelectedCid);
+  const modelsPanel = view.el.querySelector('.cons-models-panel');
+  assert.ok(modelsPanel, 'ConsumptionView shows Models panel cleanly without Projects/Sessions ranking tabs');
+  assert.equal(view.el.querySelector('.cons-ranking-panel'), null);
 });
 
 test('Feature 10: StepsDetailView live search, dynamic diagnostic chips, and click-to-inspect step drawer', async (t) => {
@@ -2163,7 +1923,6 @@ test('Feature 14: compact vertical ActionMenu replaces export bars, backend expo
 
 test('P0 regression: V4 display-projected steps open inspector, preserve waterfall/diagnostics/XLSX duration, match anomaly events, compute harmonic speed, and clean up UI observers/i18n', async (t) => {
   const { extractModelSteps, summarizeSpeed } = await import('../trajectory-metrics.mjs');
-  const { handleAccountCredentialAction } = await import('../backend/account-switch.mjs');
   const {
     getStepSelectionKey,
     computeStepTimingWaterfall,
@@ -2181,7 +1940,6 @@ test('P0 regression: V4 display-projected steps open inspector, preserve waterfa
   } = await import('../src/core/reportExporter.js');
   const { StepsDetailView, mergeSelectedAgentUnits } = await import('../src/views/StepsDetailView.js');
   const { CustomDateTimePicker } = await import('../src/components/ui/CustomDateTimePicker.js');
-  const { CustomNumberInput } = await import('../src/components/ui/CustomNumberInput.js');
   const { SegmentedControl } = await import('../src/components/ui/SegmentedControl.js');
   const { mountWindowOverlay } = await import('../src/components/layout/WindowOverlayShell.js');
   const { WINDOW_OVERLAY_KEY } = await import('../shared/window-bridge-protocol.mjs');
@@ -2508,18 +2266,15 @@ test('P0 regression: V4 display-projected steps open inspector, preserve waterfa
   // B-07 i18n reactive switching
   setI18nLanguage('en-US');
   const dt = CustomDateTimePicker({ modelValue: Date.UTC(2026, 10, 22, 12, 30) });
-  const num = CustomNumberInput({ modelValue: 5 });
   const seg = SegmentedControl({ options: [{ label: 'A', value: 'a' }], modelValue: 'a' });
   assert.equal(dt.el.querySelector('.dt-weekdays').textContent, 'MoTuWeThFrSaSu');
   assert.equal(dt.el.querySelector('.dt-time-row .text-muted').textContent, 'Hr / Min');
-  assert.equal(num.el.querySelectorAll('.num-step-btn')[0].getAttribute('aria-label'), 'Decrease value');
   assert.equal(seg.el.getAttribute('aria-label'), 'Segmented switcher');
   setI18nLanguage('zh-CN');
   await Promise.resolve();
   assert.equal(dt.el.querySelector('.dt-weekdays').textContent, '一二三四五六日');
   assert.equal(dt.el.querySelector('.dt-time-row .text-muted').textContent, '时 / 分');
   dt.destroy();
-  num.destroy();
   seg.destroy();
 
   // B-07 WindowOverlayShell dispose cleans up multiRunningWidget subScroll ResizeObserver
@@ -2548,27 +2303,6 @@ test('P0 regression: V4 display-projected steps open inspector, preserve waterfa
   overlay.dispose();
   overlay = null;
   assert.equal(activeResizeObservers, roBaseline);
-
-  // B-07 account-switch honors ANTIGRAVITY_GEMINI_DIR
-  const prevGemEnv = process.env.ANTIGRAVITY_GEMINI_DIR;
-  process.env.ANTIGRAVITY_GEMINI_DIR = 'D:\\CustomGeminiVerify';
-  try {
-    let seenFallbacks = [];
-    await handleAccountCredentialAction(
-      { action: 'list' },
-      {
-        platform: 'win32',
-        store: async (cfg) => {
-          seenFallbacks = cfg.fallbacks || [];
-          return { accounts: [], selectedEmail: '' };
-        },
-      }
-    );
-    assert.equal(seenFallbacks.every((p) => p.startsWith('D:\\CustomGeminiVerify')), true);
-  } finally {
-    if (prevGemEnv === undefined) delete process.env.ANTIGRAVITY_GEMINI_DIR;
-    else process.env.ANTIGRAVITY_GEMINI_DIR = prevGemEnv;
-  }
 });
 
 test('P1 regression: O(1) lowercase cache index, SQLite live-tail/parent helpers, lazy App mount, adoptedStyleSheets, rAF observer coalescing, and chart DOMRect caching', async (t) => {
@@ -2579,7 +2313,6 @@ test('P1 regression: O(1) lowercase cache index, SQLite live-tail/parent helpers
   } = await import('../backend/config.mjs');
   const { mountWindowOverlay } = await import('../src/components/layout/WindowOverlayShell.js');
   const { WINDOW_BRIDGE_KEY } = await import('../shared/window-bridge-protocol.mjs');
-  const { createSessionLineChart } = await import('../src/components/charts/SessionStepCharts.js');
   const { createTrendAreaChart } = await import('../src/components/charts/TrendAreaChart.js');
   const { uiStore } = await import('../src/store/uiStore.js');
   const { telemetryStore } = await import('../src/store/telemetryStore.js');
@@ -2716,31 +2449,6 @@ test('P1 regression: O(1) lowercase cache index, SQLite live-tail/parent helpers
   document.querySelector = origQs;
 
   // 3. Chart mousemove DOMRect caching & preSig fast path
-  const stepChart = createSessionLineChart();
-  document.body.appendChild(stepChart.el);
-  let stepBcr = 0;
-  const stepSvg = stepChart.el.querySelector('svg');
-  stepSvg.getBoundingClientRect = () => {
-    stepBcr += 1;
-    return { left: 0, top: 0, width: 400, height: 140 };
-  };
-  const stepData = [
-    { stepIndex: 1, modelShort: '4-neon', tokPerSec: 60, outputTokens: 120, inputTokens: 1000, cacheReadTokens: 2000 },
-    { stepIndex: 2, modelShort: '4-neon', tokPerSec: 80, outputTokens: 160, inputTokens: 1100, cacheReadTokens: 2200 },
-  ];
-  const r1 = stepChart.update({ steps: stepData, metric: 'tps' });
-  const r2 = stepChart.update({ steps: stepData, metric: 'tps' });
-  assert.equal(r1.summaryBadge, r2.summaryBadge, 'preSig fast-path preserves summaryBadge');
-  stepBcr = 0;
-  for (let i = 0; i < 30; i += 1) {
-    stepSvg.parentNode.dispatchEvent({ type: 'mousemove', clientX: 40 + i * 5, clientY: 50 });
-  }
-  assert.equal(stepBcr, 1, 'SessionLineChart caches SVG DOMRect across mousemove burst');
-  stepSvg.parentNode.dispatchEvent({ type: 'mouseleave' });
-  stepSvg.parentNode.dispatchEvent({ type: 'mousemove', clientX: 60, clientY: 50 });
-  assert.equal(stepBcr, 2, 'mouseleave invalidates cached SVG DOMRect cleanly');
-  stepChart.destroy();
-
   const trendChart = createTrendAreaChart();
   document.body.appendChild(trendChart.el);
   let trendBcr = 0;
@@ -2766,7 +2474,7 @@ test('P1 regression: O(1) lowercase cache index, SQLite live-tail/parent helpers
   trendChart.destroy();
 });
 
-test('P2 regressions: bundler regex-after-paren lexer, shared URI/prompt/atomic primitives, zero-ResizeObserver ToggleSwitch, SearchInput, and declarative settingsBackup parity', async (t) => {
+test('P2 regressions: bundler regex-after-paren lexer, shared URI/prompt/atomic primitives, zero-ResizeObserver ToggleSwitch, and SearchInput', async (t) => {
   const [{ stripModuleSyntax }, { decodeWorkspaceFileUriToPath, parseWorkspaceUrisColumn }, { extractShortPromptTitle }, { writeJsonAtomicSync }] =
     await Promise.all([
       import('../scripts/build-bundle.mjs'),
@@ -2841,11 +2549,10 @@ test('P2 regressions: bundler regex-after-paren lexer, shared URI/prompt/atomic 
     globalThis.ResizeObserver = prevRO;
   });
 
-  const [{ ToggleSwitch }, { createSearchInput }, { buildExportableSettingsJson, parseImportedSettingsJson }] =
+  const [{ ToggleSwitch }, { createSearchInput }] =
     await Promise.all([
       import('../src/components/ui/ToggleSwitch.js'),
       import('../src/components/ui/SearchInput.js'),
-      import('../src/core/settingsBackup.js'),
     ]);
 
   let toggledVal = 'off';
@@ -2878,36 +2585,9 @@ test('P2 regressions: bundler regex-after-paren lexer, shared URI/prompt/atomic 
   sBox.clearBtnEl.dispatchEvent({ type: 'click', stopPropagation() {} });
   assert.equal(latestQuery, '');
   assert.equal(sBox.clearBtnEl.hasAttribute('hidden'), true);
-
-  // 4. Declarative settingsBackup round-trips all 31 portable keys + coupled legacy flags
-  const exported = buildExportableSettingsJson({
-    language: 'en-US',
-    modernUi: false,
-    modelDisplayMode: 'upstream_compact',
-    pluginUpdateMode: 'auto',
-    windowMountMode: 'composer',
-    showStepFilterToolbar: true,
-    experimentalQuotaReservation: true,
-    accountQuotaRefreshMinutes: 180,
-  });
-  const parsedExport = JSON.parse(exported);
-  assert.equal(Object.keys(parsedExport.settings).length, 31);
-  const reimported = parseImportedSettingsJson(exported);
-  assert.equal(reimported.ok, true);
-  assert.equal(reimported.patch.modernUi, false);
-  assert.equal(reimported.patch.experimentalModernUi, false);
-  assert.equal(reimported.patch.modelDisplayMode, 'upstream_compact');
-  assert.equal(reimported.patch.showUpstreamModel, true);
-  assert.equal(reimported.patch.pluginUpdateMode, 'auto');
-  assert.equal(reimported.patch.autoUpdatePlugin, true);
-  assert.equal(reimported.patch.windowMountMode, 'composer');
-  assert.equal(reimported.patch.enableWindowOverlay, true);
-  assert.equal(reimported.patch.showStepFilterToolbar, true);
-  assert.equal(reimported.patch.experimentalQuotaReservation, true);
-  assert.equal(reimported.patch.accountQuotaRefreshMinutes, 180);
 });
 
-test('Feature 16: P3 extracted sub-modules (stepChartMath, overlayHostAnchors, ConsumptionBreakdownRows) and doc-to-code parity guard', async (t) => {
+test('Feature 16: P3 extracted sub-modules (overlayHostAnchors, ConsumptionBreakdownRows) and doc-to-code parity guard', async (t) => {
   const prevDoc = globalThis.document;
   const prevWin = globalThis.window;
   const { document } = createMockDom();
@@ -2925,7 +2605,6 @@ test('Feature 16: P3 extracted sub-modules (stepChartMath, overlayHostAnchors, C
   });
 
   const [
-    { computeLinearFit, computeNiceYScale, buildSplinePath },
     { computeCapsuleLayoutMode },
     { partitionModelSegments },
     { DEFAULT_SETTINGS_SCHEMA },
@@ -2934,7 +2613,6 @@ test('Feature 16: P3 extracted sub-modules (stepChartMath, overlayHostAnchors, C
     pathMod,
     urlMod,
   ] = await Promise.all([
-    import('../src/components/charts/stepChartMath.js'),
     import('../src/components/layout/overlayHostAnchors.js'),
     import('../src/components/widgets/ConsumptionBreakdownRows.js'),
     import('../backend/settings-schema.mjs'),
@@ -2944,13 +2622,7 @@ test('Feature 16: P3 extracted sub-modules (stepChartMath, overlayHostAnchors, C
     import('node:url'),
   ]);
 
-  // 1. Extracted chart math + layout hysteresis + model segment partition
-  const fit = computeLinearFit([20, 30, 40], { xs: [1000, 2000, 3000] });
-  assert.ok(fit && Math.abs(fit.slope - 0.01) < 1e-6);
-  const scale = computeNiceYScale(0, 93, 4);
-  assert.ok(scale.max >= 93 && scale.ticks.length >= 2);
-  assert.match(buildSplinePath([{ x: 0, y: 10 }, { x: 20, y: 30 }, { x: 40, y: 15 }]), /^M/);
-
+  // 1. Extracted layout hysteresis + model segment partition
   assert.equal(computeCapsuleLayoutMode(380, 'wide', { slotCount: 3 }), 'wide');
   assert.equal(computeCapsuleLayoutMode(260, 'wide', { slotCount: 3 }), 'wide');
   assert.equal(computeCapsuleLayoutMode(260, 'compact', { slotCount: 3 }), 'compact');

@@ -97,6 +97,35 @@ function isLegacyGithubRepoUrl(rawUrl) {
 }
 
 /**
+ * 判断来源 URL 是否属于受信任的当前仓库（官方或当前自定义 Fork）GitHub HTTPS 地址。
+ *
+ * @param {*} rawUrl
+ * @returns {boolean}
+ */
+function isTrustedOfficialCatalogSourceUrl(rawUrl) {
+  if (typeof rawUrl !== 'string' || !rawUrl.trim()) return false;
+  try {
+    const parsed = new URL(rawUrl.trim());
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    const pathname = parsed.pathname.toLowerCase();
+    if (
+      host !== 'github.com' &&
+      host !== 'raw.githubusercontent.com' &&
+      host !== 'codeload.github.com'
+    ) {
+      return false;
+    }
+    const prefixes = [OFFICIAL_REPO_PATH_PREFIX];
+    const customForkRepo = detectCustomGitForkRepo();
+    if (customForkRepo) prefixes.push(`/${customForkRepo.toLowerCase()}`);
+    return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 校验更新/下载链接是否属于可信的 GitHub 官方仓库与 HTTPS 域名白名单。
  *
  * @param {*} rawUrl
@@ -195,7 +224,7 @@ export function compareSemver(a, b) {
 export function readInstalledPluginVersion() {
   const manifest = loadJson(PLUGIN_MANIFEST_FILE, null);
   const ver = typeof manifest?.version === 'string' ? manifest.version.trim() : '';
-  return isValidSemver(ver) ? ver.replace(/^v/i, '') : '1.4.4';
+  return isValidSemver(ver) ? ver.replace(/^v/i, '') : '1.0.0';
 }
 
 function normalizeModelFamily(rawFamily) {
@@ -352,7 +381,9 @@ export function sanitizeCatalogPayload(raw) {
   const explicitDownloadUrl = sanitizeTrustedGithubUrl(raw.downloadUrl, '');
   const explicitArchiveUrl = sanitizeTrustedGithubUrl(raw.archiveFallbackUrl, '');
   const rawSourceUrl = typeof raw.sourceUrl === 'string' ? raw.sourceUrl.trim() : '';
-  const isLegacySource = isLegacyGithubRepoUrl(rawSourceUrl);
+  const isForeignSource =
+    Boolean(rawSourceUrl) &&
+    (isLegacyGithubRepoUrl(rawSourceUrl) || !isTrustedOfficialCatalogSourceUrl(rawSourceUrl));
 
   return {
     schemaVersion: Number(raw.schemaVersion || 1),
@@ -362,15 +393,15 @@ export function sanitizeCatalogPayload(raw) {
         : null,
     updatedAt:
       typeof raw.updatedAt === 'string' && raw.updatedAt.trim() ? raw.updatedAt.trim() : null,
-    latestPluginVersion,
+    latestPluginVersion: isForeignSource ? null : latestPluginVersion,
     releaseUrl: explicitReleaseUrl || DEFAULT_RELEASE_URL,
     downloadUrl: explicitDownloadUrl || DEFAULT_DOWNLOAD_URL,
     archiveFallbackUrl: explicitArchiveUrl || DEFAULT_ARCHIVE_FALLBACK_URL,
     hasReleaseUrl: Boolean(explicitReleaseUrl),
     hasDownloadUrl: Boolean(explicitDownloadUrl),
     hasArchiveFallbackUrl: Boolean(explicitArchiveUrl),
-    fetchedAtMs: isLegacySource ? 0 : Number(raw.fetchedAtMs || 0),
-    sourceUrl: isLegacySource ? '' : rawSourceUrl,
+    fetchedAtMs: isForeignSource ? 0 : Number(raw.fetchedAtMs || 0),
+    sourceUrl: isForeignSource ? '' : rawSourceUrl,
     pricing,
     placeholders,
   };

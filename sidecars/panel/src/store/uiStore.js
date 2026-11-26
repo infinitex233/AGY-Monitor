@@ -9,7 +9,6 @@ export function getViewTabs() {
   return [
     { value: 'overview', label: t('nav.overview'), icon: 'pulse' },
     { value: 'consumption', label: t('nav.consumption'), icon: 'chart-bar' },
-    { value: 'steps', label: t('nav.steps'), icon: 'table' },
     { value: 'settings', label: t('nav.settings'), icon: 'sliders' },
   ];
 }

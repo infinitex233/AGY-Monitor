@@ -57,12 +57,12 @@
 .quota-pool-row {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .quota-pool-row.has-divider {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-hairline);
 }
 
@@ -109,6 +109,7 @@
 
 .quota-win-meta {
   font-size: var(--fs-md);
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -389,8 +390,8 @@
 .matrix-cell {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 7px 9px;
+  gap: 5px;
+  padding: 11px 12px;
   background: var(--surface-panel);
   min-width: 0;
 }
@@ -400,12 +401,15 @@
   align-items: center;
   justify-content: space-between;
   font-size: var(--fs-md);
-  color: var(--text-secondary);
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
 .cell-value {
   font-size: var(--fs-lg);
   font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -456,9 +460,9 @@
 /* --- 3. 10 段上下文进度条与配额池填充条 (Context Segment Meter & Quota Progress Bars) --- */
 .progress-track {
   width: 100%;
-  height: 6px;
+  height: 7px;
   background: var(--surface-track);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-pill);
   overflow: hidden;
   display: flex;
 }
@@ -477,10 +481,10 @@
     width var(--dur-normal) var(--ease-fast) 0.05s;
 }
 
-/* 块状微圆角风格上下文进度条（保持 6px 紧凑高度 + 色块间 2px 轻间隙 + 每段 2px 边缘圆润处理） */
+/* 块状微圆角风格上下文进度条（7px 紧凑高度 + 色块间 2px 轻间隙 + 胶囊两端） */
 .progress-track.ctx-segment-meter {
-  height: 6px;
-  border-radius: 3px;
+  height: 7px;
+  border-radius: var(--radius-pill);
   align-items: stretch;
 }
 
@@ -894,6 +898,39 @@
 }
 
 /* --- 4. 上下文双列图例网格 (Context 10-Channel Legend Grid) --- */
+.ctx-legend-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color var(--dur-instant) var(--ease-fast),
+    background-color var(--dur-instant) var(--ease-fast);
+}
+
+.ctx-legend-toggle:hover,
+.ctx-legend-toggle:focus-visible {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+  outline: none;
+}
+
+.ctx-legend-toggle .svg-icon {
+  transition: transform var(--dur-fast) var(--ease-fast);
+}
+
+.ctx-legend-toggle.is-expanded .svg-icon {
+  transform: rotate(180deg);
+}
+
 .ctx-legend-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -902,6 +939,11 @@
   background: transparent;
   border: none;
   font-size: var(--fs-base-sm);
+}
+
+.ctx-legend-grid[hidden],
+.legend-item[hidden] {
+  display: none;
 }
 
 .legend-item {
@@ -1076,4 +1118,63 @@
   .dual-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* 上下文窗口头部主次分明排版：加粗百分比 + 括号弱化数值 */
+.ctx-summary-meta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.ctx-summary-pct {
+  font-weight: 700;
+  font-size: var(--fs-lg);
+}
+
+.ctx-summary-pct:not(.tone-warn):not(.tone-danger) {
+  color: var(--text-primary);
+}
+
+.ctx-summary-ratio {
+  font-weight: 400;
+  font-size: var(--fs-base);
+  color: var(--text-muted);
+}
+
+/* 实时监控与调用明细合并容器 */
+.overview-merged-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* 会话总览卡片：无嵌套底框、清爽四列横排 */
+.telemetry-matrix.is-flat-summary {
+  border: none;
+  background: transparent;
+  gap: var(--space-3);
+}
+
+.telemetry-matrix.is-flat-summary .matrix-cell {
+  background: transparent;
+  align-items: center;
+  text-align: center;
+  padding: 6px 0 4px;
+  gap: 6px;
+}
+
+.telemetry-matrix.is-flat-summary .cell-label {
+  justify-content: center;
+  font-size: var(--fs-base);
+  color: var(--text-muted);
+}
+
+.telemetry-matrix.is-flat-summary .cell-value {
+  font-size: var(--fs-hero);
+  line-height: 1.2;
+}
+
+.telemetry-matrix.is-flat-summary .cell-label .svg-icon {
+  display: none;
 }

@@ -237,6 +237,7 @@ function createUsageBucket() {
     totalTokens: 0,
     costUsd: 0,
     savedCostUsd: 0,
+    speedAccumulator: createSpeedAccumulator(),
   };
 }
 
@@ -246,8 +247,9 @@ function createUsageBucket() {
  * @param {ReturnType<typeof createUsageBucket>} bucket
  * @param {object} usage 已归一化的单步用量
  * @param {string} cascadeId 会话标识
+ * @param {object|null} [step=null] 原始步骤对象（用于累计总平均输出速度）
  */
-function accumulateStepIntoBucket(bucket, usage, cascadeId) {
+function accumulateStepIntoBucket(bucket, usage, cascadeId, step = null) {
   const { inTok, cacheTok, outTok, thinkTok, respTok, stepTotalTokens,
     resolvedCost, savedCost, unpriced } = usage;
   if (unpriced) bucket.unpricedCalls = (bucket.unpricedCalls || 0) + 1;
@@ -261,6 +263,9 @@ function accumulateStepIntoBucket(bucket, usage, cascadeId) {
   bucket.totalTokens += stepTotalTokens;
   bucket.costUsd += resolvedCost;
   bucket.savedCostUsd += savedCost;
+  if (step && typeof step === 'object') {
+    accumulateSpeed(bucket.speedAccumulator, step);
+  }
 }
 
 /**
@@ -272,6 +277,7 @@ function finalizeUsageBucket(bucket) {
   const promptTokens = bucket.inputTokens + bucket.cacheReadTokens;
   const cacheHitPct =
     promptTokens > 0 ? +((bucket.cacheReadTokens / promptTokens) * 100).toFixed(1) : 0;
+  const finishedSpeed = finishSpeed(bucket.speedAccumulator);
   return {
     calls: bucket.calls,
     conversationsCount: bucket.conversationsSet.size,
@@ -285,6 +291,7 @@ function finalizeUsageBucket(bucket) {
     unpricedCalls: bucket.unpricedCalls || 0,
     savedCostUsd: +bucket.savedCostUsd.toFixed(2),
     cacheHitPct,
+    avgTokPerSec: roundMetric(finishedSpeed.avgTokPerSec),
   };
 }
 
@@ -1181,10 +1188,17 @@ function planUsageTrend(window, nowMs, earliest, latest) {
     Number.isFinite(value) && value > 0 && value <= MAX_TREND_TIMESTAMP_MS ? value : fallback;
   const end = Math.max(safeMs(window.endMs, Math.max(nowMs, latest || nowMs)), latest);
   const defaultStart = end - 24 * 3600 * 1000;
-  const start =
-    window.key === 'all'
-      ? Math.min(safeMs(earliest, defaultStart), end - 3600 * 1000)
-      : Math.min(safeMs(window.startMs, defaultStart), end);
+  let start;
+  if (window.key === 'all') {
+    const curWeekMonMs = getStartOfCurrentWeekMs(end);
+    const halfYearStart = new Date(curWeekMonMs);
+    halfYearStart.setDate(halfYearStart.getDate() - 25 * 7);
+    halfYearStart.setHours(0, 0, 0, 0);
+    const halfYearFloorMs = halfYearStart.getTime();
+    start = Math.min(safeMs(earliest, halfYearFloorMs), halfYearFloorMs);
+  } else {
+    start = Math.min(safeMs(window.startMs, defaultStart), end);
+  }
   const spanMs = Math.max(0, end - start);
   const hourly =
     window.key === 'today' ||
@@ -1348,7 +1362,7 @@ function computeFamilySessionBuckets({
               ? inCurrentCycle
               : cmpMs > 0 && cmpMs >= w.startMs && cmpMs <= w.endMs;
         if (matchesPreset) {
-          accumulateStepIntoBucket(sessionBuckets[k], stepUsage, entry.cascadeId);
+          accumulateStepIntoBucket(sessionBuckets[k], stepUsage, entry.cascadeId, st);
         }
       }
 
@@ -1367,7 +1381,7 @@ function computeFamilySessionBuckets({
               ? inCurrentCycle && (effectiveCyclePool === 'all' || stepPool.poolKey === effectiveCyclePool)
               : selCmpMs > 0 && selCmpMs >= selectedWindow.startMs && selCmpMs <= selectedWindow.endMs;
         if (inSelectedWindow) {
-          accumulateStepIntoBucket(selectedSessionBucket, stepUsage, entry.cascadeId);
+          accumulateStepIntoBucket(selectedSessionBucket, stepUsage, entry.cascadeId, st);
         }
       }
     }
@@ -1559,6 +1573,7 @@ export function aggregateMultiWindowUsage({
     Boolean(isCustomWeeklyMode) === Boolean(snapshot.isCustomWeeklyMode) &&
     normalizedQuotaAccount === snapshot.normalizedQuotaAccount &&
     modelInputs.catalogRevision === snapshot.modelInputs.catalogRevision &&
+    modelInputs.phaseEpoch === snapshot.modelInputs.phaseEpoch &&
     isDeepStrictEqual(modelInputs.dynamicModelMap, snapshot.modelInputs.dynamicModelMap) &&
     sameUsageEntries(snapshot.entries, allEntriesToAggregate);
   const previous = sameSnapshot ? snapshot.ranges.get(selectedRangeCacheKey) : null;
@@ -1730,7 +1745,7 @@ export function aggregateMultiWindowUsage({
         }
         const quotaModelKey = mInfo.baseLabel || mInfo.label || '';
         if (qMs >= poolBucketEntry.start5hMs) {
-          accumulateStepIntoBucket(poolBucketEntry.b5h, stepUsage, cascadeId);
+          accumulateStepIntoBucket(poolBucketEntry.b5h, stepUsage, cascadeId, st);
           if (stepUsage.resolvedCost > 0 && stepTotalTokens > 0) {
             poolBucketEntry.pricedTokens5h += stepTotalTokens;
           }
@@ -1748,7 +1763,7 @@ export function aggregateMultiWindowUsage({
           }
         }
         if (qMs >= poolBucketEntry.startWkMs) {
-          accumulateStepIntoBucket(poolBucketEntry.bWk, stepUsage, cascadeId);
+          accumulateStepIntoBucket(poolBucketEntry.bWk, stepUsage, cascadeId, st);
           if (stepUsage.resolvedCost > 0 && stepTotalTokens > 0) {
             poolBucketEntry.pricedTokensWk += stepTotalTokens;
           }
@@ -1791,12 +1806,12 @@ export function aggregateMultiWindowUsage({
               ? inCurrentCycle
               : cmpMs > 0 && cmpMs >= w.startMs && cmpMs <= w.endMs;
         if (matchesPreset) {
-          accumulateStepIntoBucket(accountBuckets[k], stepUsage, cascadeId);
+          accumulateStepIntoBucket(accountBuckets[k], stepUsage, cascadeId, st);
           if (isCurrentConv) {
-            accumulateStepIntoBucket(sessionBuckets[k], stepUsage, cascadeId);
+            accumulateStepIntoBucket(sessionBuckets[k], stepUsage, cascadeId, st);
           }
           if (k === 'week' && includeInQuotaPools) {
-            accumulateStepIntoBucket(quotaWeekBucket, stepUsage, cascadeId);
+            accumulateStepIntoBucket(quotaWeekBucket, stepUsage, cascadeId, st);
           }
         }
       }
@@ -1820,9 +1835,9 @@ export function aggregateMultiWindowUsage({
           earliestActiveCyclePoolStartMs = poolBucketEntry.startWkMs;
         }
         if (selectedWindow.key === 'custom' || isScopedCyclePool) {
-          accumulateStepIntoBucket(selectedAccountBucket, stepUsage, cascadeId);
+          accumulateStepIntoBucket(selectedAccountBucket, stepUsage, cascadeId, st);
           if (isCurrentConv) {
-            accumulateStepIntoBucket(selectedSessionBucket, stepUsage, cascadeId);
+            accumulateStepIntoBucket(selectedSessionBucket, stepUsage, cascadeId, st);
           }
         }
         if (tMs > 0) {
@@ -2186,6 +2201,7 @@ export function aggregateSelectedWindowUsage({
       Boolean(isCustomWeeklyMode) === Boolean(snapshot.isCustomWeeklyMode) &&
       normalizedQuotaAccount === snapshot.normalizedQuotaAccount &&
       modelInputs.catalogRevision === snapshot.modelInputs.catalogRevision &&
+      modelInputs.phaseEpoch === snapshot.modelInputs.phaseEpoch &&
       isDeepStrictEqual(modelInputs.dynamicModelMap, snapshot.modelInputs.dynamicModelMap) &&
       sameUsageEntries(snapshot.entries, allEntriesToAggregate)
   );
@@ -2428,9 +2444,9 @@ export function aggregateSelectedWindowUsage({
         unpriced,
       };
 
-      accumulateStepIntoBucket(selectedAccountBucket, stepUsage, cascadeId);
+      accumulateStepIntoBucket(selectedAccountBucket, stepUsage, cascadeId, st);
       if (isCurrentConv) {
-        accumulateStepIntoBucket(selectedSessionBucket, stepUsage, cascadeId);
+        accumulateStepIntoBucket(selectedSessionBucket, stepUsage, cascadeId, st);
       }
 
       if (tMs > 0) {

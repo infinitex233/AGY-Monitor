@@ -128,6 +128,13 @@
   color: var(--text-muted);
 }
 
+.settings-compact-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* --- 主题色色卡选择器 (ThemeColorPicker) --- */
 .theme-color-picker {
   display: flex;

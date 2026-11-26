@@ -967,6 +967,7 @@ export function isEquivalentTelemetry(prev, next) {
   if (pAcct?.costUsd !== nAcct?.costUsd) return false;
   if (pAcct?.savedCostUsd !== nAcct?.savedCostUsd) return false;
   if (pAcct?.cacheHitPct !== nAcct?.cacheHitPct) return false;
+  if (pAcct?.avgTokPerSec !== nAcct?.avgTokPerSec) return false;
   if (pAcct?.unpricedCalls !== nAcct?.unpricedCalls) return false;
 
   // 6. 比对历史趋势时间分桶序列与年度分月序列
@@ -2207,47 +2208,6 @@ export async function triggerCliStatusLineAction(action) {
     telemetryStore.setState({ telemetry: nextTelemetry });
   }
   void fetchTelemetry({ force: true }).catch(() => {});
-  return res;
-}
-
-export async function fetchSessionMigrationCatalog() {
-  try {
-    return await callSidecarApi('/api/session-migration/catalog', { method: 'GET' });
-  } catch {
-    return callSidecarApi('/api/settings', {
-      method: 'POST',
-      body: { __sessionMigrationAction: 'catalog' },
-    });
-  }
-}
-
-export async function fetchQuotaReservationLog() {
-  try {
-    return await callSidecarApi('/api/quota-reservation/log', { method: 'GET' });
-  } catch {
-    return callSidecarApi('/api/settings', {
-      method: 'POST',
-      body: { __quotaReservationAction: 'log' },
-    });
-  }
-}
-
-export async function executeSessionMigration(payload) {
-  let res;
-  try {
-    res = await callSidecarApi('/api/session-migration/migrate', {
-      method: 'POST',
-      body: payload || {},
-    });
-  } catch {
-    res = await callSidecarApi('/api/settings', {
-      method: 'POST',
-      body: { __sessionMigrationAction: 'migrate', payload: payload || {} },
-    });
-  }
-  if (res?.migratedCount > 0) {
-    void fetchTelemetry({ force: true }).catch(() => {});
-  }
   return res;
 }
 

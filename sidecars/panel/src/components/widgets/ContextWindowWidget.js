@@ -196,7 +196,25 @@ export const ContextWindowWidget = defineComponent({
       hidden: true,
       text: t('fmt.mainAgent'),
     });
-    const ctxSummaryText = h('span', { className: 'text-mono', text: '0 / 256.0k (0%)' });
+    const ctxPctEl = h('strong', { className: 'ctx-summary-pct text-mono', text: '0%' });
+    const ctxRatioEl = h('span', { className: 'ctx-summary-ratio text-mono', text: '(0 / 256.0k)' });
+    const ctxSummaryText = h('span', { className: 'ctx-summary-meta text-mono' }, [
+      ctxPctEl,
+      ctxRatioEl,
+    ]);
+    const ctxLegendToggleBtn = interactiveInspector
+      ? h(
+          'button',
+          {
+            type: 'button',
+            className: 'ctx-legend-toggle',
+            'aria-expanded': 'false',
+            'aria-label': t('ctx.toggleLegendExpand'),
+            title: t('ctx.toggleLegendExpand'),
+          },
+          [createSvgIcon('chevron-down', { size: 12 })]
+        )
+      : null;
     const ctxSegmentBar = ContextSegmentMeter({ context: {} });
 
     const ctxPillGroup = h('div', { className: 'ctx-pill-group' });
@@ -220,7 +238,7 @@ export const ContextWindowWidget = defineComponent({
 
     const ctxLegendGrid = h(
       'div',
-      { className: 'ctx-legend-grid' },
+      { className: 'ctx-legend-grid', hidden: true },
       ctxChannels.map((entry) => entry.itemEl)
     );
     let lastLegendOrderSig = ctxChannels.map((entry) => entry.ch.key).join(',');
@@ -233,7 +251,10 @@ export const ContextWindowWidget = defineComponent({
           titleTextEl,
           ctxAgentBadge,
         ]),
-        h('span', { className: 'panel-meta' }, [ctxSummaryText]),
+        h('span', { className: 'panel-meta' }, [
+          ctxSummaryText,
+          ...(ctxLegendToggleBtn ? [ctxLegendToggleBtn] : []),
+        ]),
       ]),
     ];
     if (interactiveInspector) {
@@ -245,10 +266,29 @@ export const ContextWindowWidget = defineComponent({
 
     let latestData = null;
     let ctxPillsExpanded = false;
+    let ctxLegendExpanded = false;
     let isCollapsingCtxPills = false;
     let ctxCollapseTimer = null;
     let lastCascadeId = '';
     let cachedBarWidth = 0;
+
+    function syncLegendVisibility() {
+      patchAttr(ctxLegendGrid, 'hidden', !ctxLegendExpanded);
+      if (ctxLegendToggleBtn) {
+        const tip = t(ctxLegendExpanded ? 'ctx.toggleLegendCollapse' : 'ctx.toggleLegendExpand');
+        patchClasses(ctxLegendToggleBtn, { 'is-expanded': ctxLegendExpanded });
+        patchAttr(ctxLegendToggleBtn, 'aria-expanded', ctxLegendExpanded ? 'true' : 'false');
+        patchAttr(ctxLegendToggleBtn, 'aria-label', tip);
+        patchAttr(ctxLegendToggleBtn, 'title', tip);
+      }
+    }
+
+    if (ctxLegendToggleBtn) {
+      ctxLegendToggleBtn.onclick = () => {
+        ctxLegendExpanded = !ctxLegendExpanded;
+        syncLegendVisibility();
+      };
+    }
 
     function clearCtxExpandAnim() {
       if (ctxCollapseTimer) {
@@ -277,6 +317,7 @@ export const ContextWindowWidget = defineComponent({
       if (!data) {
         if (curLocale !== lastLocale) {
           lastLocale = curLocale;
+          syncLegendVisibility();
           for (const entry of ctxChannels) {
             patchText(entry.labelEl, entry.ch.label);
             if (interactiveInspector) {
@@ -301,6 +342,8 @@ export const ContextWindowWidget = defineComponent({
           if (lastCascadeId) {
             clearCtxExpandAnim();
             ctxPillsExpanded = false;
+            ctxLegendExpanded = false;
+            syncLegendVisibility();
           }
           lastCascadeId = currentCascadeId;
         }
@@ -559,22 +602,28 @@ export const ContextWindowWidget = defineComponent({
         limitTokens > 0 ? Math.min(100, +((totalTokens / limitTokens) * 100).toFixed(1)) : 0;
       const ctxToneCls =
         usedPct >= 88 ? 'tone-danger' : usedPct >= 70 ? 'tone-warn' : '';
-      patchAttr(ctxSummaryText, 'class', ctxToneCls ? `text-mono ${ctxToneCls}` : 'text-mono');
-      patchText(
-        ctxSummaryText,
-        `${formatTokens(totalTokens)} / ${formatTokens(limitTokens)} (${usedPct}%)`
+      patchAttr(
+        ctxPctEl,
+        'class',
+        ctxToneCls ? `ctx-summary-pct text-mono ${ctxToneCls}` : 'ctx-summary-pct text-mono'
       );
+      patchText(ctxPctEl, `${usedPct}%`);
+      patchText(ctxRatioEl, `(${formatTokens(totalTokens)} / ${formatTokens(limitTokens)})`);
       ctxSegmentBar.setProps({ context: { ...ctx, limitTokens, usedPct } });
 
       if (interactiveInspector) {
         const localeChanged = curLocale !== lastLocale;
         lastLocale = curLocale;
+        if (localeChanged) {
+          syncLegendVisibility();
+        }
         const scored = ctxChannels.map((entry) => {
           const val = entry.ch.getValue(ctx);
           if (localeChanged) {
             patchText(entry.labelEl, entry.ch.label);
             patchAttr(entry.itemEl, 'title', entry.ch.title);
           }
+          patchAttr(entry.itemEl, 'hidden', val <= 0);
           patchText(entry.valEl, formatTokens(val));
           return { entry, val };
         });

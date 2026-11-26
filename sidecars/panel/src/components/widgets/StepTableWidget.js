@@ -57,6 +57,20 @@ const SIZER_ROW_KEY = '__vsizer__';
 const SPACER_TOP_KEY = '__vspacer_top__';
 const SPACER_BOTTOM_KEY = '__vspacer_bottom__';
 
+const RIGHT_ALIGNED_STEP_COLS = new Set([
+  'tps',
+  'ttft',
+  'cache',
+  'cost',
+  'context',
+  'tokens_in',
+  'tokens_out',
+  'cache_tokens',
+  'tokens_combo',
+  'tokens_io_cache',
+  'tokens_custom',
+]);
+
 function estProportionalTextWidth(text) {
   const s = String(text || '');
   let w = 0;
@@ -476,7 +490,9 @@ export const StepTableWidget = defineComponent({
           patchClasses(refs.th, {
             'is-sortable': sortable,
             'is-sorted': isSorted,
+            'is-right': RIGHT_ALIGNED_STEP_COLS.has(colKey),
           });
+          patchAttr(refs.th, 'data-col', colKey);
           patchAttr(
             refs.th,
             'aria-sort',
@@ -1305,6 +1321,8 @@ export const StepTableWidget = defineComponent({
                 let entry = refs.cellMap.get(colKey);
                 if (!entry) {
                   const created = STEP_COLUMN_REGISTRY[colKey].createCell();
+                  patchAttr(created.td, 'data-col', colKey);
+                  patchClasses(created.td, { 'is-right': RIGHT_ALIGNED_STEP_COLS.has(colKey) });
                   const innerEl = h('div', { className: 'step-vsizer-inner' });
                   while (created.td.firstChild) {
                     innerEl.appendChild(created.td.firstChild);
@@ -1385,6 +1403,8 @@ export const StepTableWidget = defineComponent({
               let cell = refs.cellMap.get(colKey);
               if (!cell) {
                 cell = STEP_COLUMN_REGISTRY[colKey].createCell();
+                patchAttr(cell.td, 'data-col', colKey);
+                patchClasses(cell.td, { 'is-right': RIGHT_ALIGNED_STEP_COLS.has(colKey) });
                 refs.cellMap.set(colKey, cell);
               }
               if (isNewRow) {

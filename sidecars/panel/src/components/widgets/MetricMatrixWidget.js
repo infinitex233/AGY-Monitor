@@ -21,39 +21,86 @@ import {
 } from '../../store/telemetryStore.js';
 import { uiStore } from '../../store/uiStore.js';
 
+const LEGACY_OVERVIEW_METRICS_SIG = 'tps,ttft,avg_tps,step_cost';
+const HOVER_REALTIME_METRICS = Object.freeze([
+  'tps',
+  'ttft',
+  'cache_hit',
+  'step_cost',
+]);
+const SESSION_SUMMARY_METRICS = Object.freeze([
+  'avg_tps',
+  'avg_ttft',
+  'avg_cache',
+  'session_cost',
+]);
+const SESSION_SUMMARY_SHORT_LABEL_KEYS = Object.freeze({
+  avg_tps: 'ovSummary.avg_tps',
+  avg_ttft: 'ovSummary.avg_ttft',
+  avg_cache: 'ovSummary.avg_cache',
+  session_cost: 'ovSummary.session_cost',
+});
+
 export const MetricMatrixWidget = defineComponent({
   name: 'MetricMatrixWidget',
   setup({ props }) {
+    const isSessionSummaryPanel = props?.mode === 'overview' && !props?.preview;
+    const isHoverMetrics = props?.mode === 'hover';
     const getCtxAgentId =
       typeof props?.getCtxAgentId === 'function'
         ? props.getCtxAgentId
         : () => uiStore.getState().ctxInspectorAgentId;
     const matrixEl = h('section', {
-      className: 'telemetry-matrix',
+      className: isSessionSummaryPanel
+        ? 'telemetry-matrix is-flat-summary'
+        : 'telemetry-matrix',
       'aria-label': t('module.metrics'),
       'data-cols': '4',
     });
     patchStyleVar(matrixEl, '--matrix-cols', '4');
 
+    const panelTitleTextEl = isSessionSummaryPanel
+      ? h('span', { text: t('ovSummary.title') })
+      : null;
+    const rootEl = isSessionSummaryPanel
+      ? h('section', { className: 'panel session-summary-panel' }, [
+          h('div', { className: 'panel-header' }, [
+            h('span', { className: 'panel-title' }, [
+              createSvgIcon('pulse', { size: 13 }),
+              panelTitleTextEl,
+            ]),
+          ]),
+          matrixEl,
+        ])
+      : matrixEl;
+
     function createMetricCellNode() {
       const labelSpan = h('span', { text: '—' });
       const iconSvg = createSvgIcon('pulse', { size: 11 });
       const valueEl = h('strong', { className: 'cell-value', text: '—' });
-      const subEl = h('span', { className: 'cell-sub', text: '—' });
       const el = h('div', { className: 'matrix-cell' }, [
         h('div', { className: 'cell-label' }, [labelSpan, iconSvg]),
         valueEl,
-        subEl,
       ]);
       return {
         el,
-        refs: { labelSpan, iconSvg, valueEl, subEl },
+        refs: { labelSpan, iconSvg, valueEl },
       };
     }
 
     function update({ data } = {}) {
       patchAttr(matrixEl, 'aria-label', t('module.metrics'));
-      const metricKeys = normalizeClientOverviewMetrics(data?.settings?.overviewMetrics);
+      if (panelTitleTextEl) {
+        patchText(panelTitleTextEl, t('ovSummary.title'));
+      }
+      const normalizedKeys = normalizeClientOverviewMetrics(data?.settings?.overviewMetrics);
+      const isLegacyDefault = normalizedKeys.join(',') === LEGACY_OVERVIEW_METRICS_SIG;
+      const metricKeys =
+        isSessionSummaryPanel && isLegacyDefault
+          ? SESSION_SUMMARY_METRICS
+          : isHoverMetrics && isLegacyDefault
+            ? HOVER_REALTIME_METRICS
+            : normalizedKeys;
       const colCount = Math.max(1, Math.min(4, metricKeys.length));
       patchAttr(matrixEl, 'data-cols', String(colCount));
       patchStyleVar(matrixEl, '--matrix-cols', String(colCount));
@@ -69,20 +116,33 @@ export const MetricMatrixWidget = defineComponent({
       const settings = data?.settings || {};
       const locale = getEffectiveLocale();
 
-      const cells = metricKeys.map((key) =>
-        resolveOverviewMetricCell(key, {
+      const cells = metricKeys.map((key) => {
+        const cell = resolveOverviewMetricCell(key, {
           active,
           ctx,
           quotas,
           settings,
           hasSubagents,
-        })
-      );
+        });
+        if (isSessionSummaryPanel && SESSION_SUMMARY_SHORT_LABEL_KEYS[cell.key]) {
+          return {
+            ...cell,
+            label: t(SESSION_SUMMARY_SHORT_LABEL_KEYS[cell.key]),
+          };
+        }
+        if (isHoverMetrics && cell.key === 'cache_hit') {
+          return {
+            ...cell,
+            label: t('ovHover.cache_hit'),
+          };
+        }
+        return cell;
+      });
 
       patchKeyedList(matrixEl, cells, {
         keyFn: (cell) => cell.key,
         sigFn: (cell) =>
-          `${locale}:${cell.key}:${cell.label}:${cell.icon}:${cell.isPulsing}:${cell.valueClass}:${cell.valueText}:${cell.subClass}:${cell.subText}`,
+          `${locale}:${cell.key}:${cell.label}:${cell.icon}:${cell.isPulsing}:${cell.valueClass}:${cell.valueText}`,
         createRow: createMetricCellNode,
         updateRow: (refs, cell) => {
           patchText(refs.labelSpan, cell.label);
@@ -92,8 +152,6 @@ export const MetricMatrixWidget = defineComponent({
           patchClasses(refs.iconSvg, { 'is-pulsing': Boolean(cell.isPulsing) });
           patchAttr(refs.valueEl, 'class', cell.valueClass);
           patchText(refs.valueEl, cell.valueText);
-          patchAttr(refs.subEl, 'class', cell.subClass);
-          patchText(refs.subEl, cell.subText);
         },
       });
     }
@@ -102,7 +160,7 @@ export const MetricMatrixWidget = defineComponent({
     update({ data: null });
 
     return {
-      el: matrixEl,
+      el: rootEl,
       refs: { update },
     };
   },

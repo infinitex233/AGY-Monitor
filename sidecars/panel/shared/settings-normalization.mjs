@@ -72,6 +72,8 @@ export const OVERVIEW_METRIC_KEYS = Object.freeze([
   'tps',
   'ttft',
   'avg_tps',
+  'avg_ttft',
+  'avg_cache',
   'step_cost',
   'session_cost',
   'cache_hit',
@@ -109,7 +111,6 @@ export const DEFAULT_STEP_TABLE_COLUMNS = Object.freeze([
   'model',
   'tps',
   'ttft',
-  'tokens_combo',
   'cache',
   'cost',
 ]);

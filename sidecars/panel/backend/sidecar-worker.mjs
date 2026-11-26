@@ -14,7 +14,6 @@ import {
   dispatchBridgeApiRequest,
 } from './api-actions.mjs';
 import { computeRuntimeCodeVersion } from './config.mjs';
-import { flushAccountQuotaHistoryNow } from './account-quota-history.mjs';
 import { flushAllEndpointCachesNow } from './endpoint-registry.mjs';
 
 let shuttingDown = false;
@@ -53,7 +52,6 @@ async function gracefulStop() {
   shuttingDown = true;
   clearInterval(driftWatchTimer);
   try {
-    flushAccountQuotaHistoryNow();
     flushAllEndpointCachesNow();
   } catch {
     // Ignore cache flush errors

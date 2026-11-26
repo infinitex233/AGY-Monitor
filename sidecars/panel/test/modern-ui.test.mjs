@@ -15,14 +15,8 @@ import {
   parseCssColorLuminance,
 } from '../src/core/appearance.js';
 import { createTrendAreaChart } from '../src/components/charts/TrendAreaChart.js';
-import {
-  computePublicationFit,
-  createModelFitChart,
-  createSessionLineChart,
-} from '../src/components/charts/SessionStepCharts.js';
 import { CustomSelect } from '../src/components/ui/CustomSelect.js';
 import { SegmentedControl } from '../src/components/ui/SegmentedControl.js';
-import { AccountQuotaTrendCard } from '../src/components/widgets/AccountQuotaTrendCard.js';
 import {
   buildCapsuleSlotContext,
   createCapsuleSlotNode,
@@ -44,8 +38,6 @@ import { uiStore } from '../src/store/uiStore.js';
 import { i18nStore, setI18nLanguage } from '../src/i18n/index.js';
 import { ConsumptionView } from '../src/views/ConsumptionView.js';
 import { StepsDetailView } from '../src/views/StepsDetailView.js';
-import { SettingsGeneralTab } from '../src/views/settings/SettingsGeneralTab.js';
-import { SettingsStructureTab } from '../src/views/settings/SettingsStructureTab.js';
 
 test('modernUi schema normalization defaults to true, upgrades 1.5.2 settings without modernUi key to true, and respects explicit false', () => {
   assert.equal(DEFAULT_SETTINGS_SCHEMA.language, 'auto');
@@ -146,7 +138,7 @@ test('detectHostColorScheme accurately distinguishes light vs dark host polarity
   assert.equal(detectHostColorScheme(document.documentElement), 'dark');
 });
 
-test('applyAppearanceToRoot and SettingsGeneralTab toggle data-modern-ui + data-color-scheme and bundle includes crisp light-mode rules', async (t) => {
+test('applyAppearanceToRoot toggles data-modern-ui + data-color-scheme and bundle includes crisp light-mode rules', async (t) => {
   const prevLocale = i18nStore.getState().locale;
   const prevDoc = globalThis.document;
   const prevWin = globalThis.window;
@@ -155,33 +147,13 @@ test('applyAppearanceToRoot and SettingsGeneralTab toggle data-modern-ui + data-
   const { document } = createMockDom();
   globalThis.document = document;
   document.body.className = 'vscode-light';
-  const savedPatches = [];
   globalThis.window = {
     location: { pathname: '/' },
-    sidecar: {
-      fetch: async (_url, opts) => {
-        if (opts?.method === 'POST' && opts?.body) {
-          const parsed = JSON.parse(opts.body);
-          savedPatches.push(parsed);
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({
-              ok: true,
-              settings: { language: 'zh-CN', themeAccent: 'host', fontScale: 'md', ...parsed },
-            }),
-          };
-        }
-        return { ok: true, status: 200, json: async () => ({ ok: true }) };
-      },
-    },
     addEventListener() {},
     removeEventListener() {},
   };
 
-  let tab = null;
   t.after(() => {
-    if (tab) tab.destroy();
     setI18nLanguage(prevLocale);
     telemetryStore.setState(prevTelState, { sync: true });
     globalThis.document = prevDoc;
@@ -208,43 +180,7 @@ test('applyAppearanceToRoot and SettingsGeneralTab toggle data-modern-ui + data-
   assert.equal(document.documentElement.hasAttribute('data-modern-ui'), false);
   assert.equal(document.documentElement.getAttribute('data-color-scheme'), 'light');
 
-  // 2. SettingsGeneralTab renders '现代化 UI' (开启 / 关闭) and Language (跟随系统 / 简体中文 / English)
-  tab = SettingsGeneralTab({});
-  document.body.appendChild(tab.el);
-  tab.refs.renderSettings({
-    language: 'auto',
-    themeAccent: 'host',
-    fontScale: 'md',
-    modernUi: false,
-    experimentalModernUi: false,
-    pluginUpdateMode: 'manual',
-  });
-
-  assert.match(tab.el.textContent, /现代化 UI/);
-  assert.doesNotMatch(tab.el.textContent, /实验性/);
-  const langSegBtns = tab.refs.languageSwitch.el.querySelectorAll('.seg-btn');
-  assert.deepEqual(
-    langSegBtns.map((b) => b.textContent),
-    ['跟随系统', '简体中文', 'English']
-  );
-  assert.equal(langSegBtns[0].classList.contains('is-active'), true);
-
-  const modernBtns = tab.refs.modernUiSwitch.el.querySelectorAll('.seg-btn');
-  assert.deepEqual(
-    modernBtns.map((b) => b.textContent),
-    ['开启', '关闭']
-  );
-  assert.equal(modernBtns[1].classList.contains('is-active'), true);
-
-  // Click '开启' (index 0)
-  modernBtns[0].dispatchEvent({ type: 'click', stopPropagation() {} });
-  await new Promise((r) => setTimeout(r, 15));
-
-  assert.equal(document.documentElement.getAttribute('data-modern-ui'), 'true');
-  assert.equal(savedPatches.length, 1);
-  assert.equal(savedPatches[0].modernUi, true);
-
-  // 3. Built styles.css contains modern-ui borderless, sliding glider, and crisp pure-white light-mode rules
+  // 2. Built styles.css contains modern-ui borderless, sliding glider, and crisp pure-white light-mode rules
   const builtStyles = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
   assert.match(builtStyles, /\[data-modern-ui="true"\]\s+\.panel/);
   assert.match(builtStyles, /\[data-modern-ui="true"\]\[data-color-scheme="light"\]/);
@@ -335,7 +271,7 @@ test('applyAppearanceToRoot and SettingsGeneralTab toggle data-modern-ui + data-
   );
 });
 
-test('SegmentedControl variable-width glider snaps cleanly on reveal and glides across variable-width buttons, plus SettingsStructureTab thirdnav glider slides', (t) => {
+test('SegmentedControl variable-width glider snaps cleanly on reveal and glides across variable-width buttons', (t) => {
   const prevDoc = globalThis.document;
   const prevWin = globalThis.window;
   const prevUiState = { ...uiStore.getState() };
@@ -356,10 +292,8 @@ test('SegmentedControl variable-width glider snaps cleanly on reveal and glides 
   };
 
   let seg = null;
-  let structureTab = null;
   t.after(() => {
     seg?.destroy();
-    structureTab?.destroy();
     uiStore.setState(prevUiState, { sync: true });
     globalThis.document = prevDoc;
     globalThis.window = prevWin;
@@ -413,23 +347,6 @@ test('SegmentedControl variable-width glider snaps cleanly on reveal and glides 
   assert.deepEqual(picked, ['models', 'steps']);
   assert.equal(glider.style.getPropertyValue('--glider-x'), '3px');
   assert.equal(glider.style.getPropertyValue('--glider-w'), '114px');
-
-  // 5. SettingsStructureTab 4-tab .settings-thirdnav-bar slides .thirdnav-glider via --active-third-index
-  uiStore.setState({ settingsStructureTab: 'mount' }, { sync: true });
-  structureTab = SettingsStructureTab({});
-  const thirdNavBar = structureTab.refs.thirdNavBar;
-  const thirdGlider = thirdNavBar.querySelector('.thirdnav-glider');
-  const thirdBtns = thirdNavBar.querySelectorAll('.structure-thirdnav-btn');
-  assert.ok(thirdGlider, 'thirdNavBar contains .thirdnav-glider');
-  assert.equal(thirdNavBar.style.getPropertyValue('--active-third-index'), '0');
-
-  thirdBtns[2].dispatchEvent({ type: 'click' });
-  uiStore.flushSync?.();
-  assert.equal(thirdNavBar.style.getPropertyValue('--active-third-index'), '2');
-
-  thirdBtns[3].dispatchEvent({ type: 'click' });
-  uiStore.flushSync?.();
-  assert.equal(thirdNavBar.style.getPropertyValue('--active-third-index'), '3');
 
   // 6. LiveActivityWidget wraps .live-sub-list inside CustomScrollbar (.live-sub-scroll-host) with zero native scrollbars
   const liveWidget = LiveActivityWidget({ defaultExpandRunningSubs: true });
@@ -612,238 +529,6 @@ test('SegmentedControl variable-width glider snaps cleanly on reveal and glides 
   plotStage.dispatchEvent({ type: 'mousemove', clientX: 400, clientY: 390 });
   assert.equal(tipEl.style.getPropertyValue('--tip-y'), '54px');
   trendChart.destroy();
-
-  // 10b. SessionStepCharts (Summary view) and AccountQuotaTrendCard share 2D pointer-following tooltip + .is-tracking focus dots
-  const stepLineChart = createSessionLineChart();
-  Object.assign(stepLineChart.el, {
-    clientWidth: 460,
-    offsetHeight: 130,
-    getBoundingClientRect: () => ({ left: 0, top: 200, width: 460, height: 130, right: 460, bottom: 330 }),
-  });
-  const stepTipEl = stepLineChart.el.querySelector('.trend-tooltip');
-  assert.equal(stepTipEl.classList.contains('is-floating-tip'), true);
-  Object.assign(stepTipEl, { offsetWidth: 208, offsetHeight: 76 });
-  const stepStage = stepLineChart.el.querySelector('.sstep-plot-stage');
-  const stepSvg = stepLineChart.el.querySelector('.sstep-svg');
-  stepSvg.getBoundingClientRect = () => ({ left: 0, top: 206, width: 460, height: 106, right: 460, bottom: 312 });
-  stepLineChart.update({
-    steps: [
-      { stepIndex: 1, createdAtMs: 1000, modelShort: 'Gemini', totalTokens: 12000, inputTokens: 8000, cacheReadTokens: 2000, outputTokens: 2000, tokPerSec: 60, ttftSec: 0.4 },
-      { stepIndex: 2, createdAtMs: 2000, modelShort: 'Gemini', totalTokens: 28000, inputTokens: 16000, cacheReadTokens: 8000, outputTokens: 4000, tokPerSec: 75, ttftSec: 0.3 },
-    ],
-    metric: 'totalTokens',
-  });
-  queuedRaf?.();
-  assert.equal(stepLineChart.el.querySelector('.trend-peak-pill').classList.contains('is-ready'), true);
-  queuedRaf = null;
-  stepStage.dispatchEvent({ type: 'mousemove', clientX: 120, clientY: 300 });
-  assert.equal(stepTipEl.style.getPropertyValue('--tip-shift'), '0px');
-  assert.equal(stepTipEl.style.getPropertyValue('--tip-y'), '10px');
-  const stepHoverDot = stepLineChart.el.querySelector('.trend-hover-dot');
-  assert.equal(stepTipEl.classList.contains('is-tracking'), false);
-  assert.equal(stepHoverDot.classList.contains('is-tracking'), false);
-  queuedRaf?.();
-  assert.equal(stepTipEl.classList.contains('is-tracking'), true);
-  assert.equal(stepHoverDot.classList.contains('is-tracking'), true);
-
-  // High-density 2606-step session downsamples spline cleanly without turning into a 2600-segment wall, while keeping exact peak
-  const denseSteps = Array.from({ length: 2606 }, (_, i) => ({
-    stepIndex: 5500 + i,
-    createdAtMs: 1000 + i * 100,
-    modelLabel: i % 2 === 0 ? 'neon-4-xhigh' : 'carbon-4-high',
-    modelShort: i % 2 === 0 ? 'neon-4-xhigh' : 'carbon-4-high',
-    tokPerSec: i === 1963 ? 151 : 25 + ((i * 17) % 90),
-    inputTokens: 1000,
-    cacheReadTokens: 2000,
-    outputTokens: 100,
-  }));
-  stepLineChart.update({
-    steps: denseSteps,
-    modelGroupKey: 'neon-4-xhigh',
-    modelGroupKeys: ['neon-4-xhigh'],
-    metric: 'tps',
-  });
-  // Flush any morph animation to final path
-  if (queuedRaf) queuedRaf(performance.now() + 400);
-  const denseLineD = stepLineChart.el.querySelector('.trend-line').getAttribute('d') || '';
-  const cubicSegCount = (denseLineD.match(/ C /g) || []).length;
-  assert.ok(
-    cubicSegCount >= 120 && cubicSegCount <= 256,
-    `Expected adaptive downsampled cubic segment count in [120..256], got ${cubicSegCount}`
-  );
-  stepLineChart.update({
-    steps: denseSteps,
-    modelGroupKey: '__all__',
-    modelGroupKeys: ['__all__'],
-    metric: 'tps',
-  });
-  if (queuedRaf) queuedRaf(performance.now() + 400);
-  assert.match(stepLineChart.el.querySelector('.trend-peak-pill').textContent, /#7463.*151/);
-
-  // Switching from 1 model -> 2 models animates newly added model smoothly from baseline instead of snapping
-  globalThis.window.getComputedStyle = () => ({});
-  stepLineChart.update({
-    steps: denseSteps,
-    modelGroupKey: 'neon-4-xhigh',
-    modelGroupKeys: ['neon-4-xhigh'],
-    metric: 'tps',
-  });
-  if (queuedRaf) queuedRaf(performance.now() + 400);
-  queuedRaf = null;
-  stepLineChart.update({
-    steps: denseSteps,
-    modelGroupKey: 'neon-4-xhigh',
-    modelGroupKeys: ['neon-4-xhigh', 'carbon-4-high'],
-    metric: 'tps',
-  });
-  assert.equal(
-    typeof queuedRaf,
-    'function',
-    'Checking a 2nd model in SessionLineChart schedules a 240ms morph animation'
-  );
-  const multiPaths = stepLineChart.el.querySelectorAll('.sstep-multi-line-group .sstep-fit-line');
-  assert.equal(multiPaths.length, 2);
-  const carbonStartD = multiPaths[1].getAttribute('d') || '';
-  queuedRaf(performance.now() + 400);
-  const carbonEndD = multiPaths[1].getAttribute('d') || '';
-  assert.notEqual(carbonStartD, carbonEndD, 'Newly checked 2nd model morphs from baseline to target curve');
-
-  // High-density (>96 segments at 460px width) morph must NOT skip knots during animation or pop peaks up at completion
-  stepStage.clientWidth = 460;
-  stepLineChart.update({
-    steps: denseSteps,
-    modelGroupKey: '__all__',
-    modelGroupKeys: ['__all__'],
-    metric: 'totalTokens',
-  });
-  if (queuedRaf) queuedRaf(performance.now() + 400);
-  queuedRaf = null;
-  const morphStartTs = performance.now();
-  stepLineChart.update({
-    steps: denseSteps,
-    modelGroupKey: '__all__',
-    modelGroupKeys: ['__all__'],
-    metric: 'tps',
-  });
-  assert.equal(typeof queuedRaf, 'function');
-  queuedRaf(morphStartTs + 239.95);
-  const nearEndD = stepLineChart.el.querySelector('.trend-line').getAttribute('d') || '';
-  queuedRaf(morphStartTs + 300);
-  const exactEndD = stepLineChart.el.querySelector('.trend-line').getAttribute('d') || '';
-  const nearSegCount = (nearEndD.match(/ C /g) || []).length;
-  const exactSegCount = (exactEndD.match(/ C /g) || []).length;
-  assert.ok(
-    exactSegCount > 96 && nearSegCount >= exactSegCount,
-    '460px plot preserves >=100% of target knots during >96-segment morph without stride-2 skipping'
-  );
-  const parseEndpoints = (d) =>
-    [...d.matchAll(/([\d.]+)\s+([\d.]+)(?=\s*C|$)/g)].map((m) => ({ x: +m[1], y: +m[2] }));
-  const nearPts = parseEndpoints(nearEndD);
-  const exactPts = parseEndpoints(exactEndD);
-  for (const ep of exactPts) {
-    const minDy = nearPts.reduce(
-      (best, np) => (Math.abs(np.x - ep.x) <= 0.2 ? Math.min(best, Math.abs(np.y - ep.y)) : best),
-      Infinity
-    );
-    assert.ok(minDy <= 0.2, `Target vertex (${ep.x}, ${ep.y}) must not pop at completion (dy=${minDy})`);
-  }
-  delete globalThis.window.getComputedStyle;
-  stepLineChart.destroy();
-
-  const fitChart = createModelFitChart();
-  Object.assign(fitChart.el, {
-    clientWidth: 460,
-    offsetHeight: 160,
-    getBoundingClientRect: () => ({ left: 0, top: 200, width: 460, height: 160, right: 460, bottom: 360 }),
-  });
-  const fitTipEl = fitChart.el.querySelector('.trend-tooltip');
-  assert.equal(fitTipEl.classList.contains('is-floating-tip'), true);
-  Object.assign(fitTipEl, { offsetWidth: 212, offsetHeight: 74 });
-  fitChart.el.querySelector('.sstep-fit-svg').getBoundingClientRect = () => ({
-    left: 0,
-    top: 204,
-    width: 460,
-    height: 138,
-    right: 460,
-    bottom: 342,
-  });
-  fitChart.update({
-    steps: [
-      { stepIndex: 1, createdAtMs: 1000, modelShort: 'Gemini', tokPerSec: 55 },
-      { stepIndex: 2, createdAtMs: 2000, modelShort: 'Gemini', tokPerSec: 68 },
-      { stepIndex: 3, createdAtMs: 3000, modelShort: 'Gemini', tokPerSec: 72 },
-    ],
-    metric: 'tps',
-  });
-  queuedRaf = null;
-  fitChart.el.querySelector('.sstep-plot-stage').dispatchEvent({ type: 'mousemove', clientX: 220, clientY: 310 });
-  queuedRaf?.();
-  assert.equal(fitTipEl.classList.contains('is-tracking'), true);
-  assert.equal(fitChart.el.querySelector('.trend-hover-dot').classList.contains('is-tracking'), true);
-  assert.equal(fitChart.el.querySelector('.sstep-hover-raw-dot').classList.contains('is-tracking'), true);
-  fitChart.destroy();
-
-  const nowQ = Date.now();
-  const quotaCard = AccountQuotaTrendCard({});
-  const quotaWrap = quotaCard.el.querySelector('.trend-chart-wrap');
-  Object.assign(quotaWrap, {
-    clientWidth: 460,
-    offsetHeight: 210,
-    getBoundingClientRect: () => ({ left: 0, top: 200, width: 460, height: 210, right: 460, bottom: 410 }),
-  });
-  const quotaTipEl = quotaCard.el.querySelector('.trend-tooltip');
-  assert.equal(quotaTipEl.classList.contains('is-floating-tip'), true);
-  Object.assign(quotaTipEl, { offsetWidth: 200, offsetHeight: 74 });
-  quotaCard.el.querySelector('.trend-svg').getBoundingClientRect = () => ({
-    left: 0,
-    top: 206,
-    width: 460,
-    height: 184,
-    right: 460,
-    bottom: 390,
-  });
-  quotaCard.refs.update({
-    activeEmail: 'user@example.com',
-    activePools: [
-      {
-        poolKey: 'Gemini',
-        poolLabel: 'Gemini',
-        remainingPct: 91,
-        weeklyRemainingPct: 88,
-        resetTime: new Date(nowQ + 2 * 3600_000).toISOString(),
-      },
-    ],
-    quotaHistory: {
-      'user@example.com': {
-        pools: {
-          Gemini: {
-            label: 'Gemini',
-            reset5hMs: nowQ + 2 * 3600_000,
-            points: [
-              [nowQ - 3 * 3600_000 + 2000, 100, 90],
-              [nowQ - 3600_000, 95, 89],
-            ],
-          },
-        },
-      },
-    },
-  });
-  queuedRaf = null;
-  quotaCard.el.querySelector('.trend-plot-stage').dispatchEvent({
-    type: 'mousemove',
-    clientX: 230,
-    clientY: 320,
-  });
-  assert.equal(quotaTipEl.style.getPropertyValue('--tip-y'), '32px');
-  queuedRaf?.();
-  assert.equal(quotaTipEl.classList.contains('is-tracking'), true);
-  assert.equal(quotaCard.el.querySelector('.trend-hover-dot').classList.contains('is-tracking'), true);
-  assert.equal(
-    quotaCard.el.querySelectorAll('.trend-x-tick').some((tk) => tk.classList.contains('is-hovered')),
-    true,
-    'Hovering quota chart highlights nearest X-axis tick'
-  );
-  quotaCard.destroy();
 
   // 11. ContextWindowWidget + LiveActivityWidget use pure SVG chevrons and animate expand/collapse under [data-modern-ui="true"]
   document.documentElement.setAttribute('data-modern-ui', 'true');
@@ -1293,20 +978,6 @@ test('StepTableWidget virtualizes large sessions (>80 rows) with exact turn-rail
   assert.match(builtStyles, /\.step-vsizer-inner/);
   assert.match(builtStyles, /overflow-anchor:\s*none;/);
   assert.ok(initialRenderMs < 150, `Virtualized 1722-row initial render should stay fast (was ${initialRenderMs.toFixed(1)}ms)`);
-
-  // 7. Large-N LOESS grid interpolation tracks trends accurately without O(N^2) stalls
-  const loessXs = Array.from({ length: totalSteps }, (_, i) => i + 1);
-  const loessYs = loessXs.map((x) => 80 - 30 * (x / totalSteps) + ((x * 17) % 9) - 4);
-  const lt0 = performance.now();
-  const bigFit = computePublicationFit(loessXs, loessYs, { minVal: 0 });
-  const loessMs = performance.now() - lt0;
-  assert.equal(bigFit.method, 'LOESS');
-  assert.equal(bigFit.grid.length, 64);
-  assert.equal(bigFit.sampleFits.length, totalSteps);
-  assert.ok(bigFit.sampleFits[0] > 76 && bigFit.sampleFits[totalSteps - 1] < 54);
-  assert.ok(bigFit.r2 > 0.85, `Expected high R² on smooth downward trend, got ${bigFit.r2}`);
-  assert.ok(bigFit.grid.every((g) => g.ciLow <= g.fit + 1e-9 && g.fit <= g.ciHigh + 1e-9));
-  assert.ok(loessMs < 80, `Interpolated 1722-sample LOESS should stay fast (was ${loessMs.toFixed(1)}ms)`);
 
   stepTable.destroy();
 });

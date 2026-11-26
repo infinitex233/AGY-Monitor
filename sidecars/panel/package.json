@@ -1,9 +1,9 @@
 {
   "name": "usage-monitor-panel",
-  "version": "1.5.5",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Sidecar backend and web UI for Antigravity Usage & Speed Monitor.",
+  "description": "Sidecar backend and web UI for AGY Monitor.",
   "scripts": {
     "build": "node scripts/build-bundle.mjs",
     "pack:release": "node scripts/pack-release-zip.mjs",

@@ -336,7 +336,7 @@ export function resolveCapsuleMetricPresentation(metricKey, slotCtx, ringCircumf
       textClass: 'wm-slot-text wm-cache-text',
       showRing: false,
       dashOffset: ringCircumference,
-      text: valid ? `${Math.round(numVal)}%` : '--%',
+      text: valid ? formatCachePct(numVal) : '--%',
       toneClass,
       running: false,
       warn: toneClass === 'tone-warn',
@@ -493,6 +493,44 @@ export function resolveOverviewMetricCell(metricKey, cellCtx = {}) {
       subText: t('ovMetric.subValidSamples', {
         samples: sampleSummary(active.speedSummary),
       }),
+      subClass: 'cell-sub',
+    };
+  }
+
+  if (metricKey === 'avg_ttft') {
+    const avgTtft = active.ttftSummary?.avgSec;
+    const hasAvgTtft =
+      hasAnySteps && avgTtft != null && Number.isFinite(Number(avgTtft)) && Number(avgTtft) >= 0;
+    const ttftTone = hasAvgTtft ? getTtftToneClass(avgTtft) : '';
+    return {
+      key: 'avg_ttft',
+      label: t('ovMetric.avg_ttft'),
+      icon: 'clock',
+      iconSize: 11,
+      isPulsing: false,
+      valueText: formatMetric(avgTtft, 's'),
+      valueClass: ttftTone ? `cell-value ${ttftTone}` : 'cell-value',
+      subText: '',
+      subClass: 'cell-sub',
+    };
+  }
+
+  if (metricKey === 'avg_cache') {
+    const avgCache = active.sessionCacheHitPct ?? active.latestCacheHitPct;
+    const hasAvg = hasAnySteps && avgCache != null && Number.isFinite(Number(avgCache));
+    const promptTok =
+      Math.max(0, Number(active.inputTokens || 0) + Number(active.cacheReadTokens || 0)) ||
+      Number(active.latestPromptTokens || 0);
+    const cacheTone = hasAvg ? getCacheToneClass(avgCache, promptTok) : '';
+    return {
+      key: 'avg_cache',
+      label: t('ovMetric.avg_cache'),
+      icon: 'layers',
+      iconSize: 11,
+      isPulsing: false,
+      valueText: hasAvg ? formatCachePct(avgCache) : '—',
+      valueClass: cacheTone ? `cell-value ${cacheTone}` : 'cell-value',
+      subText: '',
       subClass: 'cell-sub',
     };
   }

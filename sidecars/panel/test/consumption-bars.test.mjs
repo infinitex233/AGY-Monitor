@@ -218,7 +218,7 @@ test('Backend aggregates per-model breakdown on both sourcesBreakdown and monthl
   assert.equal(sources[1].totalTokens, 5_000);
   assert.equal(sources[1].models.length, 1);
 
-  // November (index 10) in monthlySeries also carries aggregated per-model breakdown
+  // November (index 10) in monthlySeries also carries aggregated per-model breakdown, and range='all' trendSeries spans ~6 months
   const novBucket = payload.consumption?.monthlySeries?.[10];
   assert.ok(novBucket);
   assert.equal(novBucket.totalTokens, 20_000);
@@ -226,6 +226,7 @@ test('Backend aggregates per-model breakdown on both sourcesBreakdown and monthl
 
   // Active trendSeries bucket carries 4-channel totals & per-model 4-channel breakdown while zero-token buckets omit models
   const trendSlots = payload.consumption?.trendSeries || [];
+  assert.ok(trendSlots.length >= 176 && trendSlots.length <= 183, `All-range trend spans ~6 months (${trendSlots.length} days)`);
   const activeTrendSlot = trendSlots.find((s) => s.tokens > 0);
   const zeroTrendSlot = trendSlots.find((s) => s.tokens === 0);
   assert.ok(activeTrendSlot);
@@ -337,6 +338,7 @@ test('ConsumptionView: Top Models color dot + % bar, clutter-free Client Sources
         costUsd: 0.96,
         savedCostUsd: 0.25,
         cacheHitPct: 75.0,
+        avgTokPerSec: 88.4,
       },
       trendSeries: [
         {
@@ -421,91 +423,26 @@ test('ConsumptionView: Top Models color dot + % bar, clutter-free Client Sources
   document.body.appendChild(view.el);
   await Promise.resolve();
 
-  const allRows = view.el.querySelectorAll('.cons-item-row');
-  const modelRows = allRows.filter((r) => !r.classList.contains('cons-source-row'));
+  const modelRows = view.el.querySelectorAll('.cons-model-tr');
   const sourceRows = view.el.querySelectorAll('.cons-source-row');
   assert.equal(modelRows.length, 6);
-  assert.equal(sourceRows.length, 2);
+  assert.equal(sourceRows.length, 0);
 
-  // 1. Top Models: no color dot next to model name & 4-segment bar scales to 50% (not 100%)
-  assert.equal(modelRows[0].querySelector('.cons-title-model-dot'), null);
-
-  const argonSegSum = modelRows[0]
-    .querySelectorAll('.progress-seg')
-    .reduce((s, el) => s + parsePctVar(el, '--seg-w'), 0);
-  assert.ok(Math.abs(argonSegSum - 50) < 0.1, `Expected 50% width for 4-argon row, got ${argonSegSum}`);
-
-  // 2. Client Sources: NO multi-line .cons-source-model-chip dump; renders single-line Top 2-3 models + 1 merged '__other__' segment on the bar!
-  assert.equal(sourceRows[0].querySelectorAll('.cons-source-model-chip').length, 0);
-  const appTopItems = sourceRows[0].querySelectorAll('.cons-source-top-item');
-  assert.equal(appTopItems.length, 3, 'Should show top 3 non-other models in single-line footer');
-  assert.equal(appTopItems[0].querySelector('.cons-source-top-name')?.textContent, '4-argon');
-  assert.equal(appTopItems[0].querySelector('.cons-source-top-pct')?.textContent, '50%');
-  const argonDotColor = appTopItems[0].querySelector('.cons-source-top-dot')?.style.getPropertyValue('--dot-color');
-  assert.match(argonDotColor, /^hsl\(/);
-  assert.equal(appTopItems[1].querySelector('.cons-source-top-name')?.textContent, '4-carbon');
-  assert.equal(appTopItems[1].querySelector('.cons-source-top-pct')?.textContent, '31%');
-  assert.equal(appTopItems[2].querySelector('.cons-source-top-name')?.textContent, '3.8-flash-n');
-  assert.equal(appTopItems[2].querySelector('.cons-source-top-pct')?.textContent, '16%');
-
-  const appSegs = sourceRows[0].querySelectorAll('.cons-model-seg');
-  assert.equal(appSegs.length, 4, '3 main models + 1 merged other segment');
-  assert.equal(appSegs[0].style.getPropertyValue('--seg-color'), argonDotColor);
-  assert.equal(appSegs[3].style.getPropertyValue('--seg-color'), 'var(--cons-other-seg)');
-  const appBarSum = appSegs.reduce((s, el) => s + parsePctVar(el, '--seg-w'), 0);
-  assert.ok(Math.abs(appBarSum - 80) < 0.1);
-
-  // Hovering Client Source bar hit area OR top-models summary opens shared popover with 4-seg model bars + bottom 4-channel totals
-  const popover = view.refs.breakdownPopoverEl;
-  assert.equal(popover.hasAttribute('hidden'), true);
-  const appBarHit = sourceRows[0].querySelector('.cons-source-bar-hit');
-  appBarHit.dispatchEvent({ type: 'mouseenter', clientX: 120 });
-  assert.equal(popover.hasAttribute('hidden'), false);
-  assert.equal(popover.querySelector('.trend-tip-time')?.textContent, 'Antigravity App');
-  assert.match(popover.querySelector('.trend-tip-tokens')?.textContent || '', /80\.0k TOKEN/);
-  assert.equal((popover.textContent || '').includes('模型细分'), false);
-  const popRows = popover.querySelectorAll('.cons-pop-model-row');
-  assert.equal(popRows.length, 4);
-  assert.equal(popRows[0].querySelector('.cons-pop-model-name')?.textContent, '4-argon');
-  assert.equal(popRows[0].querySelector('.cons-pop-model-pct')?.textContent, '50.0%');
-  assert.equal(popRows[0].querySelector('.cons-model-dot')?.hasAttribute('hidden'), false);
-  assert.equal(
-    popRows[0].querySelector('.cons-model-dot')?.style.getPropertyValue('--dot-color'),
-    argonDotColor
-  );
-  const popArgonBarSum = popRows[0]
-    .querySelectorAll('.progress-seg')
-    .reduce((s, el) => s + parsePctVar(el, '--seg-w'), 0);
-  assert.ok(Math.abs(popArgonBarSum - 50) < 0.1, `Expected 50% 4-seg width in source popover, got ${popArgonBarSum}`);
-  assert.equal(popRows[3].querySelector('.cons-pop-model-name')?.textContent, '其他 (3)');
-  const popChannelsEl = popover.querySelector('.cons-pop-channels');
-  assert.equal(popChannelsEl?.hasAttribute('hidden'), false);
-  assert.equal(popover.children[popover.children.length - 1], popChannelsEl);
+  // 1. Overview & Magpie-style Models Table: 4-col overview with token breakdown subtext + avg speed; table renders all metrics sorted by Token desc
+  assert.match(view.el.querySelector('.cons-hero-sub')?.textContent || '', /20\.0k.*60\.0k.*20\.0k/);
   assert.deepEqual(
-    popChannelsEl.querySelectorAll('.cons-pop-chan-label').map((el) => el.textContent),
-    ['输入', '缓存', '思考', '输出']
+    view.el.querySelectorAll('.cons-hero-sub .dot-swatch').map((el) => el.className),
+    ['dot-swatch seg-input', 'dot-swatch seg-cached', 'dot-swatch seg-output']
   );
+  assert.equal(view.el.querySelector('.cons-hero-speed')?.textContent, '88.4 tok/s');
+  assert.equal(modelRows[0].children[0].textContent, '4-argon');
+  assert.equal(modelRows[0].children[1].textContent, '50.0%');
+  assert.equal(modelRows[0].children[2].textContent, '50.0k');
+  assert.equal(modelRows[0].children[3].textContent, '$0.50');
+  assert.equal(modelRows[0].children[7].textContent, '10');
 
-  const appHoverZone = sourceRows[0].querySelector('.cons-source-hover-zone');
-  const appTopModelsEl = sourceRows[0].querySelector('.cons-source-top-models');
-  assert.ok(appHoverZone, 'Client source row should wrap bar and top models in a unified hover zone');
-
-  // Moving seamlessly from progress bar into gap / top-models keeps popover visible without flicker
-  appBarHit.dispatchEvent({ type: 'mouseleave', relatedTarget: appHoverZone });
-  assert.equal(popover.hasAttribute('hidden'), false, 'Moving into unified hover zone gap must not hide popover');
-  appBarHit.dispatchEvent({ type: 'mouseleave', relatedTarget: appTopModelsEl });
-  assert.equal(popover.hasAttribute('hidden'), false, 'Moving from bar to model names must not hide popover');
-
-  appBarHit.dispatchEvent({ type: 'mouseleave' });
-  assert.equal(popover.hasAttribute('hidden'), true);
-
-  appTopModelsEl.dispatchEvent({ type: 'mouseenter', clientX: 90 });
-  assert.equal(popover.hasAttribute('hidden'), false);
-  assert.equal(popover.querySelector('.trend-tip-time')?.textContent, 'Antigravity App');
-  appTopModelsEl.dispatchEvent({ type: 'mouseleave', relatedTarget: appBarHit });
-  assert.equal(popover.hasAttribute('hidden'), false, 'Moving back from model names to bar must not hide popover');
-  appHoverZone.dispatchEvent({ type: 'mouseleave' });
-  assert.equal(popover.hasAttribute('hidden'), true);
+  // 2. Client Sources panel removed cleanly from ConsumptionView
+  assert.equal((view.el.textContent || '').includes('客户端来源'), false);
 
   // Verify single-line non-wrapping CSS rules and zero-gap hover layout rules
   const { readFileSync } = await import('node:fs');
@@ -516,33 +453,9 @@ test('ConsumptionView: Top Models color dot + % bar, clutter-free Client Sources
   assert.match(consCss, /@container\s*\(max-width:\s*340px\)\s*\{\s*\.cons-source-top-item:nth-child\(n\s*\+\s*3\)/);
   assert.match(consCss, /\.monthly-grid\s*\{[\s\S]*gap:\s*0/);
 
-  // 3. Monthly Breakdown: old 4-channel legend removed; Nov column renders model-colored vertical segments & unified hover popover
-  assert.equal(view.el.querySelectorAll('.monthly-legend').length, 0);
-  const monthlyGrid = view.el.querySelector('.monthly-grid');
-  const monthCols = view.el.querySelectorAll('.month-col');
-  const novCol = monthCols[10];
-  const novSegs = novCol.querySelectorAll('.month-seg.cons-model-seg');
-  assert.equal(novSegs.length, 4, '3 main models + 1 merged other segment stacked vertically');
-  // Bottom segment of vertical stack is the #1 model (4-argon) with exact matching color
-  assert.equal(novSegs[novSegs.length - 1].style.getPropertyValue('--seg-color'), argonDotColor);
-  const novSegHeightSum = novSegs.reduce((s, el) => s + parsePctVar(el, '--seg-h'), 0);
-  assert.ok(Math.abs(novSegHeightSum - 100) < 0.1);
-
-  novCol.dispatchEvent({ type: 'mouseenter' });
-  assert.equal(popover.hasAttribute('hidden'), false);
-  assert.equal(popover.querySelector('.trend-tip-time')?.textContent, '2026年 11月');
-  assert.equal(popover.querySelectorAll('.cons-pop-model-row').length, 4);
-  assert.equal(popover.querySelector('.cons-pop-channels')?.hasAttribute('hidden'), false);
-
-  // Seam/sibling handoff inside monthly-grid keeps popover open; empty month or exiting grid hides it
-  novCol.dispatchEvent({ type: 'mouseleave', relatedTarget: monthlyGrid });
-  assert.equal(popover.hasAttribute('hidden'), false, 'Sub-pixel seam inside monthly-grid must not flicker popover');
-  monthCols[0].dispatchEvent({ type: 'mouseenter' });
-  assert.equal(popover.hasAttribute('hidden'), true, 'Hovering zero-data month must hide popover');
-  novCol.dispatchEvent({ type: 'mouseenter' });
-  assert.equal(popover.hasAttribute('hidden'), false);
-  monthlyGrid.dispatchEvent({ type: 'mouseleave' });
-  assert.equal(popover.hasAttribute('hidden'), true, 'Leaving monthly-grid must hide popover');
+  // 3. No duplicate bottom heatmap or monthly panel
+  assert.equal(view.el.querySelector('.cons-heatmap-panel'), null);
+  assert.equal(view.el.querySelectorAll('.monthly-grid').length, 0);
 
   // 4. Usage Trend: taller 184px viewBox & hovering x-axis tick opens redesigned tooltip (hero TOKEN, 4-seg model bars, no subtitle/dot clutter, bottom 4 channels)
   const trendSvg = view.el.querySelector('.trend-svg');
@@ -855,7 +768,7 @@ test('ConsumptionView >90d heatmap replaces static hint with Day/Week/Month/Tota
     },
   });
 
-  // 1. <=90d (7 days): static hint visible, heatmap switcher hidden
+  // 1. <=90d (7 days): static hint removed, heatmap switcher hidden
   telemetryStore.setState(
     { selectedTimeRange: '7d', telemetry: makePayload('7d', trendSlots.slice(0, 7)) },
     { sync: true }
@@ -864,19 +777,17 @@ test('ConsumptionView >90d heatmap replaces static hint with Day/Week/Month/Tota
   document.body.appendChild(view.el);
   await Promise.resolve();
 
-  const trendHintEl = view.el.querySelector('.cons-trend-hint');
+  assert.equal(view.el.querySelector('.cons-trend-hint'), null);
   const hmSwitchEl = view.refs.heatmapModeSwitch.el;
-  assert.equal(trendHintEl.hasAttribute('hidden'), false);
   assert.equal(hmSwitchEl.hasAttribute('hidden'), true);
 
-  // 2. >90d (105 days = 15 weeks): static hint hidden, 4-way switcher visible ('日' / '周' / '月' / '全部')
+  // 2. >90d (105 days = 15 weeks): 4-way switcher visible ('日' / '周' / '月' / '全部')
   telemetryStore.setState(
     { selectedTimeRange: 'all', telemetry: makePayload('all', trendSlots) },
     { sync: true }
   );
   await Promise.resolve();
 
-  assert.equal(trendHintEl.hasAttribute('hidden'), true, 'Static heatmap hint must be hidden on >90d');
   assert.equal(hmSwitchEl.hasAttribute('hidden'), false, '4-mode switcher must be shown on >90d');
   const modeBtns = hmSwitchEl.querySelectorAll('.seg-btn');
   assert.deepEqual(

@@ -13,7 +13,6 @@ import {
   fetchTelemetry,
   getDefaultCtxInspectorAgentId,
   normalizeClientWindowMountMode,
-  resolveScopedConversation,
   telemetryStore,
 } from './store/telemetryStore.js';
 import { dismissUiToast, getViewTabs, uiStore } from './store/uiStore.js';
@@ -22,14 +21,12 @@ import { TopSessionHeader } from './components/layout/TopSessionHeader.js';
 import { TopLongPillNav } from './components/ui/TopLongPillNav.js';
 import { LiveOverviewView } from './views/LiveOverviewView.js';
 import { ConsumptionView } from './views/ConsumptionView.js';
-import { StepsDetailView } from './views/StepsDetailView.js';
 import { SettingsView } from './views/SettingsView.js';
 
 const APP_VIEW_SHORTCUT_MAP = Object.freeze({
   1: 'overview',
   2: 'consumption',
-  3: 'steps',
-  4: 'settings',
+  3: 'settings',
 });
 
 function isEditableKeyTarget(e) {
@@ -50,8 +47,9 @@ export const App = defineComponent({
   name: 'App',
   setup({ onCleanup }) {
     const sessionHeader = TopSessionHeader();
+    const initialActiveView = uiStore.getState().activeView;
     const topPillNav = TopLongPillNav({
-      modelValue: uiStore.getState().activeView,
+      modelValue: initialActiveView === 'steps' ? 'overview' : initialActiveView,
       items: getViewTabs(),
       onUpdateModelValue: (nextView) => {
         uiStore.setState({ activeView: nextView });
@@ -60,7 +58,7 @@ export const App = defineComponent({
 
     const overviewView = LiveOverviewView();
     const consumptionView = ConsumptionView();
-    const stepsView = StepsDetailView();
+    const stepsView = overviewView.refs.stepsView;
     const settingsView = SettingsView();
 
     const globalBridgeNotice = BridgeStatusNotice({
@@ -96,14 +94,12 @@ export const App = defineComponent({
     const viewMap = {
       overview: overviewView.el,
       consumption: consumptionView.el,
-      steps: stepsView.el,
       settings: settingsView.el,
     };
 
     const stageEl = h('div', { className: 'viewport-stage' }, [
       overviewView.el,
       consumptionView.el,
-      stepsView.el,
       settingsView.el,
     ]);
 
@@ -253,43 +249,29 @@ export const App = defineComponent({
       ]
     );
 
-    function syncStepsBadge() {
-      const uiSt = uiStore.getState();
-      const scopeForBadge = uiSt.activeView === 'steps' ? uiSt.selectedAgentScope : 'all';
-      const { scopedConv } = resolveScopedConversation(
-        telemetryStore.getState().telemetry,
-        scopeForBadge,
-        uiSt.ctxInspectorAgentId
-      );
-      const stepCount = scopedConv?.stepCount ?? 0;
+    function syncNavTabs() {
       topPillNav.setProps({
-        items: getViewTabs().map((tabItem) =>
-          tabItem.value === 'steps'
-            ? { ...tabItem, badge: stepCount > 0 ? stepCount : '' }
-            : tabItem
-        ),
+        items: getViewTabs(),
       });
     }
 
     const unsubUi = uiStore.subscribe(
       (st) => st.activeView,
       (activeView) => {
-        topPillNav.setValue(activeView);
+        const targetView = activeView === 'steps' ? 'overview' : activeView;
+        topPillNav.setValue(targetView);
         for (const [key, paneEl] of Object.entries(viewMap)) {
-          patchAttr(paneEl, 'hidden', key !== activeView);
+          patchAttr(paneEl, 'hidden', key !== targetView);
         }
-        if (activeView === 'overview') {
+        if (targetView === 'overview') {
           overviewView.refs?.viewScrollbar?.refresh();
-        } else if (activeView === 'consumption') {
+          stepsView?.refs?.refreshStepTableViewport?.();
+          stepsView?.refs?.stepsScroll?.refresh();
+        } else if (targetView === 'consumption') {
           consumptionView.refs?.viewScrollbar?.refresh();
-        } else if (activeView === 'steps') {
-          stepsView.refs?.refreshStepTableViewport?.();
-          stepsView.refs?.stepsScroll?.refresh();
-          stepsView.refs?.modelsScroll?.refresh();
-        } else if (activeView === 'settings') {
+        } else if (targetView === 'settings') {
           settingsView.refs?.viewScrollbar?.refresh();
         }
-        syncStepsBadge();
         syncGlobalBridgeBanner();
       }
     );
@@ -314,9 +296,6 @@ export const App = defineComponent({
 
     const unsubStepCount = telemetryStore.subscribe(
       (st) => ({
-        stepCount: st.telemetry?.activeConversation?.stepCount ?? 0,
-        totalStepsAllAgents: st.telemetry?.activeConversation?.totalStepsAllAgents ?? 0,
-        subagentCount: st.telemetry?.activeConversation?.subagentCount ?? 0,
         windowMountMode: st.telemetry?.settings?.windowMountMode,
         enableWindowOverlay: st.telemetry?.settings?.enableWindowOverlay,
         contextAgentMode: st.telemetry?.settings?.contextAgentMode,
@@ -326,14 +305,8 @@ export const App = defineComponent({
       }),
       () => {
         syncContextAgentModeFromSettings(telemetryStore.getState().telemetry?.settings);
-        syncStepsBadge();
         syncGlobalBridgeBanner();
       }
-    );
-
-    const unsubScopeBadge = uiStore.subscribe(
-      (st) => st.selectedAgentScope,
-      () => syncStepsBadge()
     );
 
     const unsubToast = uiStore.subscribe(
@@ -345,7 +318,7 @@ export const App = defineComponent({
     const unsubI18n = i18nStore.subscribe(
       (st) => st.locale,
       () => {
-        syncStepsBadge();
+        syncNavTabs();
         globalBridgeNotice.refs.refreshLabels();
         patchAttr(bannerSlotEl, 'hidden', globalBridgeNotice.el.hasAttribute('hidden'));
         patchAttr(toastCloseBtn, 'aria-label', t('export.closeToast'));
@@ -357,7 +330,6 @@ export const App = defineComponent({
       clearToastTimer();
       unsubUi();
       unsubStepCount();
-      unsubScopeBadge();
       unsubToast();
       unsubI18n();
       globalBridgeNotice.destroy();
@@ -365,7 +337,6 @@ export const App = defineComponent({
       topPillNav.destroy();
       overviewView.destroy();
       consumptionView.destroy();
-      stepsView.destroy();
       settingsView.destroy();
     });
 

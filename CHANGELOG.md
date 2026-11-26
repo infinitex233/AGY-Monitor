@@ -1,54 +1,12 @@
 # Changelog
 
-All notable changes to **Antigravity Usage & Speed Monitor** are documented in this file.
+All notable changes to **AGY Monitor** are documented in this file.
 
-## [1.5.5] - 2026-11
+## [1.0.0] - 2026-11
 
-### Added
-- **Antigravity Host UI Localization & Layered Language Packs**: Added `backend/host-i18n/` (`pack-manager.mjs`, `runtime-translator.mjs`, `http-fetch.mjs`, `index.mjs`), `shared/host-i18n-protocol.mjs`, `HostI18nCard.js`, and repository-hosted `host-i18n/` (`zh-CN@1.0.0`, excluded from Release ZIP) with SHA-256 verification, offline light/deep tier switching, missing UI string collector, loopback-only `/api/host-i18n` endpoints, and lossless CDP DOM translation.
-- **Windows Multi-Account Switching, Passphrase Vault & Quota Trend Chart**: Added loopback PKCE browser OAuth login (`account-login.mjs`), runtime native binary OAuth extraction (`account-oauth.mjs`), optional `scrypt + AES-256-GCM` secondary passphrase vault (`account-vault-crypto.mjs`) over DPAPI, background backup-account quota refresh with Ultra `5x / 20x` detection, and collinear-compressed multi-account quota history & trend chart (`account-quota-history.mjs`, `AccountQuotaTrendCard.js`).
-- **Incremental SQLite Trajectory Ledger**: Added `trajectory-sqlite-ledger.mjs` (short-lived WAL `trajectory_store.sqlite` + remote `ssh-*.sqlite`) with automatic `.json` → `.bak` migration, `O(delta)` step UPSERT, undo truncation, 64-session hot LRU, corrupt-DB self-healing, and permanent archived-session preservation.
-- **Built-In AI Image Generation Detection & Independent Pricing**: Decoded `GenerateImage` (`step_payload 140.2.6`) and PNG/JPEG/WebP headers for `0.5K / 1K / 2K / 4K` tier pricing and timing isolated from text LLM speed/context metrics.
-- **3-Tier Weekly Capacity Estimates, 4-Mode LED Heatmap & Sub-Hour Buckets**: Filtered external/family-group usage from quota reservations, added 3-tier weekly pool capacity estimates, added `1m / 5m / 15m` sub-hour trend buckets, 4-mode (`day / week / month / total`) LED heatmap switcher, per-pool cycle filter, and unified chart motion engine (`chartMotion.js`).
-
-### Fixed
-- **SQLite Schema-Init Lock Guard & `.pb` Fallback Recovery (#41)**: Added lock-free 100-byte SQLite header readiness gate (`isSqliteDbReadyForRead`) and shared `transcript-fallback.mjs` to recover empty-shell `.db` + encrypted `.pb` sessions, subagent refs, and CLI statusLine metrics.
-- **Antigravity IDE Dual-Mount Route Probing (#42)**: Added parallel short-timeout read-only DOM route probing across IDE chat iframes with UUID validation and early abort.
-- **Floating Task Panel Typography & Spacing Parity**: Mirrored host `--font-sans` / `--font-mono` onto `portalHost`, unified Shadow host variable-font resets, and aligned `.wm-multi-panel` width, card row gap, and Modern UI bottom padding with the sidebar.
-- **Proxy Hardening, Native Web Downloads & UI Polish**: Added SOCKS5/SOCKS5h & authenticated CONNECT tunnels with Keep-Alive pooling and crash recovery, native browser downloads for standalone Web exports, Excel 32,767-char truncation, subagent migration filtering, undo context-breakdown preservation, virtual-scroll column width locking, and hover-flicker fixes.
-
-## [1.5.4] - 2026-11
-
-### Added
-- **Local CloudCode Proxy & Dual Context-Window Controls**: Added `cloudcode-proxy.mjs` loopback reverse proxy (`SetCloudCodeURL`) to synchronize custom per-model context window limits to non-`self` subagents and Swarm workers alongside independent `contextWindowMainEnabled` / `contextWindowSwarmEnabled` toggles.
-- **Experimental Quota Lease Reservation Estimator**: Added `quota-reservation.mjs` 5h/weekly dual-bucket in-flight quota lease tracking, FIFO settlement, delayed refund confirmation, outlier-filtered rolling median rate calibration, violet bar indicator, and `GET /api/quota-reservation/log`.
-- **Native Multi-Sheet `.xlsx` & Markdown Exports**: Added zero-dependency OOXML workbook builder (`xlsxBuilder.js`) and localized multi-sheet Excel / Markdown report exports with local `~/Downloads` save and one-click file manager reveal toast.
-- **Step Diagnostic Drawer & Live Filtering**: Added click-to-inspect `StepDiagnosticDrawer` (timing waterfall, token/cost breakdown, 9-kind V4 `anomaly.events` list, Markdown copy), live multi-term step search, and danger-tier diagnostic filter chips.
-- **Workspace Cost Attribution & Session Migration**: Added **Projects (Workspaces)** cost ranking tab, session project tags, portable JSON settings backup/import, and opt-in cross-client session migration/cloning (`CLI ↔ Desktop/IDE` and `Legacy IDE`) with isolated UUID rewriting.
-- **CLI `statusLine` Gauge Styles & JSON Output**: Added `--style pill|bar|compact`, `--preset compact|balanced|full`, and single-line `--json` snapshot output for external prompt/bar integrations.
-
-### Changed & Optimized
-- **Hot-Path Performance (P1)**: Made `trajectoryCache` lazy via `createTrajectoryCacheStore` and added tail-row (`LIMIT 16`) SQLite reads for `cli-statusline.mjs` (`~419ms → <60ms`); skipped redundant per-poll WAL `statSync` on unchanged `IDLE` sessions; switched `cloudcode-proxy` Windows system proxy lookup to async `execFile` with TTL caching; deferred overlay `App()` instantiation until first popover open; coalesced host `MutationObserver` via `requestAnimationFrame`; shared `adoptedStyleSheets` across overlay portals and cached chart `DOMRect` on hover.
-- **Shared Primitives & Modular Architecture (P2–P3)**: Extracted `fs-atomic.mjs`, `trajectory-cache-store.mjs`, `workspace-uri.mjs`, `prompt-clean.mjs`, `windows-shortcut-provision.ps1`, `ToggleSwitch.js` (cutting `SettingsView` `ResizeObserver` count by ~59%), `SearchInput.js`, `StepDiagnosticDrawer.js`, `ConsumptionBreakdownRows.js`, `stepChartMath.js`, and `overlayHostAnchors.js`; upgraded `build-bundle.mjs` regex-after-condition-paren lexer and inner-IIFE `import/export { a as b }` alias support.
-
-### Fixed
-- **Telemetry & Inspector Accuracy (P0)**: Unified step selection keys so clicking any step reliably opens the diagnostic drawer; preserved V4 `nativeStreamSec`, `thinkingDurationSec`, and `hasToolCalls` across step projections; fixed `reportExporter.js` and `stepInspector.js` duration/waterfall fields and `anomaly.events` rendering; computed merged model average speed from exact `speedSummary.{tokens, seconds}` harmonic totals; honored `ANTIGRAVITY_GEMINI_DIR` override and cleaned up `multiRunningWidget` on overlay disposal.
-
-## [1.5.3] - 2026-04
-
-### Added & Changed
-- Graduated borderless **Modern UI** to default, defaulted language to host/system (`auto`), and unified token breakdown ordering and flat tooltip cards.
-- Added SSH Remote multi-window isolation (`endpoint-registry.mjs`) with per-endpoint trajectory/quota caches and RPC routing.
-- Added support for Opus 5.5 Orchestrator (`Neon` variants) and prevented unknown future variants from misrouting to Carbon pools.
-- Fixed 5-hour quota cycle boundary accounting and macOS host relaunch ancestor process matching.
-
-## [1.5.2] - 2026-03
-
-### Added & Changed
-- Added runtime-only whitelist Release ZIP packager (`pack-release-zip.mjs`), Native Swarm mode worker telemetry, 9-category step anomaly diagnostics, virtualized large step tables (`>80` rows), and pruned `scope=consumption` / `scope=conversation` fast paths.
-- Hardened Desktop `2.33.0+` launcher auto-provisioning and out-of-job 1-click host relaunch across Windows (UIPI-safe user relaunch + on-demand UAC), macOS, and Linux (`.desktop` / AppImage).
-
-## [1.5.1] - 2026-03
-
-### Added & Changed
-- Added hybrid SQLite + WAL direct reader, `384k` context window preset, time-phased promotional model pricing, scalable `--fs-*` typography tokens, and isolated `sidecar-worker.mjs` hot-reloadable runtime.
+### Highlights
+- **Focused 3-Tab Interface**: Streamlined navigation into **Live Monitor**, **Analytics**, and **Preferences**, embedding the call-details table directly beneath the session summary and context composition cards.
+- **Topbar Capsule & Hover Quick Card**: Displays `Live Speed | TTFT | Live Cache Hit | Context %` in the titlebar capsule and `Live Speed | TTFT | Live Cache | Step Cost` on hover, with subscription quota widgets removed.
+- **Refined Usage Analytics**: Added **24h** window preset, full-width adaptive **6-month (26-week)** calendar heatmap in **All** mode without horizontal clipping, color-coded token legend dots, and version-first compact model identifiers (e.g., `4-neon-high`, `4-hydrogen-high`).
+- **Streamlined Security & Privacy Surface**: Removed OAuth account switching, PowerShell/DPAPI credential scripts, quota reservation heuristics, cross-client session migration, and host UI translation injection so runtime code stays strictly scoped to local telemetry.
+- **Independent Versioning & Selective Pricing Sync**: Anchored releases and update checks to `infinitex233/antigravity-usage-monitor` starting at `v1.0.0`, paired with a manual GitHub Actions workflow to selectively pull upstream public pricing data.

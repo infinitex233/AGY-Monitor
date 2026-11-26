@@ -8,7 +8,6 @@
 import { t } from '../i18n/index.js';
 import { showUiToast } from '../store/uiStore.js';
 import { callSidecarApi, isWindowOverlayMode } from './httpClient.js';
-import { triggerBlobDownload } from './settingsBackup.js';
 import { copyPlainTextToClipboard } from './stepInspector.js';
 import { uint8ArrayToBase64 } from './xlsxBuilder.js';
 
@@ -107,6 +106,27 @@ async function requestLocalBackendExport(payload) {
     // 忽略回退异常，交由下方分环境处理
   }
   return { res: null, remoteForbidden: false };
+}
+
+function triggerBlobDownload(filename, content, mimeType) {
+  if (typeof document === 'undefined' || typeof Blob === 'undefined' || typeof URL === 'undefined') {
+    return false;
+  }
+  try {
+    const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = String(filename || 'export.txt');
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

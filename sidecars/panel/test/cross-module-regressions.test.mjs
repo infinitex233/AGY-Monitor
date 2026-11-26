@@ -464,8 +464,8 @@ test('BUG-09, BUG-14 & BUG-15: SemVer 2.0 prerelease/build ordering, future-only
   assert.equal(claudePool.remainingPct, 40);
   assert.equal(claudePool.weeklyRemainingPct, 80);
 
-  assert.equal(formatCountdown(new Date(nowMs + 30_000).toISOString(), nowMs), '<1分钟后重置');
-  assert.equal(formatCountdown('1969-12-31T23:59:59Z', nowMs), '未知重置时间');
+  assert.equal(formatCountdown(new Date(nowMs + 30_000).toISOString(), nowMs), '<1m');
+  assert.equal(formatCountdown('1969-12-31T23:59:59Z', nowMs), '--');
   assert.equal(formatUsd(0.0004, { precise: true }), '<$0.001');
   assert.equal(formatUsd(12.34, { unpricedCalls: 1, compactPending: true }), '$12.34');
   assert.equal(speedReasonText('short_timing'), '耗时过短 (<0.5s)');
@@ -1085,28 +1085,9 @@ test('P0 audit fixes: main/bridge-daemon import isolation, standalone lsAddr, du
   );
   assert.equal(findAct?.label, '查找文件');
 
-  // 4. Preview i18n ('live.generating'), stepColumns maxItems: 14, SQLite busy helper reuse, and pure header render
+  // 4. SQLite busy helper reuse and pure header render
   const { setI18nLanguage } = await import('../src/i18n/index.js');
-  const { buildStructurePreviewTelemetry } = await import(
-    '../src/components/settings/structurePreviewMock.js'
-  );
   setI18nLanguage('zh-CN');
-  assert.equal(
-    buildStructurePreviewTelemetry().runningConversations[0].mainActivity.label,
-    '生成中'
-  );
-  setI18nLanguage('en-US');
-  assert.equal(
-    buildStructurePreviewTelemetry().runningConversations[0].mainActivity.label,
-    'Generating'
-  );
-  setI18nLanguage('zh-CN');
-
-  const structureTabSrc = fs.readFileSync(
-    new URL('../src/views/settings/SettingsStructureTab.js', import.meta.url),
-    'utf8'
-  );
-  assert.match(structureTabSrc, /options:\s*getStepColumnOptions[\s\S]{0,120}?maxItems:\s*14\b/);
 
   const cliStatusSrc = fs.readFileSync(new URL('../cli-statusline.mjs', import.meta.url), 'utf8');
   assert.match(cliStatusSrc, /\bwithReadOnlySqliteDb\b/);
@@ -1123,28 +1104,22 @@ test('P0 audit fixes: main/bridge-daemon import isolation, standalone lsAddr, du
   assert.doesNotMatch(renderBody, /\buiStore\.setState\b/);
 });
 
-test('P1 audit fixes: shared third-party pool & route single-source, pure frozen resolveScopedConversation, mock schema alignment, and account preferences inclusion', async () => {
+test('P1 audit fixes: shared third-party pool & route single-source and pure frozen resolveScopedConversation', async () => {
   const { normalizeI18nLanguage } = await import('../src/i18n/index.js');
   const { resolveSpecificQuotaSlotSummary } = await import('../src/registries/metricRegistry.js');
   const { resolveScopedConversation, isEquivalentTelemetry } = await import(
     '../src/store/telemetryStore.js'
   );
-  const { buildStructurePreviewTelemetry } = await import(
-    '../src/components/settings/structurePreviewMock.js'
-  );
   const { BRIDGE_API_ROUTE_DEFS } = await import('../shared/window-bridge-protocol.mjs');
 
   assert.equal(normalizeI18nLanguage('system'), 'auto');
   assert.equal(typeof isEquivalentTelemetry, 'function');
-  assert.equal(BRIDGE_API_ROUTE_DEFS.length, 17);
+  assert.equal(BRIDGE_API_ROUTE_DEFS.length, 10);
   assert.ok(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/bridge/relaunch'));
-  assert.ok(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/session-migration/catalog'));
-  assert.ok(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/session-migration/migrate'));
   assert.ok(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/export-file'));
   assert.ok(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/reveal-file'));
-  assert.ok(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/quota-reservation/log'));
-  assert.ok(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/host-i18n' && r.method === 'GET'));
-  assert.ok(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/host-i18n' && r.method === 'POST'));
+  assert.equal(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/host-i18n'), false);
+  assert.equal(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/accounts'), false);
 
   // 1. Third-party pool parity across backend, CLI statusline, and frontend metricRegistry
   const h = backendHarness();
@@ -1190,16 +1165,9 @@ test('P1 audit fixes: shared third-party pool & route single-source, pure frozen
   assert.equal(scoped.aggregated.recentSteps.length, 2);
   assert.equal(scoped.mainAgent.recentSteps.length, 1);
 
-  // 3. structurePreviewMock schema completeness & account preferences bundled for use
-  const mock = buildStructurePreviewTelemetry();
-  assert.equal(typeof mock.activeConversation.context.compactionUsedTokens, 'number');
-  assert.equal(mock.activeConversation.aggregated.agentId, 'all');
-  assert.equal(Array.isArray(mock.activeConversation.agents[0].modelBreakdown), true);
-  assert.equal(mock.quotas.meta.hasOfficialData, true);
-
   const appJs = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
-  assert.equal(appJs.includes('SettingsAccountTab.js'), true);
-  assert.equal(appJs.includes('function renderQuotaRows('), true);
+  assert.equal(appJs.includes('SettingsAccountTab.js'), false);
+  assert.equal(appJs.includes('function renderQuotaRows('), false);
 });
 
 test('P2 audit fixes: standalone sqlite/proto-wire primitives, structured liveActivity/agent/media i18n, full en-US SVG charts, controlled LiveActivityWidget reuse, and shared Mock DOM', async () => {
@@ -1254,9 +1222,6 @@ test('P2 audit fixes: standalone sqlite/proto-wire primitives, structured liveAc
     const { formatTurnPromptText } = await import('../src/components/widgets/StepTableWidget.js');
     const { LiveActivityWidget } = await import('../src/components/widgets/LiveActivityWidget.js');
     const { buildCapsuleSlotContext } = await import('../src/components/widgets/CapsuleBarWidget.js');
-    const { createModelFitChart, createSessionLineChart } = await import(
-      '../src/components/charts/SessionStepCharts.js'
-    );
     const { createTrendAreaChart } = await import('../src/components/charts/TrendAreaChart.js');
 
     const waitCmdAct = extractLiveActivity(
@@ -1344,32 +1309,6 @@ test('P2 audit fixes: standalone sqlite/proto-wire primitives, structured liveAc
     controlledLive.el.querySelector('.live-task-title').onclick({});
     assert.equal(selectedCid, 'conv-en-ctrl');
     controlledLive.refs.stopLiveTicker();
-
-    // SVG charts in en-US emit zero Chinese characters
-    const sampleSteps = Array.from({ length: 6 }, (_, i) => ({
-      stepIndex: i + 1,
-      baseModelLabel: 'Gemini 4 Carbon',
-      baseModelShort: 'carbon-4',
-      tokPerSec: 70 + i * 4,
-      ttftSec: 1.1,
-      cacheHitPct: 88,
-      inputTokens: 1000,
-      cacheReadTokens: 8000,
-      outputTokens: 300,
-      contextTokens: 12000,
-      costUsd: 0.01,
-    }));
-    const lineChart = createSessionLineChart();
-    const lineRes = lineChart.update({ steps: sampleSteps, metric: 'tps' });
-    assert.equal(/[\u4e00-\u9fff]/.test(lineRes.summaryBadge), false);
-    assert.equal(/[\u4e00-\u9fff]/.test(lineChart.el.textContent), false);
-    lineChart.destroy();
-
-    const fitChart = createModelFitChart();
-    const fitRes = fitChart.update({ steps: sampleSteps, metric: 'tps' });
-    assert.equal(/[\u4e00-\u9fff]/.test(fitRes.summaryBadge), false);
-    assert.equal(/[\u4e00-\u9fff]/.test(fitChart.el.textContent), false);
-    fitChart.destroy();
 
     const trendChart = createTrendAreaChart();
     const hmSlots = Array.from({ length: 95 }, (_, i) => {
@@ -1519,7 +1458,6 @@ test('i18n static t(...) key completeness guard, scopeAll formatters, and locali
     formatAgentLabel,
     formatTrendSlotFullLabel,
   } = await import('../src/core/formatters.js');
-  const { buildStructurePreviewTelemetry } = await import('../src/components/settings/structurePreviewMock.js');
   const { buildConsumptionCsv } = await import('../src/core/reportExporter.js');
   const { createTrendAreaChart } = await import('../src/components/charts/TrendAreaChart.js');
   const { createMockDom } = await import('./mock-dom.mjs');
@@ -1554,7 +1492,7 @@ test('i18n static t(...) key completeness guard, scopeAll formatters, and locali
   }
   assert.deepEqual(missingKeys, []);
 
-  // 2. agentKind === 'all' & structurePreviewMock never leak raw key strings
+  // 2. agentKind === 'all' never leaks raw key strings
   const prevDoc = globalThis.document;
   const prevWin = globalThis.window;
   const { document } = createMockDom();
@@ -1569,12 +1507,10 @@ test('i18n static t(...) key completeness guard, scopeAll formatters, and locali
     setI18nLanguage('zh-CN');
     assert.equal(formatAgentBadgeText({ agentKind: 'all' }), '全');
     assert.equal(formatAgentLabel({ agentKind: 'all' }), '全部代理');
-    assert.equal(buildStructurePreviewTelemetry().activeConversation.aggregated.badgeText, '全');
 
     setI18nLanguage('en-US');
     assert.equal(formatAgentBadgeText({ agentKind: 'all' }), 'All');
     assert.equal(formatAgentLabel({ agentKind: 'all' }), 'All Agents');
-    assert.equal(buildStructurePreviewTelemetry().activeConversation.aggregated.badgeText, 'All');
 
     // 3. TrendAreaChart tooltip + X-axis tick title & CSV export localize dates in en-US without hardcoded Chinese
     const localStart = new Date(new Date().getFullYear(), 10, 24, 10, 0, 0, 0).getTime();
@@ -1805,14 +1741,14 @@ test('ConsumptionView and TrendAreaChart patch text DOM nodes in-place without o
 
     const matrixEl = view.el.querySelector('.cons-unified-matrix');
     const heroNumEl = view.el.querySelector('.cons-hero-num');
-    const modelRowEl = view.el.querySelector('.cons-item-row');
-    const modelTitleTextEl = modelRowEl.querySelector('.cons-row-title-text');
-    const sourceRowEl = view.el.querySelector('.cons-source-row');
+    const modelRowEl = view.el.querySelector('.cons-model-tr');
+    const modelTitleEl = modelRowEl.querySelector('.col-model');
+    assert.equal(view.el.querySelector('.cons-source-row'), null);
     const xAxisEl = view.el.querySelector('.trend-x-axis');
     const initialTicks = xAxisEl.querySelectorAll('.trend-x-tick');
     assert.equal(initialTicks.length, 4);
 
-    // Switch to 7d: same model, same source, updated numbers & tick labels -> all DOM nodes reused in-place, zero opacity flicker classes
+    // Switch to 7d: same model, updated numbers & tick labels -> all DOM nodes reused in-place, zero opacity flicker classes
     telemetryStore.setState(
       {
         selectedTimeRange: '7d',
@@ -1822,13 +1758,12 @@ test('ConsumptionView and TrendAreaChart patch text DOM nodes in-place without o
     );
 
     assert.equal(view.el.querySelector('.cons-hero-num'), heroNumEl, 'Hero token element persists');
-    assert.equal(view.el.querySelector('.cons-item-row'), modelRowEl, 'Model row element persists');
+    assert.equal(view.el.querySelector('.cons-model-tr'), modelRowEl, 'Model row element persists');
     assert.equal(
-      view.el.querySelector('.cons-item-row .cons-row-title-text'),
-      modelTitleTextEl,
-      'Model title text node persists'
+      view.el.querySelector('.cons-model-tr .col-model'),
+      modelTitleEl,
+      'Model title cell persists'
     );
-    assert.equal(view.el.querySelector('.cons-source-row'), sourceRowEl, 'Source row element persists');
 
     const nextTicks = xAxisEl.querySelectorAll('.trend-x-tick');
     assert.equal(nextTicks.length, 4);
@@ -1840,7 +1775,6 @@ test('ConsumptionView and TrendAreaChart patch text DOM nodes in-place without o
     for (const cls of ['is-range-switching', 'is-tab-entering', 'is-switching', 'is-stage-entering']) {
       assert.equal(matrixEl.classList.contains(cls), false);
       assert.equal(modelRowEl.parentNode.classList.contains(cls), false);
-      assert.equal(sourceRowEl.parentNode.classList.contains(cls), false);
       assert.equal(xAxisEl.classList.contains(cls), false);
     }
 
@@ -1905,7 +1839,7 @@ test('ConsumptionView and TrendAreaChart patch text DOM nodes in-place without o
     assert.equal(view.refs.cyclePoolSelect.el.hasAttribute('hidden'), false, 'Shown on cycle with >=2 pools');
     assert.equal(view.refs.cyclePoolSelect.refs.triggerLabel.textContent, 'Gemini');
     const badges = view.el.querySelectorAll('.cons-badge');
-    assert.match(badges[1]?.textContent || '', /当前周期 · Gemini/);
+    assert.equal(badges.length, 1, 'Only date-span badge remains');
 
     // Open dropdown and verify localized pool metadata + switch back to 'today' hides dropdown
     view.refs.cyclePoolSelect.open();

@@ -372,8 +372,22 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   background: var(--modern-surface-card);
   box-shadow: var(--modern-card-shadow);
   border-radius: var(--radius-sm);
-  padding: 8px 10px;
+  padding: 11px 13px;
+  gap: 5px;
   transition: background-color 160ms var(--ease-modern);
+}
+
+[data-modern-ui="true"] .matrix-cell:hover {
+  background: color-mix(in srgb, var(--modern-surface-card) 94%, var(--text-primary) 6%);
+}
+
+[data-modern-ui="true"] .ctx-legend-toggle {
+  border-radius: var(--radius-pill);
+}
+
+[data-modern-ui="true"] .ctx-legend-toggle:hover,
+[data-modern-ui="true"] .ctx-legend-toggle:focus-visible {
+  background: var(--modern-surface-hover);
 }
 
 /* 面板内的双栏信息项（如版本更新中的「价格表 / 当前版本」）不套二层背景 */
@@ -382,6 +396,15 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   box-shadow: none;
   border-radius: 0;
   padding: 2px 0;
+}
+
+/* 实时监控「会话总览」面板内部 4 格保持扁平无二层卡片阴影 */
+[data-modern-ui="true"] .session-summary-panel .matrix-cell,
+[data-modern-ui="true"] .session-summary-panel .matrix-cell:hover {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 6px 0 4px;
 }
 
 /* 结构页预览画布内的测速卡与任务卡保持轻微层次以呈现真实预览布局 */
@@ -420,8 +443,8 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 }
 
 [data-modern-ui="true"] .progress-track.ctx-segment-meter {
-  height: 6px;
-  border-radius: 3px;
+  height: 7px;
+  border-radius: var(--radius-pill);
   background: var(--modern-progress-track);
 }
 
@@ -443,12 +466,19 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 [data-modern-ui="true"] .cons-unified-matrix {
   border: none;
   background: transparent;
-  gap: 10px 12px;
-  padding: 2px 0;
+  gap: 14px 16px;
+  padding: 4px 0;
   overflow: visible;
 }
 
-[data-modern-ui="true"] .cons-split-3 {
+[data-modern-ui="true"] .cons-item-row:hover,
+[data-modern-ui="true"] .cons-top-conv-row:hover,
+[data-modern-ui="true"] .cons-source-row:hover {
+  background: var(--modern-surface-hover);
+}
+
+[data-modern-ui="true"] .cons-split-3,
+[data-modern-ui="true"] .cons-split-4 {
   gap: 12px;
 }
 
@@ -462,6 +492,22 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   background: transparent;
   border-radius: 0;
   padding: 2px 0;
+}
+
+[data-modern-ui="true"] .cons-models-table thead th {
+  border-bottom-color: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
+[data-modern-ui="true"] .cons-models-table tbody td {
+  border-bottom-color: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+[data-modern-ui="true"] .cons-models-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+[data-modern-ui="true"] .cons-models-table tbody tr:hover td {
+  background: var(--modern-surface-hover);
 }
 
 [data-modern-ui="true"] .trend-peak-pill,
@@ -534,6 +580,16 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 [data-modern-ui="true"] .data-table tbody tr:not(.step-vspacer):not(.step-vsizer):hover,
 [data-modern-ui="true"] .data-table.is-virtualized tbody tr.is-stripe-even:hover {
   background: var(--modern-surface-hover);
+}
+
+[data-modern-ui="true"] .data-table tbody tr:not(.step-vspacer):not(.step-vsizer) td:first-child {
+  border-top-left-radius: var(--radius-xs);
+  border-bottom-left-radius: var(--radius-xs);
+}
+
+[data-modern-ui="true"] .data-table tbody tr:not(.step-vspacer):not(.step-vsizer) td:last-child {
+  border-top-right-radius: var(--radius-xs);
+  border-bottom-right-radius: var(--radius-xs);
 }
 
 [data-modern-ui="true"] .data-table tbody tr.is-compaction,

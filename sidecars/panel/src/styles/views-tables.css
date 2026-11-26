@@ -49,7 +49,7 @@
 
 .data-table th,
 .data-table td {
-  padding: calc(5px * var(--ui-font-scale, 1)) calc(4px * var(--ui-font-scale, 1));
+  padding: calc(8px * var(--ui-font-scale, 1)) calc(8px * var(--ui-font-scale, 1));
   text-align: left;
   font-size: var(--fs-base-sm);
   border-bottom: 1px solid var(--border-hairline);
@@ -90,8 +90,9 @@
   top: 0;
   z-index: 2;
   background: var(--surface-panel);
-  color: var(--text-secondary);
-  font-weight: 600;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+  font-weight: 500;
 }
 
 .data-table th.is-sortable {
@@ -115,8 +116,38 @@
   vertical-align: middle;
 }
 
-.data-table th:last-child .step-th-inner {
+.data-table th:last-child .step-th-inner,
+.data-table th.is-right .step-th-inner {
   justify-content: flex-end;
+}
+
+.steps-data-table th[data-col="step"],
+.steps-data-table td[data-col="step"] {
+  width: 1%;
+  padding-right: calc(24px * var(--ui-font-scale, 1));
+}
+
+.steps-data-table th[data-col="time"],
+.steps-data-table td[data-col="time"] {
+  width: 1%;
+  padding-right: calc(20px * var(--ui-font-scale, 1));
+}
+
+.steps-data-table th[data-col="model"],
+.steps-data-table td[data-col="model"] {
+  padding-right: calc(16px * var(--ui-font-scale, 1));
+}
+
+.steps-data-table th.is-right,
+.steps-data-table td.is-right {
+  width: 14%;
+  padding-left: calc(16px * var(--ui-font-scale, 1));
+  padding-right: calc(8px * var(--ui-font-scale, 1));
+}
+
+.steps-data-table th.is-right:last-child,
+.steps-data-table td.is-right:last-child {
+  padding-right: 4px;
 }
 
 .step-sort-icon {
@@ -1375,4 +1406,25 @@
   border: none;
   border-radius: var(--radius-pill);
   background: var(--modern-surface-subtle);
+}
+
+/* 嵌入实时监控视图时的调用明细面板：自适应虚拟表格高，汇总分析融入外层滚动 */
+.steps-embedded-panel {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.steps-embedded-panel > .table-scroll-host {
+  flex: 0 1 auto;
+  max-height: clamp(320px, 56vh, 600px);
+}
+
+.steps-embedded-panel > .table-scroll-host.is-models-scroll {
+  max-height: none;
+}
+
+.steps-embedded-panel .models-analytics-pane {
+  overflow-y: visible;
 }

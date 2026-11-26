@@ -23,7 +23,6 @@ const ROOT_WHITELIST = Object.freeze([
   'mcp_config.json',
   'pricing-catalog.json',
   'LICENSE',
-  'assets/logo.svg',
 ]);
 
 const PANEL_TOP_WHITELIST = Object.freeze([

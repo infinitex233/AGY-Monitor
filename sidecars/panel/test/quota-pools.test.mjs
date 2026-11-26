@@ -689,9 +689,7 @@ test('per-pool cycle5h and cycleWeekly isolate each pool by its own reset window
   assert.equal(cycleSourcesTok, 155_000);
 });
 
-test('account tier badge distinguishes Ultra 5x (g1-ultra-lite-tier) vs Ultra 20x (g1-ultra-tier) and deduplicates Pro/Free', async () => {
-  const { formatAccountTierBadge } = await import('../src/components/widgets/QuotaPoolsWidget.js');
-
+test('account tier telemetry distinguishes Ultra 5x (g1-ultra-lite-tier) vs Ultra 20x (g1-ultra-tier)', async () => {
   const hUltra20 = backendHarness({
     userStatus: {
       userTier: { id: 'g1-ultra-tier', name: 'Google AI Ultra' },
@@ -701,7 +699,6 @@ test('account tier badge distinguishes Ultra 5x (g1-ultra-lite-tier) vs Ultra 20
   const p20 = await hUltra20.buildTelemetryPayloadInternal(null);
   assert.equal(p20.account.tierMultiplier, '20x');
   assert.equal(p20.account.planName, '20x');
-  assert.equal(formatAccountTierBadge(p20.account), 'Google AI Ultra · 20x');
 
   const hUltra5 = backendHarness({
     userStatus: {
@@ -712,7 +709,6 @@ test('account tier badge distinguishes Ultra 5x (g1-ultra-lite-tier) vs Ultra 20
   const p5 = await hUltra5.buildTelemetryPayloadInternal(null);
   assert.equal(p5.account.tierMultiplier, '5x');
   assert.equal(p5.account.planName, '5x');
-  assert.equal(formatAccountTierBadge(p5.account), 'Google AI Ultra · 5x');
 
   const hUltraNoId = backendHarness({
     userStatus: {
@@ -722,25 +718,6 @@ test('account tier badge distinguishes Ultra 5x (g1-ultra-lite-tier) vs Ultra 20
   });
   const pNoId = await hUltraNoId.buildTelemetryPayloadInternal(null);
   assert.equal(pNoId.account.tierMultiplier, '');
-  assert.equal(formatAccountTierBadge(pNoId.account), 'Google AI Ultra');
-
-  const hPro = backendHarness({
-    userStatus: {
-      userTier: { id: 'g1-pro-tier', name: 'Google AI Pro' },
-      planStatus: { planInfo: { planName: 'Pro' } },
-    },
-  });
-  const pPro = await hPro.buildTelemetryPayloadInternal(null);
-  assert.equal(formatAccountTierBadge(pPro.account), 'Google AI Pro');
-
-  assert.equal(
-    formatAccountTierBadge({ tierName: 'Google AI Free', planName: 'Free' }),
-    'Google AI Free'
-  );
-  assert.equal(
-    formatAccountTierBadge({ tierName: 'Google AI', planName: 'Enterprise' }),
-    'Google AI · Enterprise'
-  );
 });
 
 test('argon_weekly capsule & CLI slot enables only when user has an Argon weekly pool and auto-hides otherwise', async () => {

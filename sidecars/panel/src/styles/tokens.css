@@ -12,8 +12,8 @@
 
   /* Architectural Geometry: Only Top Nav uses --radius-pill */
   --radius-pill: 999px;
-  --radius-sm: 4px;
-  --radius-xs: 2px;
+  --radius-sm: 8px;
+  --radius-xs: 5px;
 
   /* Host-Bridged Surfaces (Antigravity 2.0 + Antigravity IDE --vscode-* + safe fallback) */
   --surface-bg: var(--background, var(--vscode-sideBar-background, var(--vscode-editor-background, hsl(0 0% 100%))));
@@ -54,8 +54,8 @@
   --fs-base-sm: calc(12.5px * var(--ui-font-scale, 1));
   --fs-base: calc(13px * var(--ui-font-scale, 1));
   --fs-body: calc(13px * var(--ui-font-scale, 1));
-  --fs-lg: calc(15px * var(--ui-font-scale, 1));
-  --fs-hero: calc(18px * var(--ui-font-scale, 1));
+  --fs-lg: calc(16px * var(--ui-font-scale, 1));
+  --fs-hero: calc(20px * var(--ui-font-scale, 1));
 
   --text-primary: var(--foreground, var(--vscode-foreground, var(--vscode-editor-foreground, hsl(215 22% 15%))));
   --text-secondary: var(--muted-foreground, var(--vscode-descriptionForeground, hsl(215 12% 44%)));
@@ -122,9 +122,9 @@
 
   /* Spacing & Density */
   --space-2: 6px;
-  --space-3: 8px;
-  --space-4: 10px;
-  --space-5: 12px;
+  --space-3: 10px;
+  --space-4: 12px;
+  --space-5: 14px;
 }
 
 :root[data-color-scheme="dark"],
@@ -180,8 +180,8 @@
   --fs-base-sm: calc(12.5px * var(--ui-font-scale, 1));
   --fs-base: calc(13px * var(--ui-font-scale, 1));
   --fs-body: calc(13px * var(--ui-font-scale, 1));
-  --fs-lg: calc(15px * var(--ui-font-scale, 1));
-  --fs-hero: calc(18px * var(--ui-font-scale, 1));
+  --fs-lg: calc(16px * var(--ui-font-scale, 1));
+  --fs-hero: calc(20px * var(--ui-font-scale, 1));
 }
 
 @media (prefers-color-scheme: dark) {

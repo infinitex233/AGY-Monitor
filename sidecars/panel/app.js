@@ -77,6 +77,8 @@ const OVERVIEW_METRIC_KEYS = Object.freeze([
   'tps',
   'ttft',
   'avg_tps',
+  'avg_ttft',
+  'avg_cache',
   'step_cost',
   'session_cost',
   'cache_hit',
@@ -114,7 +116,6 @@ const DEFAULT_STEP_TABLE_COLUMNS = Object.freeze([
   'model',
   'tps',
   'ttft',
-  'tokens_combo',
   'cache',
   'cost',
 ]);
@@ -925,33 +926,14 @@ const WINDOW_OVERLAY_METHODS = Object.freeze({
 const BRIDGE_API_ROUTE_DEFS = Object.freeze([
   Object.freeze({ path: '/api/telemetry', method: 'GET', action: 'telemetry' }),
   Object.freeze({ path: '/api/settings', method: 'POST', action: 'settings' }),
-  Object.freeze({ path: '/api/accounts', method: 'GET', action: 'accounts_get' }),
-  Object.freeze({ path: '/api/accounts/update', method: 'POST', action: 'accounts_update' }),
   Object.freeze({ path: '/api/context-window', method: 'POST', action: 'context_window' }),
   Object.freeze({ path: '/api/settings/reset', method: 'POST', action: 'settings_reset' }),
   Object.freeze({ path: '/api/cache/rebuild', method: 'POST', action: 'cache_rebuild' }),
   Object.freeze({ path: '/api/cloud-sync', method: 'POST', action: 'cloud_sync' }),
   Object.freeze({ path: '/api/plugin-update', method: 'POST', action: 'plugin_update' }),
   Object.freeze({ path: '/api/bridge/relaunch', method: 'POST', action: 'bridge_relaunch' }),
-  Object.freeze({
-    path: '/api/session-migration/catalog',
-    method: 'GET',
-    action: 'session_migration_catalog',
-  }),
-  Object.freeze({
-    path: '/api/session-migration/migrate',
-    method: 'POST',
-    action: 'session_migration_migrate',
-  }),
   Object.freeze({ path: '/api/export-file', method: 'POST', action: 'export_file' }),
   Object.freeze({ path: '/api/reveal-file', method: 'POST', action: 'reveal_file' }),
-  Object.freeze({
-    path: '/api/quota-reservation/log',
-    method: 'GET',
-    action: 'quota_reservation_log',
-  }),
-  Object.freeze({ path: '/api/host-i18n', method: 'GET', action: 'host_i18n_get' }),
-  Object.freeze({ path: '/api/host-i18n', method: 'POST', action: 'host_i18n_action' }),
 ]);
 
 const BRIDGE_API_PATHS = Object.freeze(BRIDGE_API_ROUTE_DEFS.map((r) => r.path));
@@ -960,69 +942,6 @@ function readInjectedWindowBridge() {
   return typeof window === 'undefined' ? undefined : window[WINDOW_BRIDGE_KEY];
 }
 return { WINDOW_BRIDGE_KEY, WINDOW_BRIDGE_ROUTE_KEY, WINDOW_BRIDGE_ENDPOINT_KEY, WINDOW_BRIDGE_ENDPOINT_HEADER, LOCAL_ENDPOINT_ID, WINDOW_OVERLAY_KEY, CONTEXT_WINDOWS_GLOBAL_KEY, WINDOW_OVERLAY_METHODS, BRIDGE_API_ROUTE_DEFS, BRIDGE_API_PATHS, readInjectedWindowBridge };
-})();
-
-// --- shared/host-i18n-protocol.mjs ---
-const { HOST_I18N_GLOBAL_KEY, HOST_I18N_API_PATH, HOST_I18N_SCHEMA_VERSION, HOST_I18N_OFF_LOCALE, HOST_I18N_DEFAULT_DEPTH, HOST_I18N_DEPTHS, HOST_I18N_LOCALE_RE, normalizeHostI18nLocale, normalizeHostI18nDepth } = (() => {
-/**
- * @fileoverview Zero-dependency shared protocol constants and normalizers
- * for the decoupled Antigravity Host I18n subsystem.
- */
-
-const HOST_I18N_GLOBAL_KEY = '__AGUsageMonitorHostI18n';
-const HOST_I18N_API_PATH = '/api/host-i18n';
-const HOST_I18N_SCHEMA_VERSION = 1;
-const HOST_I18N_OFF_LOCALE = 'off';
-const HOST_I18N_DEFAULT_DEPTH = 'light';
-const HOST_I18N_DEPTHS = Object.freeze(['light', 'deep']);
-const HOST_I18N_LOCALE_RE = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$/;
-
-/**
- * Normalizes a host translation locale identifier (`'off'` or canonical BCP-47 tag).
- *
- * @param {unknown} value
- * @returns {string}
- */
-function normalizeHostI18nLocale(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return HOST_I18N_OFF_LOCALE;
-  const lower = raw.toLowerCase();
-  if (
-    lower === 'off' ||
-    lower === 'none' ||
-    lower === 'disabled' ||
-    lower === 'original' ||
-    lower === 'default'
-  ) {
-    return HOST_I18N_OFF_LOCALE;
-  }
-  const normalized = raw.replace(/_/g, '-');
-  if (!HOST_I18N_LOCALE_RE.test(normalized)) {
-    return HOST_I18N_OFF_LOCALE;
-  }
-  const parts = normalized.split('-');
-  return parts
-    .map((part, idx) => {
-      if (idx === 0) return part.toLowerCase();
-      if (part.length === 2) return part.toUpperCase();
-      if (part.length === 4) return part[0].toUpperCase() + part.slice(1).toLowerCase();
-      return part;
-    })
-    .join('-');
-}
-
-/**
- * Normalizes translation depth (`'light'` or `'deep'`).
- *
- * @param {unknown} value
- * @returns {'light'|'deep'}
- */
-function normalizeHostI18nDepth(value) {
-  const lower = String(value || '').trim().toLowerCase();
-  if (lower === 'deep' || lower === 'full') return 'deep';
-  return HOST_I18N_DEFAULT_DEPTH;
-}
-return { HOST_I18N_GLOBAL_KEY, HOST_I18N_API_PATH, HOST_I18N_SCHEMA_VERSION, HOST_I18N_OFF_LOCALE, HOST_I18N_DEFAULT_DEPTH, HOST_I18N_DEPTHS, HOST_I18N_LOCALE_RE, normalizeHostI18nLocale, normalizeHostI18nDepth };
 })();
 
 // --- src/icons/svgRegistry.js ---
@@ -1410,12 +1329,12 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'fmt.speedShort': '耗时过短 (<0.5s)',
   'fmt.speedLegacy': '旧版缓存记录',
   'fmt.sampleSteps': '{valid}/{total} 步',
-  'fmt.resetUnknown': '未知重置时间',
+  'fmt.resetUnknown': '--',
   'fmt.resetSoon': '即将重置',
-  'fmt.resetUnder1m': '<1分钟后重置',
-  'fmt.resetDaysHours': '{d}天 {h}小时后重置',
-  'fmt.resetHoursMins': '{h}小时 {m}分后重置',
-  'fmt.resetMins': '{m}分钟后重置',
+  'fmt.resetUnder1m': '<1m',
+  'fmt.resetDaysHours': '{d}d {h}h',
+  'fmt.resetHoursMins': '{h}h {m}m',
+  'fmt.resetMins': '{m}m',
   'fmt.selectTime': '选择时间',
   'fmt.unknownModel': '模型未知',
   'fmt.compactionSuffix': '·压缩',
@@ -1491,15 +1410,23 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'capMetric.claude_weekly': 'Claude 周额度',
 
   // Overview Matrix Metric Options & Cells
-  'ovMetric.tps': '输出速度',
+  'ovMetric.tps': '实时速度',
   'ovMetric.ttft': '首字延迟',
   'ovMetric.avg_tps': '平均速度',
+  'ovMetric.avg_ttft': '平均首字',
+  'ovMetric.avg_cache': '平均缓存',
   'ovMetric.step_cost': '本次费用',
-  'ovMetric.session_cost': '累计费用',
+  'ovMetric.session_cost': '总费用',
   'ovMetric.cache_hit': '缓存命中率',
   'ovMetric.session_tokens': '会话 Token',
   'ovMetric.context_usage': '上下文占用',
   'ovMetric.quota_tightest': '紧俏额度',
+  'ovSummary.title': '会话总览',
+  'ovSummary.avg_tps': '速度',
+  'ovSummary.avg_ttft': '首字',
+  'ovSummary.avg_cache': '缓存',
+  'ovSummary.session_cost': '费用',
+  'ovHover.cache_hit': '实时缓存',
   'ovMetric.subAvgTtft': '均值 {val}',
   'ovMetric.subAvgCache': '均值 {val}',
   'ovMetric.subValidSamples': '有效 {samples}',
@@ -1517,6 +1444,8 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'ctx.expandMoreTitle': '展开全部 {count} 个子代理的上下文窗口胶囊',
   'ctx.collapse': '收起',
   'ctx.collapseTitle': '折叠多余子代理胶囊',
+  'ctx.toggleLegendExpand': '展开构成明细',
+  'ctx.toggleLegendCollapse': '收起构成明细',
   'ctx.ch.assistant': '模型回复',
   'ctx.ch.assistantTitle': '模型推理思考、回复正文与工具调用入参',
   'ctx.ch.toolResults': '工具结果',
@@ -1543,7 +1472,8 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'quota.weeklyPool': '周限 ({pool})',
   'quota.loading': '读取中...',
   'quota.failed': '获取失败 (--%)',
-  'quota.usedAndLeft': '{reset} · 已用 {used}%',
+  'quota.usedAndLeft': '{reset} · {used}%',
+  'quota.remainingAndReset': '{reset} · {remaining}%',
   'quota.reservedTip': '预占估算（试验性）：约 {rsv}%（实际已用约 {actual}%），静默约 10 分钟后未用差额自动退还',
   'quota.reservedTipMulti': '预占估算（试验性）：约 {rsv}%（检测到 {leases} 笔叠加租约，实际已用约 {actual}%），静默约 10 分钟后未用差额自动退还',
   'quota.legendActual': '实占',
@@ -1607,7 +1537,7 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'cons.cycleFallbackWeek': '本周',
   'cons.cycleFallbackWeekTip': '未获取官方周限重置时间，暂按自然本周一统计',
   'cons.rangeToday': '今天',
-  'cons.range24h': '1天',
+  'cons.range24h': '24小时',
   'cons.range7d': '7天',
   'cons.range14d': '14天',
   'cons.range30d': '30天',
@@ -1618,8 +1548,10 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'cons.rangeTo': '至',
   'cons.overviewTitle': '用量总览',
   'cons.totalTokens': '总 Token',
+  'cons.tokenSplitSub': '输入 {input} · 缓存 {cache} · 输出 {output}',
   'cons.estCost': '预估费用',
   'cons.cacheHitRate': '缓存命中率',
+  'cons.avgOutputSpeed': '输出速度',
   'cons.callsCount': '{calls} 次',
   'cons.cacheHitTokens': '命中 {tokens}',
   'cons.newInput': '新输入',
@@ -1639,6 +1571,16 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'cons.trendPointsHintHourly': '按小时 ({points}点) · 悬停查看',
   'cons.trendPointsHintDaily': '按日 ({points}点) · 悬停查看',
   'cons.topModels': '模型排行',
+  'cons.modelsTableTitle': '模型用量',
+  'cons.modelsTableEmpty': '当前时间范围暂无模型用量',
+  'cons.colModel': '模型',
+  'cons.colShare': '占比',
+  'cons.colTokens': 'Token',
+  'cons.colCost': '费用',
+  'cons.colCache': '缓存',
+  'cons.colSpeed': '速度',
+  'cons.colTtft': '首字',
+  'cons.colCalls': '调用',
   'cons.clientSources': '客户端来源',
   'cons.monthlyTitle': '月度统计',
   'cons.monthLabel': '{m}月',
@@ -1690,9 +1632,10 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
 
   // Steps Detail View & Step Column Registry
   'steps.title': '调用记录',
-  'steps.tabSteps': '按步查看 ({count})',
-  'steps.tabStepsFiltered': '按步查看 ({filtered}/{total})',
-  'steps.tabModels': '总汇总',
+  'steps.detailTitle': '明细',
+  'steps.tabSteps': '明细',
+  'steps.tabStepsFiltered': '明细 ({filtered}/{total})',
+  'steps.tabModels': '汇总',
   'steps.allAgents': '全部汇总',
   'steps.allModels': '全部模型',
   'steps.selectModel': '选择模型',
@@ -1837,7 +1780,7 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'stepCol.cache_tokens.opt': '缓存读取 Token',
   'stepCol.output_tokens.th': '总输出',
   'stepCol.output_tokens.opt': '总输出 Token',
-  'stepCol.cache.th': '缓存',
+  'stepCol.cache.th': '缓存命中率',
   'stepCol.cache.opt': '缓存命中率 (%)',
   'stepCol.cost.th': '费用',
   'stepCol.cost.opt': '单步费用 ($)',
@@ -1848,6 +1791,9 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'settings.subTab.account': '账号',
   'settings.subTab.other': '其他',
   'settings.subTab.aria': '偏好设置分类切换',
+  'settings.simple.appearanceTitle': '外观与显示',
+  'settings.simple.maintTitle': '数据与维护',
+  'settings.simple.versionRow': '版本与价格',
   'settings.account.current': '当前账号',
   'settings.account.signedOut': '未登录',
   'settings.account.unknown': '暂未获取账号状态',
@@ -2165,7 +2111,7 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   // Preferences -> Other Tab
   'settings.oth.modelTitle': '模型标识显示',
   'settings.oth.modelFormat': '模型名称格式',
-  'settings.oth.modelShort': '精简代号 (如 argon-4-high)',
+  'settings.oth.modelShort': '精简代号 (如 4-neon-high)',
   'settings.oth.modelUpstream': '原始模型 ID (如 gemini-3.8-flash-n)',
   'settings.oth.modelUpstreamCompact': '去前缀原始 ID (如 3.8-flash-n / sonnet-4-6 / 5.4-mini)',
   'settings.oth.orchFormat': 'Orchestrator 系列 ID',
@@ -2441,12 +2387,12 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'fmt.speedShort': 'Too brief (<0.5s)',
   'fmt.speedLegacy': 'Legacy cached',
   'fmt.sampleSteps': '{valid}/{total} steps',
-  'fmt.resetUnknown': 'Unknown reset',
-  'fmt.resetSoon': 'Resetting soon',
-  'fmt.resetUnder1m': 'Resets in <1m',
-  'fmt.resetDaysHours': 'Resets in {d}d {h}h',
-  'fmt.resetHoursMins': 'Resets in {h}h {m}m',
-  'fmt.resetMins': 'Resets in {m}m',
+  'fmt.resetUnknown': '--',
+  'fmt.resetSoon': 'Soon',
+  'fmt.resetUnder1m': '<1m',
+  'fmt.resetDaysHours': '{d}d {h}h',
+  'fmt.resetHoursMins': '{h}h {m}m',
+  'fmt.resetMins': '{m}m',
   'fmt.selectTime': 'Select time',
   'fmt.unknownModel': 'Unknown model',
   'fmt.compactionSuffix': '·compact',
@@ -2522,15 +2468,23 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'capMetric.claude_weekly': 'Claude Weekly Quota',
 
   // Overview Matrix Metric Options & Cells
-  'ovMetric.tps': 'Output Speed',
+  'ovMetric.tps': 'Live Speed',
   'ovMetric.ttft': 'First Token',
   'ovMetric.avg_tps': 'Avg Speed',
+  'ovMetric.avg_ttft': 'Avg First Token',
+  'ovMetric.avg_cache': 'Avg Cache',
   'ovMetric.step_cost': 'Step Cost',
-  'ovMetric.session_cost': 'Session Cost',
+  'ovMetric.session_cost': 'Total Cost',
   'ovMetric.cache_hit': 'Cache Hit',
   'ovMetric.session_tokens': 'Session Tokens',
   'ovMetric.context_usage': 'Context Usage',
   'ovMetric.quota_tightest': 'Tightest Quota',
+  'ovSummary.title': 'Session Summary',
+  'ovSummary.avg_tps': 'Speed',
+  'ovSummary.avg_ttft': 'TTFT',
+  'ovSummary.avg_cache': 'Cache',
+  'ovSummary.session_cost': 'Cost',
+  'ovHover.cache_hit': 'Live Cache',
   'ovMetric.subAvgTtft': 'Avg {val}',
   'ovMetric.subAvgCache': 'Avg {val}',
   'ovMetric.subValidSamples': 'Valid {samples}',
@@ -2548,6 +2502,8 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'ctx.expandMoreTitle': 'Expand all {count} subagent context pills',
   'ctx.collapse': 'Less',
   'ctx.collapseTitle': 'Collapse extra subagent pills',
+  'ctx.toggleLegendExpand': 'Show breakdown',
+  'ctx.toggleLegendCollapse': 'Hide breakdown',
   'ctx.ch.assistant': 'Assistant',
   'ctx.ch.assistantTitle': 'Model reasoning, responses, and tool call arguments',
   'ctx.ch.toolResults': 'Tool Results',
@@ -2574,7 +2530,8 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'quota.weeklyPool': 'Weekly ({pool})',
   'quota.loading': 'Loading...',
   'quota.failed': 'Unavailable (--%)',
-  'quota.usedAndLeft': '{reset} · Used {used}%',
+  'quota.usedAndLeft': '{reset} · {used}%',
+  'quota.remainingAndReset': '{reset} · {remaining}%',
   'quota.reservedTip': 'Estimated lease reservation (Experimental): ~{rsv}% (~{actual}% actual used); unused share refunds after ~10 min idle',
   'quota.reservedTipMulti': 'Estimated lease reservation (Experimental): ~{rsv}% ({leases} stacked leases, ~{actual}% actual used); unused share refunds after ~10 min idle',
   'quota.legendActual': 'Actual',
@@ -2649,8 +2606,10 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'cons.rangeTo': 'to',
   'cons.overviewTitle': 'Usage Overview',
   'cons.totalTokens': 'Total Tokens',
+  'cons.tokenSplitSub': 'In {input} · Cache {cache} · Out {output}',
   'cons.estCost': 'Est. Cost',
   'cons.cacheHitRate': 'Cache Hit Rate',
+  'cons.avgOutputSpeed': 'Output Speed',
   'cons.callsCount': '{calls} calls',
   'cons.cacheHitTokens': 'Hit {tokens}',
   'cons.newInput': 'New Input',
@@ -2670,6 +2629,16 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'cons.trendPointsHintHourly': 'Hourly ({points} pts) · Hover for details',
   'cons.trendPointsHintDaily': 'Daily ({points} pts) · Hover for details',
   'cons.topModels': 'Top Models',
+  'cons.modelsTableTitle': 'Models',
+  'cons.modelsTableEmpty': 'No model usage in this range',
+  'cons.colModel': 'Model',
+  'cons.colShare': 'Share',
+  'cons.colTokens': 'Tokens',
+  'cons.colCost': 'Cost',
+  'cons.colCache': 'Cache',
+  'cons.colSpeed': 'Speed',
+  'cons.colTtft': 'TTFT',
+  'cons.colCalls': 'Calls',
   'cons.clientSources': 'Client Sources',
   'cons.monthlyTitle': 'Monthly Breakdown',
   'cons.monthLabel': 'M{m}',
@@ -2721,7 +2690,8 @@ const I18N_MESSAGES_EN_US = Object.freeze({
 
   // Steps Detail View & Step Column Registry
   'steps.title': 'Step Records',
-  'steps.tabSteps': 'Steps ({count})',
+  'steps.detailTitle': 'Details',
+  'steps.tabSteps': 'Steps',
   'steps.tabStepsFiltered': 'Steps ({filtered}/{total})',
   'steps.tabModels': 'Analytics',
   'steps.allAgents': 'All Agents',
@@ -2996,6 +2966,9 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'settings.account.winWeekly': 'Weekly',
   'settings.account.trendEmpty': 'No quota history recorded in the selected time range.',
   'settings.subTab.aria': 'Preferences category tabs',
+  'settings.simple.appearanceTitle': 'Appearance & Display',
+  'settings.simple.maintTitle': 'Data & Maintenance',
+  'settings.simple.versionRow': 'Version & Pricing',
   'settings.saving': 'Saving…',
   'settings.saved': 'Saved',
   'settings.saveFailed': 'Save failed',
@@ -3196,7 +3169,7 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   // Preferences -> Other Tab
   'settings.oth.modelTitle': 'Model Identity Display',
   'settings.oth.modelFormat': 'Model Name Format',
-  'settings.oth.modelShort': 'Short Alias (e.g. argon-4-high)',
+  'settings.oth.modelShort': 'Short Alias (e.g. 4-neon-high)',
   'settings.oth.modelUpstream': 'Raw Upstream ID (e.g. gemini-3.8-flash-n)',
   'settings.oth.modelUpstreamCompact': 'Trimmed Raw ID (hide gemini- / claude- / gpt-)',
   'settings.oth.orchFormat': 'Orchestrator Series ID',
@@ -4417,7 +4390,7 @@ return { defineComponent };
 })();
 
 // --- src/core/formatters.js ---
-const { formatMetric, formatSpeedMetric, formatCachePct, formatPctNumber, getSpeedToneClass, getCacheToneClass, getStepCostToneClass, getTtftToneClass, formatTokens, formatTokensPrecise, formatCnyApprox, formatDateSpanBadge, formatTrendSlotFullLabel, formatUsd, speedReasonText, formatAnomalyKindLabel, formatAnomalyTagText, resolveModelAnomalySummary, formatStepAnomalyInlineSummary, buildStepAnomalyDiagnostic, buildStepCompactionDiagnostic, formatTimingDetailSec, hasStepTimingData, buildStepTimingDiagnostic, buildModelAnomalyDiagnostic, sampleSummary, formatCountdown, formatCompactDateTime, formatElapsedSec, stripVendorModelPrefix, normalizeOrchestratorIdDisplayMode, resolveModelDisplayInfo, mergeModelsByDisplayName, getAgentBadgeClass, formatAgentBadgeText, formatAgentLabel, formatConversationMeta, formatLiveActivityLabel, formatLiveActivityDetail, getCanonicalModelColorSeed, resolveDeterministicModelColor, buildDeterministicModelColorMap } = (() => {
+const { formatMetric, formatSpeedMetric, formatCachePct, formatPctNumber, getSpeedToneClass, getCacheToneClass, getStepCostToneClass, getTtftToneClass, formatTokens, formatTokensPrecise, formatCnyApprox, formatDateSpanBadge, formatTrendSlotFullLabel, formatUsd, speedReasonText, formatAnomalyKindLabel, formatAnomalyTagText, resolveModelAnomalySummary, formatStepAnomalyInlineSummary, buildStepAnomalyDiagnostic, buildStepCompactionDiagnostic, formatTimingDetailSec, hasStepTimingData, buildStepTimingDiagnostic, buildModelAnomalyDiagnostic, sampleSummary, formatCountdown, formatCompactDateTime, formatElapsedSec, stripVendorModelPrefix, normalizeOrchestratorIdDisplayMode, formatGeminiShortAlias, resolveModelDisplayInfo, mergeModelsByDisplayName, getAgentBadgeClass, formatAgentBadgeText, formatAgentLabel, formatConversationMeta, formatLiveActivityLabel, formatLiveActivityDetail, getCanonicalModelColorSeed, resolveDeterministicModelColor, buildDeterministicModelColorMap } = (() => {
 /**
  * @fileoverview Pure formatting utilities for speed metrics, token counts,
  * USD estimates, countdown timers, and custom datetime displays.
@@ -5061,6 +5034,23 @@ function extractDynamicOrchVariant(fields = []) {
   return '';
 }
 
+const GEMINI_SHORT_ALIAS_RE =
+  /^(argon|carbon|neon|hydrogen|helix|flash|pro)-(\d+(?:\.\d+)?)(-[a-z0-9.-]+)?$/i;
+
+/**
+ * 将 Gemini 系列精简代号格式化为版本号前置（如 `neon-4-high` -> `4-neon-high`），符合 Gemini 命名习惯。
+ *
+ * @param {string} name
+ * @returns {string}
+ */
+function formatGeminiShortAlias(name) {
+  const raw = String(name ?? '').trim();
+  if (!raw) return raw;
+  const match = raw.match(GEMINI_SHORT_ALIAS_RE);
+  if (!match) return raw;
+  return `${match[2]}-${match[1]}${match[3] || ''}`;
+}
+
 /**
  * 统一解析步骤、会话摘要或模型汇总行面向用户的模型显示文本及悬停提示。
  *
@@ -5256,7 +5246,9 @@ function resolveModelDisplayInfo(target, settings = {}, options = {}) {
   const baseText =
     modelDisplayMode === 'upstream_compact'
       ? stripVendorModelPrefix(cleanRawBase) || cleanRawBase
-      : cleanRawBase;
+      : modelDisplayMode === 'short' && !preferLabelInShort
+        ? formatGeminiShortAlias(cleanRawBase)
+        : cleanRawBase;
   const text = `${baseText}${compactionSuffix}`;
   const fullUpstreamWithSuffix = `${cleanRawBase}${compactionSuffix}`;
   const standardTitle =
@@ -5861,7 +5853,7 @@ function buildDeterministicModelColorMap(models = []) {
 
   return colorMap;
 }
-return { formatMetric, formatSpeedMetric, formatCachePct, formatPctNumber, getSpeedToneClass, getCacheToneClass, getStepCostToneClass, getTtftToneClass, formatTokens, formatTokensPrecise, formatCnyApprox, formatDateSpanBadge, formatTrendSlotFullLabel, formatUsd, speedReasonText, formatAnomalyKindLabel, formatAnomalyTagText, resolveModelAnomalySummary, formatStepAnomalyInlineSummary, buildStepAnomalyDiagnostic, buildStepCompactionDiagnostic, formatTimingDetailSec, hasStepTimingData, buildStepTimingDiagnostic, buildModelAnomalyDiagnostic, sampleSummary, formatCountdown, formatCompactDateTime, formatElapsedSec, stripVendorModelPrefix, normalizeOrchestratorIdDisplayMode, resolveModelDisplayInfo, mergeModelsByDisplayName, getAgentBadgeClass, formatAgentBadgeText, formatAgentLabel, formatConversationMeta, formatLiveActivityLabel, formatLiveActivityDetail, getCanonicalModelColorSeed, resolveDeterministicModelColor, buildDeterministicModelColorMap };
+return { formatMetric, formatSpeedMetric, formatCachePct, formatPctNumber, getSpeedToneClass, getCacheToneClass, getStepCostToneClass, getTtftToneClass, formatTokens, formatTokensPrecise, formatCnyApprox, formatDateSpanBadge, formatTrendSlotFullLabel, formatUsd, speedReasonText, formatAnomalyKindLabel, formatAnomalyTagText, resolveModelAnomalySummary, formatStepAnomalyInlineSummary, buildStepAnomalyDiagnostic, buildStepCompactionDiagnostic, formatTimingDetailSec, hasStepTimingData, buildStepTimingDiagnostic, buildModelAnomalyDiagnostic, sampleSummary, formatCountdown, formatCompactDateTime, formatElapsedSec, stripVendorModelPrefix, normalizeOrchestratorIdDisplayMode, formatGeminiShortAlias, resolveModelDisplayInfo, mergeModelsByDisplayName, getAgentBadgeClass, formatAgentBadgeText, formatAgentLabel, formatConversationMeta, formatLiveActivityLabel, formatLiveActivityDetail, getCanonicalModelColorSeed, resolveDeterministicModelColor, buildDeterministicModelColorMap };
 })();
 
 // --- src/core/stepInspector.js ---
@@ -6268,265 +6260,6 @@ function createCopiedFeedbackController({
   };
 }
 return { STEP_LOW_CACHE_MIN_PROMPT_TOKENS, STEP_LOW_CACHE_MAX_PCT, STEP_SLOW_TTFT_MIN_SEC, getStepSelectionKey, isLowCacheStep, isSlowTtftStep, computeStepQuickChipCounts, filterStepsBySearchAndChip, findPrevAgentContextTokens, computeStepTimingWaterfall, buildStepDiagnosticMarkdown, copyPlainTextToClipboard, createCopiedFeedbackController };
-})();
-
-// --- src/core/settingsBackup.js ---
-const { triggerBlobDownload, triggerTextFileDownload, buildExportableSettingsJson, parseImportedSettingsJson } = (() => {
-/**
- * @fileoverview 偏好设置便携 JSON 备份及恢复工具 (`settingsBackup.js`).
- * 通过单一声明式字段描述符表同时驱动导出与导入归一化，消除双遍手写 30 个键的漏同步风险。
- */
-
-
-const SETTINGS_BACKUP_SCHEMA = 'antigravity-usage-monitor.settings';
-const MAX_SETTINGS_IMPORT_BYTES = 128 * 1024;
-
-function sanitizePositiveBudgetNum(val) {
-  const num = Number(val);
-  return Number.isFinite(num) && num > 0 ? num : null;
-}
-
-/**
- * 在浏览器端通过内存 Blob 触发文件下载（统一承载文本与二进制载荷）。
- *
- * @param {string} filename
- * @param {BlobPart} blobPart
- * @param {string} [mimeType]
- * @returns {boolean}
- */
-function triggerBlobDownload(
-  filename,
-  blobPart,
-  mimeType = 'application/octet-stream'
-) {
-  try {
-    if (
-      typeof Blob === 'undefined' ||
-      typeof URL === 'undefined' ||
-      typeof URL.createObjectURL !== 'function' ||
-      typeof document === 'undefined'
-    ) {
-      return false;
-    }
-    const blob = new Blob([blobPart], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('href', url);
-    a.setAttribute('download', String(filename || 'export.dat'));
-    a.style.display = 'none';
-    document.body?.appendChild?.(a);
-    a.click?.();
-    a.remove?.();
-    setTimeout(() => {
-      try {
-        URL.revokeObjectURL(url);
-      } catch {}
-    }, 1000);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 在浏览器端通过内存 Blob 触发文本文件下载。
- *
- * @param {string} filename
- * @param {string} content
- * @param {string} [mimeType]
- * @returns {boolean}
- */
-function triggerTextFileDownload(
-  filename,
-  content,
-  mimeType = 'application/json;charset=utf-8'
-) {
-  return triggerBlobDownload(
-    String(filename || 'export.json'),
-    String(content ?? ''),
-    mimeType
-  );
-}
-
-const normField = (key, normalizeFn) => ({
-  exportTo: (src, out) => {
-    out[key] = normalizeFn(src[key]);
-  },
-  importTo: (src, hasKey, patch) => {
-    if (hasKey(key)) patch[key] = normalizeFn(src[key]);
-  },
-});
-
-const boolField = (key, defaultVal) => ({
-  exportTo: (src, out) => {
-    out[key] = defaultVal ? src[key] !== false : src[key] === true;
-  },
-  importTo: (src, hasKey, patch) => {
-    if (hasKey(key) && typeof src[key] === 'boolean') patch[key] = src[key];
-  },
-});
-
-const arrayField = (key, normalizeFn) => ({
-  exportTo: (src, out) => {
-    out[key] = normalizeFn(src[key]);
-  },
-  importTo: (src, hasKey, patch) => {
-    if (hasKey(key) && Array.isArray(src[key])) patch[key] = normalizeFn(src[key]);
-  },
-});
-
-const positiveBudgetField = (key, fallbackVal) => ({
-  exportTo: (src, out) => {
-    out[key] = sanitizePositiveBudgetNum(src[key]) ?? fallbackVal;
-  },
-  importTo: (src, hasKey, patch) => {
-    if (hasKey(key)) {
-      const num = sanitizePositiveBudgetNum(src[key]);
-      if (num !== null) patch[key] = num;
-    }
-  },
-});
-
-const PORTABLE_SETTING_DESCRIPTORS = Object.freeze([
-  normField('language', normalizeLanguageSetting),
-  normField('themeAccent', normalizeThemeAccent),
-  normField('fontScale', normalizeFontScale),
-  {
-    exportTo: (src, out) => {
-      out.modernUi = src.modernUi !== undefined ? normalizeModernUi(src.modernUi) : true;
-    },
-    importTo: (src, hasKey, patch) => {
-      if (hasKey('modernUi')) {
-        const val = normalizeModernUi(src.modernUi);
-        patch.modernUi = val;
-        patch.experimentalModernUi = val;
-      }
-    },
-  },
-  normField('weeklyLimitMode', normalizeWeeklyLimitMode),
-  positiveBudgetField('weeklyTokenBudget', 150000000),
-  positiveBudgetField('weeklyCostBudget', 100),
-  {
-    exportTo: (src, out) => {
-      const mode = normalizeModelDisplayMode(src.modelDisplayMode, src.showUpstreamModel);
-      out.modelDisplayMode = mode;
-      out.showUpstreamModel = mode !== 'short';
-    },
-    importTo: (src, hasKey, patch) => {
-      if (hasKey('modelDisplayMode') || hasKey('showUpstreamModel')) {
-        const mode = normalizeModelDisplayMode(src.modelDisplayMode, src.showUpstreamModel);
-        patch.modelDisplayMode = mode;
-        patch.showUpstreamModel = mode !== 'short';
-      }
-    },
-  },
-  normField('orchestratorIdMode', normalizeOrchestratorIdMode),
-  {
-    exportTo: (src, out) => {
-      out.pluginUpdateMode = normalizePluginUpdateMode(src.pluginUpdateMode, src.autoUpdatePlugin);
-    },
-    importTo: (src, hasKey, patch) => {
-      if (hasKey('pluginUpdateMode') || hasKey('autoUpdatePlugin')) {
-        const mode = normalizePluginUpdateMode(src.pluginUpdateMode, src.autoUpdatePlugin);
-        patch.pluginUpdateMode = mode;
-        patch.autoUpdatePlugin = mode === 'auto';
-      }
-    },
-  },
-  {
-    exportTo: (src, out) => {
-      out.windowMountMode = normalizeWindowMountMode(src.windowMountMode, src.enableWindowOverlay);
-    },
-    importTo: (src, hasKey, patch) => {
-      if (hasKey('windowMountMode') || hasKey('enableWindowOverlay')) {
-        const mode = normalizeWindowMountMode(src.windowMountMode, src.enableWindowOverlay);
-        patch.windowMountMode = mode;
-        patch.enableWindowOverlay = mode !== 'sidebar';
-      }
-    },
-  },
-  normField('popoverWidthMode', normalizePopoverWidthMode),
-  normField('popoverWidth', normalizePopoverWidth),
-  boolField('enableCliStatusLine', true),
-  normField('cliStatusLineSlots', normalizeCliStatusLineSlots),
-  normField('standalonePort', normalizeStandalonePort),
-  boolField('showTopbarMultiSession', true),
-  normField('contextAgentMode', normalizeContextAgentMode),
-  arrayField('topbarCapsuleSlots', normalizeTopbarCapsuleSlots),
-  arrayField('hoverModules', normalizeHoverModules),
-  arrayField('overviewModules', normalizeOverviewModules),
-  arrayField('overviewMetrics', normalizeOverviewMetrics),
-  boolField('showStepTurnRail', false),
-  boolField('showStepAgentBadge', true),
-  boolField('showStepSpeedColor', false),
-  boolField('showStepFilterToolbar', false),
-  normField('stepTokenComboFormat', normalizeStepTokenComboFormat),
-  arrayField('stepTableColumns', normalizeStepTableColumns),
-  normField('experimentalQuotaReservation', normalizeExperimentalQuotaReservation),
-  normField('accountQuotaRefreshMinutes', normalizeAccountQuotaRefreshMinutes),
-]);
-
-/**
- * 将当前用户偏好设置序列化为跨设备可迁移的安全 JSON 备份文本（仅包含便携偏好项，不包含凭证或高风险覆盖开关）。
- *
- * @param {object} [settings={}]
- * @returns {string}
- */
-function buildExportableSettingsJson(settings = {}) {
-  const src = settings && typeof settings === 'object' ? settings : {};
-  const outSettings = {};
-  for (const desc of PORTABLE_SETTING_DESCRIPTORS) {
-    desc.exportTo(src, outSettings);
-  }
-  const payload = {
-    schema: SETTINGS_BACKUP_SCHEMA,
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    settings: outSettings,
-  };
-  return `${JSON.stringify(payload, null, 2)}\n`;
-}
-
-/**
- * 校验并解析导入的偏好设置 JSON，仅提取并归一化白名单内的便携配置项。
- *
- * @param {string} rawText
- * @returns {{ ok: true, patch: object, appliedCount: number } | { ok: false, errorCode: string }}
- */
-function parseImportedSettingsJson(rawText) {
-  if (typeof rawText !== 'string' || !rawText.trim() || rawText.length > MAX_SETTINGS_IMPORT_BYTES) {
-    return { ok: false, errorCode: 'invalid_json' };
-  }
-  let parsed;
-  try {
-    parsed = JSON.parse(rawText);
-  } catch {
-    return { ok: false, errorCode: 'invalid_json' };
-  }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return { ok: false, errorCode: 'invalid_json' };
-  }
-
-  const hasWrappedSettings =
-    parsed.settings && typeof parsed.settings === 'object' && !Array.isArray(parsed.settings);
-  if (parsed.schema !== undefined && parsed.schema !== SETTINGS_BACKUP_SCHEMA) {
-    return { ok: false, errorCode: 'invalid_schema' };
-  }
-  const src = hasWrappedSettings ? parsed.settings : parsed;
-  const hasKey = (k) => Object.prototype.hasOwnProperty.call(src, k);
-  const patch = {};
-
-  for (const desc of PORTABLE_SETTING_DESCRIPTORS) {
-    desc.importTo(src, hasKey, patch);
-  }
-
-  const appliedCount = Object.keys(patch).length;
-  if (appliedCount === 0) {
-    return { ok: false, errorCode: 'empty_patch' };
-  }
-  return { ok: true, patch, appliedCount };
-}
-return { triggerBlobDownload, triggerTextFileDownload, buildExportableSettingsJson, parseImportedSettingsJson };
 })();
 
 // --- src/core/xlsxBuilder.js ---
@@ -9047,7 +8780,6 @@ function getViewTabs() {
   return [
     { value: 'overview', label: t('nav.overview'), icon: 'pulse' },
     { value: 'consumption', label: t('nav.consumption'), icon: 'chart-bar' },
-    { value: 'steps', label: t('nav.steps'), icon: 'table' },
     { value: 'settings', label: t('nav.settings'), icon: 'sliders' },
   ];
 }
@@ -9206,6 +8938,27 @@ async function requestLocalBackendExport(payload) {
     // 忽略回退异常，交由下方分环境处理
   }
   return { res: null, remoteForbidden: false };
+}
+
+function triggerBlobDownload(filename, content, mimeType) {
+  if (typeof document === 'undefined' || typeof Blob === 'undefined' || typeof URL === 'undefined') {
+    return false;
+  }
+  try {
+    const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = String(filename || 'export.txt');
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -9373,87 +9126,8 @@ async function copyTextWithFeedback(text, successMessage) {
 return { revealExportedFile, exportTextFileWithFeedback, exportBinaryFileWithFeedback, copyTextWithFeedback };
 })();
 
-// --- src/core/hostI18nClient.js ---
-const { fetchHostI18nStatus, refreshHostI18nManifest, selectHostI18nLanguage, updateHostI18nDepth, installOrUpdateHostI18nPack, removeHostI18nPack, collectHostI18nUntranslated } = (() => {
-/**
- * @fileoverview Decoupled HTTP/CDP client for `/api/host-i18n`.
- * Completely independent from `telemetryStore.js`.
- */
-
-
-async function fetchHostI18nStatus() {
-  return callSidecarApi(HOST_I18N_API_PATH, {
-    method: 'GET',
-    abortKey: 'host-i18n-get',
-    cdpTimeoutMs: 12000,
-  });
-}
-
-async function refreshHostI18nManifest() {
-  return callSidecarApi(HOST_I18N_API_PATH, {
-    method: 'POST',
-    body: { action: 'refresh_manifest' },
-    cdpTimeoutMs: 18000,
-  });
-}
-
-async function selectHostI18nLanguage(locale, depth) {
-  return callSidecarApi(HOST_I18N_API_PATH, {
-    method: 'POST',
-    body: {
-      action: 'select',
-      locale: normalizeHostI18nLocale(locale),
-      ...(depth !== undefined ? { depth: normalizeHostI18nDepth(depth) } : {}),
-    },
-    cdpTimeoutMs: 22000,
-  });
-}
-
-async function updateHostI18nDepth(depth) {
-  return callSidecarApi(HOST_I18N_API_PATH, {
-    method: 'POST',
-    body: {
-      action: 'set_depth',
-      depth: normalizeHostI18nDepth(depth),
-    },
-    cdpTimeoutMs: 10000,
-  });
-}
-
-async function installOrUpdateHostI18nPack(locale) {
-  return callSidecarApi(HOST_I18N_API_PATH, {
-    method: 'POST',
-    body: {
-      action: 'update',
-      locale: normalizeHostI18nLocale(locale),
-    },
-    cdpTimeoutMs: 22000,
-  });
-}
-
-async function removeHostI18nPack(locale) {
-  return callSidecarApi(HOST_I18N_API_PATH, {
-    method: 'POST',
-    body: {
-      action: 'remove',
-      locale: normalizeHostI18nLocale(locale),
-    },
-    cdpTimeoutMs: 10000,
-  });
-}
-
-async function collectHostI18nUntranslated() {
-  return callSidecarApi(HOST_I18N_API_PATH, {
-    method: 'POST',
-    body: { action: 'collect_untranslated' },
-    cdpTimeoutMs: 15000,
-  });
-}
-return { fetchHostI18nStatus, refreshHostI18nManifest, selectHostI18nLanguage, updateHostI18nDepth, installOrUpdateHostI18nPack, removeHostI18nPack, collectHostI18nUntranslated };
-})();
-
 // --- src/store/telemetryStore.js ---
-const { extractHostRouteCascadeId, telemetryStore, clearConsumptionRangeCache, clearConversationViewCache, CLIENT_TOPBAR_SLOT_KEYS, DEFAULT_CLIENT_TOPBAR_SLOTS, DEFAULT_CLIENT_CONTEXT_AGENT_MODE, CLIENT_CLI_STATUSLINE_PRESETS, DEFAULT_CLIENT_CLI_STATUSLINE_SLOTS, CLIENT_OVERVIEW_MODULE_KEYS, DEFAULT_CLIENT_OVERVIEW_MODULES, DEFAULT_CLIENT_HOVER_MODULES, CLIENT_OVERVIEW_METRIC_KEYS, DEFAULT_CLIENT_OVERVIEW_METRICS, CLIENT_STEP_COLUMN_KEYS, DEFAULT_CLIENT_STEP_COLUMNS, DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT, MIN_CLIENT_POPOVER_WIDTH, MAX_CLIENT_POPOVER_WIDTH, DEFAULT_CLIENT_POPOVER_WIDTH, parseClientStepTokenComboSegments, normalizeClientStepTokenComboFormat, normalizeClientPopoverWidthMode, normalizeClientPopoverWidth, normalizeClientModelDisplayMode, normalizeClientTopbarSlots, normalizeClientContextAgentMode, normalizeClientExperimentalQuotaReservation, normalizeClientAccountQuotaRefreshMinutes, normalizeClientCliStatusLineSlots, getDefaultCtxInspectorAgentId, resolveOverlayCtxInspectorAgentId, resolveEffectiveClientCliStatusLineSlots, normalizeClientHoverModules, normalizeClientOverviewModules, normalizeClientOverviewMetrics, normalizeClientStepColumns, normalizeClientUpdateMode, normalizeClientOrchestratorIdMode, normalizeClientWindowMountMode, isEquivalentTelemetry, resetTelemetryForEndpointSwitch, fetchTelemetry, selectConversation, selectConsumptionTimeRange, selectConsumptionCyclePool, prefetchConsumptionPresets, saveSettingsPatch, saveModelContextWindow, resetAllSettings, rebuildTrajectoryCache, triggerCloudSync, triggerBridgeHostRelaunch, triggerCliStatusLineAction, fetchSessionMigrationCatalog, fetchQuotaReservationLog, executeSessionMigration, triggerPluginUpdate, startAsyncTelemetryLoop, stopAsyncTelemetryLoop, resolveHostRouteMatch, resolveScopedConversation, isMacHostPlatform } = (() => {
+const { extractHostRouteCascadeId, telemetryStore, clearConsumptionRangeCache, clearConversationViewCache, CLIENT_TOPBAR_SLOT_KEYS, DEFAULT_CLIENT_TOPBAR_SLOTS, DEFAULT_CLIENT_CONTEXT_AGENT_MODE, CLIENT_CLI_STATUSLINE_PRESETS, DEFAULT_CLIENT_CLI_STATUSLINE_SLOTS, CLIENT_OVERVIEW_MODULE_KEYS, DEFAULT_CLIENT_OVERVIEW_MODULES, DEFAULT_CLIENT_HOVER_MODULES, CLIENT_OVERVIEW_METRIC_KEYS, DEFAULT_CLIENT_OVERVIEW_METRICS, CLIENT_STEP_COLUMN_KEYS, DEFAULT_CLIENT_STEP_COLUMNS, DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT, MIN_CLIENT_POPOVER_WIDTH, MAX_CLIENT_POPOVER_WIDTH, DEFAULT_CLIENT_POPOVER_WIDTH, parseClientStepTokenComboSegments, normalizeClientStepTokenComboFormat, normalizeClientPopoverWidthMode, normalizeClientPopoverWidth, normalizeClientModelDisplayMode, normalizeClientTopbarSlots, normalizeClientContextAgentMode, normalizeClientExperimentalQuotaReservation, normalizeClientAccountQuotaRefreshMinutes, normalizeClientCliStatusLineSlots, getDefaultCtxInspectorAgentId, resolveOverlayCtxInspectorAgentId, resolveEffectiveClientCliStatusLineSlots, normalizeClientHoverModules, normalizeClientOverviewModules, normalizeClientOverviewMetrics, normalizeClientStepColumns, normalizeClientUpdateMode, normalizeClientOrchestratorIdMode, normalizeClientWindowMountMode, isEquivalentTelemetry, resetTelemetryForEndpointSwitch, fetchTelemetry, selectConversation, selectConsumptionTimeRange, selectConsumptionCyclePool, prefetchConsumptionPresets, saveSettingsPatch, saveModelContextWindow, resetAllSettings, rebuildTrajectoryCache, triggerCloudSync, triggerBridgeHostRelaunch, triggerCliStatusLineAction, triggerPluginUpdate, startAsyncTelemetryLoop, stopAsyncTelemetryLoop, resolveHostRouteMatch, resolveScopedConversation, isMacHostPlatform } = (() => {
 /**
  * @fileoverview Reactive telemetry store with async non-overlapping poll scheduler
  * and granular slice updates.
@@ -10358,6 +10032,7 @@ function isEquivalentTelemetry(prev, next) {
   if (pAcct?.costUsd !== nAcct?.costUsd) return false;
   if (pAcct?.savedCostUsd !== nAcct?.savedCostUsd) return false;
   if (pAcct?.cacheHitPct !== nAcct?.cacheHitPct) return false;
+  if (pAcct?.avgTokPerSec !== nAcct?.avgTokPerSec) return false;
   if (pAcct?.unpricedCalls !== nAcct?.unpricedCalls) return false;
 
   // 6. 比对历史趋势时间分桶序列与年度分月序列
@@ -11601,47 +11276,6 @@ async function triggerCliStatusLineAction(action) {
   return res;
 }
 
-async function fetchSessionMigrationCatalog() {
-  try {
-    return await callSidecarApi('/api/session-migration/catalog', { method: 'GET' });
-  } catch {
-    return callSidecarApi('/api/settings', {
-      method: 'POST',
-      body: { __sessionMigrationAction: 'catalog' },
-    });
-  }
-}
-
-async function fetchQuotaReservationLog() {
-  try {
-    return await callSidecarApi('/api/quota-reservation/log', { method: 'GET' });
-  } catch {
-    return callSidecarApi('/api/settings', {
-      method: 'POST',
-      body: { __quotaReservationAction: 'log' },
-    });
-  }
-}
-
-async function executeSessionMigration(payload) {
-  let res;
-  try {
-    res = await callSidecarApi('/api/session-migration/migrate', {
-      method: 'POST',
-      body: payload || {},
-    });
-  } catch {
-    res = await callSidecarApi('/api/settings', {
-      method: 'POST',
-      body: { __sessionMigrationAction: 'migrate', payload: payload || {} },
-    });
-  }
-  if (res?.migratedCount > 0) {
-    void fetchTelemetry({ force: true }).catch(() => {});
-  }
-  return res;
-}
-
 async function triggerPluginUpdate() {
   const res = await callSidecarApi('/api/plugin-update', { method: 'POST', body: {} });
   if (res?.ok && res?.restarting) {
@@ -11899,7 +11533,7 @@ function isMacHostPlatform(telemetry) {
   }
   return false;
 }
-return { extractHostRouteCascadeId, telemetryStore, clearConsumptionRangeCache, clearConversationViewCache, CLIENT_TOPBAR_SLOT_KEYS, DEFAULT_CLIENT_TOPBAR_SLOTS, DEFAULT_CLIENT_CONTEXT_AGENT_MODE, CLIENT_CLI_STATUSLINE_PRESETS, DEFAULT_CLIENT_CLI_STATUSLINE_SLOTS, CLIENT_OVERVIEW_MODULE_KEYS, DEFAULT_CLIENT_OVERVIEW_MODULES, DEFAULT_CLIENT_HOVER_MODULES, CLIENT_OVERVIEW_METRIC_KEYS, DEFAULT_CLIENT_OVERVIEW_METRICS, CLIENT_STEP_COLUMN_KEYS, DEFAULT_CLIENT_STEP_COLUMNS, DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT, MIN_CLIENT_POPOVER_WIDTH, MAX_CLIENT_POPOVER_WIDTH, DEFAULT_CLIENT_POPOVER_WIDTH, parseClientStepTokenComboSegments, normalizeClientStepTokenComboFormat, normalizeClientPopoverWidthMode, normalizeClientPopoverWidth, normalizeClientModelDisplayMode, normalizeClientTopbarSlots, normalizeClientContextAgentMode, normalizeClientExperimentalQuotaReservation, normalizeClientAccountQuotaRefreshMinutes, normalizeClientCliStatusLineSlots, getDefaultCtxInspectorAgentId, resolveOverlayCtxInspectorAgentId, resolveEffectiveClientCliStatusLineSlots, normalizeClientHoverModules, normalizeClientOverviewModules, normalizeClientOverviewMetrics, normalizeClientStepColumns, normalizeClientUpdateMode, normalizeClientOrchestratorIdMode, normalizeClientWindowMountMode, isEquivalentTelemetry, resetTelemetryForEndpointSwitch, fetchTelemetry, selectConversation, selectConsumptionTimeRange, selectConsumptionCyclePool, prefetchConsumptionPresets, saveSettingsPatch, saveModelContextWindow, resetAllSettings, rebuildTrajectoryCache, triggerCloudSync, triggerBridgeHostRelaunch, triggerCliStatusLineAction, fetchSessionMigrationCatalog, fetchQuotaReservationLog, executeSessionMigration, triggerPluginUpdate, startAsyncTelemetryLoop, stopAsyncTelemetryLoop, resolveHostRouteMatch, resolveScopedConversation, isMacHostPlatform };
+return { extractHostRouteCascadeId, telemetryStore, clearConsumptionRangeCache, clearConversationViewCache, CLIENT_TOPBAR_SLOT_KEYS, DEFAULT_CLIENT_TOPBAR_SLOTS, DEFAULT_CLIENT_CONTEXT_AGENT_MODE, CLIENT_CLI_STATUSLINE_PRESETS, DEFAULT_CLIENT_CLI_STATUSLINE_SLOTS, CLIENT_OVERVIEW_MODULE_KEYS, DEFAULT_CLIENT_OVERVIEW_MODULES, DEFAULT_CLIENT_HOVER_MODULES, CLIENT_OVERVIEW_METRIC_KEYS, DEFAULT_CLIENT_OVERVIEW_METRICS, CLIENT_STEP_COLUMN_KEYS, DEFAULT_CLIENT_STEP_COLUMNS, DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT, MIN_CLIENT_POPOVER_WIDTH, MAX_CLIENT_POPOVER_WIDTH, DEFAULT_CLIENT_POPOVER_WIDTH, parseClientStepTokenComboSegments, normalizeClientStepTokenComboFormat, normalizeClientPopoverWidthMode, normalizeClientPopoverWidth, normalizeClientModelDisplayMode, normalizeClientTopbarSlots, normalizeClientContextAgentMode, normalizeClientExperimentalQuotaReservation, normalizeClientAccountQuotaRefreshMinutes, normalizeClientCliStatusLineSlots, getDefaultCtxInspectorAgentId, resolveOverlayCtxInspectorAgentId, resolveEffectiveClientCliStatusLineSlots, normalizeClientHoverModules, normalizeClientOverviewModules, normalizeClientOverviewMetrics, normalizeClientStepColumns, normalizeClientUpdateMode, normalizeClientOrchestratorIdMode, normalizeClientWindowMountMode, isEquivalentTelemetry, resetTelemetryForEndpointSwitch, fetchTelemetry, selectConversation, selectConsumptionTimeRange, selectConsumptionCyclePool, prefetchConsumptionPresets, saveSettingsPatch, saveModelContextWindow, resetAllSettings, rebuildTrajectoryCache, triggerCloudSync, triggerBridgeHostRelaunch, triggerCliStatusLineAction, triggerPluginUpdate, startAsyncTelemetryLoop, stopAsyncTelemetryLoop, resolveHostRouteMatch, resolveScopedConversation, isMacHostPlatform };
 })();
 
 // --- src/components/ui/TopLongPillNav.js ---
@@ -12827,146 +12461,6 @@ const ActionMenu = defineComponent({
   },
 });
 return { ActionMenu };
-})();
-
-// --- src/components/ui/CustomNumberInput.js ---
-const { CustomNumberInput } = (() => {
-/**
- * @fileoverview Bespoke CustomNumberInput spinbutton & precision stepper.
- * Replaces native <input type="number"> with custom SVG step controls,
- * keyboard ArrowUp/ArrowDown (+Shift 10x), and min/max clamping.
- */
-
-
-const CustomNumberInput = defineComponent({
-  name: 'CustomNumberInput',
-  setup({ getProps, setProps, emit, onCleanup }) {
-    function clampValue(raw) {
-      const { min = -Infinity, max = Infinity, precision = 0 } = getProps();
-      const num = Number(raw);
-      if (!Number.isFinite(num)) {
-        return Number(getProps().modelValue ?? (Number.isFinite(min) ? min : 0));
-      }
-      const clamped = Math.min(max, Math.max(min, num));
-      return precision > 0 ? Number(clamped.toFixed(precision)) : Math.round(clamped);
-    }
-
-    function applyStep(direction, multiplier = 1) {
-      const { step = 1, modelValue = 0 } = getProps();
-      const current = Number(modelValue) || 0;
-      const next = clampValue(current + direction * step * multiplier);
-      syncFieldDisplay(next);
-      if (next !== current) {
-        setProps({ modelValue: next });
-        emit('update:modelValue', next);
-      }
-    }
-
-    const decBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'num-step-btn',
-        'aria-label': t('ui.num.decrease'),
-        onClick: (e) => {
-          e.preventDefault();
-          applyStep(-1, e.shiftKey ? 10 : 1);
-        },
-      },
-      [createSvgIcon('minus', { size: 12 })]
-    );
-
-    const incBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'num-step-btn',
-        'aria-label': t('ui.num.increase'),
-        onClick: (e) => {
-          e.preventDefault();
-          applyStep(1, e.shiftKey ? 10 : 1);
-        },
-      },
-      [createSvgIcon('plus', { size: 12 })]
-    );
-
-    const textField = h('input', {
-      type: 'text',
-      inputmode: 'decimal',
-      role: 'spinbutton',
-      className: 'num-field',
-      onKeydown: (e) => {
-        if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          applyStep(1, e.shiftKey ? 10 : 1);
-        } else if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          applyStep(-1, e.shiftKey ? 10 : 1);
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          commitManualInput();
-        }
-      },
-      onChange: () => commitManualInput(),
-      onBlur: () => commitManualInput(),
-    });
-
-    function commitManualInput() {
-      const raw = String(textField.value ?? '').trim();
-      if (!raw || !/\d/.test(raw)) {
-        syncFieldDisplay(getProps().modelValue);
-        return;
-      }
-      const cleaned = raw.replace(/[^0-9.-]/g, '');
-      const parsed = Number(cleaned);
-      if (!Number.isFinite(parsed)) {
-        syncFieldDisplay(getProps().modelValue);
-        return;
-      }
-      const next = clampValue(parsed);
-      const prev = Number(getProps().modelValue);
-      syncFieldDisplay(next);
-      if (next !== prev) {
-        setProps({ modelValue: next });
-        emit('update:modelValue', next);
-      }
-    }
-
-    function syncFieldDisplay(val = getProps().modelValue) {
-      const { min, max, ariaLabel } = getProps();
-      const normalized = clampValue(val);
-      if (textField.value !== String(normalized)) {
-        textField.value = String(normalized);
-      }
-      patchAttr(textField, 'aria-valuenow', normalized);
-      if (ariaLabel) patchAttr(textField, 'aria-label', ariaLabel);
-      if (Number.isFinite(min)) patchAttr(textField, 'aria-valuemin', min);
-      if (Number.isFinite(max)) patchAttr(textField, 'aria-valuemax', max);
-    }
-
-    const rootEl = h('div', { className: 'number-input' }, [decBtn, textField, incBtn]);
-    const unsubI18n = i18nStore.subscribe(
-      (st) => st.locale,
-      () => {
-        patchAttr(decBtn, 'aria-label', t('ui.num.decrease'));
-        patchAttr(incBtn, 'aria-label', t('ui.num.increase'));
-      },
-      { immediate: false }
-    );
-    onCleanup(unsubI18n);
-    syncFieldDisplay();
-
-    return {
-      el: rootEl,
-      refs: { decBtn, incBtn, textField },
-      onPropsChange: () => syncFieldDisplay(),
-      methods: {
-        commit: () => commitManualInput(),
-      },
-    };
-  },
-});
-return { CustomNumberInput };
 })();
 
 // --- src/components/ui/CustomDateTimePicker.js ---
@@ -17100,9 +16594,7 @@ function createTrendAreaChart({ onSelectSlot = null } = {}) {
 
         if (shouldAutoScrollRight && typeof requestAnimationFrame === 'function') {
           requestAnimationFrame(() => {
-            if (hmScrollEl.scrollWidth > hmScrollEl.clientWidth) {
-              hmScrollEl.scrollLeft = hmScrollEl.scrollWidth;
-            }
+            hmScrollEl.scrollLeft = 0;
           });
         }
       } else if (currentHmMode === 'day') {
@@ -17299,3034 +16791,6 @@ function createTrendAreaChart({ onSelectSlot = null } = {}) {
   };
 }
 return { HEATMAP_DAYS_THRESHOLD, createTrendAreaChart };
-})();
-
-// --- src/components/charts/stepChartMath.js ---
-const { MODEL_COLOR_VARS, getStepModelGroupKey, toChronologicalSteps, clampValue, computeLinearFit, computePublicationFit, niceStepNumber, computeNiceYScale, computeNiceXStepTicks, formatYAxisTick, buildPolylinePath, buildSplinePath, computeStepTickIndices, formatStepAxisTag, formatChartMetricValue, formatChartMetricCompact, downsampleStepPointsForPlot, evalStepSplineYAtX } = (() => {
-/**
- * @fileoverview Pure regression math (OLS + IRLS-LOESS), nice axis tick generators,
- * SVG spline/polyline path builders, and step metric formatters extracted from SessionStepCharts.js.
- */
-
-
-/** 多模型节点和多曲线对比语义调色板（全部取自 tokens.css 语义变量，兼顾设计一致性和交叉曲线区分度） */
-const MODEL_COLOR_VARS = Object.freeze([
-  'var(--ctx-cached)',
-  'var(--ctx-skills)',
-  'var(--ctx-user-input)',
-  'var(--ctx-checkpoint)',
-  'var(--ctx-tool-results)',
-  'var(--ctx-subagent-msg)',
-]);
-
-/**
- * 提取步骤所属的基础模型分组键（和后端 `usage-aggregator.mjs` 中 `modelBreakdown[].label` 严格一致），
- * 且不受“精简代号 / 原始模型 ID”或“自动压缩”后缀切换影响。
- *
- * @param {object|null|undefined} step
- * @returns {string}
- */
-function getStepModelGroupKey(step) {
-  if (!step || typeof step !== 'object') return t('fmt.unknownModel');
-  const rawLabel = String(step.baseModelLabel || step.modelLabel || step.label || '')
-    .replace(/\s*\[自动压缩\]\s*$/u, '')
-    .replace(/\s*\((?:Max|XHigh|High|Medium|Low|Thinking|Extra Low|Tiered)\)\s*$/i, '')
-    .trim();
-  if (rawLabel) return rawLabel;
-  const rawShort = String(step.baseModelShort || step.modelShort || step.shortName || '')
-    .replace(/·(?:压缩|Compact)\s*$/iu, '')
-    .trim();
-  return rawShort || t('fmt.unknownModel');
-}
-
-/**
- * 将逆序或混合代理的步骤列表归一化为严格时间升序序列（最旧 -> 最新）。
- *
- * @param {Array<object>} steps
- * @param {boolean} isMergedAllAgents
- * @returns {Array<object>}
- */
-function toChronologicalSteps(steps, isMergedAllAgents = false) {
-  if (!Array.isArray(steps) || steps.length === 0) return [];
-  const copy = steps.slice();
-  if (isMergedAllAgents) {
-    copy.sort(
-      (a, b) =>
-        (Number(a?.createdAtMs) || 0) - (Number(b?.createdAtMs) || 0) ||
-        (Number(a?.agentIndex) || 0) - (Number(b?.agentIndex) || 0) ||
-        (Number(a?.stepIndex) || 0) - (Number(b?.stepIndex) || 0)
-    );
-    return copy;
-  }
-  copy.sort(
-    (a, b) =>
-      (Number(a?.stepIndex) || 0) - (Number(b?.stepIndex) || 0) ||
-      (Number(a?.createdAtMs) || 0) - (Number(b?.createdAtMs) || 0)
-  );
-  return copy;
-}
-
-function clampValue(v, minVal = 0, maxVal = Infinity) {
-  if (!Number.isFinite(v)) return minVal;
-  return Math.max(minVal, Math.min(maxVal, v));
-}
-
-/**
- * 双侧 95% 置信区间对应的 Student-t 临界值近似表（t_{0.975, df}）。
- *
- * @param {number} df 残差自由度
- * @returns {number}
- */
-function tCritical95(df) {
-  if (!Number.isFinite(df) || df <= 1.5) return 3.182;
-  if (df <= 2.5) return 3.182 + (2.5 - df) * 0.9;
-  if (df <= 3.5) return 2.776 + (3.5 - df) * 0.406;
-  if (df <= 4.5) return 2.571 + (4.5 - df) * 0.205;
-  if (df <= 6) return 2.447;
-  if (df <= 8) return 2.306;
-  if (df <= 10) return 2.228;
-  if (df <= 15) return 2.131;
-  if (df <= 20) return 2.086;
-  if (df <= 30) return 2.042;
-  if (df <= 60) return 2.0;
-  if (df <= 120) return 1.98;
-  return 1.96;
-}
-
-/**
- * 计算普通最小二乘线性回归（OLS: y = intercept + slope * x）。
- *
- * @param {number[]} ys 样本纵坐标序列
- * @param {{ minVal?: number, maxVal?: number, xs?: number[] }} [options]
- * @returns {{ values: number[], slope: number, intercept: number, mean: number, r: number, r2: number }}
- */
-function computeLinearFit(ys, { minVal = 0, maxVal = Infinity, xs = null } = {}) {
-  const n = Array.isArray(ys) ? ys.length : 0;
-  if (n === 0) {
-    return { values: [], slope: 0, intercept: 0, mean: 0, r: 0, r2: 0 };
-  }
-  const xArr =
-    Array.isArray(xs) && xs.length === n ? xs : Array.from({ length: n }, (_, idx) => idx);
-  const meanY = ys.reduce((acc, v) => acc + v, 0) / n;
-  if (n === 1) {
-    const c = clampValue(ys[0], minVal, maxVal);
-    return { values: [c], slope: 0, intercept: c, mean: c, r: 0, r2: 0 };
-  }
-  const meanX = xArr.reduce((acc, v) => acc + v, 0) / n;
-  let sxx = 0;
-  let sxy = 0;
-  let syy = 0;
-  for (let i = 0; i < n; i++) {
-    const dx = xArr[i] - meanX;
-    const dy = ys[i] - meanY;
-    sxx += dx * dx;
-    sxy += dx * dy;
-    syy += dy * dy;
-  }
-  const slope = sxx > 1e-12 ? sxy / sxx : 0;
-  const intercept = meanY - slope * meanX;
-  const r =
-    sxx > 1e-12 && syy > 1e-12 ? clampValue(sxy / Math.sqrt(sxx * syy), -1, 1) : 0;
-  const values = xArr.map((x) => clampValue(intercept + slope * x, minVal, maxVal));
-  return { values, slope, intercept, mean: meanY, r, r2: r * r };
-}
-
-/**
- * 学术论文级回归和 95% 置信带计算引擎（Cleveland & Devlin 高斯局部加权线性回归 LOESS + 精确帽子矩阵标准误，
- * 小样本 n <= 5 时自动采用精确 OLS 线性回归和双曲 t 分布 95% 置信区间，等同于 R `ggplot2::geom_smooth(se = TRUE)`）。
- *
- * @param {number[]} xs 严格递增或单调的样本横坐标序列
- * @param {number[]} ys 样本纵坐标序列
- * @param {{ minVal?: number, maxVal?: number, gridSize?: number, span?: number }} [options]
- */
-function computePublicationFit(
-  xs,
-  ys,
-  { minVal = 0, maxVal = Infinity, gridSize = 64, span = 0.5 } = {}
-) {
-  const n = Math.min(Array.isArray(xs) ? xs.length : 0, Array.isArray(ys) ? ys.length : 0);
-  if (n === 0) {
-    return {
-      method: 'OLS',
-      mean: 0,
-      sd: 0,
-      slope: 0,
-      intercept: 0,
-      r: 0,
-      r2: 0,
-      sampleFits: [],
-      sampleCiLow: [],
-      sampleCiHigh: [],
-      sampleCiHalf: [],
-      grid: [],
-    };
-  }
-
-  const ols = computeLinearFit(ys, { minVal, maxVal, xs });
-  let syy = 0;
-  for (let i = 0; i < n; i++) {
-    const dy = ys[i] - ols.mean;
-    syy += dy * dy;
-  }
-  const sd = n > 1 ? Math.sqrt(syy / (n - 1)) : 0;
-
-  if (n === 1) {
-    const val = clampValue(ys[0], minVal, maxVal);
-    return {
-      method: 'OLS',
-      mean: val,
-      sd: 0,
-      slope: 0,
-      intercept: val,
-      r: 0,
-      r2: 0,
-      sampleFits: [val],
-      sampleCiLow: [val],
-      sampleCiHigh: [val],
-      sampleCiHalf: [0],
-      grid: [{ x: xs[0], fit: val, ciLow: val, ciHigh: val }],
-    };
-  }
-
-  const xMin = xs[0];
-  const xMax = xs[n - 1];
-  const xSpan = Math.max(1e-9, xMax - xMin);
-  const M = Math.max(2, gridSize);
-  const gridXs = Array.from({ length: M }, (_, k) => xMin + (k / (M - 1)) * xSpan);
-
-  // 小样本（n <= 5）：采用精确 OLS 线性回归和 Student-t 双曲 95% CI 置信带
-  if (n <= 5) {
-    const meanX = xs.reduce((a, b) => a + b, 0) / n;
-    let sxx = 0;
-    let sse = 0;
-    for (let i = 0; i < n; i++) {
-      const dx = xs[i] - meanX;
-      sxx += dx * dx;
-      const resid = ys[i] - (ols.intercept + ols.slope * xs[i]);
-      sse += resid * resid;
-    }
-    const df = n - 2;
-    const seResid = df >= 1 ? Math.sqrt(sse / df) : 0;
-    const tCrit = df >= 1 ? tCritical95(df) : 0;
-
-    const evalOlsAt = (x0) => {
-      const rawFit = ols.intercept + ols.slope * x0;
-      const sePred =
-        seResid > 0
-          ? seResid * Math.sqrt(1 / n + (sxx > 1e-12 ? ((x0 - meanX) * (x0 - meanX)) / sxx : 0))
-          : 0;
-      const half = tCrit * sePred;
-      return {
-        fit: clampValue(rawFit, minVal, maxVal),
-        ciLow: clampValue(rawFit - half, minVal, maxVal),
-        ciHigh: clampValue(rawFit + half, minVal, maxVal),
-        half,
-      };
-    };
-
-    const sampleEval = xs.map(evalOlsAt);
-    const grid = gridXs.map((gx) => {
-      const g = evalOlsAt(gx);
-      return { x: gx, fit: g.fit, ciLow: g.ciLow, ciHigh: g.ciHigh };
-    });
-
-    return {
-      method: 'OLS',
-      mean: ols.mean,
-      sd,
-      slope: ols.slope,
-      intercept: ols.intercept,
-      r: ols.r,
-      r2: ols.r2,
-      sampleFits: sampleEval.map((e) => e.fit),
-      sampleCiLow: sampleEval.map((e) => e.ciLow),
-      sampleCiHigh: sampleEval.map((e) => e.ciHigh),
-      sampleCiHalf: sampleEval.map((e) => e.half),
-      grid,
-    };
-  }
-
-  // n >= 6：Cleveland 高斯局部加权一阶线性回归（LOESS）+ 精确帽子矩阵杠杆度 95% CI 置信带
-  const q = Math.max(5, Math.min(n, Math.ceil(span * n)));
-  const wBuf = new Float64Array(n);
-  const sortedXs = q <= n && xs.slice(0, n).every(
-    (x, i) => Number.isFinite(x) && (i === 0 || xs[i - 1] <= x)
-  );
-
-  function loessBandwidth(x0) {
-    // 有序 x 上的 q 个最近样本可取连续区间；二分比较两端，避免每个拟合点都排序。
-    let left = 0;
-    let right = n - q;
-    while (left < right) {
-      const mid = (left + right) >>> 1;
-      if (x0 - xs[mid] > xs[mid + q] - x0) {
-        left = mid + 1;
-      } else {
-        right = mid;
-      }
-    }
-    return Math.max(Math.abs(xs[left] - x0), Math.abs(xs[left + q - 1] - x0));
-  }
-
-  function evalLoessPoint(x0, diagIdx = -1) {
-    let h;
-    if (sortedXs) {
-      h = loessBandwidth(x0);
-      if (h <= 1e-9) {
-        h = Math.max(Math.abs(xs[0] - x0), Math.abs(xs[n - 1] - x0), xSpan * 0.05, 1e-6);
-      }
-    } else {
-      const sortedDists = Array.from({ length: n }, (_, j) => Math.abs(xs[j] - x0)).sort((a, b) => a - b);
-      h = sortedDists[q - 1];
-      if (h <= 1e-9) {
-        h = Math.max(sortedDists[n - 1], xSpan * 0.05, 1e-6);
-      }
-    }
-    const maxDist = h * 1.0001;
-    let start = 0;
-    let end = n;
-    if (sortedXs) {
-      // 三次权重的支持区间之外权重为零，保留区间内样本原来的累加顺序。
-      let right = n;
-      while (start < right) {
-        const mid = (start + right) >>> 1;
-        if (x0 - xs[mid] >= maxDist) start = mid + 1;
-        else right = mid;
-      }
-      let left = start;
-      while (left < end) {
-        const mid = (left + end) >>> 1;
-        if (xs[mid] - x0 < maxDist) left = mid + 1;
-        else end = mid;
-      }
-    }
-
-    let sw = 0;
-    let swx = 0;
-    for (let j = start; j < end; j++) {
-      const u = Math.abs(xs[j] - x0) / maxDist;
-      const base = 1 - u * u * u;
-      const w = u >= 1 ? 0 : base * base * base;
-      wBuf[j] = w;
-      sw += w;
-      swx += w * xs[j];
-    }
-
-    if (sw <= 1e-12) {
-      const fallbackVal = ols.intercept + ols.slope * x0;
-      return { rawFit: fallbackVal, leverageNormSq: 1 / n, diagHat: 1 / n, localHatDiag: 1 / n };
-    }
-
-    const mx = swx / sw;
-    let sxxW = 0;
-    for (let j = start; j < end; j++) {
-      const w = wBuf[j];
-      if (w <= 0) continue;
-      const dx = xs[j] - mx;
-      sxxW += w * dx * dx;
-    }
-
-    const dx0 = x0 - mx;
-    const useSlope = sxxW > 1e-12;
-    const inverseWeightSum = 1 / sw;
-    const slopeScale = useSlope ? dx0 / sxxW : 0;
-    const localHatDiag = inverseWeightSum + (useSlope ? (dx0 * dx0) / sxxW : 0);
-    let rawFit = 0;
-    let leverageNormSq = 0;
-    let diagHat = 0;
-
-    for (let j = start; j < end; j++) {
-      const w = wBuf[j];
-      if (w <= 0) continue;
-      const lj = w * inverseWeightSum + (useSlope ? w * (xs[j] - mx) * slopeScale : 0);
-      rawFit += lj * ys[j];
-      leverageNormSq += lj * lj;
-      if (j === diagIdx) diagHat = lj;
-    }
-
-    return { rawFit, leverageNormSq, diagHat, localHatDiag };
-  }
-
-  const rawSampleFits = new Float64Array(n);
-  const sampleLevSq = new Float64Array(n);
-  let sse = 0;
-  let traceL = 0;
-  let precomputedGridEval = null;
-
-  // 大样本（n > 200 且 x 单调有序）采用和 R `stats::loess(surface = "interpolate")` 一致的网格插值加速：
-  // 仅在 M 个均匀网格顶点做精确 LOESS（O(M·N)），再线性插值样本拟合值和杠杆度，避免 O(N²) 阻塞主线程。
-  if (n > 200 && sortedXs && M >= 2) {
-    const gridRawFit = new Float64Array(M);
-    const gridLevSq = new Float64Array(M);
-    const gridHatDiag = new Float64Array(M);
-    for (let k = 0; k < M; k++) {
-      const res = evalLoessPoint(gridXs[k], -1);
-      gridRawFit[k] = res.rawFit;
-      gridLevSq[k] = res.leverageNormSq;
-      gridHatDiag[k] = res.localHatDiag;
-    }
-    precomputedGridEval = { gridRawFit, gridLevSq };
-
-    const invSpan = (M - 1) / xSpan;
-    const maxK0 = M - 2;
-    for (let i = 0; i < n; i++) {
-      const u = (xs[i] - xMin) * invSpan;
-      const k0 = u <= 0 ? 0 : u >= maxK0 ? maxK0 : Math.floor(u);
-      const frac = Math.max(0, Math.min(1, u - k0));
-      const rf = gridRawFit[k0] + frac * (gridRawFit[k0 + 1] - gridRawFit[k0]);
-      const ls = Math.max(0, gridLevSq[k0] + frac * (gridLevSq[k0 + 1] - gridLevSq[k0]));
-      const hd = gridHatDiag[k0] + frac * (gridHatDiag[k0 + 1] - gridHatDiag[k0]);
-      rawSampleFits[i] = rf;
-      sampleLevSq[i] = ls;
-      traceL += hd;
-      const diff = ys[i] - rf;
-      sse += diff * diff;
-    }
-  } else {
-    for (let i = 0; i < n; i++) {
-      const res = evalLoessPoint(xs[i], i);
-      rawSampleFits[i] = res.rawFit;
-      sampleLevSq[i] = res.leverageNormSq;
-      traceL += res.diagHat;
-      const diff = ys[i] - res.rawFit;
-      sse += diff * diff;
-    }
-  }
-
-  const dfRes = Math.max(1, n - traceL);
-  const sigmaHat = Math.sqrt(sse / dfRes);
-  const tCrit = tCritical95(dfRes);
-
-  const sampleFits = new Array(n);
-  const sampleCiLow = new Array(n);
-  const sampleCiHigh = new Array(n);
-  const sampleCiHalf = new Array(n);
-  let clampedSse = 0;
-
-  for (let i = 0; i < n; i++) {
-    const fitVal = clampValue(rawSampleFits[i], minVal, maxVal);
-    const half = tCrit * sigmaHat * Math.sqrt(sampleLevSq[i]);
-    sampleFits[i] = fitVal;
-    sampleCiLow[i] = clampValue(rawSampleFits[i] - half, minVal, maxVal);
-    sampleCiHigh[i] = clampValue(rawSampleFits[i] + half, minVal, maxVal);
-    sampleCiHalf[i] = half;
-    const d = ys[i] - fitVal;
-    clampedSse += d * d;
-  }
-
-  const grid = precomputedGridEval
-    ? gridXs.map((gx, k) => {
-        const rf = precomputedGridEval.gridRawFit[k];
-        const half = tCrit * sigmaHat * Math.sqrt(Math.max(0, precomputedGridEval.gridLevSq[k]));
-        return {
-          x: gx,
-          fit: clampValue(rf, minVal, maxVal),
-          ciLow: clampValue(rf - half, minVal, maxVal),
-          ciHigh: clampValue(rf + half, minVal, maxVal),
-        };
-      })
-    : gridXs.map((gx) => {
-        const res = evalLoessPoint(gx, -1);
-        const half = tCrit * sigmaHat * Math.sqrt(res.leverageNormSq);
-        return {
-          x: gx,
-          fit: clampValue(res.rawFit, minVal, maxVal),
-          ciLow: clampValue(res.rawFit - half, minVal, maxVal),
-          ciHigh: clampValue(res.rawFit + half, minVal, maxVal),
-        };
-      });
-
-  const r2Loess = syy > 1e-12 ? clampValue(1 - clampedSse / syy, 0, 1) : 1;
-
-  return {
-    method: 'LOESS',
-    mean: ols.mean,
-    sd,
-    slope: ols.slope,
-    intercept: ols.intercept,
-    r: ols.r,
-    r2: r2Loess,
-    sampleFits,
-    sampleCiLow,
-    sampleCiHigh,
-    sampleCiHalf,
-    grid,
-  };
-}
-
-/**
- * Heckbert 科学坐标轴刻度取整算法，生成科研图表风格的均匀整洁刻度。
- */
-function niceStepNumber(range, round) {
-  if (!Number.isFinite(range) || range <= 0) return 1;
-  const exponent = Math.floor(Math.log10(range));
-  const fraction = range / 10 ** exponent;
-  let niceFraction;
-  if (round) {
-    if (fraction < 1.5) niceFraction = 1;
-    else if (fraction < 3) niceFraction = 2;
-    else if (fraction < 7) niceFraction = 5;
-    else niceFraction = 10;
-  } else if (fraction <= 1) niceFraction = 1;
-  else if (fraction <= 2) niceFraction = 2;
-  else if (fraction <= 5) niceFraction = 5;
-  else niceFraction = 10;
-  return niceFraction * 10 ** exponent;
-}
-
-function computeNiceYScale(dataMin, dataMax, { minBound = 0, maxBound = Infinity, tickCount = 4 } = {}) {
-  let lo = Number.isFinite(dataMin) ? dataMin : 0;
-  let hi = Number.isFinite(dataMax) ? dataMax : 1;
-  if (minBound === 0 && lo >= 0 && hi > 0 && lo <= hi * 0.32) {
-    lo = 0;
-  }
-  if (hi - lo <= 1e-9) {
-    const pad = lo > 0 ? lo * 0.15 : 1;
-    lo = Math.max(minBound, lo - pad);
-    hi = Math.min(maxBound, hi + pad);
-    if (hi - lo <= 1e-9) {
-      lo = Math.max(minBound, hi - 1);
-    }
-  } else {
-    const pad = (hi - lo) * 0.05;
-    lo = Math.max(minBound, lo - (lo === 0 ? 0 : pad));
-    hi = Math.min(maxBound, hi + pad);
-  }
-
-  const rawRange = niceStepNumber(hi - lo, false);
-  const step = niceStepNumber(rawRange / Math.max(2, tickCount - 1), true);
-  let graphMin = Math.max(minBound, Math.floor(lo / step) * step);
-  let graphMax = Math.min(maxBound, Math.ceil(hi / step) * step);
-  if (graphMax - graphMin <= 1e-9) {
-    graphMax = graphMin + step;
-  }
-
-  const ticks = [];
-  for (let v = graphMin; v <= graphMax + step * 0.25; v += step) {
-    const clamped = clampValue(+v.toPrecision(10), minBound, maxBound);
-    if (ticks.length === 0 || Math.abs(clamped - ticks[ticks.length - 1]) > step * 1e-4) {
-      ticks.push(clamped);
-    }
-    if (ticks.length >= 8) break;
-  }
-  return {
-    min: ticks[0] ?? graphMin,
-    max: ticks[ticks.length - 1] ?? graphMax,
-    step,
-    ticks,
-  };
-}
-
-function computeNiceXStepTicks(xs) {
-  const n = xs.length;
-  if (n === 0) return [];
-  if (n <= 5) {
-    return Array.from(new Set(xs.map((x) => Math.round(x))));
-  }
-  const xMin = xs[0];
-  const xMax = xs[n - 1];
-  const span = xMax - xMin;
-  if (span <= 5) {
-    return Array.from(new Set(xs.map((x) => Math.round(x))));
-  }
-  const step = Math.max(1, Math.round(niceStepNumber(span / 4.5, true)));
-  const firstTick = Math.ceil(xMin / step) * step;
-  const ticks = [];
-  if (firstTick - xMin > step * 0.45) {
-    ticks.push(Math.round(xMin));
-  }
-  for (let v = firstTick; v <= xMax + 1e-6; v += step) {
-    ticks.push(Math.round(v));
-    if (ticks.length >= 7) break;
-  }
-  if (ticks.length === 0) {
-    return [Math.round(xMin), Math.round(xMax)];
-  }
-  return ticks;
-}
-
-function formatYAxisTick(metric, val, step) {
-  if (!Number.isFinite(val)) return '';
-  if (Math.abs(val) < 1e-9) {
-    return metric === 'cost' ? '$0' : metric === 'cache' ? '0%' : metric === 'ttft' ? '0s' : '0';
-  }
-  if (metric === 'tps') {
-    return step >= 1 ? `${Math.round(val)}` : val.toFixed(1);
-  }
-  if (metric === 'ttft') {
-    return step >= 1 ? `${Math.round(val)}s` : `${val.toFixed(1)}s`;
-  }
-  if (metric === 'cache') {
-    return step >= 1 ? `${Math.round(val)}%` : formatPctNumber(val, { withSymbol: true });
-  }
-  if (metric === 'cost') {
-    if (step >= 1) return `$${Math.round(val)}`;
-    if (step >= 0.1) return `$${val.toFixed(1)}`;
-    if (step >= 0.01) return `$${val.toFixed(2)}`;
-    return `$${val.toFixed(3)}`;
-  }
-  return String(val);
-}
-
-function buildPolylinePath(points) {
-  if (!points.length) return '';
-  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
-  for (let i = 1; i < points.length; i++) {
-    d += ` L ${points[i].x.toFixed(1)} ${points[i].y.toFixed(1)}`;
-  }
-  return d;
-}
-
-function buildSplinePath(points) {
-  if (!points.length) return '';
-  if (points.length === 1) {
-    return `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
-  }
-  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i];
-    const p1 = points[i + 1];
-    const cpx1 = p0.x + (p1.x - p0.x) * 0.38;
-    const cpx2 = p1.x - (p1.x - p0.x) * 0.38;
-    d += ` C ${cpx1.toFixed(1)} ${p0.y.toFixed(1)}, ${cpx2.toFixed(1)} ${p1.y.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
-  }
-  return d;
-}
-
-function computeStepTickIndices(count) {
-  if (count <= 0) return [];
-  if (count <= 6) return Array.from({ length: count }, (_, i) => i);
-  const maxTicks = 6;
-  const set = new Set();
-  for (let k = 0; k < maxTicks; k++) {
-    set.add(Math.round((k / (maxTicks - 1)) * (count - 1)));
-  }
-  return Array.from(set).sort((a, b) => a - b);
-}
-
-function formatStepAxisTag(st, showAgentPrefix) {
-  const num = `#${Number(st?.stepIndex ?? 0)}`;
-  if (!showAgentPrefix) return num;
-  const badge = formatAgentBadgeText({
-    agentKind:
-      st?.agentKind || (!st?.isSubagent ? 'main' : st?.isSideQuestion ? 'side_question' : 'subagent'),
-    agentOrdinal:
-      st?.agentOrdinal || (st?.isSideQuestion ? st?.sideIndex || 0 : st?.agentIndex || 0),
-    isMain: !st?.isSubagent,
-    isSideQuestion: Boolean(st?.isSideQuestion),
-    sideIndex: st?.sideIndex || 0,
-    index: st?.agentIndex || 0,
-    badgeText: st?.agentBadge,
-  });
-  return `${badge}${num}`;
-}
-
-function formatChartMetricValue(metric, val) {
-  if (!Number.isFinite(val)) return '—';
-  switch (metric) {
-    case 'totalTokens':
-    case 'context':
-      return `${formatTokensPrecise(val)} tok`;
-    case 'tps':
-      return formatSpeedMetric(val, ' tok/s');
-    case 'ttft':
-      return formatMetric(val, 's');
-    case 'cache':
-      return formatPctNumber(val, { withSymbol: true });
-    case 'cost':
-      return formatUsd(val, { precise: true });
-    default:
-      return String(val);
-  }
-}
-
-function formatChartMetricCompact(metric, val) {
-  if (!Number.isFinite(val)) return '—';
-  switch (metric) {
-    case 'totalTokens':
-    case 'context':
-      return formatTokens(val);
-    case 'tps':
-      return formatSpeedMetric(val, ' tok/s');
-    case 'ttft':
-      return formatMetric(val, 's');
-    case 'cache':
-      return formatPctNumber(val, { withSymbol: true });
-    case 'cost':
-      return formatUsd(val, { precise: true });
-    default:
-      return String(val);
-  }
-}
-
-/**
- * Downsamples dense chronological step series (`> maxPoints`, e.g. 1,500–5,000 steps) to an
- * adaptive visual vertex budget (`~2.1px` per segment) so cubic splines never overplot into an
- * opaque solid wall while strictly preserving the start step, end step, and exact global peak step.
- *
- * @template {{ value?: number }} T
- * @param {T[]} points
- * @param {number} [maxPoints=208]
- * @returns {T[]}
- */
-function downsampleStepPointsForPlot(points, maxPoints = 208) {
-  if (!Array.isArray(points) || points.length <= maxPoints || maxPoints < 8) {
-    return points;
-  }
-  const n = points.length;
-  let globalPeakIdx = -1;
-  let globalPeakVal = -Infinity;
-  for (let i = 0; i < n; i += 1) {
-    const v = Number(points[i]?.value);
-    if (Number.isFinite(v) && v >= globalPeakVal) {
-      globalPeakVal = v;
-      globalPeakIdx = i;
-    }
-  }
-
-  const out = [points[0]];
-  const bucketCount = maxPoints - 2;
-  const interiorLen = n - 2;
-  for (let b = 0; b < bucketCount; b += 1) {
-    const bStart = 1 + Math.floor((b * interiorLen) / bucketCount);
-    const bEnd = Math.max(bStart + 1, 1 + Math.floor(((b + 1) * interiorLen) / bucketCount));
-    let pickIdx = -1;
-    if (globalPeakIdx >= bStart && globalPeakIdx < bEnd) {
-      pickIdx = globalPeakIdx;
-    } else {
-      for (let k = bStart; k < bEnd; k += 1) {
-        if (points[k]?.anomalySummary) {
-          if (pickIdx < 0 || points[k]?.anomalySeverity === 'danger') {
-            pickIdx = k;
-            if (points[k]?.anomalySeverity === 'danger') break;
-          }
-        }
-      }
-      if (pickIdx < 0) {
-        pickIdx = bStart + Math.floor((bEnd - bStart) / 2);
-      }
-    }
-    const picked = points[pickIdx];
-    if (picked && picked !== out[out.length - 1]) {
-      out.push(picked);
-    }
-  }
-  const lastPt = points[n - 1];
-  if (lastPt && lastPt !== out[out.length - 1]) {
-    out.push(lastPt);
-  }
-  return out;
-}
-
-/**
- * Evaluates the exact `y` coordinate on `buildSplinePath(plotPoints)` at horizontal coordinate `targetX`
- * so overlay markers (such as anomaly dots) sit flush on the rendered curve even between downsampled knots.
- *
- * @param {Array<{ x: number, y: number }>} plotPoints
- * @param {number} targetX
- * @returns {number}
- */
-function evalStepSplineYAtX(plotPoints, targetX) {
-  if (!Array.isArray(plotPoints) || plotPoints.length === 0) return 0;
-  if (plotPoints.length === 1 || targetX <= plotPoints[0].x) return plotPoints[0].y;
-  const last = plotPoints[plotPoints.length - 1];
-  if (targetX >= last.x) return last.y;
-
-  let loIdx = 0;
-  let hiIdx = plotPoints.length - 1;
-  while (loIdx + 1 < hiIdx) {
-    const mid = (loIdx + hiIdx) >>> 1;
-    if (plotPoints[mid].x <= targetX) loIdx = mid;
-    else hiIdx = mid;
-  }
-  const p0 = plotPoints[loIdx];
-  const p1 = plotPoints[hiIdx];
-  const dx = p1.x - p0.x;
-  if (!(dx > 1e-6)) return p0.y;
-
-  const uTarget = Math.max(0, Math.min(1, (targetX - p0.x) / dx));
-  let sLo = 0;
-  let sHi = 1;
-  for (let it = 0; it < 14; it += 1) {
-    const s = (sLo + sHi) * 0.5;
-    const inv = 1 - s;
-    const u = 3 * inv * inv * s * 0.38 + 3 * inv * s * s * 0.62 + s * s * s;
-    if (u < uTarget) sLo = s;
-    else sHi = s;
-  }
-  const s = (sLo + sHi) * 0.5;
-  return p0.y + (p1.y - p0.y) * s * s * (3 - 2 * s);
-}
-return { MODEL_COLOR_VARS, getStepModelGroupKey, toChronologicalSteps, clampValue, computeLinearFit, computePublicationFit, niceStepNumber, computeNiceYScale, computeNiceXStepTicks, formatYAxisTick, buildPolylinePath, buildSplinePath, computeStepTickIndices, formatStepAxisTag, formatChartMetricValue, formatChartMetricCompact, downsampleStepPointsForPlot, evalStepSplineYAtX };
-})();
-
-// --- src/components/charts/SessionStepCharts.js ---
-const { createSessionLineChart, createModelFitChart } = (() => {
-/**
- * @fileoverview 当前会话步骤级线性走势图与模型趋势拟合图组件 (SessionStepCharts).
- *
- * 包含两部分能力：
- * 1. `createSessionLineChart`：查看当前会话（支持主代理 / 子代理 / 全部汇总）所有模型的步进变化，
- *    支持切换 `总Token`（累计调用总量）、`上下文`（单步上下文体积）、`TPS`、`首字`、`费用` 五大维度；
- * 2. `createModelFitChart`：查看指定模型或全部模型的 `TPS`、`首字`、`缓存`、`费用` 散点与鲁棒局部加权线性回归（LOWESS + OLS 基准）拟合曲线，
- *    内置视图级模型锁定状态机，进入视图时自动锚定当前调用模型，停留在视图期间绝不随轮询跳变。
- */
-
-
-
-
-let sessionChartUid = 0;
-
-/**
- * 创建会话全模型线性走势图（支持 `totalTokens` | `context` | `tps` | `ttft` | `cost`，全宽 1:1 贴边对齐）。
- */
-function createSessionLineChart() {
-  const DEFAULT_VIEW_W = 460;
-  const VIEW_H = 106;
-  const TOP_Y = 18;
-  const BOTTOM_Y = 94;
-  const SPAN_Y = BOTTOM_Y - TOP_Y;
-
-  let viewW = DEFAULT_VIEW_W;
-
-  function resolvePlotBounds(w) {
-    const leftX = 1;
-    const rightX = Math.max(leftX + 20, w - 1);
-    return { leftX, rightX, spanX: rightX - leftX };
-  }
-
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${viewW} ${VIEW_H}`);
-  svg.setAttribute('class', 'sstep-svg');
-  svg.setAttribute('aria-hidden', 'true');
-
-  const gradId = `sstep-line-grad-${++sessionChartUid}`;
-  const defs = document.createElementNS(SVG_NS, 'defs');
-  const grad = document.createElementNS(SVG_NS, 'linearGradient');
-  grad.setAttribute('id', gradId);
-  grad.setAttribute('x1', '0');
-  grad.setAttribute('y1', '0');
-  grad.setAttribute('x2', '0');
-  grad.setAttribute('y2', '1');
-  const stop1 = document.createElementNS(SVG_NS, 'stop');
-  stop1.setAttribute('offset', '0%');
-  stop1.setAttribute('stop-color', 'var(--ctx-cached)');
-  stop1.setAttribute('stop-opacity', '0.28');
-  const stop2 = document.createElementNS(SVG_NS, 'stop');
-  stop2.setAttribute('offset', '100%');
-  stop2.setAttribute('stop-color', 'var(--ctx-cached)');
-  stop2.setAttribute('stop-opacity', '0.0');
-  grad.appendChild(stop1);
-  grad.appendChild(stop2);
-  defs.appendChild(grad);
-  svg.appendChild(defs);
-
-  const gridGroup = document.createElementNS(SVG_NS, 'g');
-  gridGroup.setAttribute('class', 'trend-grid');
-  const gridLines = [];
-  for (const y of [TOP_Y, Math.round((TOP_Y + BOTTOM_Y) / 2), BOTTOM_Y]) {
-    const line = document.createElementNS(SVG_NS, 'line');
-    line.setAttribute('x1', '0');
-    line.setAttribute('y1', String(y));
-    line.setAttribute('x2', String(viewW));
-    line.setAttribute('y2', String(y));
-    gridGroup.appendChild(line);
-    gridLines.push(line);
-  }
-  svg.appendChild(gridGroup);
-
-  const areaPath = document.createElementNS(SVG_NS, 'path');
-  areaPath.setAttribute('fill', `url(#${gradId})`);
-  svg.appendChild(areaPath);
-
-  const multiAreaGroup = document.createElementNS(SVG_NS, 'g');
-  multiAreaGroup.setAttribute('class', 'sstep-multi-area-group');
-  svg.appendChild(multiAreaGroup);
-
-  const linePath = document.createElementNS(SVG_NS, 'path');
-  linePath.setAttribute('class', 'trend-line');
-  linePath.setAttribute('fill', 'none');
-  svg.appendChild(linePath);
-
-  const multiLineGroup = document.createElementNS(SVG_NS, 'g');
-  multiLineGroup.setAttribute('class', 'sstep-multi-line-group');
-  svg.appendChild(multiLineGroup);
-
-  const dotsGroup = document.createElementNS(SVG_NS, 'g');
-  svg.appendChild(dotsGroup);
-
-  const anomalyDotsGroup = document.createElementNS(SVG_NS, 'g');
-  anomalyDotsGroup.setAttribute('class', 'sstep-anomaly-dots');
-  svg.appendChild(anomalyDotsGroup);
-
-  const hoverLine = document.createElementNS(SVG_NS, 'line');
-  hoverLine.setAttribute('class', 'trend-hover-line');
-  hoverLine.setAttribute('y1', '10');
-  hoverLine.setAttribute('y2', String(BOTTOM_Y));
-  hoverLine.setAttribute('hidden', 'true');
-  svg.appendChild(hoverLine);
-
-  const hoverDot = document.createElementNS(SVG_NS, 'circle');
-  hoverDot.setAttribute('r', '3.4');
-  hoverDot.setAttribute('class', 'trend-hover-dot');
-  hoverDot.setAttribute('hidden', 'true');
-  svg.appendChild(hoverDot);
-
-  const emptyHintEl = h('div', {
-    className: 'sstep-empty-hint text-muted',
-    text: t('chart.step.empty'),
-    hidden: true,
-  });
-
-  const peakPill = h('span', { className: 'trend-peak-pill text-mono', hidden: true });
-
-  const tipHeadLeft = h('span', { className: 'trend-tip-time text-mono' });
-  const tipHeadRight = h('span', { className: 'trend-tip-calls text-mono' });
-  const tipMainLeft = h('strong', { className: 'trend-tip-tokens text-mono' });
-  const tipMainRight = h('span', { className: 'trend-tip-cost text-mono' });
-  const tipInLabelEl = h('span', { className: 'trend-tip-stat-label', text: t('cons.legInput') });
-  const tipInValEl = h('span', { className: 'trend-tip-stat-val text-mono' });
-  const tipCacheLabelEl = h('span', { className: 'trend-tip-stat-label', text: t('cons.legCache') });
-  const tipCacheValEl = h('span', { className: 'trend-tip-stat-val text-mono' });
-  const tipOutLabelEl = h('span', { className: 'trend-tip-stat-label', text: t('cons.legOutput') });
-  const tipOutValEl = h('span', { className: 'trend-tip-stat-val text-mono' });
-  const tipIoGrid = h('div', { className: 'trend-tip-sub is-grid', hidden: true }, [
-    h('div', { className: 'trend-tip-stat' }, [tipInLabelEl, tipInValEl]),
-    h('div', { className: 'trend-tip-stat' }, [tipCacheLabelEl, tipCacheValEl]),
-    h('div', { className: 'trend-tip-stat' }, [tipOutLabelEl, tipOutValEl]),
-  ]);
-  const tipSub = h('div', { className: 'trend-tip-sub text-mono', hidden: true });
-  const tipAnomaly = h('div', { className: 'trend-tip-anomaly text-mono', hidden: true });
-  const tooltipEl = h('div', { className: 'trend-tooltip', hidden: true }, [
-    h('div', { className: 'trend-tip-head' }, [tipHeadLeft, tipHeadRight]),
-    h('div', { className: 'trend-tip-main' }, [tipMainLeft, tipMainRight]),
-    tipIoGrid,
-    tipSub,
-    tipAnomaly,
-  ]);
-
-  const xAxisEl = h('div', { className: 'trend-x-axis' });
-  const modelLegendEl = h('div', { className: 'sstep-model-legend', hidden: true });
-  const plotStage = h('div', { className: 'sstep-plot-stage' }, [
-    peakPill,
-    emptyHintEl,
-    svg,
-  ]);
-  const rootEl = h('div', { className: 'sstep-chart-wrap' }, [
-    plotStage,
-    xAxisEl,
-    modelLegendEl,
-    tooltipEl,
-  ]);
-
-  let currentPoints = [];
-  let currentMaxVal = 0;
-  let currentMetric = 'totalTokens';
-  let hoveredIdx = -1;
-  let lastPointer = null;
-  let tickElsByIdx = new Map();
-  let lastSig = '';
-  let lastPreSig = '';
-  let lastSummaryBadge = '';
-  let lastUpdateParams = null;
-  let cachedPlotSvgRect = null;
-  let lastLineMode = '';
-  let lastSingleLineKey = '';
-  const multiSeriesNodesByKey = new Map();
-  const anomalyDotElsByKey = new Map();
-
-  const singleCurveMorphCtrl = createCubicCurveMorphController();
-  const multiCurveMorphCtrl = createMultiSeriesCurveMorphController();
-  const peakReadyArmer = createReadyClassArmer(peakPill, 'is-ready');
-  const lineTooltipCtrl = createFloatingChartTooltipController({
-    containerEl: rootEl,
-    tooltipEl,
-    defaultTipWidth: 212,
-    defaultTipHeight: 86,
-    defaultViewWidth: DEFAULT_VIEW_W,
-    defaultViewHeight: VIEW_H,
-  });
-
-  function invalidatePlotSvgRect() {
-    cachedPlotSvgRect = null;
-    lineTooltipCtrl.invalidateRects();
-  }
-
-  function syncViewWidth() {
-    const measured = Math.round(
-      plotStage.clientWidth ||
-        svg.clientWidth ||
-        plotStage.getBoundingClientRect?.()?.width ||
-        0
-    );
-    if (measured >= 160 && measured !== viewW) {
-      viewW = measured;
-      svg.setAttribute('viewBox', `0 0 ${viewW} ${VIEW_H}`);
-      for (const line of gridLines) {
-        line.setAttribute('x1', '0');
-        line.setAttribute('x2', String(viewW));
-      }
-      return true;
-    }
-    return false;
-  }
-
-  function showHoverAt(idx, pointer = null, { forceRefresh = false } = {}) {
-    if (idx < 0 || idx >= currentPoints.length) {
-      clearHover();
-      return;
-    }
-    const wasHidden = tooltipEl.hasAttribute('hidden');
-    const changedIdx = forceRefresh || wasHidden || idx !== hoveredIdx;
-    hoveredIdx = idx;
-    if (pointer) {
-      lastPointer = pointer;
-    }
-    const pt = currentPoints[idx];
-    const hasIoParts = Boolean(pt.ioParts);
-
-    if (changedIdx) {
-      patchAttr(hoverLine, 'hidden', false);
-      patchAttr(hoverLine, 'x1', pt.x.toFixed(1));
-      patchAttr(hoverLine, 'x2', pt.x.toFixed(1));
-
-      patchAttr(hoverDot, 'hidden', false);
-      patchAttr(hoverDot, 'cx', pt.x.toFixed(1));
-      patchAttr(hoverDot, 'cy', pt.y.toFixed(1));
-      const hoverAccent = pt.anomalySummary
-        ? pt.anomalySeverity === 'danger'
-          ? 'var(--metric-danger)'
-          : 'var(--metric-warn)'
-        : pt.hoverColor || 'var(--ctx-cached)';
-      patchStyleVar(hoverDot, '--hover-dot-color', hoverAccent);
-
-      patchAttr(peakPill, 'hidden', true);
-
-      patchText(tipHeadLeft, pt.stepTag);
-      patchText(tipHeadRight, pt.modelText);
-      patchText(
-        tipMainLeft,
-        pt.valid ? formatChartMetricValue(currentMetric, pt.value) : t('chart.step.excluded')
-      );
-      patchText(tipMainRight, pt.secondaryRight || '');
-      patchAttr(tipIoGrid, 'hidden', !hasIoParts);
-      if (hasIoParts) {
-        patchText(tipInLabelEl, t('cons.legInput'));
-        patchText(tipCacheLabelEl, t('cons.legCache'));
-        patchText(tipOutLabelEl, t('cons.legOutput'));
-        patchText(tipInValEl, pt.ioParts.inTok);
-        patchText(tipCacheValEl, pt.ioParts.cacheTok);
-        patchText(tipOutValEl, pt.ioParts.outTok);
-      }
-      patchAttr(tipSub, 'hidden', hasIoParts || !pt.subDetail);
-      if (!hasIoParts && pt.subDetail) {
-        patchText(tipSub, pt.subDetail);
-      }
-      patchAttr(tipAnomaly, 'hidden', !pt.anomalySummary);
-      if (pt.anomalySummary) {
-        patchText(tipAnomaly, pt.anomalySummary);
-        patchClasses(tipAnomaly, { 'is-danger': pt.anomalySeverity === 'danger' });
-      }
-
-      for (const [tIdx, el] of tickElsByIdx.entries()) {
-        patchClasses(el, { 'is-hovered': tIdx === idx });
-      }
-    }
-
-    const wrapRect = lineTooltipCtrl.getWrapRect();
-    const wrapW =
-      wrapRect && wrapRect.width > 0
-        ? wrapRect.width
-        : Number(rootEl.clientWidth || viewW || DEFAULT_VIEW_W);
-    const fallbackX = (pt.x / Math.max(1, viewW)) * wrapW;
-    const fallbackY = pt.y + 4;
-    lineTooltipCtrl.show({
-      fallbackX,
-      fallbackY,
-      pointer: pointer || lastPointer,
-      trackedDots: [hoverDot],
-      viewWidth: viewW,
-      viewHeight: VIEW_H,
-      sizeKey: `${hasIoParts ? 'io' : pt.subDetail ? 'sub' : 'min'}:${pt.anomalySummary ? 'a' : '0'}`,
-    });
-  }
-
-  function clearHover() {
-    hoveredIdx = -1;
-    lastPointer = null;
-    lineTooltipCtrl.hide();
-    patchAttr(hoverLine, 'hidden', true);
-    patchAttr(hoverDot, 'hidden', true);
-    patchClasses(hoverDot, { 'is-tracking': false });
-    if (currentMaxVal > 0 && currentPoints.some((p) => p.valid)) {
-      patchAttr(peakPill, 'hidden', false);
-    }
-    for (const el of tickElsByIdx.values()) {
-      patchClasses(el, { 'is-hovered': false });
-    }
-  }
-
-  plotStage.addEventListener('mousemove', (e) => {
-    if (!currentPoints.length) return;
-    if (!cachedPlotSvgRect) {
-      cachedPlotSvgRect = svg.getBoundingClientRect();
-    }
-    const rect = cachedPlotSvgRect;
-    if (!rect || rect.width <= 0) {
-      cachedPlotSvgRect = null;
-      return;
-    }
-    const relX = ((e.clientX - rect.left) / rect.width) * viewW;
-    const { leftX, spanX } = resolvePlotBounds(viewW);
-    const ratio = (relX - leftX) / Math.max(1, spanX);
-    const idx = Math.max(
-      0,
-      Math.min(currentPoints.length - 1, Math.round(ratio * (currentPoints.length - 1)))
-    );
-    const pointer =
-      Number.isFinite(Number(e?.clientX)) && Number.isFinite(Number(e?.clientY))
-        ? { clientX: Number(e.clientX), clientY: Number(e.clientY) }
-        : null;
-    showHoverAt(idx, pointer);
-  });
-  plotStage.addEventListener('mouseleave', () => {
-    invalidatePlotSvgRect();
-    clearHover();
-  });
-
-  let resizeObs = null;
-  let onWinResize = null;
-  if (typeof ResizeObserver === 'function') {
-    resizeObs = new ResizeObserver(() => {
-      invalidatePlotSvgRect();
-      if (syncViewWidth() && lastUpdateParams) {
-        lastSig = '';
-        lastPreSig = '';
-        update({ ...lastUpdateParams, _skipMorph: true });
-      }
-    });
-    resizeObs.observe(plotStage);
-  } else if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-    onWinResize = () => {
-      if (syncViewWidth() && lastUpdateParams) {
-        lastSig = '';
-        update({ ...lastUpdateParams, _skipMorph: true });
-      }
-    };
-    window.addEventListener('resize', onWinResize);
-  }
-
-  function destroy() {
-    singleCurveMorphCtrl.cancel();
-    multiCurveMorphCtrl.cancel();
-    peakReadyArmer.cancel();
-    lineTooltipCtrl.destroy();
-    resizeObs?.disconnect();
-    resizeObs = null;
-    if (onWinResize && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
-      window.removeEventListener('resize', onWinResize);
-      onWinResize = null;
-    }
-  }
-
-  /**
-   * @param {{
-   *   steps: Array<object>,
-   *   modelGroupKey?: string,
-   *   modelGroupKeys?: string[]|null,
-   *   modelColorByGroup?: Map<string, string>|null,
-   *   metric: 'totalTokens'|'context'|'tps'|'ttft'|'cost',
-   *   showAgentPrefix?: boolean,
-   *   displaySettings?: object,
-   * }} params
-   * @returns {{ summaryBadge: string }}
-   */
-  function update({
-    steps = [],
-    modelGroupKey = '__all__',
-    modelGroupKeys = null,
-    modelColorByGroup = null,
-    metric = 'totalTokens',
-    showAgentPrefix = false,
-    displaySettings = {},
-    _skipMorph = false,
-  } = {}) {
-    lastUpdateParams = {
-      steps,
-      modelGroupKey,
-      modelGroupKeys,
-      modelColorByGroup,
-      metric,
-      showAgentPrefix,
-      displaySettings,
-    };
-    currentMetric = metric;
-    syncViewWidth();
-
-    const accentColor = 'var(--ctx-cached)';
-    patchAttr(stop1, 'stop-color', accentColor);
-    patchAttr(stop2, 'stop-color', accentColor);
-    patchStyleVar(rootEl, '--sstep-accent', accentColor);
-
-    const rawKeys =
-      Array.isArray(modelGroupKeys) && modelGroupKeys.length > 0
-        ? modelGroupKeys
-        : [modelGroupKey || '__all__'];
-    const isPooledAll = rawKeys.includes('__all__');
-    const targetKeys = isPooledAll
-      ? ['__all__']
-      : Array.from(new Set(rawKeys.map((k) => String(k || '')).filter(Boolean)));
-    const targetKeySet = new Set(targetKeys);
-    const isMultiCompare = !isPooledAll && targetKeys.length >= 2;
-
-    const matchedSteps = isPooledAll
-      ? steps
-      : steps.filter((st) => st && targetKeySet.has(getStepModelGroupKey(st)));
-
-    patchText(emptyHintEl, t('chart.step.empty'));
-    if (!matchedSteps.length) {
-      currentPoints = [];
-      patchClasses(rootEl, { 'is-dense': false });
-      lastSig = 'empty';
-      lastPreSig = '';
-      lastLineMode = '';
-      lastSingleLineKey = '';
-      singleCurveMorphCtrl.reset();
-      multiCurveMorphCtrl.reset();
-      lastSummaryBadge = t('chart.step.zeroSteps');
-      invalidatePlotSvgRect();
-      patchAttr(areaPath, 'd', '');
-      patchAttr(linePath, 'd', '');
-      while (multiAreaGroup.firstChild) multiAreaGroup.removeChild(multiAreaGroup.firstChild);
-      while (multiLineGroup.firstChild) multiLineGroup.removeChild(multiLineGroup.firstChild);
-      while (dotsGroup.firstChild) dotsGroup.removeChild(dotsGroup.firstChild);
-      while (anomalyDotsGroup.firstChild) anomalyDotsGroup.removeChild(anomalyDotsGroup.firstChild);
-      anomalyDotElsByKey.clear();
-      while (xAxisEl.firstChild) xAxisEl.removeChild(xAxisEl.firstChild);
-      patchAttr(modelLegendEl, 'hidden', true);
-      patchAttr(peakPill, 'hidden', true);
-      patchAttr(emptyHintEl, 'hidden', false);
-      clearHover();
-      return { summaryBadge: lastSummaryBadge };
-    }
-
-    const locale = getEffectiveLocale();
-    const extColorSig = modelColorByGroup
-      ? Array.from(modelColorByGroup.entries())
-          .map(([k, v]) => `${k}=${v}`)
-          .join(',')
-      : '';
-    let preStepParts = `${matchedSteps.length}:`;
-    for (let i = 0; i < matchedSteps.length; i += 1) {
-      const s = matchedSteps[i];
-      preStepParts += `${s.stepIndex ?? i},${s.agentIndex ?? 0},${s.modelKey || s.modelShort || ''},${s.inputTokens || 0},${s.cacheReadTokens || 0},${s.outputTokens || 0},${s.contextTokens || 0},${s.tokPerSec ?? ''},${s.ttftSec ?? ''},${s.costUsd ?? ''},${s.anomalySig || ''};`;
-    }
-    const preSig = `${locale}|${viewW}|${metric}|${showAgentPrefix}|${displaySettings?.modelDisplayMode || ''}|${Boolean(displaySettings?.showUpstreamModel)}|${displaySettings?.orchestratorIdMode || ''}|${targetKeys.join(',')}|${extColorSig}|${preStepParts}`;
-    if (preSig === lastPreSig && lastSummaryBadge) {
-      return { summaryBadge: lastSummaryBadge };
-    }
-
-    const modelColorMap = new Map();
-    const modelLabelByGroup = new Map();
-    if (isMultiCompare) {
-      for (let i = 0; i < targetKeys.length; i++) {
-        const gk = targetKeys[i];
-        const colorVar =
-          modelColorByGroup?.get(gk) || MODEL_COLOR_VARS[i % MODEL_COLOR_VARS.length];
-        modelColorMap.set(gk, colorVar);
-        const disp = resolveModelDisplayInfo({ modelLabel: gk, label: gk }, displaySettings, {
-          fallback: gk,
-        });
-        modelLabelByGroup.set(gk, disp.baseText || disp.text || gk);
-      }
-    }
-    for (const st of matchedSteps) {
-      const gk = getStepModelGroupKey(st);
-      if (!modelColorMap.has(gk)) {
-        const colorVar =
-          modelColorByGroup?.get(gk) ||
-          MODEL_COLOR_VARS[modelColorMap.size % MODEL_COLOR_VARS.length];
-        modelColorMap.set(gk, colorVar);
-      }
-      if (!modelLabelByGroup.has(gk)) {
-        const disp = resolveModelDisplayInfo(st, displaySettings, { fallback: gk });
-        modelLabelByGroup.set(gk, disp.baseText || disp.text || gk);
-      }
-    }
-
-    let runningTokens = 0;
-    let runningCost = 0;
-    let validSum = 0;
-    let validCount = 0;
-    const perModelRunningTokens = new Map();
-    const perModelRunningCost = new Map();
-    const perModelPrevCtx = new Map();
-    const perModelStats = new Map();
-
-    const rawItems = matchedSteps.map((st, idx) => {
-      const gk = getStepModelGroupKey(st);
-      const inTok = Math.max(0, Number(st.inputTokens || 0));
-      const cacheTok = Math.max(0, Number(st.cacheReadTokens || 0));
-      const outTok = Math.max(0, Number(st.outputTokens || 0));
-      const stepTotalTok = inTok + cacheTok + outTok;
-      runningTokens += stepTotalTok;
-      const modelCumTok = (perModelRunningTokens.get(gk) || 0) + stepTotalTok;
-      perModelRunningTokens.set(gk, modelCumTok);
-
-      const stepCost = Number.isFinite(Number(st.costUsd)) ? Math.max(0, Number(st.costUsd)) : null;
-      if (stepCost !== null) {
-        runningCost += stepCost;
-        perModelRunningCost.set(gk, (perModelRunningCost.get(gk) || 0) + stepCost);
-      }
-      const modelCumCost = perModelRunningCost.get(gk) || 0;
-
-      const ctxTok = Math.max(0, Number(st.contextTokens ?? stepTotalTok));
-      const hasPrevModelCtx = perModelPrevCtx.has(gk);
-      const prevSameModelCtx = hasPrevModelCtx ? perModelPrevCtx.get(gk) : ctxTok;
-      perModelPrevCtx.set(gk, ctxTok);
-
-      const prevGlobalCtx =
-        idx > 0
-          ? Math.max(
-              0,
-              Number(
-                matchedSteps[idx - 1].contextTokens ??
-                  Number(matchedSteps[idx - 1].inputTokens || 0) +
-                    Number(matchedSteps[idx - 1].cacheReadTokens || 0) +
-                    Number(matchedSteps[idx - 1].outputTokens || 0)
-              )
-            )
-          : ctxTok;
-      const hasPrevCtx = isMultiCompare ? hasPrevModelCtx : idx > 0;
-      const ctxDelta = isMultiCompare ? ctxTok - prevSameModelCtx : idx > 0 ? ctxTok - prevGlobalCtx : 0;
-
-      const disp = resolveModelDisplayInfo(st, displaySettings, { fallback: '—' });
-      const stepTag = formatStepAxisTag(st, showAgentPrefix);
-
-      let valid = true;
-      let value = 0;
-      let secondaryRight = '';
-      let subDetail = '';
-      let ioParts = null;
-
-      if (metric === 'totalTokens') {
-        value = isMultiCompare ? modelCumTok : runningTokens;
-        secondaryRight = t('chart.step.stepAdd', { tokens: formatTokens(stepTotalTok) });
-        ioParts = {
-          inTok: formatTokens(inTok),
-          cacheTok: formatTokens(cacheTok),
-          outTok: formatTokens(outTok),
-        };
-        subDetail = t('chart.step.ioSplit', ioParts);
-      } else if (metric === 'context') {
-        value = ctxTok;
-        if (hasPrevCtx) {
-          const sign = ctxDelta >= 0 ? '+' : '-';
-          secondaryRight = `${sign}${formatTokens(Math.abs(ctxDelta))}`;
-        } else {
-          secondaryRight = t('chart.step.cacheShort', { pct: Number(st.cacheHitPct ?? 0) });
-        }
-        subDetail = st.isCompactionStep
-          ? t('chart.step.compactionCheckpoint')
-          : t('chart.step.cacheHitOut', {
-              pct: Number(st.cacheHitPct ?? 0),
-              outTok: formatTokens(outTok),
-            });
-      } else if (metric === 'tps') {
-        valid = !st.isCompactionStep && Number.isFinite(st.tokPerSec) && st.tokPerSec > 0;
-        value = valid ? Number(st.tokPerSec) : 0;
-        secondaryRight = Number.isFinite(st.ttftSec)
-          ? t('chart.step.ttftShort', { sec: formatMetric(st.ttftSec, '') })
-          : '';
-        subDetail = valid
-          ? t('chart.step.outAndCtx', {
-              outTok: formatTokens(outTok),
-              ctxTok: formatTokens(ctxTok),
-            })
-          : speedReasonText(st.selectedSpeedReason) ||
-            (st.isCompactionStep ? t('chart.step.compactionStep') : t('chart.step.noSpeedSample'));
-      } else if (metric === 'ttft') {
-        valid = !st.isCompactionStep && Number.isFinite(st.ttftSec) && st.ttftSec >= 0;
-        value = valid ? Number(st.ttftSec) : 0;
-        secondaryRight = Number.isFinite(st.tokPerSec) ? formatSpeedMetric(st.tokPerSec, ' tok/s') : '';
-        subDetail = valid
-          ? t('chart.step.ctxAndCache', {
-              ctxTok: formatTokens(ctxTok),
-              pct: Number(st.cacheHitPct ?? 0),
-            })
-          : st.isCompactionStep
-            ? t('chart.step.compactionStep')
-            : t('chart.step.noTtftSample');
-      } else if (metric === 'cost') {
-        valid = stepCost !== null;
-        value = valid ? stepCost : 0;
-        const shownCumCost = isMultiCompare ? modelCumCost : runningCost;
-        secondaryRight = t('chart.step.cumCost', {
-          cost: formatUsd(shownCumCost, { precise: shownCumCost > 0 && shownCumCost < 0.1 }),
-        });
-        subDetail = t('chart.step.cacheAndStepTok', {
-          pct: Number(st.cacheHitPct ?? 0),
-          tokens: formatTokens(stepTotalTok),
-        });
-      }
-
-      if (valid) {
-        validSum += value;
-        validCount += 1;
-        let stStat = perModelStats.get(gk);
-        if (!stStat) {
-          stStat = { count: 0, sum: 0, max: 0, last: 0, cumTok: 0, cumCost: 0 };
-          perModelStats.set(gk, stStat);
-        }
-        stStat.count += 1;
-        stStat.sum += value;
-        if (value > stStat.max) stStat.max = value;
-        stStat.last = value;
-        stStat.cumTok = modelCumTok;
-        stStat.cumCost = modelCumCost;
-      }
-
-      const dotColor = modelColorMap.get(gk) || accentColor;
-      const anomalySummary = formatStepAnomalyInlineSummary(st.anomaly);
-      return {
-        idx,
-        st,
-        stepTag,
-        modelGroupKey: gk,
-        modelText: disp.text,
-        dotColor,
-        hoverColor: isMultiCompare ? dotColor : accentColor,
-        valid,
-        value,
-        secondaryRight,
-        subDetail,
-        ioParts,
-        anomalySummary,
-        anomalySeverity: st.anomaly?.severity || '',
-      };
-    });
-
-    let maxVal = 0;
-    let peakIdx = -1;
-    for (let i = 0; i < rawItems.length; i++) {
-      if (rawItems[i].valid && rawItems[i].value >= maxVal) {
-        maxVal = rawItems[i].value;
-        peakIdx = i;
-      }
-    }
-    currentMaxVal = maxVal;
-
-    const { leftX, rightX, spanX } = resolvePlotBounds(viewW);
-    const maxPlotPoints = Math.max(128, Math.min(256, Math.floor(spanX / 2.1)));
-    const denom = maxVal > 0 ? maxVal : 1;
-    const isSingle = rawItems.length === 1;
-    const points = rawItems.map((item, i) => {
-      const x = isSingle
-        ? (leftX + rightX) / 2
-        : leftX + (i / Math.max(1, rawItems.length - 1)) * spanX;
-      const ratio = item.valid && maxVal > 0 ? item.value / denom : 0;
-      const y = item.valid ? BOTTOM_Y - ratio * SPAN_Y : BOTTOM_Y;
-      return { ...item, x, y };
-    });
-
-    const validPoints = points.filter((p) => p.valid);
-    let hoverPoints = points;
-    if (isMultiCompare) {
-      if (points.length > maxPlotPoints * targetKeys.length) {
-        const merged = [];
-        for (const gk of targetKeys) {
-          const rawSeries = points.filter((p) => p.modelGroupKey === gk && p.valid);
-          merged.push(...downsampleStepPointsForPlot(rawSeries, maxPlotPoints));
-        }
-        merged.sort((a, b) => a.idx - b.idx);
-        if (merged.length > 0) hoverPoints = merged;
-      }
-    } else if (validPoints.length > maxPlotPoints) {
-      hoverPoints = downsampleStepPointsForPlot(validPoints, maxPlotPoints);
-    }
-    currentPoints = hoverPoints;
-    patchClasses(rootEl, {
-      'is-dense': isMultiCompare
-        ? hoverPoints.length > 120 * targetKeys.length
-        : hoverPoints.length > 120,
-    });
-    patchAttr(emptyHintEl, 'hidden', validPoints.length > 0);
-
-    const colorSig = Array.from(modelColorMap.entries())
-      .map(([k, v]) => `${k}=${v}`)
-      .join(',');
-    const sig =
-      `${locale}|${viewW}|${metric}|${showAgentPrefix}|${isMultiCompare ? 'multi' : 'single'}:${targetKeys.join(',')}|${colorSig}|` +
-      points
-        .map(
-          (p) =>
-            `${p.stepTag}:${p.modelText}:${p.valid ? p.value.toFixed(4) : 'x'}:${p.st?.anomalySig || ''}`
-        )
-        .join('|');
-
-    if (sig !== lastSig) {
-      lastSig = sig;
-      while (dotsGroup.firstChild) dotsGroup.removeChild(dotsGroup.firstChild);
-      const plottedSeriesByKey = new Map();
-      let singlePlottedPts = null;
-
-      if (isMultiCompare) {
-        if (lastLineMode === 'single') {
-          const prevSingleSegs = singleCurveMorphCtrl.getCurrentSegs();
-          if (prevSingleSegs.length > 0) {
-            if (lastSingleLineKey && lastSingleLineKey !== '__all__') {
-              multiCurveMorphCtrl.seedSeries(lastSingleLineKey, prevSingleSegs);
-            } else {
-              for (const gk of targetKeys) {
-                multiCurveMorphCtrl.seedSeries(gk, prevSingleSegs);
-              }
-            }
-          }
-        }
-        singleCurveMorphCtrl.reset();
-        lastLineMode = 'multi';
-        lastSingleLineKey = '';
-        patchAttr(linePath, 'd', '');
-        patchAttr(areaPath, 'd', '');
-        for (let ci = multiLineGroup.children.length - 1; ci >= 0; ci--) {
-          const ch = multiLineGroup.children[ci];
-          if (ch.getAttribute?.('class') === 'sstep-series-single-dot') {
-            ch.remove();
-          }
-        }
-
-        const activeGks = new Set();
-        const morphItems = [];
-
-        for (const gk of targetKeys) {
-          const seriesColor = modelColorMap.get(gk) || accentColor;
-          const rawSeriesPts = points.filter((p) => p.modelGroupKey === gk && p.valid);
-          const seriesPts = downsampleStepPointsForPlot(rawSeriesPts, maxPlotPoints);
-          if (seriesPts.length === 0) continue;
-          plottedSeriesByKey.set(gk, seriesPts);
-
-          if (seriesPts.length === 1) {
-            const singleDot = document.createElementNS(SVG_NS, 'circle');
-            singleDot.setAttribute('cx', seriesPts[0].x.toFixed(1));
-            singleDot.setAttribute('cy', seriesPts[0].y.toFixed(1));
-            singleDot.setAttribute('r', '3.1');
-            singleDot.setAttribute('class', 'sstep-series-single-dot');
-            patchStyleVar(singleDot, '--sstep-series-color', seriesColor);
-            multiLineGroup.appendChild(singleDot);
-          } else {
-            activeGks.add(gk);
-            let nodes = multiSeriesNodesByKey.get(gk);
-            if (!nodes) {
-              const mArea = document.createElementNS(SVG_NS, 'path');
-              mArea.setAttribute('class', 'sstep-multi-area');
-              const mLine = document.createElementNS(SVG_NS, 'path');
-              mLine.setAttribute('class', 'sstep-fit-line');
-              mLine.setAttribute('fill', 'none');
-              nodes = { mArea, mLine };
-              multiSeriesNodesByKey.set(gk, nodes);
-            }
-            patchStyleVar(nodes.mArea, '--sstep-series-color', seriesColor);
-            patchStyleVar(nodes.mLine, '--sstep-fit-accent', seriesColor);
-            multiAreaGroup.appendChild(nodes.mArea);
-            multiLineGroup.appendChild(nodes.mLine);
-
-            const seriesLineD = buildSplinePath(seriesPts);
-            const firstX = seriesPts[0].x.toFixed(1);
-            const lastX = seriesPts[seriesPts.length - 1].x.toFixed(1);
-            const seriesAreaD = `${seriesLineD} L ${lastX} ${BOTTOM_Y} L ${firstX} ${BOTTOM_Y} Z`;
-
-            morphItems.push({
-              key: gk,
-              nextSegs: pointsToNormalizedCubicSegs(seriesPts, BOTTOM_Y, {
-                leftX,
-                spanX,
-              }),
-              lineEl: nodes.mLine,
-              areaEl: nodes.mArea,
-              endDotEl: null,
-              endX: NaN,
-              endY: NaN,
-              finalLineD: seriesLineD,
-              finalAreaD: seriesAreaD,
-            });
-          }
-        }
-
-        for (const [gk, nodes] of multiSeriesNodesByKey.entries()) {
-          if (!activeGks.has(gk)) {
-            nodes.mArea.remove();
-            nodes.mLine.remove();
-          }
-        }
-
-        multiCurveMorphCtrl.morphSeries({
-          items: morphItems,
-          leftX,
-          spanX,
-          bottomY: BOTTOM_Y,
-          skipMorph: _skipMorph,
-          allowBaselineEntry: true,
-        });
-      } else {
-        const nextSingleKey = isPooledAll ? '__all__' : targetKeys[0] || '__all__';
-        if (lastLineMode === 'multi') {
-          const seedSegs =
-            multiCurveMorphCtrl.getSeriesSegs(nextSingleKey) ||
-            multiCurveMorphCtrl.getFirstSegs();
-          if (seedSegs && seedSegs.length > 0) {
-            singleCurveMorphCtrl.seedSegs(seedSegs);
-          }
-        }
-        multiCurveMorphCtrl.reset();
-        lastLineMode = 'single';
-        lastSingleLineKey = nextSingleKey;
-        for (const nodes of multiSeriesNodesByKey.values()) {
-          nodes.mArea.remove();
-          nodes.mLine.remove();
-        }
-        const plotValidPoints = downsampleStepPointsForPlot(validPoints, maxPlotPoints);
-        singlePlottedPts = plotValidPoints;
-        if (plotValidPoints.length === 0) {
-          singleCurveMorphCtrl.reset();
-          patchAttr(linePath, 'd', '');
-          patchAttr(areaPath, 'd', '');
-        } else if (plotValidPoints.length === 1) {
-          const yVal = plotValidPoints[0].y;
-          const yStr = yVal.toFixed(1);
-          const lineD = `M ${leftX.toFixed(1)} ${yStr} L ${rightX.toFixed(1)} ${yStr}`;
-          const areaD = `${lineD} L ${rightX.toFixed(1)} ${BOTTOM_Y} L ${leftX.toFixed(1)} ${BOTTOM_Y} Z`;
-          const flatPts = [
-            { x: leftX, y: yVal },
-            { x: rightX, y: yVal },
-          ];
-          singleCurveMorphCtrl.morphTo({
-            nextSegs: pointsToNormalizedCubicSegs(flatPts, BOTTOM_Y, { leftX, spanX }),
-            leftX,
-            spanX,
-            bottomY: BOTTOM_Y,
-            linePath,
-            areaPath,
-            finalLineD: lineD,
-            finalAreaD: areaD,
-            skipMorph: _skipMorph,
-          });
-        } else {
-          const lineD = buildSplinePath(plotValidPoints);
-          const firstX = plotValidPoints[0].x.toFixed(1);
-          const lastX = plotValidPoints[plotValidPoints.length - 1].x.toFixed(1);
-          const areaD = `${lineD} L ${lastX} ${BOTTOM_Y} L ${firstX} ${BOTTOM_Y} Z`;
-          singleCurveMorphCtrl.morphTo({
-            nextSegs: pointsToNormalizedCubicSegs(plotValidPoints, BOTTOM_Y, { leftX, spanX }),
-            leftX,
-            spanX,
-            bottomY: BOTTOM_Y,
-            linePath,
-            areaPath,
-            finalLineD: lineD,
-            finalAreaD: areaD,
-            skipMorph: _skipMorph,
-          });
-        }
-      }
-
-      const clusteredAnomalies = [];
-      for (const pt of points) {
-        if (!pt.valid || !pt.anomalySummary) continue;
-        const curvePts = isMultiCompare
-          ? plottedSeriesByKey.get(pt.modelGroupKey)
-          : singlePlottedPts;
-        if (!curvePts || curvePts.length === 0) continue;
-        const onCurveY =
-          curvePts.length === 1 ? curvePts[0].y : evalStepSplineYAtX(curvePts, pt.x);
-        const prevCluster = clusteredAnomalies[clusteredAnomalies.length - 1];
-        if (
-          prevCluster &&
-          (!isMultiCompare || prevCluster.modelGroupKey === pt.modelGroupKey) &&
-          Math.abs(pt.x - prevCluster.x) < 3.0
-        ) {
-          if (pt.anomalySeverity === 'danger' && prevCluster.severity !== 'danger') {
-            prevCluster.key = `${pt.stepTag}:${pt.modelGroupKey}`;
-            prevCluster.x = pt.x;
-            prevCluster.y = onCurveY;
-            prevCluster.severity = 'danger';
-          }
-          continue;
-        }
-        clusteredAnomalies.push({
-          key: `${pt.stepTag}:${pt.modelGroupKey}`,
-          modelGroupKey: pt.modelGroupKey,
-          x: pt.x,
-          y: onCurveY,
-          severity: pt.anomalySeverity === 'danger' ? 'danger' : 'warn',
-        });
-      }
-      clusteredAnomalies.sort((a, b) =>
-        a.severity === 'danger' ? 1 : b.severity === 'danger' ? -1 : 0
-      );
-
-      const activeAnomalyKeys = new Set();
-      for (const item of clusteredAnomalies) {
-        activeAnomalyKeys.add(item.key);
-        let dotEl = anomalyDotElsByKey.get(item.key);
-        if (!dotEl) {
-          dotEl = document.createElementNS(SVG_NS, 'circle');
-          dotEl.setAttribute('r', '2.1');
-          anomalyDotElsByKey.set(item.key, dotEl);
-        }
-        patchAttr(dotEl, 'cx', item.x.toFixed(1));
-        patchAttr(dotEl, 'cy', item.y.toFixed(1));
-        patchAttr(
-          dotEl,
-          'class',
-          `sstep-anomaly-dot${item.severity === 'danger' ? ' is-danger' : ''}`
-        );
-        anomalyDotsGroup.appendChild(dotEl);
-      }
-      for (const [k, el] of anomalyDotElsByKey.entries()) {
-        if (!activeAnomalyKeys.has(k)) {
-          el.remove();
-          anomalyDotElsByKey.delete(k);
-        }
-      }
-
-      const tickIndices = computeStepTickIndices(currentPoints.length);
-      while (xAxisEl.firstChild) xAxisEl.removeChild(xAxisEl.firstChild);
-      tickElsByIdx = new Map();
-      for (let i = 0; i < tickIndices.length; i++) {
-        const tIdx = tickIndices[i];
-        const pt = currentPoints[tIdx];
-        if (!pt) continue;
-        const isFirst = !isSingle && i === 0;
-        const isLast = !isSingle && i === tickIndices.length - 1;
-        const pct = isFirst ? 0 : isLast ? 100 : (pt.x / viewW) * 100;
-        const tickEl = h('span', {
-          className: `trend-x-tick text-mono${isFirst ? ' is-start' : isLast ? ' is-end' : ''}`,
-          text: pt.stepTag,
-          title: `${pt.stepTag} · ${pt.modelText}`,
-        });
-        patchStyleVar(tickEl, '--tick-x', `${pct.toFixed(2)}%`);
-        tickEl.onclick = () => {
-          lastPointer = null;
-          showHoverAt(tIdx, null);
-        };
-        xAxisEl.appendChild(tickEl);
-        tickElsByIdx.set(tIdx, tickEl);
-      }
-
-      while (modelLegendEl.firstChild) modelLegendEl.removeChild(modelLegendEl.firstChild);
-      if (isMultiCompare) {
-        patchAttr(modelLegendEl, 'hidden', false);
-        for (const gk of targetKeys) {
-          const colorVar = modelColorMap.get(gk) || accentColor;
-          const swatch = h('span', { className: 'sstep-legend-line' });
-          patchStyleVar(swatch, '--swatch-bg', colorVar);
-          const stStat = perModelStats.get(gk);
-          const baseLabel = modelLabelByGroup.get(gk) || gk;
-          let summarySuffix = t('chart.step.noSamples');
-          if (stStat && stStat.count > 0) {
-            if (metric === 'totalTokens') {
-              summarySuffix = formatTokens(stStat.cumTok);
-            } else if (metric === 'context') {
-              summarySuffix = t('chart.step.peakShort', { val: formatTokens(stStat.max) });
-            } else if (metric === 'tps' || metric === 'ttft') {
-              summarySuffix = formatChartMetricCompact(metric, stStat.sum / stStat.count);
-            } else if (metric === 'cost') {
-              summarySuffix = formatUsd(stStat.cumCost, {
-                precise: stStat.cumCost > 0 && stStat.cumCost < 0.1,
-              });
-            }
-          }
-          modelLegendEl.appendChild(
-            h('span', { className: 'sstep-legend-item' }, [
-              swatch,
-              h('span', { text: `${baseLabel} (${summarySuffix})` }),
-            ])
-          );
-        }
-      } else {
-        const showPooledDotLegend = points.length <= 64 && modelColorMap.size > 1;
-        patchAttr(modelLegendEl, 'hidden', !showPooledDotLegend);
-        if (showPooledDotLegend) {
-          for (const [gk, colorVar] of modelColorMap.entries()) {
-            const swatch = h('span', { className: 'sstep-legend-dot' });
-            patchStyleVar(swatch, '--swatch-bg', colorVar);
-            modelLegendEl.appendChild(
-              h('span', { className: 'sstep-legend-item' }, [
-                swatch,
-                h('span', { text: modelLabelByGroup.get(gk) || gk }),
-              ])
-            );
-          }
-        }
-      }
-    }
-
-    if (peakIdx >= 0 && validPoints.length > 0 && maxVal > 0) {
-      const peakPt = points[peakIdx];
-      patchText(
-        peakPill,
-        t('chart.step.peakPill', {
-          tag: peakPt.stepTag,
-          val: formatChartMetricCompact(metric, peakPt.value),
-        })
-      );
-      patchStyleVar(peakPill, '--sstep-accent', isMultiCompare ? peakPt.dotColor : accentColor);
-      const pctLeft = Math.max(14, Math.min(86, (peakPt.x / viewW) * 100));
-      patchStyleVar(peakPill, '--peak-x', `${pctLeft.toFixed(1)}%`);
-      peakReadyArmer.arm();
-      if (hoveredIdx < 0) patchAttr(peakPill, 'hidden', false);
-    } else {
-      patchAttr(peakPill, 'hidden', true);
-    }
-
-    if (hoveredIdx >= currentPoints.length) {
-      clearHover();
-    } else if (hoveredIdx >= 0) {
-      showHoverAt(hoveredIdx, lastPointer, { forceRefresh: true });
-    }
-
-    let summaryBadge = t('chart.step.stepsCount', { count: matchedSteps.length });
-    const activeCompareCount = isMultiCompare ? targetKeys.length : 1;
-    const multiPrefix = isMultiCompare
-      ? t('chart.step.multiPrefix', { count: activeCompareCount })
-      : '';
-    if (metric === 'totalTokens') {
-      summaryBadge = t('chart.step.sumTokens', {
-        prefix: multiPrefix,
-        tokens: formatTokens(runningTokens),
-      });
-    } else if (metric === 'context') {
-      const lastCtx = points[points.length - 1]?.value || 0;
-      summaryBadge = isMultiCompare
-        ? t('chart.step.peakTokens', { prefix: multiPrefix, tokens: formatTokens(maxVal) })
-        : t('chart.step.currentCtx', { tokens: formatTokens(lastCtx) });
-    } else if (metric === 'tps') {
-      summaryBadge =
-        validCount > 0
-          ? t('chart.step.meanTps', {
-              prefix: multiPrefix,
-              val: (validSum / validCount).toFixed(1),
-            })
-          : t('chart.step.noValidSamples');
-    } else if (metric === 'ttft') {
-      summaryBadge =
-        validCount > 0
-          ? t('chart.step.meanSec', {
-              prefix: multiPrefix,
-              val: (validSum / validCount).toFixed(1),
-            })
-          : t('chart.step.noValidSamples');
-    } else if (metric === 'cost') {
-      summaryBadge = t('chart.step.sumCost', {
-        prefix: multiPrefix,
-        cost: formatUsd(runningCost, { precise: runningCost > 0 && runningCost < 0.1 }),
-      });
-    }
-
-    lastPreSig = preSig;
-    lastSummaryBadge = summaryBadge;
-    return { summaryBadge };
-  }
-
-  return { el: rootEl, update, destroy };
-}
-
-/**
- * 创建学术论文风格散点回归与 95% 置信带拟合图（全宽 1:1 贴边对齐 + 项目统一冷蓝灰设计语言）：
- * - 全宽水平参考网格与底部线性步序刻度轴（内嵌左对齐 Y 轴刻度标签，零左右缩进留白）；
- * - 半透明冷蓝灰实心观测散点（自然呈现重叠密度）；
- * - 围绕回归曲线的 95% CI 置信区间阴影带（绝不向 y=0 做面积图填充）；
- * - 高斯局部线性回归曲线（LOESS, n >= 6）或精确线性回归（OLS, n <= 5），配相关系数 r 与拟合优度 R²。
- */
-function createModelFitChart() {
-  const DEFAULT_VIEW_W = 460;
-  const VIEW_H = 136;
-  const TOP_Y = 16;
-  const BOTTOM_Y = 116;
-  const SPAN_Y = BOTTOM_Y - TOP_Y;
-
-  let viewW = DEFAULT_VIEW_W;
-
-  function resolveFitBounds(w) {
-    const plotLeft = 2;
-    const plotRight = Math.max(plotLeft + 20, w - 2);
-    return { plotLeft, plotRight, plotSpanX: plotRight - plotLeft };
-  }
-
-  const svg = document.createElementNS(SVG_NS, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${viewW} ${VIEW_H}`);
-  svg.setAttribute('class', 'sstep-svg sstep-fit-svg');
-  svg.setAttribute('aria-hidden', 'true');
-
-  const gridGroup = document.createElementNS(SVG_NS, 'g');
-  gridGroup.setAttribute('class', 'sstep-sci-grid');
-  svg.appendChild(gridGroup);
-
-  const axesGroup = document.createElementNS(SVG_NS, 'g');
-  axesGroup.setAttribute('class', 'sstep-sci-axes');
-  svg.appendChild(axesGroup);
-
-  const multiBandGroup = document.createElementNS(SVG_NS, 'g');
-  multiBandGroup.setAttribute('class', 'sstep-multi-band-group');
-  svg.appendChild(multiBandGroup);
-
-  const scatterGroup = document.createElementNS(SVG_NS, 'g');
-  scatterGroup.setAttribute('class', 'sstep-scatter-group');
-  svg.appendChild(scatterGroup);
-
-  const multiCurveGroup = document.createElementNS(SVG_NS, 'g');
-  multiCurveGroup.setAttribute('class', 'sstep-multi-curve-group');
-  svg.appendChild(multiCurveGroup);
-
-  const ciBandPath = document.createElementNS(SVG_NS, 'path');
-  ciBandPath.setAttribute('class', 'sstep-ci-band');
-  svg.appendChild(ciBandPath);
-
-  const olsLine = document.createElementNS(SVG_NS, 'line');
-  olsLine.setAttribute('class', 'sstep-ols-line');
-  olsLine.setAttribute('hidden', 'true');
-  svg.appendChild(olsLine);
-
-  const fitPath = document.createElementNS(SVG_NS, 'path');
-  fitPath.setAttribute('class', 'sstep-fit-line');
-  fitPath.setAttribute('fill', 'none');
-  svg.appendChild(fitPath);
-
-  const hoverLine = document.createElementNS(SVG_NS, 'line');
-  hoverLine.setAttribute('class', 'trend-hover-line');
-  hoverLine.setAttribute('y1', String(TOP_Y));
-  hoverLine.setAttribute('y2', String(BOTTOM_Y));
-  hoverLine.setAttribute('hidden', 'true');
-  svg.appendChild(hoverLine);
-
-  const hoverRawDot = document.createElementNS(SVG_NS, 'circle');
-  hoverRawDot.setAttribute('r', '3.0');
-  hoverRawDot.setAttribute('class', 'sstep-hover-raw-dot');
-  hoverRawDot.setAttribute('hidden', 'true');
-  svg.appendChild(hoverRawDot);
-
-  const hoverFitDot = document.createElementNS(SVG_NS, 'circle');
-  hoverFitDot.setAttribute('r', '3.1');
-  hoverFitDot.setAttribute('class', 'trend-hover-dot');
-  hoverFitDot.setAttribute('hidden', 'true');
-  svg.appendChild(hoverFitDot);
-
-  const emptyHintEl = h('div', {
-    className: 'sstep-empty-hint text-muted',
-    text: t('chart.fit.empty'),
-    hidden: true,
-  });
-
-  const tipHeadLeft = h('span', { className: 'trend-tip-time text-mono' });
-  const tipHeadRight = h('span', { className: 'trend-tip-calls text-mono' });
-  const tipMainLeft = h('strong', { className: 'trend-tip-tokens text-mono' });
-  const tipMainRight = h('span', { className: 'trend-tip-cost text-mono' });
-  const tipSub = h('div', { className: 'trend-tip-sub text-mono', hidden: true });
-  const tipAnomaly = h('div', { className: 'trend-tip-anomaly text-mono', hidden: true });
-  const tooltipEl = h('div', { className: 'trend-tooltip', hidden: true }, [
-    h('div', { className: 'trend-tip-head' }, [tipHeadLeft, tipHeadRight]),
-    h('div', { className: 'trend-tip-main' }, [tipMainLeft, tipMainRight]),
-    tipSub,
-    tipAnomaly,
-  ]);
-
-  const fitMethodLabelEl = h('span', { text: t('chart.fit.loess') });
-  const olsLegendTextEl = h('span', { text: t('chart.fit.olsLinear') });
-  const olsLegendWrapEl = h('span', { className: 'sstep-fit-legend-ols' }, [
-    h('span', { className: 'sstep-fit-swatch is-ols' }),
-    olsLegendTextEl,
-  ]);
-  const obsLegendTextEl = h('span', { text: t('chart.fit.observed') });
-  const singleLegendEl = h('span', { className: 'sstep-fit-legend' }, [
-    h('span', { className: 'sstep-fit-swatch is-scatter' }),
-    obsLegendTextEl,
-    h('span', { className: 'sstep-fit-swatch is-curve' }),
-    fitMethodLabelEl,
-    h('span', { className: 'sstep-fit-swatch is-ci' }),
-    h('span', { text: '95% CI' }),
-    olsLegendWrapEl,
-  ]);
-  const multiLegendEl = h('div', { className: 'sstep-model-legend', hidden: true });
-  const fitStatsEl = h('span', { className: 'sstep-fit-delta text-mono text-muted' });
-
-  const fitLegendFoot = h('div', { className: 'sstep-fit-foot' }, [
-    singleLegendEl,
-    multiLegendEl,
-    fitStatsEl,
-  ]);
-
-  const plotStage = h('div', { className: 'sstep-plot-stage' }, [emptyHintEl, svg]);
-  const rootEl = h('div', { className: 'sstep-chart-wrap' }, [plotStage, fitLegendFoot, tooltipEl]);
-
-  let currentSamples = [];
-  let currentMetric = 'tps';
-  let hoveredIdx = -1;
-  let lastFitPointer = null;
-  let lastSig = '';
-  let lastUpdateParams = null;
-  let fitCacheMetric = '';
-  const fitCache = new Map();
-  const multiFitNodesByKey = new Map();
-
-  const fitMorphCtrl = createFitGridMorphController();
-  let lastFitMode = '';
-  let lastSingleFitKey = '';
-  const fitTooltipCtrl = createFloatingChartTooltipController({
-    containerEl: rootEl,
-    tooltipEl,
-    defaultTipWidth: 216,
-    defaultTipHeight: 82,
-    defaultViewWidth: DEFAULT_VIEW_W,
-    defaultViewHeight: VIEW_H,
-  });
-
-  function reusePublicationFit(key, xs, ys, maxVal, isMultiCompare) {
-    const previous = fitCache.get(key);
-    if (
-      previous && previous.xs.length === xs.length &&
-      xs.every((x, i) => x === previous.xs[i] && ys[i] === previous.ys[i])
-    ) {
-      return previous.result;
-    }
-    const result = computePublicationFit(xs, ys, {
-      minVal: 0,
-      maxVal,
-      gridSize: isMultiCompare ? 56 : 64,
-      span: 0.5,
-    });
-    fitCache.set(key, { xs, ys, result });
-    return result;
-  }
-
-  function syncViewWidth() {
-    const measured = Math.round(
-      plotStage.clientWidth ||
-        svg.clientWidth ||
-        plotStage.getBoundingClientRect?.()?.width ||
-        0
-    );
-    if (measured >= 160 && measured !== viewW) {
-      viewW = measured;
-      svg.setAttribute('viewBox', `0 0 ${viewW} ${VIEW_H}`);
-      return true;
-    }
-    return false;
-  }
-
-  function showHoverAt(idx, pointer = null, { forceRefresh = false } = {}) {
-    if (idx < 0 || idx >= currentSamples.length) {
-      clearHover();
-      return;
-    }
-    const wasHidden = tooltipEl.hasAttribute('hidden');
-    const changedIdx = forceRefresh || wasHidden || idx !== hoveredIdx;
-    hoveredIdx = idx;
-    if (pointer) {
-      lastFitPointer = pointer;
-    }
-    const sp = currentSamples[idx];
-
-    if (changedIdx) {
-      patchAttr(hoverLine, 'hidden', false);
-      patchAttr(hoverLine, 'x1', sp.x.toFixed(1));
-      patchAttr(hoverLine, 'x2', sp.x.toFixed(1));
-
-      patchAttr(hoverFitDot, 'hidden', false);
-      patchAttr(hoverFitDot, 'cx', sp.x.toFixed(1));
-      patchAttr(hoverFitDot, 'cy', sp.fitY.toFixed(1));
-      patchStyleVar(hoverFitDot, '--hover-dot-color', sp.seriesColor || 'var(--accent-primary)');
-
-      patchAttr(hoverRawDot, 'hidden', false);
-      patchAttr(hoverRawDot, 'cx', sp.x.toFixed(1));
-      patchAttr(hoverRawDot, 'cy', sp.rawY.toFixed(1));
-      patchClasses(hoverRawDot, {
-        'is-anomaly': Boolean(sp.anomalySummary),
-        'is-danger': Boolean(sp.anomalySummary && sp.anomalySeverity === 'danger'),
-      });
-
-      patchText(tipHeadLeft, sp.stepTag);
-      patchText(tipHeadRight, sp.modelText);
-      patchText(
-        tipMainLeft,
-        t('chart.fit.tipFit', { val: formatChartMetricValue(currentMetric, sp.fitVal) })
-      );
-      patchText(
-        tipMainRight,
-        t('chart.fit.tipObs', { val: formatChartMetricValue(currentMetric, sp.rawVal) })
-      );
-
-      patchAttr(tipSub, 'hidden', false);
-      if (sp.compareHint) {
-        patchText(tipSub, sp.compareHint);
-      } else if (currentSamples.length >= 3 && sp.ciHalf > 0) {
-        patchText(
-          tipSub,
-          `95% CI [${formatChartMetricCompact(currentMetric, sp.ciLow)}, ${formatChartMetricCompact(currentMetric, sp.ciHigh)}]`
-        );
-      } else {
-        const ctxTok = Math.max(0, Number(sp.st?.contextTokens || 0));
-        patchText(
-          tipSub,
-          t('chart.step.ctxAndCache', {
-            ctxTok: formatTokens(ctxTok),
-            pct: Number(sp.st?.cacheHitPct ?? 0),
-          })
-        );
-      }
-      patchAttr(tipAnomaly, 'hidden', !sp.anomalySummary);
-      if (sp.anomalySummary) {
-        patchText(tipAnomaly, sp.anomalySummary);
-        patchClasses(tipAnomaly, { 'is-danger': sp.anomalySeverity === 'danger' });
-      }
-    }
-
-    const wrapRect = fitTooltipCtrl.getWrapRect();
-    const wrapW =
-      wrapRect && wrapRect.width > 0
-        ? wrapRect.width
-        : Number(rootEl.clientWidth || viewW || DEFAULT_VIEW_W);
-    const fallbackX = (sp.x / Math.max(1, viewW)) * wrapW;
-    const fallbackY = sp.fitY + 4;
-    fitTooltipCtrl.show({
-      fallbackX,
-      fallbackY,
-      pointer: pointer || lastFitPointer,
-      trackedDots: [hoverFitDot, hoverRawDot],
-      viewWidth: viewW,
-      viewHeight: VIEW_H,
-      sizeKey: sp.anomalySummary ? 'fit:a' : 'fit:0',
-    });
-  }
-
-  function clearHover() {
-    hoveredIdx = -1;
-    lastFitPointer = null;
-    fitTooltipCtrl.hide();
-    patchAttr(hoverLine, 'hidden', true);
-    patchAttr(hoverFitDot, 'hidden', true);
-    patchAttr(hoverRawDot, 'hidden', true);
-    patchClasses(hoverFitDot, { 'is-tracking': false });
-    patchClasses(hoverRawDot, { 'is-tracking': false });
-  }
-
-  let cachedFitSvgRect = null;
-  plotStage.addEventListener('mousemove', (e) => {
-    if (!currentSamples.length) return;
-    if (!cachedFitSvgRect) {
-      cachedFitSvgRect = svg.getBoundingClientRect();
-    }
-    const rect = cachedFitSvgRect;
-    if (!rect || rect.width <= 0) {
-      cachedFitSvgRect = null;
-      return;
-    }
-    const relX = ((e.clientX - rect.left) / rect.width) * viewW;
-    let lo = 0;
-    let hi = currentSamples.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi) >>> 1;
-      if (currentSamples[mid].x < relX) lo = mid + 1;
-      else hi = mid;
-    }
-    let bestIdx = lo;
-    if (
-      lo > 0 &&
-      Math.abs(currentSamples[lo - 1].x - relX) <= Math.abs(currentSamples[lo].x - relX)
-    ) {
-      bestIdx = lo - 1;
-    }
-    const pointer =
-      Number.isFinite(Number(e?.clientX)) && Number.isFinite(Number(e?.clientY))
-        ? { clientX: Number(e.clientX), clientY: Number(e.clientY) }
-        : null;
-    showHoverAt(bestIdx, pointer);
-  });
-  plotStage.addEventListener('mouseleave', () => {
-    cachedFitSvgRect = null;
-    fitTooltipCtrl.invalidateRects();
-    clearHover();
-  });
-
-  let resizeObs = null;
-  let onWinResize = null;
-  if (typeof ResizeObserver === 'function') {
-    resizeObs = new ResizeObserver(() => {
-      cachedFitSvgRect = null;
-      fitTooltipCtrl.invalidateRects();
-      if (syncViewWidth() && lastUpdateParams) {
-        lastSig = '';
-        update({ ...lastUpdateParams, _skipMorph: true });
-      }
-    });
-    resizeObs.observe(plotStage);
-  } else if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-    onWinResize = () => {
-      if (syncViewWidth() && lastUpdateParams) {
-        lastSig = '';
-        update({ ...lastUpdateParams, _skipMorph: true });
-      }
-    };
-    window.addEventListener('resize', onWinResize);
-  }
-
-  function destroy() {
-    fitMorphCtrl.cancel();
-    fitTooltipCtrl.destroy();
-    resizeObs?.disconnect();
-    resizeObs = null;
-    if (onWinResize && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
-      window.removeEventListener('resize', onWinResize);
-      onWinResize = null;
-    }
-  }
-
-  /**
-   * 在给定横坐标 x0 处对某模型的回归网格做线性插值（仅当 x0 位于该模型观测区间内时返回拟合值）。
-   */
-  function interpolateSeriesGridFit(grid, x0) {
-    if (!Array.isArray(grid) || grid.length === 0) return null;
-    if (grid.length === 1) {
-      return Math.abs(grid[0].x - x0) < 1e-6 ? grid[0].fit : null;
-    }
-    const gMin = grid[0].x;
-    const gMax = grid[grid.length - 1].x;
-    if (x0 < gMin - 1e-6 || x0 > gMax + 1e-6) return null;
-    if (x0 <= gMin) return grid[0].fit;
-    if (x0 >= gMax) return grid[grid.length - 1].fit;
-    for (let i = 0; i < grid.length - 1; i++) {
-      const a = grid[i];
-      const b = grid[i + 1];
-      if (x0 >= a.x && x0 <= b.x) {
-        const span = b.x - a.x;
-        const t = span > 1e-9 ? (x0 - a.x) / span : 0;
-        return a.fit + t * (b.fit - a.fit);
-      }
-    }
-    return grid[grid.length - 1].fit;
-  }
-
-  /**
-   * 绘制共享的水平网格线、底部步序坐标轴及左对齐内联 Y 轴刻度标签。
-   */
-  function renderFitAxesAndGrid({ yScale, mapY, mapX, xs, isSingle, plotLeft, plotRight, metric, showAgentPrefix }) {
-    while (gridGroup.firstChild) gridGroup.removeChild(gridGroup.firstChild);
-    while (axesGroup.firstChild) axesGroup.removeChild(axesGroup.firstChild);
-
-    const xMin = xs[0];
-    const xMax = xs[xs.length - 1];
-
-    const xSpine = document.createElementNS(SVG_NS, 'line');
-    xSpine.setAttribute('x1', '0');
-    xSpine.setAttribute('y1', String(BOTTOM_Y));
-    xSpine.setAttribute('x2', String(viewW));
-    xSpine.setAttribute('y2', String(BOTTOM_Y));
-    xSpine.setAttribute('class', 'sstep-axis-spine');
-    axesGroup.appendChild(xSpine);
-
-    for (const tv of yScale.ticks) {
-      const ty = mapY(tv);
-      if (Math.abs(ty - BOTTOM_Y) > 1.5) {
-        const gLine = document.createElementNS(SVG_NS, 'line');
-        gLine.setAttribute('x1', '0');
-        gLine.setAttribute('y1', ty.toFixed(1));
-        gLine.setAttribute('x2', String(viewW));
-        gLine.setAttribute('y2', ty.toFixed(1));
-        gridGroup.appendChild(gLine);
-      }
-
-      const labelEl = document.createElementNS(SVG_NS, 'text');
-      labelEl.setAttribute('x', '0');
-      labelEl.setAttribute('y', (ty - 3.5).toFixed(1));
-      labelEl.setAttribute('text-anchor', 'start');
-      labelEl.setAttribute('class', 'sstep-axis-label is-y-inline');
-      labelEl.textContent = formatYAxisTick(metric, tv, yScale.step);
-      axesGroup.appendChild(labelEl);
-    }
-
-    const xTickEntries = [];
-    if (isSingle) {
-      xTickEntries.push({
-        xv: Math.round(xMin),
-        tickX: mapX(xMin),
-        labelX: mapX(xMin),
-        anchor: 'middle',
-      });
-    } else {
-      xTickEntries.push({
-        xv: Math.round(xMin),
-        tickX: plotLeft,
-        labelX: 0,
-        anchor: 'start',
-      });
-      const interiorTicks = computeNiceXStepTicks(xs);
-      for (const xv of interiorTicks) {
-        if (xv <= xMin || xv >= xMax) continue;
-        const tx = mapX(xv);
-        if (tx < plotLeft + 38 || tx > plotRight - 38) continue;
-        xTickEntries.push({
-          xv,
-          tickX: tx,
-          labelX: tx,
-          anchor: 'middle',
-        });
-      }
-      xTickEntries.push({
-        xv: Math.round(xMax),
-        tickX: plotRight,
-        labelX: viewW,
-        anchor: 'end',
-      });
-    }
-
-    for (const xt of xTickEntries) {
-      const tickMark = document.createElementNS(SVG_NS, 'line');
-      tickMark.setAttribute('x1', xt.tickX.toFixed(1));
-      tickMark.setAttribute('y1', String(BOTTOM_Y));
-      tickMark.setAttribute('x2', xt.tickX.toFixed(1));
-      tickMark.setAttribute('y2', (BOTTOM_Y + 3.2).toFixed(1));
-      tickMark.setAttribute('class', 'sstep-axis-tick');
-      axesGroup.appendChild(tickMark);
-
-      const labelEl = document.createElementNS(SVG_NS, 'text');
-      labelEl.setAttribute('x', xt.labelX.toFixed(1));
-      labelEl.setAttribute('y', (BOTTOM_Y + 13.5).toFixed(1));
-      labelEl.setAttribute('text-anchor', xt.anchor);
-      labelEl.setAttribute('class', 'sstep-axis-label');
-      labelEl.textContent = showAgentPrefix ? `${xt.xv}` : `#${xt.xv}`;
-      axesGroup.appendChild(labelEl);
-    }
-  }
-
-  /**
-   * @param {{
-   *   steps: Array<object>,
-   *   modelGroupKey?: string,
-   *   modelGroupKeys?: string[]|null,
-   *   modelColorByGroup?: Map<string, string>|null,
-   *   metric: 'tps'|'ttft'|'cache'|'cost',
-   *   showAgentPrefix?: boolean,
-   *   displaySettings?: object,
-   * }} params
-   * @returns {{ sampleCount: number, summaryBadge: string }}
-   */
-  function update({
-    steps = [],
-    modelGroupKey = '__all__',
-    modelGroupKeys = null,
-    modelColorByGroup = null,
-    metric = 'tps',
-    showAgentPrefix = false,
-    displaySettings = {},
-    _skipMorph = false,
-  } = {}) {
-    lastUpdateParams = {
-      steps,
-      modelGroupKey,
-      modelGroupKeys,
-      modelColorByGroup,
-      metric,
-      showAgentPrefix,
-      displaySettings,
-    };
-    currentMetric = metric;
-    syncViewWidth();
-
-    patchStyleVar(rootEl, '--sstep-fit-accent', 'var(--ctx-cached)');
-
-    const rawKeys =
-      Array.isArray(modelGroupKeys) && modelGroupKeys.length > 0
-        ? modelGroupKeys
-        : [modelGroupKey || '__all__'];
-    const isPooledAll = rawKeys.includes('__all__');
-    const targetKeys = isPooledAll
-      ? ['__all__']
-      : Array.from(new Set(rawKeys.map((k) => String(k || '')).filter(Boolean)));
-    const targetKeySet = new Set(targetKeys);
-    const isMultiCompare = !isPooledAll && targetKeys.length >= 2;
-
-    const matchedItems = [];
-    let prevXVal = -Infinity;
-    for (let idx = 0; idx < steps.length; idx++) {
-      const st = steps[idx];
-      if (!st || typeof st !== 'object') continue;
-      let globalX = showAgentPrefix ? idx + 1 : Number(st.stepIndex ?? idx + 1);
-      if (!Number.isFinite(globalX) || globalX <= prevXVal) {
-        globalX = prevXVal === -Infinity ? idx + 1 : prevXVal + 1;
-      }
-      prevXVal = globalX;
-
-      const gk = getStepModelGroupKey(st);
-      if (!isPooledAll && !targetKeySet.has(gk)) {
-        continue;
-      }
-      let valid = false;
-      let rawVal = 0;
-      if (metric === 'tps') {
-        valid = !st.isCompactionStep && Number.isFinite(st.tokPerSec) && st.tokPerSec > 0;
-        rawVal = valid ? Number(st.tokPerSec) : 0;
-      } else if (metric === 'ttft') {
-        valid = !st.isCompactionStep && Number.isFinite(st.ttftSec) && st.ttftSec >= 0;
-        rawVal = valid ? Number(st.ttftSec) : 0;
-      } else if (metric === 'cache') {
-        valid = !st.isCompactionStep && Number.isFinite(st.cacheHitPct) && st.cacheHitPct >= 0;
-        rawVal = valid ? Number(st.cacheHitPct) : 0;
-      } else if (metric === 'cost') {
-        valid = Number.isFinite(Number(st.costUsd)) && Number(st.costUsd) >= 0;
-        rawVal = valid ? Number(st.costUsd) : 0;
-      }
-      if (valid) {
-        const disp = resolveModelDisplayInfo(st, displaySettings, { fallback: '—' });
-        matchedItems.push({
-          st,
-          gk,
-          xVal: globalX,
-          rawVal,
-          stepTag: formatStepAxisTag(st, showAgentPrefix),
-          modelText: disp.baseText || disp.text,
-          anomalySummary: formatStepAnomalyInlineSummary(st.anomaly),
-          anomalySeverity: st.anomaly?.severity || '',
-        });
-      }
-    }
-
-    const locale = getEffectiveLocale();
-    patchText(emptyHintEl, t('chart.fit.empty'));
-    patchText(obsLegendTextEl, t('chart.fit.observed'));
-    patchText(olsLegendTextEl, t('chart.fit.olsLinear'));
-
-    if (fitCacheMetric !== metric) {
-      fitCache.clear();
-      fitCacheMetric = metric;
-    }
-    for (const key of fitCache.keys()) {
-      if (isMultiCompare ? !targetKeySet.has(key) : key !== null) fitCache.delete(key);
-    }
-
-    if (matchedItems.length === 0) {
-      fitCache.clear();
-      fitMorphCtrl.reset();
-      lastFitMode = '';
-      lastSingleFitKey = '';
-      currentSamples = [];
-      lastSig = 'empty';
-      patchAttr(ciBandPath, 'd', '');
-      patchAttr(fitPath, 'd', '');
-      patchAttr(olsLine, 'hidden', true);
-      for (const nodes of multiFitNodesByKey.values()) {
-        nodes.bandEl.remove();
-        nodes.curveEl.remove();
-      }
-      while (gridGroup.firstChild) gridGroup.removeChild(gridGroup.firstChild);
-      while (axesGroup.firstChild) axesGroup.removeChild(axesGroup.firstChild);
-      while (scatterGroup.firstChild) scatterGroup.removeChild(scatterGroup.firstChild);
-      patchAttr(singleLegendEl, 'hidden', false);
-      patchAttr(multiLegendEl, 'hidden', true);
-      patchAttr(emptyHintEl, 'hidden', false);
-      patchText(fitMethodLabelEl, t('chart.fit.loess'));
-      patchText(fitStatsEl, 'n = 0');
-      clearHover();
-      return { sampleCount: 0, summaryBadge: t('chart.fit.zeroSamples') };
-    }
-
-    patchAttr(emptyHintEl, 'hidden', true);
-    const minBound = 0;
-    const maxBound = metric === 'cache' ? 100 : Infinity;
-
-    // 分支 A：多模型同图独立拟合曲线对比模式（勾选 >= 2 个模型）
-    if (isMultiCompare) {
-      const seriesList = [];
-      for (let kIdx = 0; kIdx < targetKeys.length; kIdx++) {
-        const key = targetKeys[kIdx];
-        const items = matchedItems.filter((it) => it.gk === key);
-        if (items.length === 0) continue;
-        const xs = items.map((d) => d.xVal);
-        const rawYs = items.map((d) => d.rawVal);
-        const pubFit = reusePublicationFit(key, xs, rawYs, maxBound, true);
-        const colorVar =
-          modelColorByGroup?.get(key) || MODEL_COLOR_VARS[kIdx % MODEL_COLOR_VARS.length];
-        seriesList.push({
-          key,
-          label: items[0].modelText || key,
-          colorVar,
-          items,
-          xs,
-          rawYs,
-          pubFit,
-        });
-      }
-
-      patchAttr(singleLegendEl, 'hidden', true);
-      patchAttr(multiLegendEl, 'hidden', false);
-      patchAttr(ciBandPath, 'd', '');
-      patchAttr(fitPath, 'd', '');
-      patchAttr(olsLine, 'hidden', true);
-
-      const allXs = matchedItems.map((d) => d.xVal);
-      let dataMin = Infinity;
-      let dataMax = -Infinity;
-      for (const s of seriesList) {
-        for (const v of s.rawYs) {
-          if (v < dataMin) dataMin = v;
-          if (v > dataMax) dataMax = v;
-        }
-        for (const g of s.pubFit.grid) {
-          if (g.ciLow < dataMin) dataMin = g.ciLow;
-          if (g.ciHigh > dataMax) dataMax = g.ciHigh;
-        }
-      }
-
-      const yScale = computeNiceYScale(dataMin, dataMax, {
-        minBound,
-        maxBound,
-        tickCount: 4,
-      });
-      const yRange = Math.max(1e-9, yScale.max - yScale.min);
-      const mapY = (v) =>
-        BOTTOM_Y - ((clampValue(v, yScale.min, yScale.max) - yScale.min) / yRange) * SPAN_Y;
-
-      const { plotLeft, plotRight, plotSpanX } = resolveFitBounds(viewW);
-      const xMin = allXs[0];
-      const xMax = allXs[allXs.length - 1];
-      const isSingle = matchedItems.length === 1 || xMax - xMin <= 1e-9;
-      const mapX = (xv) =>
-        isSingle
-          ? (plotLeft + plotRight) / 2
-          : plotLeft + ((xv - xMin) / (xMax - xMin)) * plotSpanX;
-
-      const combinedSamples = [];
-      for (const s of seriesList) {
-        const sSamples = s.items.map((item, i) => {
-          const x = mapX(item.xVal);
-          const rawY = mapY(item.rawVal);
-          const fitVal = s.pubFit.sampleFits[i];
-          const fitY = mapY(fitVal);
-          const peerParts = [];
-          for (const other of seriesList) {
-            if (other.key === s.key) continue;
-            const interp = interpolateSeriesGridFit(other.pubFit.grid, item.xVal);
-            if (interp !== null) {
-              peerParts.push(`${other.label} ${formatChartMetricCompact(metric, interp)}`);
-            } else {
-              peerParts.push(
-                t('chart.fit.peerMean', {
-                  label: other.label,
-                  val: formatChartMetricCompact(metric, other.pubFit.mean),
-                })
-              );
-            }
-          }
-          return {
-            ...item,
-            x,
-            rawY,
-            fitVal,
-            fitY,
-            ciLow: s.pubFit.sampleCiLow[i],
-            ciHigh: s.pubFit.sampleCiHigh[i],
-            ciHalf: s.pubFit.sampleCiHalf[i],
-            seriesColor: s.colorVar,
-            compareHint:
-              peerParts.length > 0
-                ? t('chart.fit.peerCompare', { peers: peerParts.join(' · ') })
-                : '',
-          };
-        });
-        s.samples = sSamples;
-        combinedSamples.push(...sSamples);
-      }
-      combinedSamples.sort((a, b) => a.x - b.x || a.xVal - b.xVal);
-      currentSamples = combinedSamples;
-
-      const sig =
-        `multi|${locale}|${viewW}|${targetKeys.join(',')}|${metric}|${showAgentPrefix}|${yScale.min.toFixed(4)}|${yScale.max.toFixed(4)}|` +
-        seriesList
-          .map(
-            (s) =>
-              `${s.key}:${s.colorVar}:` +
-              s.samples
-                .map(
-                  (p) =>
-                    `${p.xVal}:${p.rawVal.toFixed(3)}:${p.fitVal.toFixed(3)}:${p.st?.anomalySig || ''}`
-                )
-                .join(',')
-          )
-          .join('||');
-
-      if (sig !== lastSig) {
-        lastSig = sig;
-        renderFitAxesAndGrid({
-          yScale,
-          mapY,
-          mapX,
-          xs: allXs,
-          isSingle,
-          plotLeft,
-          plotRight,
-          metric,
-          showAgentPrefix,
-        });
-
-        while (scatterGroup.firstChild) scatterGroup.removeChild(scatterGroup.firstChild);
-
-        const dotRadius =
-          combinedSamples.length > 80 ? '1.8' : combinedSamples.length > 36 ? '2.1' : '2.4';
-        const dedupOverdraw = combinedSamples.length > 200;
-        const scatterTarget =
-          typeof document.createDocumentFragment === 'function'
-            ? document.createDocumentFragment()
-            : scatterGroup;
-        const anomalyOverlayDots = [];
-        const activeFitKeys = new Set();
-        const fitMorphItems = [];
-
-        for (const s of seriesList) {
-          const binCounts = dedupOverdraw ? new Map() : null;
-          for (const sp of s.samples) {
-            if (sp.anomalySummary) {
-              anomalyOverlayDots.push(sp);
-              continue;
-            }
-            if (binCounts) {
-              const binKey = (Math.round(sp.x * 2) << 11) ^ Math.round(sp.rawY * 2);
-              const prevCnt = binCounts.get(binKey) || 0;
-              if (prevCnt >= 6) continue;
-              binCounts.set(binKey, prevCnt + 1);
-            }
-            const dot = document.createElementNS(SVG_NS, 'circle');
-            dot.setAttribute('cx', sp.x.toFixed(1));
-            dot.setAttribute('cy', sp.rawY.toFixed(1));
-            dot.setAttribute('r', dotRadius);
-            dot.setAttribute('class', 'sstep-scatter-dot is-multi');
-            patchStyleVar(dot, '--sstep-fit-accent', s.colorVar);
-            scatterTarget.appendChild(dot);
-          }
-
-          activeFitKeys.add(s.key);
-          let nodes = multiFitNodesByKey.get(s.key);
-          if (!nodes) {
-            const bandEl = document.createElementNS(SVG_NS, 'path');
-            bandEl.setAttribute('class', 'sstep-ci-band is-multi');
-            const curveEl = document.createElementNS(SVG_NS, 'path');
-            curveEl.setAttribute('class', 'sstep-fit-line');
-            curveEl.setAttribute('fill', 'none');
-            nodes = { bandEl, curveEl };
-            multiFitNodesByKey.set(s.key, nodes);
-          }
-          patchStyleVar(nodes.bandEl, '--sstep-fit-accent', s.colorVar);
-          patchStyleVar(nodes.curveEl, '--sstep-fit-accent', s.colorVar);
-
-          if (s.samples.length === 1) {
-            const sp = s.samples[0];
-            const segHalf = Math.min(12, plotSpanX * 0.04);
-            const x1 = Math.max(plotLeft, sp.x - segHalf);
-            const x2 = Math.min(plotRight, sp.x + segHalf);
-            const yStr = sp.fitY.toFixed(1);
-            const flatCurveD = `M ${x1.toFixed(1)} ${yStr} L ${x2.toFixed(1)} ${yStr}`;
-            nodes.bandEl.setAttribute('d', '');
-            nodes.bandEl.remove();
-            multiCurveGroup.appendChild(nodes.curveEl);
-            fitMorphItems.push({
-              key: `multi:${s.key}`,
-              gridPts: [
-                { x: x1, fitY: sp.fitY, lowY: sp.fitY, highY: sp.fitY },
-                { x: x2, fitY: sp.fitY, lowY: sp.fitY, highY: sp.fitY },
-              ],
-              curveEl: nodes.curveEl,
-              bandEl: null,
-              olsEl: null,
-              olsCoords: null,
-              finalCurveD: flatCurveD,
-              finalBandD: '',
-            });
-          } else {
-            const gridPts = s.pubFit.grid.map((g) => ({
-              x: mapX(g.x),
-              fitY: mapY(g.fit),
-              lowY: mapY(g.ciLow),
-              highY: mapY(g.ciHigh),
-            }));
-
-            let bandD = '';
-            if (s.samples.length >= 3) {
-              bandD = `M ${gridPts[0].x.toFixed(1)} ${gridPts[0].highY.toFixed(1)}`;
-              for (let i = 1; i < gridPts.length; i++) {
-                bandD += ` L ${gridPts[i].x.toFixed(1)} ${gridPts[i].highY.toFixed(1)}`;
-              }
-              for (let i = gridPts.length - 1; i >= 0; i--) {
-                bandD += ` L ${gridPts[i].x.toFixed(1)} ${gridPts[i].lowY.toFixed(1)}`;
-              }
-              bandD += ' Z';
-              multiBandGroup.appendChild(nodes.bandEl);
-            } else {
-              nodes.bandEl.setAttribute('d', '');
-              nodes.bandEl.remove();
-            }
-
-            const curveD = buildPolylinePath(gridPts.map((p) => ({ x: p.x, y: p.fitY })));
-            multiCurveGroup.appendChild(nodes.curveEl);
-            fitMorphItems.push({
-              key: `multi:${s.key}`,
-              gridPts,
-              curveEl: nodes.curveEl,
-              bandEl: bandD ? nodes.bandEl : null,
-              olsEl: null,
-              olsCoords: null,
-              finalCurveD: curveD,
-              finalBandD: bandD,
-            });
-          }
-        }
-
-        for (const [k, nodes] of multiFitNodesByKey.entries()) {
-          if (!activeFitKeys.has(k)) {
-            nodes.bandEl.remove();
-            nodes.curveEl.remove();
-          }
-        }
-        if (lastFitMode === 'single') {
-          const prevSingleGrid = fitMorphCtrl.getGrid('single');
-          if (prevSingleGrid && prevSingleGrid.length > 0) {
-            if (lastSingleFitKey && lastSingleFitKey !== '__all__') {
-              fitMorphCtrl.seedGrid(`multi:${lastSingleFitKey}`, prevSingleGrid);
-            } else {
-              for (const s of seriesList) {
-                fitMorphCtrl.seedGrid(`multi:${s.key}`, prevSingleGrid);
-              }
-            }
-          }
-        }
-        lastFitMode = 'multi';
-        lastSingleFitKey = '';
-        fitMorphCtrl.morphFits({
-          items: fitMorphItems,
-          skipMorph: _skipMorph,
-          allowBaselineEntry: true,
-          bottomY: BOTTOM_Y,
-        });
-        anomalyOverlayDots.sort((a, b) =>
-          a.anomalySeverity === 'danger' ? 1 : b.anomalySeverity === 'danger' ? -1 : 0
-        );
-        for (const sp of anomalyOverlayDots) {
-          const aDot = document.createElementNS(SVG_NS, 'circle');
-          aDot.setAttribute('cx', sp.x.toFixed(1));
-          aDot.setAttribute('cy', sp.rawY.toFixed(1));
-          aDot.setAttribute('r', dotRadius);
-          aDot.setAttribute(
-            'class',
-            `sstep-scatter-dot is-anomaly${sp.anomalySeverity === 'danger' ? ' is-danger' : ''}`
-          );
-          scatterTarget.appendChild(aDot);
-        }
-        if (scatterTarget !== scatterGroup) {
-          scatterGroup.appendChild(scatterTarget);
-        }
-
-        while (multiLegendEl.firstChild) multiLegendEl.removeChild(multiLegendEl.firstChild);
-        for (const s of seriesList) {
-          const swatch = h('span', { className: 'sstep-legend-line' });
-          patchStyleVar(swatch, '--swatch-bg', s.colorVar);
-          multiLegendEl.appendChild(
-            h('span', { className: 'sstep-legend-item' }, [
-              swatch,
-              h('span', {
-                text: `${s.label} (${formatChartMetricCompact(metric, s.pubFit.mean)})`,
-              }),
-            ])
-          );
-        }
-      }
-
-      const r2SummaryTitle = seriesList
-        .map((s) => {
-          const rSign = s.pubFit.r >= 0 ? '+' : '';
-          return `${s.label}: n=${s.samples.length}, r=${rSign}${s.pubFit.r.toFixed(2)}, R²=${s.pubFit.r2.toFixed(2)}`;
-        })
-        .join(' | ');
-      patchText(
-        fitStatsEl,
-        seriesList.length <= 2
-          ? seriesList.map((s) => `R²=${s.pubFit.r2.toFixed(2)}`).join(' · ')
-          : t('chart.fit.curvesCount', { count: seriesList.length })
-      );
-      patchAttr(fitStatsEl, 'title', r2SummaryTitle);
-
-      if (hoveredIdx >= currentSamples.length) {
-        clearHover();
-      } else if (hoveredIdx >= 0) {
-        showHoverAt(hoveredIdx, lastFitPointer, { forceRefresh: true });
-      }
-
-      return {
-        sampleCount: combinedSamples.length,
-        summaryBadge: t('chart.fit.multiBadge', {
-          steps: combinedSamples.length,
-          models: seriesList.length,
-        }),
-      };
-    }
-
-    // 分支 B：单模型或整体合并单曲线模式
-    const nextSingleFitKey = isPooledAll ? '__all__' : targetKeys[0] || '__all__';
-    if (lastFitMode === 'multi') {
-      const seedGrid =
-        fitMorphCtrl.getGrid(`multi:${nextSingleFitKey}`) || fitMorphCtrl.getFirstGrid();
-      if (seedGrid && seedGrid.length > 0) {
-        fitMorphCtrl.seedGrid('single', seedGrid);
-      }
-    }
-    lastFitMode = 'single';
-    lastSingleFitKey = nextSingleFitKey;
-    for (const nodes of multiFitNodesByKey.values()) {
-      nodes.bandEl.remove();
-      nodes.curveEl.remove();
-    }
-    patchAttr(singleLegendEl, 'hidden', false);
-    patchAttr(multiLegendEl, 'hidden', true);
-
-    const filtered = matchedItems;
-    const xs = filtered.map((d) => d.xVal);
-    const rawYs = filtered.map((d) => d.rawVal);
-    const pubFit = reusePublicationFit(null, xs, rawYs, maxBound, false);
-
-    patchText(
-      fitMethodLabelEl,
-      pubFit.method === 'LOESS' ? t('chart.fit.loess') : t('chart.fit.olsReg')
-    );
-    patchAttr(olsLegendWrapEl, 'hidden', filtered.length < 6);
-
-    let dataMin = Infinity;
-    let dataMax = -Infinity;
-    for (let i = 0; i < filtered.length; i++) {
-      if (rawYs[i] < dataMin) dataMin = rawYs[i];
-      if (rawYs[i] > dataMax) dataMax = rawYs[i];
-    }
-    for (const g of pubFit.grid) {
-      if (g.ciLow < dataMin) dataMin = g.ciLow;
-      if (g.ciHigh > dataMax) dataMax = g.ciHigh;
-    }
-
-    const yScale = computeNiceYScale(dataMin, dataMax, {
-      minBound,
-      maxBound,
-      tickCount: 4,
-    });
-    const yRange = Math.max(1e-9, yScale.max - yScale.min);
-    const mapY = (v) =>
-      BOTTOM_Y - ((clampValue(v, yScale.min, yScale.max) - yScale.min) / yRange) * SPAN_Y;
-
-    const { plotLeft, plotRight, plotSpanX } = resolveFitBounds(viewW);
-    const xMin = xs[0];
-    const xMax = xs[xs.length - 1];
-    const isSingle = filtered.length === 1 || xMax - xMin <= 1e-9;
-    const mapX = (xv) =>
-      isSingle
-        ? (plotLeft + plotRight) / 2
-        : plotLeft + ((xv - xMin) / (xMax - xMin)) * plotSpanX;
-
-    const samples = filtered.map((item, i) => {
-      const x = mapX(item.xVal);
-      const rawY = mapY(item.rawVal);
-      const fitVal = pubFit.sampleFits[i];
-      const fitY = mapY(fitVal);
-      return {
-        ...item,
-        x,
-        rawY,
-        fitVal,
-        fitY,
-        ciLow: pubFit.sampleCiLow[i],
-        ciHigh: pubFit.sampleCiHigh[i],
-        ciHalf: pubFit.sampleCiHalf[i],
-        seriesColor: 'var(--accent-primary)',
-        compareHint: '',
-      };
-    });
-    currentSamples = samples;
-
-    const sig =
-      `single|${locale}|${viewW}|${targetKeys[0]}|${metric}|${showAgentPrefix}|${yScale.min.toFixed(4)}|${yScale.max.toFixed(4)}|` +
-      samples
-        .map(
-          (s) => `${s.xVal}:${s.rawVal.toFixed(4)}:${s.fitVal.toFixed(4)}:${s.st?.anomalySig || ''}`
-        )
-        .join('|');
-
-    if (sig !== lastSig) {
-      lastSig = sig;
-      renderFitAxesAndGrid({
-        yScale,
-        mapY,
-        mapX,
-        xs,
-        isSingle,
-        plotLeft,
-        plotRight,
-        metric,
-        showAgentPrefix,
-      });
-
-      // 2. 绘制半透明冷蓝灰实心观测散点（自然呈现局部密度，不抢夺拟合曲线焦点）
-      while (scatterGroup.firstChild) scatterGroup.removeChild(scatterGroup.firstChild);
-      const dotRadius = samples.length > 80 ? '1.8' : samples.length > 36 ? '2.1' : '2.4';
-      const binCounts = samples.length > 200 ? new Map() : null;
-      const scatterTarget =
-        typeof document.createDocumentFragment === 'function'
-          ? document.createDocumentFragment()
-          : scatterGroup;
-      const singleAnomalyDots = [];
-      for (const s of samples) {
-        if (s.anomalySummary) {
-          singleAnomalyDots.push(s);
-          continue;
-        }
-        if (binCounts) {
-          const binKey = (Math.round(s.x * 2) << 11) ^ Math.round(s.rawY * 2);
-          const prevCnt = binCounts.get(binKey) || 0;
-          if (prevCnt >= 6) continue;
-          binCounts.set(binKey, prevCnt + 1);
-        }
-        const dot = document.createElementNS(SVG_NS, 'circle');
-        dot.setAttribute('cx', s.x.toFixed(1));
-        dot.setAttribute('cy', s.rawY.toFixed(1));
-        dot.setAttribute('r', dotRadius);
-        dot.setAttribute('class', 'sstep-scatter-dot');
-        scatterTarget.appendChild(dot);
-      }
-      singleAnomalyDots.sort((a, b) =>
-        a.anomalySeverity === 'danger' ? 1 : b.anomalySeverity === 'danger' ? -1 : 0
-      );
-      for (const s of singleAnomalyDots) {
-        const aDot = document.createElementNS(SVG_NS, 'circle');
-        aDot.setAttribute('cx', s.x.toFixed(1));
-        aDot.setAttribute('cy', s.rawY.toFixed(1));
-        aDot.setAttribute('r', dotRadius);
-        aDot.setAttribute(
-          'class',
-          `sstep-scatter-dot is-anomaly${s.anomalySeverity === 'danger' ? ' is-danger' : ''}`
-        );
-        scatterTarget.appendChild(aDot);
-      }
-      if (scatterTarget !== scatterGroup) {
-        scatterGroup.appendChild(scatterTarget);
-      }
-
-      // 3. 绘制 95% CI 置信带闭合多边形和回归拟合曲线（支持 240ms 平滑连续形变，绝不向底部 X 轴填充面积）
-      if (isSingle) {
-        const yVal = samples[0].fitY;
-        const yStr = yVal.toFixed(1);
-        const flatCurveD = `M ${plotLeft.toFixed(1)} ${yStr} L ${plotRight.toFixed(1)} ${yStr}`;
-        patchAttr(ciBandPath, 'd', '');
-        patchAttr(olsLine, 'hidden', true);
-        const flatGrid = Array.from({ length: 64 }, (_, gi) => ({
-          x: plotLeft + (gi / 63) * plotSpanX,
-          fitY: yVal,
-          lowY: yVal,
-          highY: yVal,
-        }));
-        fitMorphCtrl.morphFits({
-          items: [
-            {
-              key: 'single',
-              gridPts: flatGrid,
-              curveEl: fitPath,
-              bandEl: null,
-              olsEl: null,
-              olsCoords: null,
-              finalCurveD: flatCurveD,
-              finalBandD: '',
-            },
-          ],
-          skipMorph: _skipMorph,
-        });
-      } else {
-        const gridPts = pubFit.grid.map((g) => ({
-          x: mapX(g.x),
-          fitY: mapY(g.fit),
-          lowY: mapY(g.ciLow),
-          highY: mapY(g.ciHigh),
-        }));
-
-        const curveD = buildPolylinePath(gridPts.map((p) => ({ x: p.x, y: p.fitY })));
-        let bandD = '';
-        if (samples.length >= 3) {
-          bandD = `M ${gridPts[0].x.toFixed(1)} ${gridPts[0].highY.toFixed(1)}`;
-          for (let i = 1; i < gridPts.length; i++) {
-            bandD += ` L ${gridPts[i].x.toFixed(1)} ${gridPts[i].highY.toFixed(1)}`;
-          }
-          for (let i = gridPts.length - 1; i >= 0; i--) {
-            bandD += ` L ${gridPts[i].x.toFixed(1)} ${gridPts[i].lowY.toFixed(1)}`;
-          }
-          bandD += ' Z';
-        } else {
-          patchAttr(ciBandPath, 'd', '');
-        }
-
-        const showOlsRef = samples.length >= 6;
-        patchAttr(olsLine, 'hidden', !showOlsRef);
-        let olsCoords = null;
-        if (showOlsRef) {
-          const olsStartVal = clampValue(pubFit.intercept + pubFit.slope * xMin, minBound, maxBound);
-          const olsEndVal = clampValue(pubFit.intercept + pubFit.slope * xMax, minBound, maxBound);
-          olsCoords = {
-            x1: plotLeft,
-            y1: mapY(olsStartVal),
-            x2: plotRight,
-            y2: mapY(olsEndVal),
-          };
-        }
-
-        fitMorphCtrl.morphFits({
-          items: [
-            {
-              key: 'single',
-              gridPts,
-              curveEl: fitPath,
-              bandEl: bandD ? ciBandPath : null,
-              olsEl: showOlsRef ? olsLine : null,
-              olsCoords,
-              finalCurveD: curveD,
-              finalBandD: bandD,
-            },
-          ],
-          skipMorph: _skipMorph,
-        });
-      }
-    }
-
-    const summaryBadge = t('chart.fit.singleBadge', {
-      steps: samples.length,
-      mean: formatChartMetricCompact(metric, pubFit.mean),
-    });
-    if (samples.length >= 2) {
-      const rSign = pubFit.r >= 0 ? '+' : '';
-      const slopeSign = pubFit.slope >= 0 ? '+' : '';
-      patchText(fitStatsEl, `r = ${rSign}${pubFit.r.toFixed(2)} · R² = ${pubFit.r2.toFixed(2)}`);
-      patchAttr(
-        fitStatsEl,
-        'title',
-        t('chart.fit.olsTitle', {
-          slope: `${slopeSign}${pubFit.slope.toFixed(3)}`,
-          intercept: pubFit.intercept.toFixed(2),
-          sd: pubFit.sd.toFixed(2),
-        })
-      );
-    } else {
-      patchText(fitStatsEl, `n = ${samples.length}`);
-      patchAttr(fitStatsEl, 'title', '');
-    }
-
-    if (hoveredIdx >= samples.length) {
-      clearHover();
-    } else if (hoveredIdx >= 0) {
-      showHoverAt(hoveredIdx, lastFitPointer, { forceRefresh: true });
-    }
-
-    return { sampleCount: samples.length, summaryBadge };
-  }
-
-  return { el: rootEl, update, destroy };
-}
-return { createSessionLineChart, createModelFitChart };
 })();
 
 // --- src/registries/metricRegistry.js ---
@@ -20641,7 +17105,7 @@ function resolveCapsuleMetricPresentation(metricKey, slotCtx, ringCircumference)
       textClass: 'wm-slot-text wm-cache-text',
       showRing: false,
       dashOffset: ringCircumference,
-      text: valid ? `${Math.round(numVal)}%` : '--%',
+      text: valid ? formatCachePct(numVal) : '--%',
       toneClass,
       running: false,
       warn: toneClass === 'tone-warn',
@@ -20802,6 +17266,44 @@ function resolveOverviewMetricCell(metricKey, cellCtx = {}) {
     };
   }
 
+  if (metricKey === 'avg_ttft') {
+    const avgTtft = active.ttftSummary?.avgSec;
+    const hasAvgTtft =
+      hasAnySteps && avgTtft != null && Number.isFinite(Number(avgTtft)) && Number(avgTtft) >= 0;
+    const ttftTone = hasAvgTtft ? getTtftToneClass(avgTtft) : '';
+    return {
+      key: 'avg_ttft',
+      label: t('ovMetric.avg_ttft'),
+      icon: 'clock',
+      iconSize: 11,
+      isPulsing: false,
+      valueText: formatMetric(avgTtft, 's'),
+      valueClass: ttftTone ? `cell-value ${ttftTone}` : 'cell-value',
+      subText: '',
+      subClass: 'cell-sub',
+    };
+  }
+
+  if (metricKey === 'avg_cache') {
+    const avgCache = active.sessionCacheHitPct ?? active.latestCacheHitPct;
+    const hasAvg = hasAnySteps && avgCache != null && Number.isFinite(Number(avgCache));
+    const promptTok =
+      Math.max(0, Number(active.inputTokens || 0) + Number(active.cacheReadTokens || 0)) ||
+      Number(active.latestPromptTokens || 0);
+    const cacheTone = hasAvg ? getCacheToneClass(avgCache, promptTok) : '';
+    return {
+      key: 'avg_cache',
+      label: t('ovMetric.avg_cache'),
+      icon: 'layers',
+      iconSize: 11,
+      isPulsing: false,
+      valueText: hasAvg ? formatCachePct(avgCache) : '—',
+      valueClass: cacheTone ? `cell-value ${cacheTone}` : 'cell-value',
+      subText: '',
+      subClass: 'cell-sub',
+    };
+  }
+
   if (metricKey === 'step_cost' || metricKey === 'session_cost') {
     const stepCost = active.latestStepCostUsd;
     const sessCost = Number(active.sessionCostUsd || 0);
@@ -20946,39 +17448,86 @@ const { MetricMatrixWidget } = (() => {
  */
 
 
+const LEGACY_OVERVIEW_METRICS_SIG = 'tps,ttft,avg_tps,step_cost';
+const HOVER_REALTIME_METRICS = Object.freeze([
+  'tps',
+  'ttft',
+  'cache_hit',
+  'step_cost',
+]);
+const SESSION_SUMMARY_METRICS = Object.freeze([
+  'avg_tps',
+  'avg_ttft',
+  'avg_cache',
+  'session_cost',
+]);
+const SESSION_SUMMARY_SHORT_LABEL_KEYS = Object.freeze({
+  avg_tps: 'ovSummary.avg_tps',
+  avg_ttft: 'ovSummary.avg_ttft',
+  avg_cache: 'ovSummary.avg_cache',
+  session_cost: 'ovSummary.session_cost',
+});
+
 const MetricMatrixWidget = defineComponent({
   name: 'MetricMatrixWidget',
   setup({ props }) {
+    const isSessionSummaryPanel = props?.mode === 'overview' && !props?.preview;
+    const isHoverMetrics = props?.mode === 'hover';
     const getCtxAgentId =
       typeof props?.getCtxAgentId === 'function'
         ? props.getCtxAgentId
         : () => uiStore.getState().ctxInspectorAgentId;
     const matrixEl = h('section', {
-      className: 'telemetry-matrix',
+      className: isSessionSummaryPanel
+        ? 'telemetry-matrix is-flat-summary'
+        : 'telemetry-matrix',
       'aria-label': t('module.metrics'),
       'data-cols': '4',
     });
     patchStyleVar(matrixEl, '--matrix-cols', '4');
 
+    const panelTitleTextEl = isSessionSummaryPanel
+      ? h('span', { text: t('ovSummary.title') })
+      : null;
+    const rootEl = isSessionSummaryPanel
+      ? h('section', { className: 'panel session-summary-panel' }, [
+          h('div', { className: 'panel-header' }, [
+            h('span', { className: 'panel-title' }, [
+              createSvgIcon('pulse', { size: 13 }),
+              panelTitleTextEl,
+            ]),
+          ]),
+          matrixEl,
+        ])
+      : matrixEl;
+
     function createMetricCellNode() {
       const labelSpan = h('span', { text: '—' });
       const iconSvg = createSvgIcon('pulse', { size: 11 });
       const valueEl = h('strong', { className: 'cell-value', text: '—' });
-      const subEl = h('span', { className: 'cell-sub', text: '—' });
       const el = h('div', { className: 'matrix-cell' }, [
         h('div', { className: 'cell-label' }, [labelSpan, iconSvg]),
         valueEl,
-        subEl,
       ]);
       return {
         el,
-        refs: { labelSpan, iconSvg, valueEl, subEl },
+        refs: { labelSpan, iconSvg, valueEl },
       };
     }
 
     function update({ data } = {}) {
       patchAttr(matrixEl, 'aria-label', t('module.metrics'));
-      const metricKeys = normalizeClientOverviewMetrics(data?.settings?.overviewMetrics);
+      if (panelTitleTextEl) {
+        patchText(panelTitleTextEl, t('ovSummary.title'));
+      }
+      const normalizedKeys = normalizeClientOverviewMetrics(data?.settings?.overviewMetrics);
+      const isLegacyDefault = normalizedKeys.join(',') === LEGACY_OVERVIEW_METRICS_SIG;
+      const metricKeys =
+        isSessionSummaryPanel && isLegacyDefault
+          ? SESSION_SUMMARY_METRICS
+          : isHoverMetrics && isLegacyDefault
+            ? HOVER_REALTIME_METRICS
+            : normalizedKeys;
       const colCount = Math.max(1, Math.min(4, metricKeys.length));
       patchAttr(matrixEl, 'data-cols', String(colCount));
       patchStyleVar(matrixEl, '--matrix-cols', String(colCount));
@@ -20994,20 +17543,33 @@ const MetricMatrixWidget = defineComponent({
       const settings = data?.settings || {};
       const locale = getEffectiveLocale();
 
-      const cells = metricKeys.map((key) =>
-        resolveOverviewMetricCell(key, {
+      const cells = metricKeys.map((key) => {
+        const cell = resolveOverviewMetricCell(key, {
           active,
           ctx,
           quotas,
           settings,
           hasSubagents,
-        })
-      );
+        });
+        if (isSessionSummaryPanel && SESSION_SUMMARY_SHORT_LABEL_KEYS[cell.key]) {
+          return {
+            ...cell,
+            label: t(SESSION_SUMMARY_SHORT_LABEL_KEYS[cell.key]),
+          };
+        }
+        if (isHoverMetrics && cell.key === 'cache_hit') {
+          return {
+            ...cell,
+            label: t('ovHover.cache_hit'),
+          };
+        }
+        return cell;
+      });
 
       patchKeyedList(matrixEl, cells, {
         keyFn: (cell) => cell.key,
         sigFn: (cell) =>
-          `${locale}:${cell.key}:${cell.label}:${cell.icon}:${cell.isPulsing}:${cell.valueClass}:${cell.valueText}:${cell.subClass}:${cell.subText}`,
+          `${locale}:${cell.key}:${cell.label}:${cell.icon}:${cell.isPulsing}:${cell.valueClass}:${cell.valueText}`,
         createRow: createMetricCellNode,
         updateRow: (refs, cell) => {
           patchText(refs.labelSpan, cell.label);
@@ -21017,8 +17579,6 @@ const MetricMatrixWidget = defineComponent({
           patchClasses(refs.iconSvg, { 'is-pulsing': Boolean(cell.isPulsing) });
           patchAttr(refs.valueEl, 'class', cell.valueClass);
           patchText(refs.valueEl, cell.valueText);
-          patchAttr(refs.subEl, 'class', cell.subClass);
-          patchText(refs.subEl, cell.subText);
         },
       });
     }
@@ -21027,7 +17587,7 @@ const MetricMatrixWidget = defineComponent({
     update({ data: null });
 
     return {
-      el: matrixEl,
+      el: rootEl,
       refs: { update },
     };
   },
@@ -21215,7 +17775,25 @@ const ContextWindowWidget = defineComponent({
       hidden: true,
       text: t('fmt.mainAgent'),
     });
-    const ctxSummaryText = h('span', { className: 'text-mono', text: '0 / 256.0k (0%)' });
+    const ctxPctEl = h('strong', { className: 'ctx-summary-pct text-mono', text: '0%' });
+    const ctxRatioEl = h('span', { className: 'ctx-summary-ratio text-mono', text: '(0 / 256.0k)' });
+    const ctxSummaryText = h('span', { className: 'ctx-summary-meta text-mono' }, [
+      ctxPctEl,
+      ctxRatioEl,
+    ]);
+    const ctxLegendToggleBtn = interactiveInspector
+      ? h(
+          'button',
+          {
+            type: 'button',
+            className: 'ctx-legend-toggle',
+            'aria-expanded': 'false',
+            'aria-label': t('ctx.toggleLegendExpand'),
+            title: t('ctx.toggleLegendExpand'),
+          },
+          [createSvgIcon('chevron-down', { size: 12 })]
+        )
+      : null;
     const ctxSegmentBar = ContextSegmentMeter({ context: {} });
 
     const ctxPillGroup = h('div', { className: 'ctx-pill-group' });
@@ -21239,7 +17817,7 @@ const ContextWindowWidget = defineComponent({
 
     const ctxLegendGrid = h(
       'div',
-      { className: 'ctx-legend-grid' },
+      { className: 'ctx-legend-grid', hidden: true },
       ctxChannels.map((entry) => entry.itemEl)
     );
     let lastLegendOrderSig = ctxChannels.map((entry) => entry.ch.key).join(',');
@@ -21252,7 +17830,10 @@ const ContextWindowWidget = defineComponent({
           titleTextEl,
           ctxAgentBadge,
         ]),
-        h('span', { className: 'panel-meta' }, [ctxSummaryText]),
+        h('span', { className: 'panel-meta' }, [
+          ctxSummaryText,
+          ...(ctxLegendToggleBtn ? [ctxLegendToggleBtn] : []),
+        ]),
       ]),
     ];
     if (interactiveInspector) {
@@ -21264,10 +17845,29 @@ const ContextWindowWidget = defineComponent({
 
     let latestData = null;
     let ctxPillsExpanded = false;
+    let ctxLegendExpanded = false;
     let isCollapsingCtxPills = false;
     let ctxCollapseTimer = null;
     let lastCascadeId = '';
     let cachedBarWidth = 0;
+
+    function syncLegendVisibility() {
+      patchAttr(ctxLegendGrid, 'hidden', !ctxLegendExpanded);
+      if (ctxLegendToggleBtn) {
+        const tip = t(ctxLegendExpanded ? 'ctx.toggleLegendCollapse' : 'ctx.toggleLegendExpand');
+        patchClasses(ctxLegendToggleBtn, { 'is-expanded': ctxLegendExpanded });
+        patchAttr(ctxLegendToggleBtn, 'aria-expanded', ctxLegendExpanded ? 'true' : 'false');
+        patchAttr(ctxLegendToggleBtn, 'aria-label', tip);
+        patchAttr(ctxLegendToggleBtn, 'title', tip);
+      }
+    }
+
+    if (ctxLegendToggleBtn) {
+      ctxLegendToggleBtn.onclick = () => {
+        ctxLegendExpanded = !ctxLegendExpanded;
+        syncLegendVisibility();
+      };
+    }
 
     function clearCtxExpandAnim() {
       if (ctxCollapseTimer) {
@@ -21296,6 +17896,7 @@ const ContextWindowWidget = defineComponent({
       if (!data) {
         if (curLocale !== lastLocale) {
           lastLocale = curLocale;
+          syncLegendVisibility();
           for (const entry of ctxChannels) {
             patchText(entry.labelEl, entry.ch.label);
             if (interactiveInspector) {
@@ -21320,6 +17921,8 @@ const ContextWindowWidget = defineComponent({
           if (lastCascadeId) {
             clearCtxExpandAnim();
             ctxPillsExpanded = false;
+            ctxLegendExpanded = false;
+            syncLegendVisibility();
           }
           lastCascadeId = currentCascadeId;
         }
@@ -21578,22 +18181,28 @@ const ContextWindowWidget = defineComponent({
         limitTokens > 0 ? Math.min(100, +((totalTokens / limitTokens) * 100).toFixed(1)) : 0;
       const ctxToneCls =
         usedPct >= 88 ? 'tone-danger' : usedPct >= 70 ? 'tone-warn' : '';
-      patchAttr(ctxSummaryText, 'class', ctxToneCls ? `text-mono ${ctxToneCls}` : 'text-mono');
-      patchText(
-        ctxSummaryText,
-        `${formatTokens(totalTokens)} / ${formatTokens(limitTokens)} (${usedPct}%)`
+      patchAttr(
+        ctxPctEl,
+        'class',
+        ctxToneCls ? `ctx-summary-pct text-mono ${ctxToneCls}` : 'ctx-summary-pct text-mono'
       );
+      patchText(ctxPctEl, `${usedPct}%`);
+      patchText(ctxRatioEl, `(${formatTokens(totalTokens)} / ${formatTokens(limitTokens)})`);
       ctxSegmentBar.setProps({ context: { ...ctx, limitTokens, usedPct } });
 
       if (interactiveInspector) {
         const localeChanged = curLocale !== lastLocale;
         lastLocale = curLocale;
+        if (localeChanged) {
+          syncLegendVisibility();
+        }
         const scored = ctxChannels.map((entry) => {
           const val = entry.ch.getValue(ctx);
           if (localeChanged) {
             patchText(entry.labelEl, entry.ch.label);
             patchAttr(entry.itemEl, 'title', entry.ch.title);
           }
+          patchAttr(entry.itemEl, 'hidden', val <= 0);
           patchText(entry.valEl, formatTokens(val));
           return { entry, val };
         });
@@ -21653,2213 +18262,6 @@ const ContextWindowWidget = defineComponent({
   },
 });
 return { CTX_CHANNEL_DEFS, ContextWindowWidget };
-})();
-
-// --- src/components/widgets/QuotaPoolsWidget.js ---
-const { buildQuotaPoolItems, createPoolQuotaRow, formatQuotaSummaryFooter, syncPoolQuotaRow, quotaPoolRowSig, formatAccountTierBadge, maskAccountLabel, QuotaPoolsWidget } = (() => {
-/**
- * @fileoverview Standalone decoupled Quota Pools Widget (`QuotaPoolsWidget.js`).
- * Renders dynamic multi-pool quota bars (Gemini, Argon/Carbon, Claude & GPT)
- * and weekly summary footer for both `LiveOverviewView` and `WindowOverlayShell`.
- */
-
-
-/**
- * 归一化动态配额池列表；在官方配额尚未返回时回退预占 Gemini 与 Claude & GPT 两个标准池槽位。
- *
- * @param {object|null|undefined} quotas
- * @param {number} minuteTick
- * @param {{ isPending?: boolean }} [options]
- * @returns {Array<object>}
- */
-function buildQuotaPoolItems(
-  quotas,
-  minuteTick = 0,
-  { isPending = false, showReserved = false } = {}
-) {
-  const safeQuotas = quotas || {};
-  const activePool = safeQuotas.activePool || {};
-  const rawPools =
-    Array.isArray(safeQuotas.pools) && safeQuotas.pools.length > 0
-      ? safeQuotas.pools
-      : [
-          { poolKey: 'Gemini', poolLabel: 'Gemini', family: 'Gemini' },
-          { poolKey: 'Claude & GPT', poolLabel: 'Claude & GPT', family: 'Claude & GPT' },
-        ];
-  const weekly = safeQuotas.weekly || {};
-  const poolItems = rawPools.map((p) => {
-    const key = p.poolKey || p.family || p.poolLabel || 'Other';
-    const poolLabel = p.poolLabel || p.family || key;
-    const isActivePool =
-      Boolean(activePool.family) &&
-      (activePool.poolKey === key ||
-        activePool.family === p.family ||
-        (key === 'Claude & GPT' && ['Claude', 'GPT'].includes(activePool.family)));
-    return {
-      key,
-      poolLabel,
-      poolData: p,
-      fallbackWeekly: weekly,
-      isActivePool,
-      minuteTick,
-      isPending,
-      showReserved: Boolean(showReserved),
-    };
-  });
-  if (
-    weekly?.isOfficial === false &&
-    poolItems.length > 0 &&
-    !poolItems.some((item) => item.isActivePool)
-  ) {
-    poolItems[0].isActivePool = true;
-  }
-  return poolItems;
-}
-
-/**
- * 创建单个配额池的 DOM 行结构，内含 5h 限额及每周限额两个可独立显隐的子窗口进度条。
- */
-function createPoolQuotaRow() {
-  const title5h = h('span', { className: 'quota-win-title', text: '5h' });
-  const usage5h = h('span', { className: 'quota-win-usage', hidden: true, text: '' });
-  const left5h = h('span', { className: 'quota-win-left' }, [title5h, usage5h]);
-  const meta5h = h('span', { className: 'panel-meta quota-win-meta text-mono', text: '--' });
-  const fill5h = h('div', { className: 'progress-fill' });
-  const fillReserved5h = h('div', { className: 'progress-fill-reserved' });
-  const track5h = h('div', { className: 'progress-track' }, [fill5h, fillReserved5h]);
-  const row5h = h('div', { style: 'display: flex; flex-direction: column; gap: 4px;' }, [
-    h('div', { className: 'panel-header quota-win-head' }, [left5h, meta5h]),
-    track5h,
-  ]);
-
-  const titleWk = h('span', { className: 'quota-win-title', text: t('quota.weeklyShort') });
-  const usageWk = h('span', { className: 'quota-win-usage', hidden: true, text: '' });
-  const leftWk = h('span', { className: 'quota-win-left' }, [titleWk, usageWk]);
-  const metaWk = h('span', { className: 'panel-meta quota-win-meta text-mono', text: '--' });
-  const fillWk = h('div', { className: 'progress-fill' });
-  const fillReservedWk = h('div', { className: 'progress-fill-reserved' });
-  const trackWk = h('div', { className: 'progress-track' }, [fillWk, fillReservedWk]);
-  const rowWk = h('div', { style: 'display: flex; flex-direction: column; gap: 4px;' }, [
-    h('div', { className: 'panel-header quota-win-head' }, [leftWk, metaWk]),
-    trackWk,
-  ]);
-
-  const el = h('div', { className: 'quota-pool-row' }, [
-    row5h,
-    rowWk,
-  ]);
-
-  return {
-    el,
-    refs: {
-      row5h,
-      left5h,
-      title5h,
-      usage5h,
-      meta5h,
-      track5h,
-      fill5h,
-      fillReserved5h,
-      rowWk,
-      leftWk,
-      titleWk,
-      usageWk,
-      metaWk,
-      trackWk,
-      fillWk,
-      fillReservedWk,
-    },
-  };
-}
-
-/**
- * 格式化可用额度面板底部的汇总行文案（官方配额模式下展示各池周期合计，自定义预算模式下展示自然周累计）。
- */
-function formatQuotaSummaryFooter(quotas, account) {
-  const weekly = quotas?.weekly || {};
-  const isCustomLocal = weekly.isOfficial === false;
-  const tokStr = formatTokens(weekly.tokens || 0);
-  const costStr = formatUsd(weekly.costUsd || 0);
-  const leftText = isCustomLocal
-    ? t('quota.footTokensCustom', { tok: tokStr, cost: costStr })
-    : t('quota.footTokensCycle', { tok: tokStr, cost: costStr });
-  const rightText =
-    Number(account?.aiCredits) > 0
-      ? t('quota.footCredits', { credits: account.aiCredits })
-      : isCustomLocal
-        ? t('quota.footCallsCustom', { calls: weekly.calls || 0 })
-        : t('quota.footCallsCycle', { calls: weekly.calls || 0 });
-  const tooltip = isCustomLocal ? t('quota.footTipCustom') : t('quota.footTipCycle');
-  return { leftText, rightText, tooltip };
-}
-
-function syncQuotaWindowMeter({
-  hasData,
-  usedVal,
-  resetTime,
-  fallbackMetaText,
-  showReserved,
-  rawReservedPct,
-  leaseCount,
-  metaEl,
-  trackEl,
-  fillEl,
-  fillReservedEl,
-}) {
-  const numReserved = showReserved && hasData ? Number(rawReservedPct || 0) : 0;
-  const rsvVal =
-    Number.isFinite(numReserved) && numReserved >= 0.05 ? Math.min(usedVal, numReserved) : 0;
-  const actualVal = Math.max(0, usedVal - rsvVal);
-  const resetStr = hasData ? formatCountdown(resetTime) : '';
-
-  patchText(
-    metaEl,
-    hasData
-      ? t('quota.usedAndLeft', {
-          reset: resetStr,
-          used: formatPctNumber(usedVal),
-        })
-      : fallbackMetaText
-  );
-
-  if (hasData && rsvVal > 0) {
-    const rsvStr = formatPctNumber(rsvVal);
-    const actualStr = formatPctNumber(actualVal);
-    const leases = Math.max(1, Number(leaseCount) || 1);
-    const tipText =
-      leases >= 2
-        ? t('quota.reservedTipMulti', { rsv: rsvStr, leases, actual: actualStr })
-        : t('quota.reservedTip', { rsv: rsvStr, actual: actualStr });
-    patchAttr(metaEl, 'title', tipText);
-    patchAttr(trackEl, 'title', tipText);
-    const actualWidth = +Math.min(100, actualVal).toFixed(2);
-    const rsvWidth = +Math.min(Math.max(0, 100 - actualWidth), rsvVal).toFixed(2);
-    patchStyleVar(fillEl, '--fill-w', `${actualWidth}%`);
-    patchStyleVar(fillReservedEl, '--reserved-w', `${rsvWidth}%`);
-    patchClasses(fillReservedEl, { 'is-active': true, 'has-sep': actualWidth > 0 });
-  } else {
-    patchAttr(metaEl, 'title', null);
-    patchAttr(trackEl, 'title', null);
-    patchStyleVar(fillEl, '--fill-w', `${Math.min(100, usedVal)}%`);
-    patchStyleVar(fillReservedEl, '--reserved-w', '0%');
-    patchClasses(fillReservedEl, { 'is-active': false, 'has-sep': false });
-  }
-
-  patchClasses(fillEl, {
-    'tone-warn': usedVal >= 70 && usedVal < 85,
-    'tone-danger': usedVal >= 85,
-  });
-}
-
-/**
- * 同步单个配额池行的 5h 及每周窗口状态。
- */
-function syncPoolQuotaRow(refs, item, idx, rowEl) {
-  const { poolData, poolLabel, fallbackWeekly, isActivePool, isPending, showReserved } = item;
-  patchClasses(rowEl, { 'quota-pool-row': true, 'has-divider': idx > 0 });
-
-  const has5h = poolData?.usedPct != null && poolData?.remainingPct != null;
-  const used5hVal = has5h ? Number(poolData.usedPct) : 0;
-
-  const useCustomWeekly = Boolean(isActivePool && fallbackWeekly?.isOfficial === false);
-  const wkUsedRaw = useCustomWeekly
-    ? fallbackWeekly?.usedPct
-    : poolData?.weeklyUsedPct ?? (isActivePool ? fallbackWeekly?.usedPct : null);
-  const wkRemRaw = useCustomWeekly
-    ? fallbackWeekly?.remainingPct
-    : poolData?.weeklyRemainingPct ?? (isActivePool ? fallbackWeekly?.remainingPct : null);
-  const wkResetRaw = useCustomWeekly
-    ? fallbackWeekly?.resetTime || poolData?.weeklyResetTime
-    : poolData?.weeklyResetTime || (isActivePool ? fallbackWeekly?.resetTime : null);
-  const hasWk = wkUsedRaw != null && wkRemRaw != null;
-  const usedWkVal = hasWk ? Number(wkUsedRaw) : 0;
-
-  const hide5h = !has5h && hasWk;
-  const hideWk = !hasWk && has5h;
-  refs.row5h.hidden = hide5h;
-  refs.row5h.style.display = hide5h ? 'none' : 'flex';
-  refs.rowWk.hidden = hideWk;
-  refs.rowWk.style.display = hideWk ? 'none' : 'flex';
-
-  const fallbackMetaText = isPending ? t('quota.loading') : t('quota.failed');
-  const allowReserved = Boolean(showReserved && !isPending);
-
-  patchText(refs.title5h, `5h (${poolLabel})`);
-  const c5h = poolData?.cycle5h;
-  const est = poolData?.rateEstimate;
-  if (!isPending && has5h && c5h && (c5h.tokens != null || c5h.costUsd != null)) {
-    const tok5h = formatTokens(c5h.tokens || 0);
-    const cost5h = formatUsd(c5h.costUsd || 0);
-    const calls5h = Number(c5h.calls || 0);
-    const full5hRef = formatPoolFullCapRef(est?.eqFull5hUsd, est?.eqFull5hTokens);
-    const baseTip5h = t('quota.cycle5hTitle', {
-      pool: poolLabel,
-      tok: tok5h,
-      cost: cost5h,
-      calls: calls5h,
-    });
-    refs.usage5h.hidden = false;
-    patchText(refs.usage5h, `· ${tok5h} (${cost5h})`);
-    patchAttr(
-      refs.left5h,
-      'title',
-      full5hRef ? `${baseTip5h} · ${t('quota.cycleFullSuffix', { full: full5hRef })}` : baseTip5h
-    );
-  } else {
-    refs.usage5h.hidden = true;
-    patchText(refs.usage5h, '');
-    patchAttr(refs.left5h, 'title', null);
-  }
-  syncQuotaWindowMeter({
-    hasData: has5h,
-    usedVal: used5hVal,
-    resetTime: poolData?.resetTime,
-    fallbackMetaText,
-    showReserved: allowReserved,
-    rawReservedPct: poolData?.reservedPct,
-    leaseCount: poolData?.reservedLeaseCount,
-    metaEl: refs.meta5h,
-    trackEl: refs.track5h,
-    fillEl: refs.fill5h,
-    fillReservedEl: refs.fillReserved5h,
-  });
-
-  const customTitle =
-    useCustomWeekly && fallbackWeekly?.title
-      ? fallbackWeekly.title
-      : t('quota.weeklyPool', { pool: poolLabel });
-  patchText(refs.titleWk, customTitle);
-  const cWk = useCustomWeekly
-    ? fallbackWeekly
-    : poolData?.cycleWeekly || (isActivePool ? fallbackWeekly : null);
-  if (!isPending && hasWk && cWk && (cWk.tokens != null || cWk.costUsd != null)) {
-    const tokWk = formatTokens(cWk.tokens || 0);
-    const costWk = formatUsd(cWk.costUsd || 0);
-    const callsWk = Number(cWk.calls || 0);
-    const fullWkRef = !useCustomWeekly
-      ? formatPoolFullCapRef(est?.eqFullWeeklyUsd, est?.eqFullWeeklyTokens)
-      : '';
-    const baseTipWk = useCustomWeekly
-      ? t('quota.cycleWkCustomTitle', { tok: tokWk, cost: costWk, calls: callsWk })
-      : t('quota.cycleWkPoolTitle', {
-          pool: poolLabel,
-          tok: tokWk,
-          cost: costWk,
-          calls: callsWk,
-        });
-    refs.usageWk.hidden = false;
-    patchText(refs.usageWk, `· ${tokWk} (${costWk})`);
-    patchAttr(
-      refs.leftWk,
-      'title',
-      fullWkRef ? `${baseTipWk} · ${t('quota.cycleFullSuffix', { full: fullWkRef })}` : baseTipWk
-    );
-  } else {
-    refs.usageWk.hidden = true;
-    patchText(refs.usageWk, '');
-    patchAttr(refs.leftWk, 'title', null);
-  }
-  syncQuotaWindowMeter({
-    hasData: hasWk,
-    usedVal: usedWkVal,
-    resetTime: wkResetRaw,
-    fallbackMetaText,
-    showReserved: allowReserved && !useCustomWeekly,
-    rawReservedPct: poolData?.weeklyReservedPct,
-    leaseCount: poolData?.weeklyReservedLeaseCount,
-    metaEl: refs.metaWk,
-    trackEl: refs.trackWk,
-    fillEl: refs.fillWk,
-    fillReservedEl: refs.fillReservedWk,
-  });
-}
-
-function quotaPoolRowSig(item, idx) {
-  const c5h = item.poolData?.cycle5h;
-  const cWk = item.poolData?.cycleWeekly;
-  const est = item.poolData?.rateEstimate;
-  const fw = item.fallbackWeekly;
-  return `${getEffectiveLocale()}:${idx}:${item.poolLabel}:${item.isActivePool}:${Boolean(item.isPending)}:${Boolean(item.showReserved)}:${item.minuteTick}:${item.poolData?.usedPct}:${item.poolData?.remainingPct}:${item.poolData?.reservedPct}:${item.poolData?.reservedLeaseCount}:${item.poolData?.resetTime}:${item.poolData?.weeklyUsedPct}:${item.poolData?.weeklyRemainingPct}:${item.poolData?.weeklyReservedPct}:${item.poolData?.weeklyReservedLeaseCount}:${item.poolData?.weeklyResetTime}:${c5h?.tokens}:${c5h?.costUsd}:${c5h?.calls}:${cWk?.tokens}:${cWk?.costUsd}:${cWk?.calls}:${est?.eqFull5hUsd}:${est?.eqFull5hTokens}:${est?.eqFullWeeklyUsd}:${est?.eqFullWeeklyTokens}:${fw?.isOfficial}:${fw?.usedPct}:${fw?.remainingPct}:${fw?.resetTime}:${fw?.title}:${fw?.tokens}:${fw?.costUsd}:${fw?.calls}`;
-}
-
-/**
- * 格式化可用额度面板右上角的账号订阅徽章（区分 Ultra 5x / 20x，并对 Pro / Free 去重）。
- *
- * @param {object|null|undefined} account
- * @returns {string}
- */
-function formatAccountTierBadge(account) {
-  const tierName = String(account?.tierName || '').trim() || 'Google AI';
-  const tierId = String(account?.tierId || '').trim().toLowerCase();
-  const explicitMult = String(account?.tierMultiplier || '').trim();
-  const inferredMult =
-    explicitMult ||
-    (/(?:^|[-_\s])5x(?:$|[-_\s])|ultra[-_]?lite/i.test(`${tierId} ${tierName}`)
-      ? '5x'
-      : /(?:^|[-_\s])20x(?:$|[-_\s])/i.test(`${tierId} ${tierName}`) || tierId === 'g1-ultra-tier'
-        ? '20x'
-        : '');
-  const rawPlan = String(account?.planName || '').trim();
-  const isUltra = /\bultra\b/i.test(tierName) || /ultra/i.test(tierId);
-
-  if (isUltra) {
-    if (inferredMult) {
-      const hasMultInTier = new RegExp(`(?:^|\\s|·)${inferredMult}(?:$|\\s)`, 'i').test(tierName);
-      return hasMultInTier ? tierName : `${tierName} · ${inferredMult}`;
-    }
-    if (rawPlan && !/^(?:pro|ultra)$/i.test(rawPlan)) {
-      return `${tierName} · ${rawPlan}`;
-    }
-    return tierName;
-  }
-
-  if (!rawPlan) return tierName;
-  const escapedPlan = rawPlan.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  if (new RegExp(`(?:^|\\s|·)${escapedPlan}(?:$|\\s)`, 'i').test(tierName)) {
-    return tierName;
-  }
-  return `${tierName} · ${rawPlan}`;
-}
-
-/**
- * 对账号邮箱或名称做轻量隐私脱敏（如 `sjee80343@gmail.com` -> `sj***43@gmail.com`），
- * 兼顾多账号辨识度及截图分享隐私安全。
- *
- * @param {string|null|undefined} raw
- * @returns {string}
- */
-function maskAccountLabel(raw) {
-  const str = String(raw || '').trim();
-  if (!str) return '';
-  const atIdx = str.indexOf('@');
-  if (atIdx > 0 && atIdx < str.length - 1) {
-    const local = str.slice(0, atIdx);
-    const domain = str.slice(atIdx);
-    const chars = Array.from(local);
-    if (chars.length <= 1) return `*${domain}`;
-    if (chars.length === 2) return `${chars[0]}*${domain}`;
-    if (chars.length <= 4) return `${chars[0]}***${chars[chars.length - 1]}${domain}`;
-    return `${chars.slice(0, 2).join('')}***${chars.slice(-2).join('')}${domain}`;
-  }
-  const chars = Array.from(str);
-  if (chars.length <= 1) return '*';
-  if (chars.length === 2) return `${chars[0]}*`;
-  if (chars.length <= 4) return `${chars[0]}***${chars[chars.length - 1]}`;
-  return `${chars.slice(0, 2).join('')}***${chars[chars.length - 1]}`;
-}
-
-function formatRateEqUsd(val) {
-  const num = Number(val);
-  if (!Number.isFinite(num) || num <= 0) return '--';
-  if (num >= 10) return `$${Math.round(num)}`;
-  return `$${Number(num.toFixed(1))}`;
-}
-
-function formatPoolFullCapRef(eqUsd, eqTok) {
-  const usdNum = Number(eqUsd);
-  if (!Number.isFinite(usdNum) || usdNum <= 0) return '';
-  const usdStr = formatRateEqUsd(usdNum);
-  const tokNum = Number(eqTok);
-  if (Number.isFinite(tokNum) && tokNum > 0) {
-    return `${usdStr} (${formatTokens(tokNum)})`;
-  }
-  return usdStr;
-}
-
-function formatRatePerUsdValue(rate) {
-  const num = Number(rate);
-  if (!Number.isFinite(num) || num <= 0) return '--';
-  return String(Number(num.toFixed(2)));
-}
-
-function formatRateMultiplier(mult) {
-  const num = Number(mult);
-  if (!Number.isFinite(num) || num <= 0) return '';
-  return `${Number(num.toFixed(1))}x`;
-}
-
-function createRateModelCard({
-  name,
-  isMutedName = false,
-  isFallback = false,
-  multiplier = null,
-  rate5hPctPerUsd = null,
-  rateWeeklyPctPerUsd = null,
-  eqFull5hUsd = null,
-  eqFullWeeklyUsd = null,
-  eqFull5hTokens = null,
-  eqFullWeeklyTokens = null,
-  samples = 0,
-  source = null,
-  isPreliminary = false,
-}) {
-  const leftNodes = [
-    h('span', {
-      className: `quota-rate-model-name${isMutedName ? ' is-muted' : ''}`,
-      text: name,
-    }),
-  ];
-  const multText = formatRateMultiplier(multiplier);
-  if (multText) {
-    leftNodes.push(
-      h('span', {
-        className: `quota-rate-mult-badge${Number(multiplier) >= 1.5 ? ' is-high' : ''}`,
-        text: multText,
-      })
-    );
-  }
-
-  const has5hRate = rate5hPctPerUsd != null;
-  const primaryRate = has5hRate ? rate5hPctPerUsd : rateWeeklyPctPerUsd;
-  const subParts = [];
-  if (primaryRate != null) {
-    subParts.push(
-      t('quota.ratePopPerUsd', {
-        win: has5hRate ? '5h' : t('quota.weeklyShort'),
-        rate: formatRatePerUsdValue(primaryRate),
-      })
-    );
-  }
-  if (isPreliminary) {
-    subParts.push(
-      source === 'anchor_slope' ? t('quota.ratePopPrelimSlope') : t('quota.ratePopPrelimCycle')
-    );
-  } else if (Number(samples) > 0) {
-    subParts.push(t('quota.ratePopSamples', { n: Number(samples) }));
-  }
-
-  const eqCells = [];
-  if (eqFull5hUsd != null) {
-    const cell5hChildren = [
-      h('span', { className: 'quota-rate-eq-k', text: t('quota.ratePopEq5hLabel') }),
-      h('span', {
-        className: 'quota-rate-eq-v text-mono',
-        text: `≈ ${formatRateEqUsd(eqFull5hUsd)}`,
-      }),
-    ];
-    if (Number.isFinite(Number(eqFull5hTokens)) && Number(eqFull5hTokens) > 0) {
-      cell5hChildren.push(
-        h('span', {
-          className: 'quota-rate-eq-tok text-mono',
-          text: `· ${formatTokens(Number(eqFull5hTokens))}`,
-        })
-      );
-    }
-    eqCells.push(h('div', { className: 'quota-rate-eq-cell' }, cell5hChildren));
-  }
-  if (eqFullWeeklyUsd != null) {
-    const cellWkChildren = [
-      h('span', { className: 'quota-rate-eq-k', text: t('quota.ratePopEqWkLabel') }),
-      h('span', {
-        className: 'quota-rate-eq-v text-mono',
-        text: `≈ ${formatRateEqUsd(eqFullWeeklyUsd)}`,
-      }),
-    ];
-    if (Number.isFinite(Number(eqFullWeeklyTokens)) && Number(eqFullWeeklyTokens) > 0) {
-      cellWkChildren.push(
-        h('span', {
-          className: 'quota-rate-eq-tok text-mono',
-          text: `· ${formatTokens(Number(eqFullWeeklyTokens))}`,
-        })
-      );
-    }
-    eqCells.push(h('div', { className: 'quota-rate-eq-cell' }, cellWkChildren));
-  }
-
-  const cardChildren = [
-    h('div', { className: 'quota-rate-row-top' }, [
-      h('div', { className: 'quota-rate-model-left' }, leftNodes),
-      ...(subParts.length > 0
-        ? [h('span', { className: 'quota-rate-meta text-mono', text: subParts.join(' · ') })]
-        : []),
-    ]),
-  ];
-  if (eqCells.length > 0) {
-    cardChildren.push(
-      h(
-        'div',
-        { className: `quota-rate-eq-grid${eqCells.length === 1 ? ' is-single' : ''}` },
-        eqCells
-      )
-    );
-  }
-
-  return h('div', { className: `quota-rate-model-row${isFallback ? ' is-fallback' : ''}` }, cardChildren);
-}
-
-function buildRatePopoverSig(data) {
-  const locale = getEffectiveLocale();
-  const acct = String(data?.account?.email || data?.account?.name || '').trim();
-  const pools = Array.isArray(data?.quotas?.pools) ? data.quotas.pools : [];
-  const poolSig = pools
-    .map((p) => `${p.poolKey || ''}:${p.poolLabel || ''}:${JSON.stringify(p.rateEstimate || null)}`)
-    .join('|');
-  return `${locale}|${acct}|${poolSig}`;
-}
-
-const QuotaPoolsWidget = defineComponent({
-  name: 'QuotaPoolsWidget',
-  setup({ props, onCleanup }) {
-    const compactHover = Boolean(props.compactHover);
-    const titleTextEl = h('span', { text: t('module.quotas') });
-    const tierBadge = h('span', { className: 'panel-meta', text: 'Google AI · Pro' });
-
-    const ratePopTitleEl = h('span', {
-      className: 'quota-rate-pop-title',
-      text: t('quota.ratePopTitle'),
-    });
-    const ratePopAccountEl = h('span', {
-      className: 'quota-rate-pop-account',
-      text: t('quota.ratePopAccountCurrent'),
-    });
-    const ratePopBodyEl = h('div', { className: 'quota-rate-pop-body' });
-    const ratePopoverEl = h(
-      'div',
-      {
-        className: 'quota-rate-popover',
-        role: 'tooltip',
-        hidden: true,
-      },
-      [
-        h('div', { className: 'quota-rate-pop-head' }, [ratePopTitleEl, ratePopAccountEl]),
-        ratePopBodyEl,
-      ]
-    );
-    ratePopoverEl.hidden = true;
-
-    let ratePopOpen = false;
-    let ratePopCloseTimer = null;
-    let lastRatePopSig = '';
-
-    const cancelRatePopClose = () => {
-      if (ratePopCloseTimer) {
-        clearTimeout(ratePopCloseTimer);
-        ratePopCloseTimer = null;
-      }
-    };
-
-    const setRatePopOpen = (open) => {
-      const next = Boolean(open);
-      ratePopOpen = next;
-      ratePopoverEl.hidden = !next;
-      patchAttr(ratePopoverEl, 'hidden', !next);
-      patchAttr(rateHelpBtn, 'aria-expanded', next ? 'true' : 'false');
-      patchClasses(rateHelpBtn, { 'is-open': next });
-    };
-
-    const openRatePop = () => {
-      cancelRatePopClose();
-      if (!ratePopOpen) setRatePopOpen(true);
-    };
-
-    const scheduleRatePopClose = () => {
-      cancelRatePopClose();
-      ratePopCloseTimer = setTimeout(() => {
-        ratePopCloseTimer = null;
-        setRatePopOpen(false);
-      }, 130);
-    };
-
-    const rateHelpBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'quota-rate-help-btn',
-        'aria-label': t('quota.rateHelpAria'),
-        'aria-haspopup': 'true',
-        'aria-expanded': 'false',
-        onMouseenter: openRatePop,
-        onMouseleave: scheduleRatePopClose,
-        onFocus: openRatePop,
-        onBlur: scheduleRatePopClose,
-        onClick: (ev) => {
-          ev?.stopPropagation?.();
-          cancelRatePopClose();
-          setRatePopOpen(!ratePopOpen);
-        },
-        onKeydown: (ev) => {
-          if (ev?.key === 'Escape' && ratePopOpen) {
-            ev.stopPropagation?.();
-            cancelRatePopClose();
-            setRatePopOpen(false);
-          }
-        },
-      },
-      [createSvgIcon('help-circle', { size: 13 })]
-    );
-
-    ratePopoverEl.addEventListener?.('mouseenter', openRatePop);
-    ratePopoverEl.addEventListener?.('mouseleave', scheduleRatePopClose);
-    onCleanup?.(() => {
-      cancelRatePopClose();
-    });
-
-    function syncRatePopoverContent(data) {
-      const sig = buildRatePopoverSig(data);
-      if (sig === lastRatePopSig) return;
-      lastRatePopSig = sig;
-
-      patchText(ratePopTitleEl, t('quota.ratePopTitle'));
-      patchAttr(rateHelpBtn, 'aria-label', t('quota.rateHelpAria'));
-
-      const acctMasked = maskAccountLabel(data?.account?.email || data?.account?.name || '');
-      patchText(
-        ratePopAccountEl,
-        acctMasked
-          ? t('quota.ratePopAccountScope', { account: acctMasked })
-          : t('quota.ratePopAccountCurrent')
-      );
-      patchAttr(ratePopAccountEl, 'title', acctMasked || null);
-
-      while (ratePopBodyEl.firstChild) {
-        ratePopBodyEl.removeChild(ratePopBodyEl.firstChild);
-      }
-
-      const rawPools = Array.isArray(data?.quotas?.pools) ? data.quotas.pools : [];
-      const populatedGroups = [];
-
-      for (const p of rawPools) {
-        const est = p?.rateEstimate;
-        if (!est || typeof est !== 'object') continue;
-        const models = Array.isArray(est.models) ? est.models : [];
-        const hasPoolFallback =
-          models.length === 0 &&
-          (Number.isFinite(est.rate5hPctPerUsd) || Number.isFinite(est.rateWeeklyPctPerUsd));
-        const ext = est.externalUsage && est.externalUsage.detected ? est.externalUsage : null;
-        if (models.length === 0 && !hasPoolFallback && !ext) continue;
-
-        const poolLabel = p.poolLabel || p.family || p.poolKey || 'Pool';
-        const fallbackPrimaryIs5h = est.rate5hPctPerUsd != null;
-        const anyModelHasWeekly = models.some((m) => m?.eqFullWeeklyUsd != null);
-        const needsWeeklyFallbackRow =
-          models.length > 0 &&
-          !anyModelHasWeekly &&
-          Number.isFinite(est.rateWeeklyPctPerUsd) &&
-          est.eqFullWeeklyUsd != null;
-        const rows =
-          models.length > 0
-            ? [
-                ...models.map((item) =>
-                  createRateModelCard({
-                    name: item.model,
-                    multiplier: item.multiplier,
-                    rate5hPctPerUsd: item.rate5hPctPerUsd,
-                    rateWeeklyPctPerUsd: item.rateWeeklyPctPerUsd,
-                    eqFull5hUsd: item.eqFull5hUsd,
-                    eqFullWeeklyUsd: item.eqFullWeeklyUsd,
-                    eqFull5hTokens: item.eqFull5hTokens,
-                    eqFullWeeklyTokens: item.eqFullWeeklyTokens,
-                    samples: item.samples,
-                  })
-                ),
-                ...(needsWeeklyFallbackRow
-                  ? [
-                      createRateModelCard({
-                        name: t('quota.ratePopPoolFallback'),
-                        isMutedName: true,
-                        isFallback: true,
-                        rateWeeklyPctPerUsd: est.rateWeeklyPctPerUsd,
-                        eqFullWeeklyUsd: est.eqFullWeeklyUsd,
-                        eqFullWeeklyTokens: est.eqFullWeeklyTokens,
-                        samples: Number(est.samplesWeekly) || 0,
-                        source: est.sourceWeekly || null,
-                        isPreliminary: Boolean(est.isPreliminaryWeekly),
-                      }),
-                    ]
-                  : []),
-              ]
-            : hasPoolFallback
-              ? [
-                  createRateModelCard({
-                    name: t('quota.ratePopPoolFallback'),
-                    isMutedName: true,
-                    isFallback: true,
-                    rate5hPctPerUsd: est.rate5hPctPerUsd,
-                    rateWeeklyPctPerUsd: est.rateWeeklyPctPerUsd,
-                    eqFull5hUsd: est.eqFull5hUsd,
-                    eqFullWeeklyUsd: est.eqFullWeeklyUsd,
-                    eqFull5hTokens: est.eqFull5hTokens,
-                    eqFullWeeklyTokens: est.eqFullWeeklyTokens,
-                    samples: Math.max(Number(est.samples5h) || 0, Number(est.samplesWeekly) || 0),
-                    source: fallbackPrimaryIs5h ? est.source5h || null : est.sourceWeekly || null,
-                    isPreliminary: fallbackPrimaryIs5h
-                      ? Boolean(est.isPreliminary5h)
-                      : Boolean(est.isPreliminaryWeekly),
-                  }),
-                ]
-              : [];
-
-        const headChildren = [h('div', { className: 'quota-rate-pool-label', text: poolLabel })];
-        if (ext?.activeRecently) {
-          headChildren.push(
-            h('span', {
-              className: 'quota-rate-shared-badge',
-              text: t('quota.ratePopSharedBadge'),
-              title: t('quota.ratePopSharedBadgeTip'),
-            })
-          );
-        }
-
-        const groupChildren = [h('div', { className: 'quota-rate-pool-head' }, headChildren)];
-        if (rows.length > 0) {
-          groupChildren.push(h('div', { className: 'quota-rate-model-list' }, rows));
-        } else {
-          groupChildren.push(
-            h('div', { className: 'quota-rate-pop-empty', text: t('quota.ratePopEmpty') })
-          );
-        }
-        if (ext) {
-          const extParts = [];
-          if (Number(ext.used5hPct) >= 0.1) {
-            extParts.push(
-              t('quota.ratePopExt5h', { pct: formatPctNumber(Number(ext.used5hPct)) })
-            );
-          }
-          if (Number(ext.usedWeeklyPct) >= 0.1) {
-            extParts.push(
-              t('quota.ratePopExtWk', { pct: formatPctNumber(Number(ext.usedWeeklyPct)) })
-            );
-          }
-          const extText =
-            extParts.length > 0
-              ? t('quota.ratePopExternalDetail', { detail: extParts.join(' · ') })
-              : t('quota.ratePopExternalBaseline');
-          groupChildren.push(
-            h('div', {
-              className: `quota-rate-ext-banner${ext.activeRecently ? ' is-active' : ''}`,
-              text: extText,
-            })
-          );
-        }
-
-        populatedGroups.push(h('div', { className: 'quota-rate-pool-group' }, groupChildren));
-      }
-
-      if (populatedGroups.length === 0) {
-        ratePopBodyEl.appendChild(
-          h('div', { className: 'quota-rate-pop-empty', text: t('quota.ratePopEmpty') })
-        );
-      } else {
-        for (const grp of populatedGroups) {
-          ratePopBodyEl.appendChild(grp);
-        }
-      }
-    }
-
-    const poolsListEl = h(
-      'div',
-      compactHover
-        ? { className: 'wm-hover-quota-pools' }
-        : { style: 'display: flex; flex-direction: column; gap: 0;' }
-    );
-
-    if (compactHover) {
-      patchKeyedList(poolsListEl, buildQuotaPoolItems(null, 0, { isPending: true }), {
-        keyFn: (item) => item.key,
-        sigFn: quotaPoolRowSig,
-        createRow: createPoolQuotaRow,
-        updateRow: syncPoolQuotaRow,
-      });
-    }
-
-    const legendActualTextEl = h('span', { text: t('quota.legendActual') });
-    const legendReservedTextEl = h('span', { text: t('quota.legendReserved') });
-    const reserveLegendEl = h(
-      'div',
-      { className: 'quota-reserve-legend', hidden: true },
-      [
-        h('span', { className: 'quota-legend-item' }, [
-          h('span', { className: 'quota-legend-line is-actual', 'aria-hidden': 'true' }),
-          legendActualTextEl,
-        ]),
-        h('span', { className: 'quota-legend-item' }, [
-          h('span', { className: 'quota-legend-line is-reserved', 'aria-hidden': 'true' }),
-          legendReservedTextEl,
-        ]),
-      ]
-    );
-
-    const quotaPanel = h('section', { className: 'panel quota-panel' }, [
-      h('div', { className: 'panel-header' }, [
-        h('span', { className: 'panel-title' }, [
-          createSvgIcon('pulse', { size: 13 }),
-          titleTextEl,
-          rateHelpBtn,
-        ]),
-        tierBadge,
-      ]),
-      poolsListEl,
-      reserveLegendEl,
-      ratePopoverEl,
-    ]);
-
-    syncRatePopoverContent(null);
-
-    function update({ data, minuteTick } = {}) {
-      patchText(titleTextEl, t('module.quotas'));
-      patchText(legendActualTextEl, t('quota.legendActual'));
-      patchText(legendReservedTextEl, t('quota.legendReserved'));
-      syncRatePopoverContent(data);
-      if (!data) {
-        reserveLegendEl.hidden = true;
-        if (compactHover) {
-          patchKeyedList(poolsListEl, buildQuotaPoolItems(null, 0, { isPending: true }), {
-            keyFn: (item) => item.key,
-            sigFn: quotaPoolRowSig,
-            createRow: createPoolQuotaRow,
-            updateRow: syncPoolQuotaRow,
-          });
-        }
-        return;
-      }
-
-      const quotas = data.quotas || {};
-      const showReserved = data.settings?.experimentalQuotaReservation !== false;
-      reserveLegendEl.hidden = !showReserved;
-      const effTick = Number.isFinite(minuteTick) ? minuteTick : Math.floor(Date.now() / 30000);
-      patchText(tierBadge, formatAccountTierBadge(data.account));
-      patchKeyedList(poolsListEl, buildQuotaPoolItems(quotas, effTick, { showReserved }), {
-        keyFn: (item) => item.key,
-        sigFn: quotaPoolRowSig,
-        createRow: createPoolQuotaRow,
-        updateRow: syncPoolQuotaRow,
-      });
-    }
-
-    return {
-      el: quotaPanel,
-      refs: { update, poolsListEl, rateHelpBtn, ratePopoverEl },
-    };
-  },
-});
-return { buildQuotaPoolItems, createPoolQuotaRow, formatQuotaSummaryFooter, syncPoolQuotaRow, quotaPoolRowSig, formatAccountTierBadge, maskAccountLabel, QuotaPoolsWidget };
-})();
-
-// --- src/components/widgets/AccountQuotaTrendCard.js ---
-const { resolveQuotaWindowBounds, buildQuotaWindowSeries, AccountQuotaTrendCard } = (() => {
-/**
- * @fileoverview Per-account quota remaining-% trajectory chart (`AccountQuotaTrendCard.js`).
- * Full-bleed edge-to-edge plot (`x = 1 .. viewW - 1`), X-axis clamped to earliest recorded
- * sample when history is shorter than the selected preset, and adaptive integer Y-scale so
- * real quota movements never compress into a tiny corner with wasted whitespace.
- */
-
-
-const POOL_COLORS = Object.freeze({
-  Gemini: 'var(--accent-primary)',
-  'Claude & GPT': 'var(--metric-ok)',
-  Argon: 'var(--ctx-thinking)',
-  Carbon: 'var(--metric-warn)',
-});
-
-const POOL_ORDER = ['Gemini', 'Argon', 'Carbon', 'Claude & GPT'];
-
-let quotaChartUid = 0;
-
-function floorMinute(ms) {
-  const n = Number(ms);
-  if (!(n > 0)) return 0;
-  const d = new Date(n);
-  d.setSeconds(0, 0);
-  return d.getTime();
-}
-
-function ceilMinute(ms) {
-  const n = Number(ms);
-  if (!(n > 0)) return 0;
-  const d = new Date(n);
-  d.setSeconds(59, 999);
-  return d.getTime();
-}
-
-function pad2(n) {
-  return String(n).padStart(2, '0');
-}
-
-function formatAxisTickTime(ms, spanMs) {
-  const d = new Date(ms);
-  const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  if (spanMs <= 36 * 3600_000) {
-    return hm;
-  }
-  const md = `${d.getMonth() + 1}/${pad2(d.getDate())}`;
-  if (spanMs <= 7 * 86400_000) {
-    return `${md} ${pad2(d.getHours())}h`;
-  }
-  return md;
-}
-
-function formatHoverTimestamp(ms) {
-  const d = new Date(ms);
-  return `${d.getMonth() + 1}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
-
-function buildHorizontalTangentSpline(pts) {
-  if (pts.length === 0) return '';
-  if (pts.length === 1) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
-  let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i];
-    const p1 = pts[i + 1];
-    const dx = (p1.x - p0.x) * 0.38;
-    d += ` C ${(p0.x + dx).toFixed(1)} ${p0.y.toFixed(1)}, ${(p1.x - dx).toFixed(1)} ${p1.y.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
-  }
-  return d;
-}
-
-const HOVER_SLOT_COUNT = 96;
-const MAX_SVG_COLUMN_BUCKETS = 96;
-
-/**
- * Downsamples dense sub-pixel SVG points (e.g. 12s poll bursts) into `<= maxCols`
- * min/max-preserving visual knots so curve rasterization and morphing stay crisp and fast,
- * while `rawPoints` remain intact for exact timestamp interpolation.
- */
-function simplifySvgPointsForRender(svgPts, leftX, plotW, maxCols = MAX_SVG_COLUMN_BUCKETS) {
-  if (svgPts.length <= maxCols) return svgPts;
-  const colW = Math.max(1, plotW) / maxCols;
-  const out = [svgPts[0]];
-  let idx = 1;
-  const endIdx = svgPts.length - 1;
-  while (idx < endIdx) {
-    const col = Math.floor((svgPts[idx].x - leftX) / colW);
-    let minPt = svgPts[idx];
-    let maxPt = svgPts[idx];
-    let j = idx + 1;
-    while (j < endIdx && Math.floor((svgPts[j].x - leftX) / colW) === col) {
-      const cand = svgPts[j];
-      if (cand.y < minPt.y) minPt = cand;
-      if (cand.y > maxPt.y) maxPt = cand;
-      j += 1;
-    }
-    if (minPt === maxPt) {
-      out.push(minPt);
-    } else if (minPt.x <= maxPt.x) {
-      out.push(minPt, maxPt);
-    } else {
-      out.push(maxPt, minPt);
-    }
-    idx = j;
-  }
-  out.push(svgPts[endIdx]);
-  return out;
-}
-
-/**
- * Computes tight, integer-aligned `[yMin, yMid, yMax]` bounds (`0..100%`) around
- * observed `[dataMin, dataMax]` so small-to-moderate quota changes use the full
- * vertical canvas instead of leaving 80%+ empty bottom space.
- */
-function computeAdaptiveQuotaScale(dataMin, dataMax) {
-  const lo = Math.max(0, Math.min(100, Number.isFinite(dataMin) ? dataMin : 0));
-  const hi = Math.max(lo, Math.min(100, Number.isFinite(dataMax) ? dataMax : 100));
-  const rawSpan = hi - lo;
-  const pad = Math.max(1.5, rawSpan * 0.14);
-
-  let yMax = hi >= 98.5 ? 100 : Math.min(100, Math.ceil((hi + pad) / 10) * 10);
-  let yMin = lo <= 2 ? 0 : Math.max(0, Math.floor((lo - pad) / 10) * 10);
-
-  if (yMax - yMin < 10) {
-    if (yMax >= 100) {
-      yMax = 100;
-      yMin = 90;
-    } else if (yMin <= 0) {
-      yMin = 0;
-      yMax = 10;
-    } else {
-      yMin = Math.max(0, yMax - 10);
-    }
-  }
-  // Ensure `(yMax - yMin)` is even so midpoint tick is always an exact integer
-  if ((yMax - yMin) % 2 !== 0) {
-    if (yMin > 0) yMin -= 1;
-    else if (yMax < 100) yMax += 1;
-  }
-  const yMid = Math.round((yMin + yMax) / 2);
-  return { yMin, yMid, yMax, span: Math.max(1, yMax - yMin) };
-}
-
-const IMPULSE_GLITCH_MAX_SPAN_MS = 20 * 60_000;
-const IMPULSE_GLITCH_MIN_JUMP_PCT = 3;
-const IMPULSE_GLITCH_MAX_NEIGHBOR_DIFF_PCT = 1.2;
-const CYCLE_RESET_JUMP_MIN_PCT = 3.5;
-
-function stripIsolatedImpulseSpikes(pts) {
-  if (pts.length < 3) return pts;
-  const out = pts.slice();
-  let i = 1;
-  while (i < out.length - 1) {
-    const prev = out[i - 1];
-    const cur = out[i];
-    const next = out[i + 1];
-    const spanMs = next.ts - prev.ts;
-    if (
-      spanMs >= 0 &&
-      spanMs <= IMPULSE_GLITCH_MAX_SPAN_MS &&
-      cur.val - prev.val >= IMPULSE_GLITCH_MIN_JUMP_PCT &&
-      cur.val - next.val >= IMPULSE_GLITCH_MIN_JUMP_PCT &&
-      Math.abs(next.val - prev.val) <= IMPULSE_GLITCH_MAX_NEIGHBOR_DIFF_PCT
-    ) {
-      out.splice(i, 1);
-      if (i > 1) i -= 1;
-      continue;
-    }
-    i += 1;
-  }
-  return out;
-}
-
-function resolveQuotaWindowBounds({
-  pools,
-  selectedRange,
-  selectedWin,
-  selectedPool,
-  customStartMs = 0,
-  customEndMs = 0,
-  nowMs = Date.now(),
-}) {
-  if (selectedRange === 'custom') {
-    return {
-      startMs: Math.min(customStartMs, customEndMs),
-      endMs: Math.max(customStartMs, customEndMs),
-    };
-  }
-  if (selectedRange === 'today') {
-    const d = new Date(nowMs);
-    d.setHours(0, 0, 0, 0);
-    return { startMs: d.getTime(), endMs: nowMs };
-  }
-  if (selectedRange === '24h') return { startMs: nowMs - 24 * 3600_000, endMs: nowMs };
-  if (selectedRange === '7d') return { startMs: nowMs - 7 * 86400_000, endMs: nowMs };
-  if (selectedRange === '14d') return { startMs: nowMs - 14 * 86400_000, endMs: nowMs };
-  if (selectedRange === '30d') return { startMs: nowMs - 30 * 86400_000, endMs: nowMs };
-  if (selectedRange === 'all') {
-    let minTs = Infinity;
-    for (const p of pools) {
-      for (const pt of p.points) {
-        if (pt[0] > 0 && pt[0] < minTs) minTs = pt[0];
-      }
-    }
-    const safeStart =
-      Number.isFinite(minTs) && minTs < nowMs - 60_000 ? minTs : nowMs - 5 * 3600_000;
-    return { startMs: safeStart, endMs: nowMs };
-  }
-
-  const targetPools =
-    selectedPool !== 'all' ? pools.filter((p) => p.poolKey === selectedPool) : pools;
-  const refPools = targetPools.length ? targetPools : pools;
-  const isWeekly = selectedWin === 'weekly';
-  const winDurationMs = isWeekly ? 7 * 86400_000 : 5 * 3600_000;
-
-  let activeMinResetMs = Infinity;
-  let anyMinResetMs = Infinity;
-  for (const p of refPools) {
-    const rMs = isWeekly ? p.resetWeeklyMs : p.reset5hMs;
-    const liveVal = isWeekly ? p.liveWk : p.live5h;
-    if (!(rMs > nowMs)) continue;
-    if (rMs < anyMinResetMs) anyMinResetMs = rMs;
-    if (liveVal !== null && liveVal !== undefined && liveVal < 99.95 && rMs < activeMinResetMs) {
-      activeMinResetMs = rMs;
-    }
-  }
-  const chosenResetMs = Number.isFinite(activeMinResetMs)
-    ? activeMinResetMs
-    : Number.isFinite(anyMinResetMs)
-      ? anyMinResetMs
-      : 0;
-  const startMs = chosenResetMs > nowMs ? chosenResetMs - winDurationMs : nowMs - winDurationMs;
-  return { startMs: Math.min(startMs, nowMs - 60_000), endMs: nowMs };
-}
-
-/**
- * Extracts per-pool trajectories for the requested window, ensuring `'cycle'` mode
- * strictly excludes pre-reset points from any previous expired cycle (eliminating
- * artificial `84% -> 100%` vertical reset spikes at cycle start).
- */
-function buildQuotaWindowSeries({
-  visiblePools,
-  rawBounds,
-  selectedRange,
-  selectedWin,
-  nowMs = Date.now(),
-}) {
-  const isCycleMode = selectedRange === 'cycle';
-  const isWeekly = selectedWin === 'weekly';
-  const valIdx = isWeekly ? 2 : 1;
-  const winDurationMs = isWeekly ? 7 * 86400_000 : 5 * 3600_000;
-
-  const staged = [];
-  let hasStartAnchor = false;
-  let earliestInWinTs = Infinity;
-
-  for (const p of visiblePools) {
-    const cleanedAll = [];
-    for (let i = 0; i < p.points.length; i++) {
-      const pt = p.points[i];
-      const v = pt[valIdx];
-      if (v === null || v === undefined || !Number.isFinite(Number(v))) continue;
-      cleanedAll.push({
-        ts: pt[0],
-        val: Math.max(0, Math.min(100, Number(v))),
-      });
-    }
-    const sanitized = stripIsolatedImpulseSpikes(cleanedAll);
-    if (sanitized.length === 0) continue;
-
-    const pResetMs = isWeekly ? p.resetWeeklyMs : p.reset5hMs;
-    const pLiveVal = isWeekly ? p.liveWk : p.live5h;
-    const poolCutoffMs =
-      isCycleMode && pResetMs > nowMs && pLiveVal !== null && pLiveVal < 99.95
-        ? Math.max(rawBounds.startMs, pResetMs - winDurationMs)
-        : rawBounds.startMs;
-
-    let carryBefore = null;
-    let inWinPts = [];
-    for (let i = 0; i < sanitized.length; i++) {
-      const sp = sanitized[i];
-      if (sp.ts <= poolCutoffMs) {
-        carryBefore = sp;
-      } else if (sp.ts <= rawBounds.endMs) {
-        inWinPts.push(sp);
-      }
-    }
-
-    // In `'cycle'` mode, `< 99.95%` observations at or before `poolCutoffMs` belong
-    // to the previous expired cycle and must never carry forward into the new cycle.
-    if (isCycleMode && carryBefore && carryBefore.val < 99.95) {
-      carryBefore = null;
-    }
-
-    let hadResetInWindow = false;
-    if (isCycleMode && inWinPts.length >= 2) {
-      let lastResetIdx = 0;
-      for (let k = 1; k < inWinPts.length; k++) {
-        const prev = inWinPts[k - 1].val;
-        const cur = inWinPts[k].val;
-        if (cur - prev >= CYCLE_RESET_JUMP_MIN_PCT || (cur >= 99.5 && prev <= 98.5)) {
-          lastResetIdx = k;
-        }
-      }
-      if (lastResetIdx > 0) {
-        inWinPts = inWinPts.slice(lastResetIdx);
-        carryBefore = null;
-        hadResetInWindow = true;
-      }
-    }
-
-    const isMidWindowReset = hadResetInWindow && inWinPts[0].ts - poolCutoffMs > 5 * 60_000;
-    const anchorsCycleOrigin =
-      isCycleMode &&
-      !isMidWindowReset &&
-      !carryBefore &&
-      inWinPts.length > 0 &&
-      inWinPts[0].ts - poolCutoffMs <= 3 * 60_000;
-
-    if (carryBefore || (anchorsCycleOrigin && poolCutoffMs <= rawBounds.startMs + 5000)) {
-      hasStartAnchor = true;
-    }
-    if (inWinPts.length > 0 && inWinPts[0].ts < earliestInWinTs) {
-      earliestInWinTs = inWinPts[0].ts;
-    }
-
-    staged.push({
-      pool: p,
-      poolCutoffMs,
-      carryBefore,
-      inWinPts,
-      isMidWindowReset,
-      anchorsCycleOrigin,
-    });
-  }
-
-  let plottedStartMs = rawBounds.startMs;
-  if (
-    !hasStartAnchor &&
-    selectedRange !== 'custom' &&
-    Number.isFinite(earliestInWinTs) &&
-    earliestInWinTs > rawBounds.startMs
-  ) {
-    plottedStartMs =
-      rawBounds.endMs - earliestInWinTs >= 60_000
-        ? earliestInWinTs
-        : Math.max(rawBounds.startMs, rawBounds.endMs - 5 * 60_000);
-  }
-  const plottedEndMs = Math.max(plottedStartMs + 60_000, rawBounds.endMs);
-
-  const rawBuilt = [];
-  let dataMin = Infinity;
-  let dataMax = -Infinity;
-
-  for (const item of staged) {
-    const { pool, poolCutoffMs, carryBefore, inWinPts, isMidWindowReset, anchorsCycleOrigin } = item;
-    const seriesPts = [];
-    const anchorStartTs = Math.max(plottedStartMs, poolCutoffMs);
-
-    if (carryBefore) {
-      seriesPts.push({ ts: anchorStartTs, val: carryBefore.val });
-    } else if (anchorsCycleOrigin) {
-      const originVal = Math.max(100, inWinPts[0].val);
-      if (inWinPts[0].ts > anchorStartTs) {
-        seriesPts.push({ ts: anchorStartTs, val: Math.min(100, originVal) });
-      }
-    } else if (
-      !isMidWindowReset &&
-      inWinPts.length > 0 &&
-      inWinPts[0].ts > plottedStartMs &&
-      (inWinPts.length === 1 || inWinPts[0].val >= 99.95)
-    ) {
-      seriesPts.push({ ts: plottedStartMs, val: inWinPts[0].val });
-    }
-
-    for (let i = 0; i < inWinPts.length; i++) {
-      const vp = inWinPts[i];
-      if (vp.ts >= plottedStartMs) {
-        seriesPts.push(vp);
-      }
-    }
-
-    if (seriesPts.length > 0 && plottedEndMs <= nowMs + 60_000) {
-      const tail = seriesPts[seriesPts.length - 1];
-      const tailEnd = Math.min(plottedEndMs, nowMs);
-      if (tailEnd > tail.ts + 1000) {
-        seriesPts.push({ ts: tailEnd, val: tail.val });
-      }
-    }
-    if (seriesPts.length === 0) continue;
-
-    for (let i = 0; i < seriesPts.length; i++) {
-      const v = seriesPts[i].val;
-      if (v < dataMin) dataMin = v;
-      if (v > dataMax) dataMax = v;
-    }
-    rawBuilt.push({
-      poolKey: pool.poolKey,
-      label: pool.label,
-      color: POOL_COLORS[pool.poolKey] || 'var(--accent-primary)',
-      rawPoints: seriesPts,
-      latestVal: seriesPts[seriesPts.length - 1].val,
-    });
-  }
-
-  return {
-    plottedStartMs,
-    plottedEndMs,
-    rawBuilt,
-    yScale: rawBuilt.length > 0 ? computeAdaptiveQuotaScale(dataMin, dataMax) : null,
-  };
-}
-
-function getTimeRangeOptions() {
-  return [
-    { value: 'cycle', label: t('cons.rangeCycle') },
-    { value: 'today', label: t('cons.rangeToday') },
-    { value: '24h', label: t('cons.range24h') },
-    { value: '7d', label: t('cons.range7d') },
-    { value: '14d', label: t('cons.range14d') },
-    { value: '30d', label: t('cons.range30d') },
-    { value: 'all', label: t('cons.rangeAll') },
-    { value: 'custom', label: t('cons.rangeCustom') },
-  ];
-}
-
-function getQuotaWindowOptions() {
-  return [
-    { value: '5h', label: t('settings.account.win5h') },
-    { value: 'weekly', label: t('settings.account.winWeekly') },
-  ];
-}
-
-const AccountQuotaTrendCard = defineComponent({
-  name: 'AccountQuotaTrendCard',
-  setup({ onCleanup }) {
-    const VIEW_H = 184;
-    const TOP_Y = 18;
-    const BOTTOM_Y = 166;
-    const SPAN_Y = BOTTOM_Y - TOP_Y;
-    const LEFT_X = 1;
-    const RIGHT_PAD = 1;
-
-    let viewW = 460;
-    let selectedRange = 'cycle';
-    let selectedWin = '5h';
-    let selectedPool = 'all';
-    let selectedAccountEmail = '';
-
-    const initNow = Date.now();
-    let customStartMs = floorMinute(initNow - 24 * 3600_000);
-    let customEndMs = ceilMinute(initNow);
-    let draftStartMs = customStartMs;
-    let draftEndMs = customEndMs;
-
-    let latestState = {
-      activeEmail: '',
-      activePools: [],
-      riskAccepted: false,
-      accounts: [],
-      savedQuotas: new Map(),
-      quotaHistory: {},
-    };
-
-    let plottedSeries = [];
-    let plottedStartMs = 0;
-    let plottedEndMs = 0;
-    let plottedYScale = { yMin: 0, yMid: 50, yMax: 100, span: 100 };
-
-    const cardTitleText = h('span', { text: t('settings.account.trendTitle') });
-    const spanBadgeEl = h('span', { className: 'cons-badge text-mono', text: '' });
-
-    const accountSelect = CustomSelect({
-      className: 'cons-cycle-pool-select account-trend-email-select',
-      modelValue: '',
-      options: [],
-      onUpdateModelValue: (val) => {
-        selectedAccountEmail = String(val || '').trim().toLowerCase();
-        hideHover();
-        renderChart();
-      },
-    });
-    patchAttr(accountSelect.el, 'hidden', true);
-
-    const poolSelect = CustomSelect({
-      className: 'cons-cycle-pool-select',
-      modelValue: 'all',
-      options: [{ value: 'all', label: t('cons.cyclePoolAll') }],
-      onUpdateModelValue: (val) => {
-        selectedPool = val || 'all';
-        hideHover();
-        renderChart();
-      },
-    });
-
-    const winSwitch = SegmentedControl({
-      ariaLabel: t('settings.account.trendWinAria'),
-      modelValue: selectedWin,
-      options: getQuotaWindowOptions(),
-      onUpdateModelValue: (val) => {
-        selectedWin = val === 'weekly' ? 'weekly' : '5h';
-        winSwitch.setProps({ modelValue: selectedWin, options: getQuotaWindowOptions() });
-        hideHover();
-        renderChart();
-      },
-    });
-
-    const rangeSwitch = SegmentedControl({
-      ariaLabel: t('cons.rangeAria'),
-      modelValue: selectedRange,
-      options: getTimeRangeOptions(),
-      onUpdateModelValue: (nextRange) => {
-        selectedRange = nextRange || 'cycle';
-        if (selectedRange === 'custom') {
-          startPicker.setValue(draftStartMs);
-          endPicker.setValue(draftEndMs);
-        }
-        rangeSwitch.setProps({ modelValue: selectedRange, options: getTimeRangeOptions() });
-        hideHover();
-        renderChart();
-      },
-    });
-
-    const startPicker = CustomDateTimePicker({
-      modelValue: draftStartMs,
-      onUpdateModelValue: (ms) => {
-        draftStartMs = ms;
-        startPicker.setValue(ms);
-      },
-    });
-    const endPicker = CustomDateTimePicker({
-      modelValue: draftEndMs,
-      onUpdateModelValue: (ms) => {
-        draftEndMs = ms;
-        endPicker.setValue(ms);
-      },
-    });
-    const applyCustomLabel = h('span', { text: t('cons.applyFilter') });
-    const applyCustomBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-primary',
-        onClick: () => {
-          const s = Number(draftStartMs || 0);
-          const e = Number(draftEndMs || 0);
-          const lo = floorMinute(s > 0 && e > 0 ? Math.min(s, e) : s);
-          const hi = ceilMinute(s > 0 && e > 0 ? Math.max(s, e) : e);
-          if (lo > 0 && hi > lo) {
-            customStartMs = lo;
-            customEndMs = hi;
-            draftStartMs = lo;
-            draftEndMs = hi;
-            startPicker.setValue(lo);
-            endPicker.setValue(hi);
-            renderChart();
-          }
-        },
-      },
-      [createSvgIcon('check', { size: 12 }), applyCustomLabel]
-    );
-    const rangeToEl = h('span', { className: 'text-muted', text: t('cons.rangeTo') });
-    const customRangeBar = h('div', { className: 'cons-custom-range-bar', hidden: true }, [
-      startPicker.el,
-      rangeToEl,
-      endPicker.el,
-      applyCustomBtn,
-    ]);
-
-    // --- Full-Bleed Edge-to-Edge 184px SVG Stage (reusing TrendAreaChart `.trend-svg`) ---
-    const uid = ++quotaChartUid;
-    const gradId = `acct-quota-grad-${uid}`;
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${viewW} ${VIEW_H}`);
-    svg.setAttribute('class', 'trend-svg');
-    svg.setAttribute('aria-hidden', 'true');
-
-    const defs = document.createElementNS(SVG_NS, 'defs');
-    const grad = document.createElementNS(SVG_NS, 'linearGradient');
-    grad.setAttribute('id', gradId);
-    grad.setAttribute('x1', '0');
-    grad.setAttribute('y1', '0');
-    grad.setAttribute('x2', '0');
-    grad.setAttribute('y2', '1');
-    const stopTop = document.createElementNS(SVG_NS, 'stop');
-    stopTop.setAttribute('offset', '0%');
-    stopTop.setAttribute('stop-color', 'var(--accent-primary)');
-    stopTop.setAttribute('stop-opacity', '0.24');
-    const stopBot = document.createElementNS(SVG_NS, 'stop');
-    stopBot.setAttribute('offset', '100%');
-    stopBot.setAttribute('stop-color', 'var(--accent-primary)');
-    stopBot.setAttribute('stop-opacity', '0.0');
-    grad.appendChild(stopTop);
-    grad.appendChild(stopBot);
-    defs.appendChild(grad);
-    svg.appendChild(defs);
-
-    const gridGroup = document.createElementNS(SVG_NS, 'g');
-    gridGroup.setAttribute('class', 'trend-grid');
-    const gridRowSpecs = [
-      { y: TOP_Y, dy: 3, labeled: true },
-      { y: Math.round(TOP_Y + SPAN_Y * 0.25), dy: 0, labeled: false },
-      { y: Math.round(TOP_Y + SPAN_Y * 0.5), dy: 3, labeled: true },
-      { y: Math.round(TOP_Y + SPAN_Y * 0.75), dy: 0, labeled: false },
-      { y: BOTTOM_Y, dy: -3, labeled: true },
-    ];
-    const gridLines = [];
-    const yLabels = [];
-    for (const row of gridRowSpecs) {
-      const line = document.createElementNS(SVG_NS, 'line');
-      line.setAttribute('x1', '0');
-      line.setAttribute('y1', String(row.y));
-      line.setAttribute('x2', String(viewW));
-      line.setAttribute('y2', String(row.y));
-      gridGroup.appendChild(line);
-      gridLines.push(line);
-
-      if (row.labeled) {
-        const lbl = document.createElementNS(SVG_NS, 'text');
-        lbl.setAttribute('class', 'sstep-axis-label is-y-inline');
-        lbl.setAttribute('x', '3');
-        lbl.setAttribute('y', String(row.y + row.dy));
-        lbl.setAttribute('text-anchor', 'start');
-        yLabels.push(lbl);
-      }
-    }
-    svg.appendChild(gridGroup);
-
-    const seriesGroup = document.createElementNS(SVG_NS, 'g');
-    svg.appendChild(seriesGroup);
-
-    // Append inline Y labels above series fills so halo stroke keeps text crisp
-    const yLabelOverlay = document.createElementNS(SVG_NS, 'g');
-    for (const lbl of yLabels) {
-      yLabelOverlay.appendChild(lbl);
-    }
-    svg.appendChild(yLabelOverlay);
-
-    const hoverLine = document.createElementNS(SVG_NS, 'line');
-    hoverLine.setAttribute('class', 'trend-hover-line');
-    hoverLine.setAttribute('y1', String(TOP_Y));
-    hoverLine.setAttribute('y2', String(BOTTOM_Y));
-    hoverLine.setAttribute('hidden', '');
-    svg.appendChild(hoverLine);
-
-    const hoverDotsGroup = document.createElementNS(SVG_NS, 'g');
-    hoverDotsGroup.setAttribute('hidden', '');
-    svg.appendChild(hoverDotsGroup);
-
-    const tipTimeEl = h('span', { className: 'trend-tip-time text-mono' });
-    const tipWinEl = h('span', { className: 'trend-tip-calls' });
-    const tipRowsHost = h('div', { className: 'account-trend-tip-rows' });
-    const tooltipEl = h('div', { className: 'trend-tooltip', hidden: true }, [
-      h('div', { className: 'trend-tip-head' }, [tipTimeEl, tipWinEl]),
-      tipRowsHost,
-    ]);
-
-    const xAxisEl = h('div', { className: 'trend-x-axis' });
-    const legendRowEl = h('div', { className: 'account-trend-legend' });
-    const emptyStateEl = h('div', { className: 'smodel-empty settings-action-desc', hidden: true });
-
-    const plotStage = h(
-      'div',
-      {
-        className: 'trend-plot-stage',
-        onMousemove: handlePointerMove,
-        onMouseleave: hideHover,
-      },
-      [svg]
-    );
-    const chartWrap = h('div', { className: 'trend-chart-wrap' }, [
-      plotStage,
-      xAxisEl,
-      legendRowEl,
-      tooltipEl,
-    ]);
-
-    const tooltipCtrl = createFloatingChartTooltipController({
-      containerEl: chartWrap,
-      tooltipEl,
-      defaultTipWidth: 204,
-      defaultTipHeight: 78,
-      defaultViewWidth: 460,
-      defaultViewHeight: VIEW_H,
-    });
-    const seriesMorphCtrl = createMultiSeriesCurveMorphController();
-    const seriesNodePoolByKey = new Map();
-    const hoverDotPoolByKey = new Map();
-    let xTickElements = [];
-    let hoveredSlotIdx = -1;
-    let lastActiveDots = [];
-    let lastFallbackX = 0;
-    let lastFallbackY = 0;
-    let lastSizeKey = '';
-    let lastTipTimeStr = '';
-    let lastTipWinStr = '';
-    let lastHoveredTickIdx = -1;
-    let lastPointer = null;
-    let cachedSvgRect = null;
-    let lastPlotSig = '';
-
-    const rootEl = h('section', { className: 'panel account-quota-trend-panel' }, [
-      h('div', { className: 'panel-header account-trend-toprow' }, [
-        h('span', { className: 'panel-title cons-overview-title' }, [
-          createSvgIcon('pulse', { size: 13 }),
-          cardTitleText,
-          accountSelect.el,
-          poolSelect.el,
-        ]),
-        winSwitch.el,
-      ]),
-      h('div', { className: 'panel-header cons-overview-head account-trend-subbar' }, [
-        spanBadgeEl,
-        h('div', { className: 'cons-overview-controls' }, [rangeSwitch.el]),
-      ]),
-      customRangeBar,
-      chartWrap,
-      emptyStateEl,
-    ]);
-
-    function valueToSvgY(val) {
-      const clamped = Math.max(plottedYScale.yMin, Math.min(plottedYScale.yMax, val));
-      return BOTTOM_Y - ((clamped - plottedYScale.yMin) / plottedYScale.span) * SPAN_Y;
-    }
-
-    function syncHoveredTickClass(activeTickIdx) {
-      if (activeTickIdx === lastHoveredTickIdx) return;
-      lastHoveredTickIdx = activeTickIdx;
-      for (let i = 0; i < xTickElements.length; i++) {
-        patchClasses(xTickElements[i], { 'is-hovered': i === activeTickIdx });
-      }
-    }
-
-    function hideHover() {
-      cachedSvgRect = null;
-      hoveredSlotIdx = -1;
-      lastActiveDots = [];
-      lastTipTimeStr = '';
-      lastTipWinStr = '';
-      lastPointer = null;
-      tooltipCtrl.hide();
-      hoverLine.setAttribute('hidden', '');
-      hoverDotsGroup.setAttribute('hidden', '');
-      for (const dot of hoverDotPoolByKey.values()) {
-        dot.setAttribute('hidden', '');
-        patchClasses(dot, { 'is-tracking': false });
-      }
-      syncHoveredTickClass(-1);
-    }
-
-    function sampleSeriesValueAt(points, targetMs) {
-      if (!points.length) return null;
-      if (targetMs < points[0].ts - 1000) return null;
-      if (targetMs <= points[0].ts) return points[0].val;
-      const last = points[points.length - 1];
-      if (targetMs > last.ts + 60_000) return null;
-      if (targetMs >= last.ts) return last.val;
-      let lo = 0;
-      let hi = points.length - 1;
-      while (lo + 1 < hi) {
-        const mid = (lo + hi) >> 1;
-        if (points[mid].ts <= targetMs) lo = mid;
-        else hi = mid;
-      }
-      const a = points[lo];
-      const b = points[hi];
-      const span = b.ts - a.ts;
-      if (span <= 0) return b.val;
-      return a.val + (b.val - a.val) * ((targetMs - a.ts) / span);
-    }
-
-    function showHoverAtSlot(slotIdx, pointer = null, { forceRefresh = false } = {}) {
-      if (!plottedSeries.length || !(plottedEndMs > plottedStartMs) || slotIdx < 0) {
-        hideHover();
-        return;
-      }
-      const clampedSlot = Math.max(0, Math.min(HOVER_SLOT_COUNT, slotIdx));
-      const wasHidden = tooltipEl.hasAttribute('hidden');
-      const changedSlot = forceRefresh || wasHidden || clampedSlot !== hoveredSlotIdx;
-      hoveredSlotIdx = clampedSlot;
-      if (pointer) lastPointer = pointer;
-
-      if (changedSlot) {
-        const u = clampedSlot / HOVER_SLOT_COUNT;
-        const plotW = Math.max(20, viewW - LEFT_X - RIGHT_PAD);
-        const clampedX = LEFT_X + u * plotW;
-        const targetMs = Math.round(plottedStartMs + u * (plottedEndMs - plottedStartMs));
-
-        hoverLine.setAttribute('x1', clampedX.toFixed(1));
-        hoverLine.setAttribute('x2', clampedX.toFixed(1));
-
-        const tipItems = [];
-        const activeDots = [];
-        let sumY = 0;
-        const usedKeys = new Set();
-
-        for (let i = 0; i < plottedSeries.length; i++) {
-          const s = plottedSeries[i];
-          const val = sampleSeriesValueAt(s.rawPoints, targetMs);
-          if (val === null) continue;
-          usedKeys.add(s.poolKey);
-          const y = valueToSvgY(val);
-          sumY += y;
-
-          let dot = hoverDotPoolByKey.get(s.poolKey);
-          if (!dot) {
-            dot = document.createElementNS(SVG_NS, 'circle');
-            dot.setAttribute('class', 'trend-hover-dot');
-            dot.setAttribute('r', '3.2');
-            dot.style.fill = 'var(--surface-panel)';
-            hoverDotPoolByKey.set(s.poolKey, dot);
-            hoverDotsGroup.appendChild(dot);
-          }
-          if (dot._lastColor !== s.color) {
-            dot._lastColor = s.color;
-            dot.style.stroke = s.color;
-          }
-          dot.setAttribute('cx', clampedX.toFixed(1));
-          dot.setAttribute('cy', y.toFixed(1));
-          if (dot.hasAttribute('hidden')) dot.removeAttribute('hidden');
-          activeDots.push(dot);
-          tipItems.push({ key: s.poolKey, label: s.label, color: s.color, val });
-        }
-
-        for (const [k, dot] of hoverDotPoolByKey.entries()) {
-          if (!usedKeys.has(k) && !dot.hasAttribute('hidden')) {
-            dot.setAttribute('hidden', '');
-            patchClasses(dot, { 'is-tracking': false });
-          }
-        }
-
-        if (tipItems.length === 0) {
-          hideHover();
-          return;
-        }
-        if (hoverLine.hasAttribute('hidden')) hoverLine.removeAttribute('hidden');
-        if (hoverDotsGroup.hasAttribute('hidden')) hoverDotsGroup.removeAttribute('hidden');
-
-        if (xTickElements.length > 1) {
-          syncHoveredTickClass(Math.round(u * (xTickElements.length - 1)));
-        }
-
-        const nextTimeStr = formatHoverTimestamp(targetMs);
-        if (nextTimeStr !== lastTipTimeStr) {
-          lastTipTimeStr = nextTimeStr;
-          patchText(tipTimeEl, nextTimeStr);
-        }
-        const nextWinStr = t(
-          selectedWin === 'weekly' ? 'settings.account.winWeekly' : 'settings.account.win5h'
-        );
-        if (nextWinStr !== lastTipWinStr) {
-          lastTipWinStr = nextWinStr;
-          patchText(tipWinEl, nextWinStr);
-        }
-
-        patchKeyedList(tipRowsHost, tipItems, {
-          keyFn: (it) => it.key,
-          sigFn: (it) => `${it.label}:${it.val.toFixed(1)}`,
-          createRow: () => {
-            const sw = h('span', { className: 'dot-swatch' });
-            const nm = h('span', { className: 'account-trend-tip-name' });
-            const vl = h('strong', { className: 'text-mono' });
-            const row = h('div', { className: 'account-trend-tip-row' }, [
-              h('span', { className: 'legend-left' }, [sw, nm]),
-              vl,
-            ]);
-            return { el: row, refs: { sw, nm, vl } };
-          },
-          updateRow: (r, it) => {
-            if (r.sw._lastBg !== it.color) {
-              r.sw._lastBg = it.color;
-              r.sw.style.background = it.color;
-            }
-            patchText(r.nm, it.label);
-            patchText(r.vl, `${+it.val.toFixed(1)}%`);
-          },
-        });
-
-        const wrapRect = tooltipCtrl.getWrapRect();
-        const wrapW =
-          wrapRect && wrapRect.width > 0
-            ? wrapRect.width
-            : Number(chartWrap.clientWidth || viewW || 460);
-        lastFallbackX = (clampedX / Math.max(1, viewW)) * wrapW;
-        lastFallbackY = sumY / activeDots.length + 6;
-        lastActiveDots = activeDots;
-        lastSizeKey = `rows:${tipItems.length}`;
-      }
-
-      tooltipCtrl.show({
-        fallbackX: lastFallbackX,
-        fallbackY: lastFallbackY,
-        pointer: pointer || lastPointer,
-        trackedDots: lastActiveDots,
-        viewWidth: viewW,
-        viewHeight: VIEW_H,
-        sizeKey: lastSizeKey,
-      });
-    }
-
-    function handlePointerMove(ev) {
-      if (!plottedSeries.length || !(plottedEndMs > plottedStartMs)) {
-        hideHover();
-        return;
-      }
-      if (!cachedSvgRect) {
-        cachedSvgRect = svg.getBoundingClientRect?.() || null;
-      }
-      const rect = cachedSvgRect;
-      const widthPx = Number(rect?.width || viewW);
-      if (!(widthPx > 0)) {
-        cachedSvgRect = null;
-        return;
-      }
-      const offsetX = Number(ev.clientX || 0) - Number(rect?.left || 0);
-      const svgX = (offsetX / widthPx) * viewW;
-      const plotW = Math.max(20, viewW - LEFT_X - RIGHT_PAD);
-      const u = Math.max(0, Math.min(1, (svgX - LEFT_X) / plotW));
-      const slotIdx = Math.round(u * HOVER_SLOT_COUNT);
-      const pointer =
-        Number.isFinite(Number(ev?.clientX)) && Number.isFinite(Number(ev?.clientY))
-          ? { clientX: Number(ev.clientX), clientY: Number(ev.clientY) }
-          : null;
-      showHoverAtSlot(slotIdx, pointer);
-    }
-
-    function resolveTargetAccountEmail() {
-      const { activeEmail, riskAccepted, accounts } = latestState;
-      if (!riskAccepted) {
-        return activeEmail || '';
-      }
-      const candidates = [];
-      if (activeEmail) candidates.push(activeEmail);
-      for (const addr of accounts) {
-        if (addr && !candidates.includes(addr)) candidates.push(addr);
-      }
-      if (selectedAccountEmail && candidates.includes(selectedAccountEmail)) {
-        return selectedAccountEmail;
-      }
-      selectedAccountEmail = candidates[0] || '';
-      return selectedAccountEmail;
-    }
-
-    function buildMergedPoolsForEmail(email, nowMs) {
-      const histPools = latestState.quotaHistory?.[email]?.pools || {};
-      const livePools =
-        email && email === latestState.activeEmail
-          ? latestState.activePools || []
-          : latestState.savedQuotas.get(email)?.pools || [];
-
-      const merged = new Map();
-      for (const [pk, hEntry] of Object.entries(histPools)) {
-        merged.set(pk, {
-          poolKey: pk,
-          label: hEntry.label || pk,
-          reset5hMs: Number(hEntry.reset5hMs) || 0,
-          resetWeeklyMs: Number(hEntry.resetWeeklyMs) || 0,
-          points: Array.isArray(hEntry.points) ? hEntry.points.slice() : [],
-          live5h: null,
-          liveWk: null,
-        });
-      }
-
-      for (const lp of livePools) {
-        const pk = String(lp?.poolKey || lp?.family || lp?.poolLabel || '').trim();
-        if (!pk || pk === 'Unknown') continue;
-        let item = merged.get(pk);
-        if (!item) {
-          item = {
-            poolKey: pk,
-            label: String(lp?.poolLabel || pk),
-            reset5hMs: 0,
-            resetWeeklyMs: 0,
-            points: [],
-            live5h: null,
-            liveWk: null,
-          };
-          merged.set(pk, item);
-        }
-        if (lp?.poolLabel) item.label = String(lp.poolLabel);
-        const r5Ms = Date.parse(lp?.resetTime || '');
-        const rWMs = Date.parse(lp?.weeklyResetTime || '');
-        if (Number.isFinite(r5Ms) && r5Ms > 0) item.reset5hMs = r5Ms;
-        if (Number.isFinite(rWMs) && rWMs > 0) item.resetWeeklyMs = rWMs;
-        if (Number.isFinite(lp?.remainingPct)) item.live5h = +Number(lp.remainingPct).toFixed(1);
-        if (Number.isFinite(lp?.weeklyRemainingPct)) {
-          item.liveWk = +Number(lp.weeklyRemainingPct).toFixed(1);
-        }
-        if (item.live5h !== null || item.liveWk !== null) {
-          const last = item.points[item.points.length - 1];
-          if (!last || nowMs >= last[0]) {
-            item.points.push([
-              nowMs,
-              item.live5h ?? (last ? last[1] : null),
-              item.liveWk ?? (last ? last[2] : null),
-            ]);
-          }
-        }
-      }
-
-      return Array.from(merged.values()).sort(
-        (a, b) =>
-          (POOL_ORDER.indexOf(a.poolKey) === -1 ? 99 : POOL_ORDER.indexOf(a.poolKey)) -
-          (POOL_ORDER.indexOf(b.poolKey) === -1 ? 99 : POOL_ORDER.indexOf(b.poolKey))
-      );
-    }
-
-    function renderChart({ skipMorph = false } = {}) {
-      const nowMs = Date.now();
-      const locale = getEffectiveLocale();
-
-      patchText(cardTitleText, t('settings.account.trendTitle'));
-      patchText(rangeToEl, t('cons.rangeTo'));
-      patchText(applyCustomLabel, t('cons.applyFilter'));
-      winSwitch.setProps({ modelValue: selectedWin, options: getQuotaWindowOptions() });
-      rangeSwitch.setProps({ modelValue: selectedRange, options: getTimeRangeOptions() });
-      patchAttr(customRangeBar, 'hidden', selectedRange !== 'custom');
-
-      const targetEmail = resolveTargetAccountEmail();
-      const candidateEmails = [];
-      if (latestState.activeEmail) candidateEmails.push(latestState.activeEmail);
-      if (latestState.riskAccepted) {
-        for (const addr of latestState.accounts) {
-          if (addr && !candidateEmails.includes(addr)) candidateEmails.push(addr);
-        }
-      }
-      const showAccountPicker = latestState.riskAccepted && candidateEmails.length > 1;
-      patchAttr(accountSelect.el, 'hidden', !showAccountPicker);
-      if (showAccountPicker) {
-        accountSelect.setProps({
-          modelValue: targetEmail,
-          options: candidateEmails.map((addr) => ({
-            value: addr,
-            label: addr.split('@')[0] || addr,
-            title: addr,
-          })),
-        });
-      }
-
-      const mergedPools = targetEmail ? buildMergedPoolsForEmail(targetEmail, nowMs) : [];
-      if (selectedPool !== 'all' && !mergedPools.some((p) => p.poolKey === selectedPool)) {
-        selectedPool = 'all';
-      }
-      const poolOpts = [
-        {
-          value: 'all',
-          label: t('cons.cyclePoolAll'),
-        },
-        ...mergedPools.map((p) => ({
-          value: p.poolKey,
-          label: p.poolKey === 'Claude & GPT' ? 'Claude/GPT' : p.label,
-          title: p.label,
-        })),
-      ];
-      poolSelect.setProps({ modelValue: selectedPool, options: poolOpts });
-      patchAttr(poolSelect.el, 'hidden', mergedPools.length <= 1);
-
-      const rawBounds = resolveQuotaWindowBounds({
-        pools: mergedPools,
-        selectedRange,
-        selectedWin,
-        selectedPool,
-        customStartMs,
-        customEndMs,
-        nowMs,
-      });
-      const visiblePools =
-        selectedPool === 'all'
-          ? mergedPools
-          : mergedPools.filter((p) => p.poolKey === selectedPool);
-
-      const built = buildQuotaWindowSeries({
-        visiblePools,
-        rawBounds,
-        selectedRange,
-        selectedWin,
-        nowMs,
-      });
-      plottedStartMs = built.plottedStartMs;
-      plottedEndMs = built.plottedEndMs;
-      const spanMs = plottedEndMs - plottedStartMs;
-      patchText(spanBadgeEl, formatDateSpanBadge(plottedStartMs, plottedEndMs));
-
-      const rawBuilt = built.rawBuilt;
-      const hasPlot = rawBuilt.length > 0;
-      patchAttr(chartWrap, 'hidden', !hasPlot);
-      patchAttr(emptyStateEl, 'hidden', hasPlot);
-      if (!hasPlot) {
-        plottedSeries = [];
-        lastPlotSig = '';
-        seriesMorphCtrl.reset();
-        hideHover();
-        patchText(emptyStateEl, t('settings.account.trendEmpty'));
-        return;
-      }
-
-      plottedYScale = built.yScale;
-      yLabels[0].textContent = `${plottedYScale.yMax}%`;
-      yLabels[1].textContent = `${plottedYScale.yMid}%`;
-      yLabels[2].textContent = `${plottedYScale.yMin}%`;
-
-      const plotW = Math.max(20, viewW - LEFT_X - RIGHT_PAD);
-      svg.setAttribute('viewBox', `0 0 ${viewW} ${VIEW_H}`);
-      for (const gl of gridLines) {
-        gl.setAttribute('x2', String(viewW));
-      }
-
-      plottedSeries = rawBuilt.map((rb) => {
-        const fullSvgPts = rb.rawPoints.map((sp) => {
-          const u = Math.max(0, Math.min(1, (sp.ts - plottedStartMs) / spanMs));
-          return {
-            x: LEFT_X + u * plotW,
-            y: valueToSvgY(sp.val),
-            val: sp.val,
-            ts: sp.ts,
-          };
-        });
-        return {
-          ...rb,
-          svgPts: simplifySvgPointsForRender(fullSvgPts, LEFT_X, plotW),
-        };
-      });
-
-      const plotSig =
-        `${locale}|${viewW}|${targetEmail}|${selectedWin}|${selectedRange}|${selectedPool}|${plottedYScale.yMin}-${plottedYScale.yMax}|` +
-        plottedSeries
-          .map(
-            (s) =>
-              `${s.poolKey}:${s.svgPts.length}:${s.svgPts[0]?.x.toFixed(1)}:${s.svgPts[0]?.y.toFixed(1)}:${s.svgPts[s.svgPts.length - 1]?.x.toFixed(1)}:${s.svgPts[s.svgPts.length - 1]?.y.toFixed(1)}`
-          )
-          .join('|');
-
-      if (plotSig !== lastPlotSig) {
-        lastPlotSig = plotSig;
-        const activePoolKeys = new Set();
-        const morphItems = [];
-
-        for (let i = 0; i < plottedSeries.length; i++) {
-          const s = plottedSeries[i];
-          activePoolKeys.add(s.poolKey);
-          let nodes = seriesNodePoolByKey.get(s.poolKey);
-          if (!nodes) {
-            const areaEl = document.createElementNS(SVG_NS, 'path');
-            const lineEl = document.createElementNS(SVG_NS, 'path');
-            lineEl.setAttribute('fill', 'none');
-            lineEl.setAttribute('stroke-width', '1.9');
-            lineEl.setAttribute('stroke-linecap', 'round');
-            const endDotEl = document.createElementNS(SVG_NS, 'circle');
-            endDotEl.setAttribute('r', '2.7');
-            nodes = { areaEl, lineEl, endDotEl };
-            seriesNodePoolByKey.set(s.poolKey, nodes);
-          }
-
-          const lineD = buildHorizontalTangentSpline(s.svgPts);
-          let areaD = '';
-          if (s.svgPts.length >= 2) {
-            const first = s.svgPts[0];
-            const last = s.svgPts[s.svgPts.length - 1];
-            areaD = `${lineD} L ${last.x.toFixed(1)} ${BOTTOM_Y} L ${first.x.toFixed(1)} ${BOTTOM_Y} Z`;
-            if (plottedSeries.length === 1) {
-              stopTop.setAttribute('stop-color', s.color);
-              stopBot.setAttribute('stop-color', s.color);
-              nodes.areaEl.removeAttribute('class');
-              nodes.areaEl.style.removeProperty('--sstep-series-color');
-              nodes.areaEl.setAttribute('fill', `url(#${gradId})`);
-            } else {
-              nodes.areaEl.removeAttribute('fill');
-              nodes.areaEl.setAttribute('class', 'sstep-multi-area');
-              nodes.areaEl.style.setProperty('--sstep-series-color', s.color);
-            }
-            nodes.areaEl.removeAttribute('hidden');
-          } else {
-            nodes.areaEl.setAttribute('d', '');
-            nodes.areaEl.setAttribute('hidden', '');
-          }
-
-          nodes.lineEl.setAttribute('stroke', s.color);
-          nodes.endDotEl.setAttribute('fill', s.color);
-
-          seriesGroup.appendChild(nodes.areaEl);
-          seriesGroup.appendChild(nodes.lineEl);
-          seriesGroup.appendChild(nodes.endDotEl);
-
-          const endPt = s.svgPts[s.svgPts.length - 1];
-          morphItems.push({
-            key: s.poolKey,
-            nextSegs: pointsToNormalizedCubicSegs(s.svgPts, BOTTOM_Y, {
-              leftX: LEFT_X,
-              spanX: plotW,
-              tension: 0.38,
-            }),
-            lineEl: nodes.lineEl,
-            areaEl: areaD ? nodes.areaEl : null,
-            endDotEl: nodes.endDotEl,
-            endX: endPt.x,
-            endY: endPt.y,
-            finalLineD: lineD,
-            finalAreaD: areaD,
-          });
-        }
-
-        for (const [k, nodes] of seriesNodePoolByKey.entries()) {
-          if (!activePoolKeys.has(k)) {
-            nodes.areaEl.remove();
-            nodes.lineEl.remove();
-            nodes.endDotEl.remove();
-          }
-        }
-
-        seriesMorphCtrl.morphSeries({
-          items: morphItems,
-          leftX: LEFT_X,
-          spanX: plotW,
-          bottomY: BOTTOM_Y,
-          skipMorph,
-        });
-      }
-
-      // Edge-to-edge X-axis ticks (`0% .. 100%`) with active hover highlight & click-to-inspect
-      const tickCount = 5;
-      const activeTickIdx =
-        hoveredSlotIdx >= 0 ? Math.round((hoveredSlotIdx / HOVER_SLOT_COUNT) * (tickCount - 1)) : -1;
-      const ticks = [];
-      for (let k = 0; k < tickCount; k++) {
-        const ratio = k / (tickCount - 1);
-        const tickMs = Math.round(plottedStartMs + ratio * spanMs);
-        const leftPct = ratio * 100;
-        ticks.push({
-          idx: k,
-          slotIdx: Math.round(ratio * HOVER_SLOT_COUNT),
-          leftPct,
-          label: formatAxisTickTime(tickMs, spanMs),
-          fullTitle: formatHoverTimestamp(tickMs),
-          edge: k === 0 ? 'start' : k === tickCount - 1 ? 'end' : '',
-          isHovered: k === activeTickIdx,
-        });
-      }
-      xTickElements = [];
-      lastHoveredTickIdx = activeTickIdx;
-      patchKeyedList(xAxisEl, ticks, {
-        keyFn: (tk) => tk.idx,
-        sigFn: (tk) => `${tk.leftPct.toFixed(1)}:${tk.label}:${tk.edge}:${tk.isHovered}`,
-        createRow: () => {
-          const el = h('span', { className: 'trend-x-tick text-mono' });
-          return { el, refs: { el } };
-        },
-        updateRow: (r, tk) => {
-          patchText(r.el, tk.label);
-          patchAttr(r.el, 'title', tk.fullTitle);
-          patchStyleVar(r.el, '--tick-x', `${tk.leftPct.toFixed(2)}%`);
-          patchClasses(r.el, {
-            'is-start': tk.edge === 'start',
-            'is-end': tk.edge === 'end',
-            'is-hovered': tk.isHovered,
-          });
-          r.el.onclick = () => {
-            lastPointer = null;
-            showHoverAtSlot(tk.slotIdx, null, { forceRefresh: true });
-          };
-          xTickElements[tk.idx] = r.el;
-        },
-      });
-
-      patchKeyedList(legendRowEl, plottedSeries, {
-        keyFn: (s) => s.poolKey,
-        sigFn: (s) => `${s.label}:${s.latestVal.toFixed(1)}:${s.color}`,
-        createRow: () => {
-          const sw = h('span', { className: 'dot-swatch' });
-          const nm = h('span', { className: 'account-trend-leg-name' });
-          const vl = h('strong', { className: 'text-mono' });
-          const el = h('span', { className: 'account-trend-leg-item' }, [sw, nm, vl]);
-          return { el, refs: { sw, nm, vl } };
-        },
-        updateRow: (r, s) => {
-          r.sw.style.background = s.color;
-          patchText(r.nm, s.label);
-          patchText(r.vl, `${+s.latestVal.toFixed(1)}%`);
-        },
-      });
-
-      if (hoveredSlotIdx >= 0) {
-        showHoverAtSlot(hoveredSlotIdx, lastPointer, { forceRefresh: true });
-      }
-    }
-
-    let resizeObs = null;
-    if (typeof ResizeObserver === 'function') {
-      resizeObs = new ResizeObserver((entries) => {
-        cachedSvgRect = null;
-        tooltipCtrl.invalidateRects();
-        const w = Math.floor(Number(entries?.[0]?.contentRect?.width || 0));
-        if (w >= 180 && Math.abs(w - viewW) >= 2) {
-          viewW = w;
-          renderChart({ skipMorph: true });
-        }
-      });
-      resizeObs.observe(plotStage);
-    }
-
-    onCleanup(() => {
-      seriesMorphCtrl.cancel();
-      tooltipCtrl.destroy();
-      resizeObs?.disconnect();
-      accountSelect.destroy();
-      poolSelect.destroy();
-      winSwitch.destroy();
-      rangeSwitch.destroy();
-      startPicker.destroy();
-      endPicker.destroy();
-    });
-
-    function update(nextState) {
-      latestState = { ...latestState, ...nextState };
-      renderChart();
-    }
-
-    renderChart();
-    return {
-      el: rootEl,
-      refs: { update, refreshLabels: () => renderChart() },
-    };
-  },
-});
-return { resolveQuotaWindowBounds, buildQuotaWindowSeries, AccountQuotaTrendCard };
 })();
 
 // --- src/components/widgets/LiveActivityWidget.js ---
@@ -24724,14 +19126,6 @@ const OVERVIEW_WIDGET_REGISTRY = Object.freeze({
         setCtxAgentId,
       }),
   },
-  quotas: {
-    key: 'quotas',
-    labelKey: 'module.quotas',
-    create: ({ mode }) =>
-      QuotaPoolsWidget({
-        compactHover: mode === 'hover',
-      }),
-  },
   live_tasks: {
     key: 'live_tasks',
     labelKey: 'module.live_tasks',
@@ -25096,13 +19490,8 @@ const STEP_COLUMN_REGISTRY = Object.freeze({
         className: 'cell-value tone-muted',
         style: 'font-size: var(--fs-base-sm);',
       });
-      const wrapEl = h(
-        'span',
-        { style: 'display: inline-block; vertical-align: middle;' },
-        [speedMain]
-      );
-      const td = h('td', {}, [wrapEl]);
-      return { td, refs: { wrapEl, speedMain, speedReason: null } };
+      const td = h('td', {}, [speedMain]);
+      return { td, refs: { td, speedMain } };
     },
     updateCell: (refs, st, ctx) => {
       patchText(refs.speedMain, formatSpeedMetric(st.tokPerSec, ' tok/s'));
@@ -25116,17 +19505,7 @@ const STEP_COLUMN_REGISTRY = Object.freeze({
             : 'tone-muted';
       patchAttr(refs.speedMain, 'class', toneCls ? `cell-value ${toneCls}` : 'cell-value');
       const reason = speedReasonText(st.selectedSpeedReason);
-      if (reason && !refs.speedReason) {
-        refs.speedReason = h('div', {
-          className: 'text-muted',
-          style: 'font-size: var(--fs-xs);',
-        });
-        refs.wrapEl.appendChild(refs.speedReason);
-      }
-      if (refs.speedReason) {
-        patchText(refs.speedReason, reason);
-        patchAttr(refs.speedReason, 'hidden', !reason);
-      }
+      patchAttr(refs.td, 'title', reason || null);
     },
   },
 
@@ -26090,6 +20469,20 @@ const SIZER_ROW_KEY = '__vsizer__';
 const SPACER_TOP_KEY = '__vspacer_top__';
 const SPACER_BOTTOM_KEY = '__vspacer_bottom__';
 
+const RIGHT_ALIGNED_STEP_COLS = new Set([
+  'tps',
+  'ttft',
+  'cache',
+  'cost',
+  'context',
+  'tokens_in',
+  'tokens_out',
+  'cache_tokens',
+  'tokens_combo',
+  'tokens_io_cache',
+  'tokens_custom',
+]);
+
 function estProportionalTextWidth(text) {
   const s = String(text || '');
   let w = 0;
@@ -26509,7 +20902,9 @@ const StepTableWidget = defineComponent({
           patchClasses(refs.th, {
             'is-sortable': sortable,
             'is-sorted': isSorted,
+            'is-right': RIGHT_ALIGNED_STEP_COLS.has(colKey),
           });
+          patchAttr(refs.th, 'data-col', colKey);
           patchAttr(
             refs.th,
             'aria-sort',
@@ -27338,6 +21733,8 @@ const StepTableWidget = defineComponent({
                 let entry = refs.cellMap.get(colKey);
                 if (!entry) {
                   const created = STEP_COLUMN_REGISTRY[colKey].createCell();
+                  patchAttr(created.td, 'data-col', colKey);
+                  patchClasses(created.td, { 'is-right': RIGHT_ALIGNED_STEP_COLS.has(colKey) });
                   const innerEl = h('div', { className: 'step-vsizer-inner' });
                   while (created.td.firstChild) {
                     innerEl.appendChild(created.td.firstChild);
@@ -27418,6 +21815,8 @@ const StepTableWidget = defineComponent({
               let cell = refs.cellMap.get(colKey);
               if (!cell) {
                 cell = STEP_COLUMN_REGISTRY[colKey].createCell();
+                patchAttr(cell.td, 'data-col', colKey);
+                patchClasses(cell.td, { 'is-right': RIGHT_ALIGNED_STEP_COLS.has(colKey) });
                 refs.cellMap.set(colKey, cell);
               }
               if (isNewRow) {
@@ -27941,92 +22340,11 @@ return { formatTurnPromptText, StepTableWidget };
 })();
 
 // --- src/components/widgets/ConsumptionBreakdownRows.js ---
-const { partitionModelSegments, createBreakdownItemRow, updateBreakdownItemRow, createConsumptionBreakdownRowBuilders } = (() => {
+const { partitionModelSegments } = (() => {
 /**
- * @fileoverview Reusable model, client-source, workspace, and top-conversation breakdown
- * row builders (`ConsumptionBreakdownRows.js`) extracted from `ConsumptionView.js`.
- * Consolidates shared long-tail model partitioning, hover-popover event binding, and top-model pill rendering.
+ * @fileoverview Long-tail model segment partitioner for ConsumptionView (`ConsumptionBreakdownRows.js`).
  */
 
-
-function createSourceModelSegment() {
-  const segEl = h('div', { className: 'progress-seg cons-model-seg' });
-  return { el: segEl, refs: { segEl } };
-}
-
-function createSourceTopModelItem() {
-  const dotEl = h('span', { className: 'dot-swatch cons-model-dot cons-source-top-dot' });
-  const nameEl = h('span', { className: 'cons-source-top-name' });
-  const pctEl = h('strong', { className: 'cons-source-top-pct text-mono' });
-  const itemEl = h('span', { className: 'cons-source-top-item' }, [dotEl, nameEl, pctEl]);
-  return { el: itemEl, refs: { itemEl, dotEl, nameEl, pctEl } };
-}
-
-function formatCompactSourceSharePct(pct) {
-  const num = Number(pct || 0);
-  if (!Number.isFinite(num) || num <= 0) return '0%';
-  if (num >= 10) return `${Math.round(num)}%`;
-  return `${num.toFixed(1)}%`;
-}
-
-function renderSegmentedModelBarAndTopPills(
-  trackEl,
-  topModelsEl,
-  partitioned,
-  scaleRatio,
-  fallbackKey
-) {
-  const barItems =
-    partitioned.length > 0
-      ? partitioned.map((seg) => ({
-          key: seg.key,
-          segPct: scaleRatio > 0 ? seg.pct * scaleRatio : 0,
-          color: seg.color,
-        }))
-      : scaleRatio > 0
-        ? [
-            {
-              key: fallbackKey,
-              segPct: scaleRatio * 100,
-              color: 'var(--accent-primary)',
-            },
-          ]
-        : [];
-
-  patchKeyedList(trackEl, barItems, {
-    keyFn: (seg) => seg.key,
-    sigFn: (seg) => `${seg.key}:${seg.segPct.toFixed(2)}:${seg.color}`,
-    createRow: createSourceModelSegment,
-    updateRow: (segRefs, seg) => {
-      patchStyleVar(segRefs.segEl, '--seg-w', `${seg.segPct.toFixed(2)}%`);
-      patchStyleVar(segRefs.segEl, '--seg-color', seg.color);
-    },
-  });
-
-  const topModels = partitioned
-    .filter((seg) => !seg.isOther)
-    .slice(0, 3)
-    .map((seg) => ({
-      key: seg.key,
-      label: seg.label,
-      pctText: formatCompactSourceSharePct(seg.pct),
-      color: seg.color,
-    }));
-  patchAttr(topModelsEl, 'hidden', topModels.length === 0);
-  patchKeyedList(topModelsEl, topModels, {
-    keyFn: (m) => m.key,
-    sigFn: (m) => `${m.key}:${m.label}:${m.pctText}:${m.color}`,
-    createRow: createSourceTopModelItem,
-    updateRow: (mRefs, m) => {
-      patchStyleVar(mRefs.dotEl, '--dot-color', m.color);
-      patchText(mRefs.nameEl, m.label);
-      patchText(mRefs.pctEl, m.pctText);
-      patchAttr(mRefs.itemEl, 'title', `${m.label} (${m.pctText})`);
-    },
-  });
-
-  return topModels;
-}
 
 /**
  * Collapses long-tail model entries into primary segments + an aggregated "Other (N)" tail.
@@ -28126,1812 +22444,7 @@ function partitionModelSegments(
 
   return out;
 }
-
-/**
- * Creates a model ranking row (`tokens` | `cost` | `speed` | `calls` sort modes).
- */
-function createBreakdownItemRow() {
-  const nameTextEl = h('span', { className: 'cons-row-title-text' });
-  const nameEl = h('strong', { className: 'cons-row-title' }, [nameTextEl]);
-  const pctBadge = h('span', { className: 'cons-share-pill text-mono', text: '0%' });
-  const totalTokEl = h('span', { className: 'cons-row-tok text-mono' });
-  const costEl = h('strong', { className: 'cons-row-cost text-mono' });
-  const segBar = createFourSegmentBar();
-
-  const inLbl = h('span', { text: t('cons.footInput') });
-  const cacheLbl = h('span', { text: t('cons.footCache') });
-  const outLbl = h('span', { text: t('cons.footOutput') });
-  const thinkLbl = h('span', { text: t('cons.footThinking') });
-  const callsLbl = h('span', { text: t('cons.footCalls') });
-
-  const inVal = h('strong', { className: 'text-mono' });
-  const cacheVal = h('strong', { className: 'text-mono' });
-  const outVal = h('strong', { className: 'text-mono' });
-  const thinkVal = h('strong', { className: 'text-mono' });
-  const callsVal = h('strong', { className: 'text-mono' });
-  const metricBarFillEl = h('div', { className: 'progress-seg cons-metric-fill' });
-  const metricBarEl = h(
-    'div',
-    { className: 'progress-track cons-seg-bar cons-metric-bar', hidden: true },
-    [metricBarFillEl]
-  );
-  const tokenFootEl = h('div', { className: 'cons-item-foot' }, [
-    h('span', { className: 'legend-left' }, [
-      h('span', { className: 'dot-swatch seg-input' }),
-      inLbl,
-      inVal,
-    ]),
-    h('span', { className: 'legend-left' }, [
-      h('span', { className: 'dot-swatch seg-cached' }),
-      cacheLbl,
-      cacheVal,
-    ]),
-    h('span', { className: 'legend-left' }, [
-      h('span', { className: 'dot-swatch seg-thinking' }),
-      thinkLbl,
-      thinkVal,
-    ]),
-    h('span', { className: 'legend-left' }, [
-      h('span', { className: 'dot-swatch seg-output' }),
-      outLbl,
-      outVal,
-    ]),
-    h('span', { className: 'legend-left' }, [callsLbl, callsVal]),
-  ]);
-  const perfMainEl = h('span', { className: 'cons-model-perf-main text-mono' });
-  const perfUnitCostEl = h('span', { className: 'cons-model-unit-cost text-mono', hidden: true });
-  const perfFootEl = h('div', { className: 'cons-model-perf-foot', hidden: true }, [
-    perfMainEl,
-    perfUnitCostEl,
-  ]);
-  const focusLeftEl = h('span', { className: 'cons-model-focus-left text-mono' });
-  const focusRightEl = h('span', { className: 'cons-model-focus-right text-mono' });
-  const focusFootEl = h(
-    'div',
-    { className: 'cons-item-foot cons-model-focus-foot', hidden: true },
-    [focusLeftEl, focusRightEl]
-  );
-
-  const rowEl = h('div', { className: 'cons-item-row' }, [
-    h('div', { className: 'panel-header' }, [
-      nameEl,
-      h('span', { className: 'cons-row-metrics' }, [pctBadge, totalTokEl, costEl]),
-    ]),
-    segBar.el,
-    metricBarEl,
-    tokenFootEl,
-    perfFootEl,
-    focusFootEl,
-  ]);
-
-  return {
-    el: rowEl,
-    refs: {
-      nameEl,
-      nameTextEl,
-      pctBadge,
-      totalTokEl,
-      costEl,
-      segBar,
-      metricBarEl,
-      metricBarFillEl,
-      tokenFootEl,
-      inLbl,
-      cacheLbl,
-      outLbl,
-      thinkLbl,
-      callsLbl,
-      inVal,
-      cacheVal,
-      outVal,
-      thinkVal,
-      callsVal,
-      perfFootEl,
-      perfMainEl,
-      perfUnitCostEl,
-      focusFootEl,
-      focusLeftEl,
-      focusRightEl,
-    },
-  };
-}
-
-/**
- * Incrementally patches a model ranking row.
- */
-function updateBreakdownItemRow(refs, item, totalsCtx, sortMode = 'tokens') {
-  const displayLabel = item.label || item.name || item.shortName || '—';
-  patchText(refs.nameTextEl, displayLabel);
-  patchAttr(refs.nameEl, 'title', item.title || displayLabel);
-
-  const total = Number(item.totalTokens || 0);
-  const costVal = Number(item.costUsd || 0);
-  const callsCount = Number(item.calls || 0);
-  const isAllUnpriced =
-    callsCount > 0 && Number(item.unpricedCalls || 0) >= callsCount && !(costVal > 0);
-  const costText = formatUsd(isAllUnpriced ? null : costVal, {
-    precise: costVal > 0 && costVal < 0.1,
-  });
-
-  const avgTps =
-    item.avgTokPerSec != null &&
-    Number.isFinite(Number(item.avgTokPerSec)) &&
-    Number(item.avgTokPerSec) > 0
-      ? Number(item.avgTokPerSec)
-      : null;
-  const avgTtft =
-    item.avgTtftSec != null &&
-    Number.isFinite(Number(item.avgTtftSec)) &&
-    Number(item.avgTtftSec) >= 0
-      ? Number(item.avgTtftSec)
-      : null;
-  const hasExplicitCachePct =
-    item.cacheHitPct != null && Number.isFinite(Number(item.cacheHitPct));
-  const promptTok = Number(item.inputTokens || 0) + Number(item.cacheReadTokens || 0);
-  const cachePctVal = hasExplicitCachePct
-    ? Number(item.cacheHitPct)
-    : promptTok > 0 && Number(item.cacheReadTokens || 0) > 0
-      ? +((Number(item.cacheReadTokens || 0) / promptTok) * 100).toFixed(1)
-      : 0;
-  const cachePctStr = formatPctNumber(cachePctVal);
-  const effCostPer1M =
-    !isAllUnpriced && costVal > 0 && total >= 1000 ? costVal / (total / 1_000_000) : null;
-  const outTok = Number(
-    item.outputTokens ?? Number(item.responseTokens || 0) + Number(item.thinkingTokens || 0)
-  );
-
-  if (sortMode === 'cost') {
-    const costBase = Number(totalsCtx?.totalCost || 0);
-    const costShare = costBase > 0 ? +((costVal / costBase) * 100).toFixed(1) : 0;
-    const barPct =
-      costBase > 0 && costVal > 0 ? Math.min(100, Math.max(1, (costVal / costBase) * 100)) : 0;
-    patchAttr(refs.pctBadge, 'hidden', false);
-    patchAttr(refs.pctBadge, 'title', null);
-    patchText(refs.pctBadge, formatPctNumber(costShare, { withSymbol: true }));
-    patchText(refs.totalTokEl, isAllUnpriced ? '' : formatCnyApprox(costVal));
-    patchText(refs.costEl, costText);
-
-    patchAttr(refs.segBar.el, 'hidden', true);
-    patchAttr(refs.metricBarEl, 'hidden', false);
-    patchStyleVar(refs.metricBarFillEl, '--seg-w', `${barPct.toFixed(2)}%`);
-    patchClasses(refs.metricBarFillEl, {
-      'tone-cost': true,
-      'tone-speed': false,
-      'tone-calls': false,
-    });
-
-    patchAttr(refs.tokenFootEl, 'hidden', true);
-    patchAttr(refs.perfFootEl, 'hidden', true);
-    patchAttr(refs.focusFootEl, 'hidden', false);
-    const unitPart =
-      effCostPer1M !== null
-        ? t('cons.modelUnitCost', {
-            cost: formatUsd(effCostPer1M, { precise: effCostPer1M < 0.1 }),
-          })
-        : '';
-    const cachePart = t('cons.topConvCacheMeta', { pct: cachePctStr });
-    patchText(refs.focusLeftEl, unitPart ? `${unitPart} · ${cachePart}` : cachePart);
-    patchText(
-      refs.focusRightEl,
-      `${formatTokensPrecise(total)} · ${t('cons.callsCount', { calls: callsCount })}`
-    );
-    return;
-  }
-
-  if (sortMode === 'speed') {
-    const maxTps = Number(totalsCtx?.maxAvgTps || 0);
-    const speedPct =
-      maxTps > 0 && avgTps !== null ? Math.min(100, Math.max(2, (avgTps / maxTps) * 100)) : 0;
-    patchAttr(refs.pctBadge, 'hidden', avgTps === null);
-    patchAttr(refs.pctBadge, 'title', avgTps !== null ? t('cons.speedRelTip') : null);
-    patchText(refs.pctBadge, avgTps !== null ? `${Math.round(speedPct)}%` : '');
-    patchText(
-      refs.totalTokEl,
-      avgTtft !== null ? t('cons.focusTtft', { ttft: formatMetric(avgTtft, 's') }) : ''
-    );
-    patchText(refs.costEl, formatSpeedMetric(avgTps, ' tok/s'));
-
-    patchAttr(refs.segBar.el, 'hidden', true);
-    patchAttr(refs.metricBarEl, 'hidden', false);
-    patchStyleVar(refs.metricBarFillEl, '--seg-w', `${speedPct.toFixed(2)}%`);
-    patchClasses(refs.metricBarFillEl, {
-      'tone-cost': false,
-      'tone-speed': true,
-      'tone-calls': false,
-    });
-
-    patchAttr(refs.tokenFootEl, 'hidden', true);
-    patchAttr(refs.perfFootEl, 'hidden', true);
-    patchAttr(refs.focusFootEl, 'hidden', false);
-    patchText(
-      refs.focusLeftEl,
-      t('cons.focusSpeedMeta', {
-        ttft: formatMetric(avgTtft, 's'),
-        cache: cachePctStr,
-        out: formatTokensPrecise(outTok),
-      })
-    );
-    patchText(refs.focusRightEl, t('cons.callsCount', { calls: callsCount }));
-    return;
-  }
-
-  if (sortMode === 'calls') {
-    const callsBase = Number(totalsCtx?.totalCalls || 0);
-    const callsShare = callsBase > 0 ? +((callsCount / callsBase) * 100).toFixed(1) : 0;
-    const barPct =
-      callsBase > 0 && callsCount > 0
-        ? Math.min(100, Math.max(1, (callsCount / callsBase) * 100))
-        : 0;
-    patchAttr(refs.pctBadge, 'hidden', false);
-    patchAttr(refs.pctBadge, 'title', null);
-    patchText(refs.pctBadge, formatPctNumber(callsShare, { withSymbol: true }));
-    patchText(refs.totalTokEl, formatTokensPrecise(total));
-    patchText(refs.costEl, t('cons.callsCount', { calls: callsCount }));
-
-    patchAttr(refs.segBar.el, 'hidden', true);
-    patchAttr(refs.metricBarEl, 'hidden', false);
-    patchStyleVar(refs.metricBarFillEl, '--seg-w', `${barPct.toFixed(2)}%`);
-    patchClasses(refs.metricBarFillEl, {
-      'tone-cost': false,
-      'tone-speed': false,
-      'tone-calls': true,
-    });
-
-    patchAttr(refs.tokenFootEl, 'hidden', true);
-    patchAttr(refs.perfFootEl, 'hidden', true);
-    patchAttr(refs.focusFootEl, 'hidden', false);
-    const avgPerCall = callsCount > 0 ? total / callsCount : 0;
-    patchText(
-      refs.focusLeftEl,
-      t('cons.focusCallsMeta', {
-        avgTok: formatTokensPrecise(avgPerCall),
-        cost: costText,
-      })
-    );
-    patchText(refs.focusRightEl, t('cons.topConvCacheMeta', { pct: cachePctStr }));
-    return;
-  }
-
-  patchText(refs.inLbl, t('cons.footInput'));
-  patchText(refs.cacheLbl, t('cons.footCache'));
-  patchText(refs.outLbl, t('cons.footOutput'));
-  patchText(refs.thinkLbl, t('cons.footThinking'));
-  patchText(refs.callsLbl, t('cons.footCalls'));
-  const grandTotalTokens = Number(totalsCtx?.totalTokens || 0);
-  const share = grandTotalTokens > 0 ? +((total / grandTotalTokens) * 100).toFixed(1) : 0;
-  const scaleRatio =
-    grandTotalTokens > 0 && total > 0 ? Math.min(1, Math.max(0.008, total / grandTotalTokens)) : 0;
-  patchAttr(refs.pctBadge, 'hidden', false);
-  patchAttr(refs.pctBadge, 'title', null);
-  patchText(refs.pctBadge, formatPctNumber(share, { withSymbol: true }));
-  patchText(refs.totalTokEl, formatTokensPrecise(total));
-  patchText(refs.costEl, costText);
-
-  const responseTok =
-    item.responseTokens != null
-      ? Number(item.responseTokens)
-      : Math.max(0, Number(item.outputTokens || 0) - Number(item.thinkingTokens || 0));
-  const thinkingTok = Number(item.thinkingTokens || 0);
-
-  patchAttr(refs.segBar.el, 'hidden', false);
-  patchAttr(refs.metricBarEl, 'hidden', true);
-  refs.segBar.update({
-    inputTokens: Number(item.inputTokens || 0),
-    cacheReadTokens: Number(item.cacheReadTokens || 0),
-    responseTokens: responseTok,
-    thinkingTokens: thinkingTok,
-    scaleRatio,
-  });
-
-  patchAttr(refs.tokenFootEl, 'hidden', false);
-  patchAttr(refs.focusFootEl, 'hidden', true);
-  patchText(refs.inVal, formatTokensPrecise(item.inputTokens || 0));
-  patchText(refs.cacheVal, formatTokensPrecise(item.cacheReadTokens || 0));
-  patchText(refs.outVal, formatTokensPrecise(responseTok));
-  patchText(refs.thinkVal, formatTokensPrecise(thinkingTok));
-  patchText(refs.callsVal, String(callsCount));
-
-  const hasPerfMeta = avgTps !== null || avgTtft !== null || effCostPer1M !== null;
-  patchAttr(refs.perfFootEl, 'hidden', !hasPerfMeta);
-  if (hasPerfMeta) {
-    if (avgTps !== null || avgTtft !== null) {
-      patchText(
-        refs.perfMainEl,
-        t('steps.modelPerfFoot', {
-          tps: formatSpeedMetric(avgTps, ' tok/s'),
-          ttft: formatMetric(avgTtft, 's'),
-          cache: cachePctStr,
-        })
-      );
-    } else {
-      patchText(refs.perfMainEl, t('cons.topConvCacheMeta', { pct: cachePctStr }));
-    }
-    patchAttr(refs.perfUnitCostEl, 'hidden', effCostPer1M === null);
-    patchText(
-      refs.perfUnitCostEl,
-      effCostPer1M !== null
-        ? t('cons.modelUnitCost', {
-            cost: formatUsd(effCostPer1M, { precise: effCostPer1M < 0.1 }),
-          })
-        : ''
-    );
-  }
-}
-
-/**
- * Binds shared popover hover callbacks to build source-breakdown and workspace/conversation rows.
- */
-function createConsumptionBreakdownRowBuilders({
-  showPopover,
-  movePopover,
-  hidePopover,
-  isHoveredTarget,
-  onSelectConversation,
-}) {
-  function isNodeInside(root, node) {
-    if (!root || !node) return false;
-    if (typeof root.contains === 'function') return root.contains(node);
-    let cur = node;
-    while (cur) {
-      if (cur === root) return true;
-      cur = cur.parentNode || null;
-    }
-    return false;
-  }
-
-  function attachUnifiedHoverZone(zoneEl, compatTargets, rowState) {
-    zoneEl.addEventListener('mouseenter', (e) => {
-      if (rowState.hoverPayload) {
-        showPopover(zoneEl, rowState.hoverPayload, e?.clientX ?? null, e?.clientY ?? null);
-      }
-    });
-    zoneEl.addEventListener('mousemove', (e) => {
-      if (rowState.hoverPayload && isHoveredTarget(zoneEl)) {
-        movePopover(zoneEl, e?.clientX ?? null, e?.clientY ?? null);
-      }
-    });
-    zoneEl.addEventListener('mouseleave', () => {
-      if (isHoveredTarget(zoneEl)) hidePopover();
-    });
-
-    for (const childEl of compatTargets) {
-      if (!childEl) continue;
-      childEl.addEventListener('mouseenter', (e) => {
-        if (rowState.hoverPayload) {
-          showPopover(zoneEl, rowState.hoverPayload, e?.clientX ?? null, e?.clientY ?? null);
-        }
-      });
-      childEl.addEventListener('mousemove', (e) => {
-        if (rowState.hoverPayload && isHoveredTarget(zoneEl)) {
-          movePopover(zoneEl, e?.clientX ?? null, e?.clientY ?? null);
-        }
-      });
-      childEl.addEventListener('mouseleave', (e) => {
-        const nextEl = e?.relatedTarget || null;
-        if (isNodeInside(zoneEl, nextEl)) {
-          return;
-        }
-        if (isHoveredTarget(zoneEl)) hidePopover();
-      });
-    }
-  }
-
-  function createSourceBreakdownRow() {
-    const nameTextEl = h('span', { className: 'cons-row-title-text' });
-    const nameEl = h('strong', { className: 'cons-row-title' }, [nameTextEl]);
-    const pctBadge = h('span', { className: 'cons-share-pill text-mono', text: '0%' });
-    const totalTokEl = h('span', { className: 'cons-row-tok text-mono' });
-    const costEl = h('strong', { className: 'cons-row-cost text-mono' });
-    const trackEl = h('div', { className: 'progress-track cons-seg-bar cons-source-model-bar' });
-    const rowState = { hoverPayload: null };
-
-    const barHitEl = h('div', { className: 'cons-source-bar-hit' }, [trackEl]);
-    const topModelsEl = h('div', { className: 'cons-source-top-models', hidden: true });
-
-    const callsLbl = h('span', { text: t('cons.footCalls') });
-    const callsVal = h('strong', { className: 'text-mono' });
-
-    const hoverZoneEl = h('div', { className: 'cons-source-hover-zone' }, [
-      barHitEl,
-      h('div', { className: 'cons-item-foot cons-source-foot' }, [
-        topModelsEl,
-        h('span', { className: 'legend-left cons-calls-stat' }, [callsLbl, callsVal]),
-      ]),
-    ]);
-    attachUnifiedHoverZone(hoverZoneEl, [barHitEl, topModelsEl], rowState);
-
-    const rowEl = h('div', { className: 'cons-item-row cons-source-row' }, [
-      h('div', { className: 'panel-header' }, [
-        nameEl,
-        h('span', { className: 'cons-row-metrics' }, [pctBadge, totalTokEl, costEl]),
-      ]),
-      hoverZoneEl,
-    ]);
-
-    return {
-      el: rowEl,
-      refs: {
-        nameEl,
-        nameTextEl,
-        pctBadge,
-        totalTokEl,
-        costEl,
-        hoverZoneEl,
-        barHitEl,
-        trackEl,
-        topModelsEl,
-        callsLbl,
-        callsVal,
-        rowState,
-      },
-    };
-  }
-
-  function updateSourceBreakdownRow(refs, item, grandTotalTokens, modelColorMap) {
-    patchText(refs.callsLbl, t('cons.footCalls'));
-    const displayLabel = item.label || item.name || '—';
-    patchText(refs.nameTextEl, displayLabel);
-    patchAttr(refs.nameEl, 'title', item.title || displayLabel);
-
-    const total = Number(item.totalTokens || 0);
-    const share = grandTotalTokens > 0 ? +((total / grandTotalTokens) * 100).toFixed(1) : 0;
-    const scaleRatio =
-      grandTotalTokens > 0 && total > 0 ? Math.min(1, Math.max(0.01, total / grandTotalTokens)) : 0;
-    patchText(refs.pctBadge, formatPctNumber(share, { withSymbol: true }));
-    patchText(refs.totalTokEl, formatTokensPrecise(total));
-
-    const costVal = Number(item.costUsd || 0);
-    const callsCount = Number(item.calls || 0);
-    const isAllUnpriced =
-      callsCount > 0 && Number(item.unpricedCalls || 0) >= callsCount && !(costVal > 0);
-    const costText = formatUsd(isAllUnpriced ? null : costVal, {
-      precise: costVal > 0 && costVal < 0.1,
-    });
-    patchText(refs.costEl, costText);
-    patchText(refs.callsVal, String(callsCount));
-
-    const sourceModels = Array.isArray(item.mergedModels) ? item.mergedModels : [];
-    const partitioned = partitionModelSegments(sourceModels, modelColorMap, {
-      maxMain: 5,
-      minSharePct: 1.5,
-    });
-
-    renderSegmentedModelBarAndTopPills(
-      refs.trackEl,
-      refs.topModelsEl,
-      partitioned,
-      total > 0 ? scaleRatio : 0,
-      '__source_fallback__'
-    );
-
-    refs.rowState.hoverPayload =
-      total > 0 || callsCount > 0
-        ? {
-            title: displayLabel,
-            calls: callsCount,
-            totalTokens: total,
-            costText,
-            inputTokens: item.inputTokens,
-            cacheReadTokens: item.cacheReadTokens,
-            thinkingTokens: item.thinkingTokens,
-            responseTokens: item.responseTokens,
-            outputTokens: item.outputTokens,
-            segments: partitioned,
-          }
-        : null;
-    patchClasses(refs.hoverZoneEl, { 'is-interactive': Boolean(refs.rowState.hoverPayload) });
-  }
-
-  function createTopConversationRow() {
-    const titleTextEl = h('span', { className: 'cons-row-title-text' });
-    const wsBadgeEl = h('span', { className: 'cons-ws-sessions-tag text-mono', hidden: true });
-    const titleEl = h('strong', { className: 'cons-row-title cons-top-conv-title' }, [
-      titleTextEl,
-      wsBadgeEl,
-    ]);
-    const pctBadge = h('span', { className: 'cons-share-pill text-mono', text: '0%' });
-    const totalTokEl = h('span', { className: 'cons-row-tok text-mono' });
-    const costEl = h('strong', { className: 'cons-row-cost text-mono' });
-    const trackEl = h('div', { className: 'progress-track cons-seg-bar cons-source-model-bar' });
-    const rowState = { cascadeId: '', canJump: false, hoverPayload: null };
-
-    const barHitEl = h('div', { className: 'cons-source-bar-hit' }, [trackEl]);
-    const topModelsEl = h('div', { className: 'cons-source-top-models', hidden: true });
-
-    const fallbackMetaEl = h('span', { className: 'cons-top-conv-meta', hidden: true });
-    const callsLbl = h('span', { text: t('cons.footCalls') });
-    const callsVal = h('strong', { className: 'text-mono' });
-
-    const hoverZoneEl = h('div', { className: 'cons-source-hover-zone' }, [
-      barHitEl,
-      h('div', { className: 'cons-item-foot cons-source-foot' }, [
-        topModelsEl,
-        fallbackMetaEl,
-        h('span', { className: 'legend-left cons-calls-stat' }, [callsLbl, callsVal]),
-      ]),
-    ]);
-    attachUnifiedHoverZone(hoverZoneEl, [barHitEl, topModelsEl], rowState);
-
-    const rowEl = h(
-      'div',
-      {
-        className: 'cons-top-conv-row',
-        onClick: () => {
-          if (!rowState.canJump || !rowState.cascadeId) return;
-          hidePopover();
-          onSelectConversation?.(rowState.cascadeId);
-        },
-      },
-      [
-        h('div', { className: 'panel-header' }, [
-          titleEl,
-          h('span', { className: 'cons-row-metrics' }, [pctBadge, totalTokEl, costEl]),
-        ]),
-        hoverZoneEl,
-      ]
-    );
-
-    return {
-      el: rowEl,
-      refs: {
-        rowEl,
-        titleEl,
-        titleTextEl,
-        wsBadgeEl,
-        pctBadge,
-        totalTokEl,
-        costEl,
-        hoverZoneEl,
-        barHitEl,
-        trackEl,
-        topModelsEl,
-        fallbackMetaEl,
-        callsLbl,
-        callsVal,
-        rowState,
-      },
-    };
-  }
-
-  function updateTopConversationRow(refs, item, bases, modelColorMap, sortMode = 'cost') {
-    patchText(refs.callsLbl, t('cons.footCalls'));
-    const isWorkspaceRow = Boolean(item.isWorkspaceRow);
-    const title = isWorkspaceRow
-      ? item.isUnbound
-        ? t('cons.workspaceUnbound')
-        : String(item.label || item.workspacePath || '—').trim()
-      : String(item.title || item.cascadeId || '—').trim();
-    refs.rowState.cascadeId = isWorkspaceRow ? '' : String(item.cascadeId || '');
-    refs.rowState.canJump =
-      !isWorkspaceRow && item.canJump !== false && Boolean(refs.rowState.cascadeId);
-    patchClasses(refs.rowEl, {
-      'is-jumpable': refs.rowState.canJump,
-      'cons-workspace-row': isWorkspaceRow,
-    });
-    const baseTip =
-      isWorkspaceRow && item.workspacePath && item.workspacePath !== title
-        ? `${title} (${item.workspacePath})`
-        : title;
-    patchAttr(
-      refs.rowEl,
-      'title',
-      refs.rowState.canJump ? `${baseTip} — ${t('cons.topConvJumpTip')}` : baseTip
-    );
-    patchText(refs.titleTextEl, title);
-    if (refs.wsBadgeEl) {
-      const showWsBadge = isWorkspaceRow && Number(item.sessionCount || 0) > 0;
-      patchAttr(refs.wsBadgeEl, 'hidden', !showWsBadge);
-      if (showWsBadge) {
-        patchText(refs.wsBadgeEl, t('cons.workspaceSessions', { count: item.sessionCount }));
-      }
-    }
-
-    const total = Number(item.totalTokens || 0);
-    const costVal = Number(item.costUsd || 0);
-    const callsCount = Number(item.calls || 0);
-    const isAllUnpriced =
-      callsCount > 0 && Number(item.unpricedCalls || 0) >= callsCount && !(costVal > 0);
-    const costText = formatUsd(isAllUnpriced ? null : costVal, {
-      precise: costVal > 0 && costVal < 0.1,
-    });
-
-    const tokBase = Number(bases?.tokens || 0);
-    const costBase = Number(bases?.cost || 0);
-    const useCostBasis = sortMode === 'cost' && costBase > 0;
-    const share = useCostBasis
-      ? +((costVal / costBase) * 100).toFixed(1)
-      : tokBase > 0
-        ? +((total / tokBase) * 100).toFixed(1)
-        : 0;
-    const scaleRatio = useCostBasis
-      ? costVal > 0
-        ? Math.min(1, Math.max(0.01, costVal / costBase))
-        : 0
-      : tokBase > 0 && total > 0
-        ? Math.min(1, Math.max(0.01, total / tokBase))
-        : 0;
-
-    patchText(refs.pctBadge, formatPctNumber(share, { withSymbol: true }));
-    if (sortMode === 'tokens') {
-      patchText(refs.totalTokEl, costText);
-      patchText(refs.costEl, formatTokensPrecise(total));
-    } else {
-      patchText(refs.totalTokEl, formatTokensPrecise(total));
-      patchText(refs.costEl, costText);
-    }
-    patchText(refs.callsVal, String(callsCount));
-
-    const convModels = Array.isArray(item.mergedModels) ? item.mergedModels : [];
-    const partitioned = partitionModelSegments(convModels, modelColorMap, {
-      maxMain: 5,
-      minSharePct: 1.5,
-    });
-    const topModels = renderSegmentedModelBarAndTopPills(
-      refs.trackEl,
-      refs.topModelsEl,
-      partitioned,
-      scaleRatio,
-      '__conv_fallback__'
-    );
-
-    const showFallbackMeta = topModels.length === 0;
-    patchAttr(refs.fallbackMetaEl, 'hidden', !showFallbackMeta);
-    if (showFallbackMeta) {
-      const srcLabel = item.sourceName || item.appSource || '';
-      const cacheLabel = t('cons.topConvCacheMeta', {
-        pct: formatPctNumber(item.cacheHitPct ?? 0),
-      });
-      patchText(refs.fallbackMetaEl, srcLabel ? `${srcLabel} · ${cacheLabel}` : cacheLabel);
-    }
-
-    refs.rowState.hoverPayload =
-      partitioned.length > 0 && (total > 0 || callsCount > 0)
-        ? {
-            title,
-            calls: callsCount,
-            totalTokens: total,
-            costText,
-            inputTokens: item.inputTokens,
-            cacheReadTokens: item.cacheReadTokens,
-            thinkingTokens: item.thinkingTokens,
-            responseTokens: item.responseTokens,
-            outputTokens: item.outputTokens,
-            segments: partitioned,
-          }
-        : null;
-    patchClasses(refs.hoverZoneEl, { 'is-interactive': Boolean(refs.rowState.hoverPayload) });
-  }
-
-  return {
-    createSourceBreakdownRow,
-    updateSourceBreakdownRow,
-    createTopConversationRow,
-    updateTopConversationRow,
-  };
-}
-return { partitionModelSegments, createBreakdownItemRow, updateBreakdownItemRow, createConsumptionBreakdownRowBuilders };
-})();
-
-// --- src/components/settings/structurePreviewMock.js ---
-const { buildStructurePreviewTelemetry } = (() => {
-/**
- * @fileoverview Realistic Simulated Telemetry Builder (`structurePreviewMock.js`)
- * for `SettingsStructureTab` real-UI live previews.
- * Exercises all 13 capsule metrics, 8 overview metrics, 10 context channels + subagents,
- * multi-pool quotas, live running task + subagent, and 12 step table columns.
- */
-
-
-function buildStructurePreviewTelemetry(
-  baseSettings = {},
-  draftOverrides = {},
-  { includeArgonPool = false } = {}
-) {
-  const anchorMinMs = Math.floor(Date.now() / 60000) * 60000;
-  const reset5hIso = new Date(anchorMinMs + (2 * 60 + 42) * 60000).toISOString();
-  const resetWkIso = new Date(anchorMinMs + (4 * 24 * 60 + 180) * 60000).toISOString();
-  const resetClaude5hIso = new Date(anchorMinMs + (1 * 60 + 18) * 60000).toISOString();
-
-  const mergedSettings = {
-    ...(baseSettings && typeof baseSettings === 'object' ? baseSettings : {}),
-    ...draftOverrides,
-  };
-
-  const sessionTitle = t('settings.mock.sessionTitle');
-  const subRole = t('settings.mock.subRole');
-  const promptLatest = t('settings.mock.turnPromptLatest');
-  const promptPrev = t('settings.mock.turnPromptPrev');
-
-  const mainContext = {
-    totalTokens: 142800,
-    limitTokens: 256000,
-    compactionLimitTokens: 256000,
-    compactionUsedTokens: 142800,
-    usedPct: 55.8,
-    messagesTokens: 119660,
-    toolResultsTokens: 86400,
-    assistantTokens: 24200,
-    systemToolsTokens: 11800,
-    checkpointTokens: 7600,
-    systemPromptTokens: 5800,
-    skillsTokens: 3100,
-    userRulesTokens: 1900,
-    userInputTokens: 1120,
-    mcpToolsTokens: 540,
-    subagentTokens: 340,
-  };
-
-  const subContext = {
-    totalTokens: 72704,
-    limitTokens: 256000,
-    compactionLimitTokens: 256000,
-    compactionUsedTokens: 72704,
-    usedPct: 28.4,
-    messagesTokens: 63704,
-    toolResultsTokens: 51200,
-    assistantTokens: 11400,
-    systemToolsTokens: 5600,
-    systemPromptTokens: 3400,
-    userInputTokens: 1104,
-    checkpointTokens: 0,
-    skillsTokens: 0,
-    userRulesTokens: 0,
-    mcpToolsTokens: 0,
-    subagentTokens: 0,
-  };
-
-  const mockSteps = [
-    {
-      stepIndex: 24,
-      agentCascadeId: 'mock-main',
-      agentId: 'main',
-      agentIndex: 0,
-      isSubagent: false,
-      agentBadge: '主',
-      agentLabel: t('fmt.mainAgent'),
-      modelLabel: 'Gemini 4 Carbon (High)',
-      modelShort: 'carbon-4-high',
-      rawModel: 'MODEL_PLACEHOLDER_M37',
-      modelUpstream: 'gemini-4-carbon-high',
-      upstreamModel: 'gemini-4-carbon-high',
-      tokPerSec: 68.4,
-      ttftSec: 1.15,
-      totalDurationSec: 12.6,
-      streamDurationSec: 11.45,
-      contextTokens: 142800,
-      inputTokens: 7800,
-      cacheReadTokens: 133580,
-      outputTokens: 1420,
-      thinkingTokens: 860,
-      responseTokens: 560,
-      cacheHitPct: 94.5,
-      costUsd: 0.042,
-      inCostUsd: 0.0156,
-      cacheCostUsd: 0.0134,
-      outCostUsd: 0.0142,
-      createdAtMs: anchorMinMs - 14_000,
-      turnIndex: 2,
-      rootTurnIndex: 2,
-      isTurnStart: false,
-      isRootTurnStart: false,
-      isLatestTurn: true,
-      isRootLatestTurn: true,
-      turnPrompt: promptLatest,
-      rootTurnPrompt: promptLatest,
-    },
-    {
-      stepIndex: 8,
-      agentCascadeId: 'mock-sub-1',
-      agentId: 'sub-1',
-      agentIndex: 1,
-      isSubagent: true,
-      agentBadge: '子1',
-      agentRole: subRole,
-      agentLabel: subRole,
-      modelLabel: 'Gemini 3.8 Flash',
-      modelShort: 'flash-3.8',
-      rawModel: 'MODEL_PLACEHOLDER_M42',
-      modelUpstream: 'gemini-3.8-flash-n',
-      upstreamModel: 'gemini-3.8-flash-n',
-      tokPerSec: 96.2,
-      ttftSec: 0.68,
-      totalDurationSec: 5.4,
-      streamDurationSec: 4.72,
-      contextTokens: 72704,
-      inputTokens: 8600,
-      cacheReadTokens: 63400,
-      outputTokens: 704,
-      thinkingTokens: 240,
-      responseTokens: 464,
-      cacheHitPct: 88.1,
-      costUsd: 0.009,
-      inCostUsd: 0.0065,
-      cacheCostUsd: 0.0005,
-      outCostUsd: 0.0026,
-      createdAtMs: anchorMinMs - 42_000,
-      turnIndex: 1,
-      rootTurnIndex: 2,
-      isTurnStart: true,
-      isRootTurnStart: false,
-      isLatestTurn: true,
-      isRootLatestTurn: true,
-      turnPrompt: promptLatest,
-      rootTurnPrompt: promptLatest,
-    },
-    {
-      stepIndex: 22,
-      agentCascadeId: 'mock-main',
-      agentId: 'main',
-      agentIndex: 0,
-      isSubagent: false,
-      agentBadge: '主',
-      agentLabel: t('fmt.mainAgent'),
-      isCompactionStep: true,
-      modelLabel: 'Gemini 4 Carbon (High) [自动压缩]',
-      modelShort: 'carbon-4-high·压缩',
-      rawModel: 'MODEL_PLACEHOLDER_M37',
-      modelUpstream: 'gemini-4-carbon-high·压缩',
-      upstreamModel: 'gemini-4-carbon-high',
-      tokPerSec: 46.5,
-      ttftSec: 3.4,
-      totalDurationSec: 15.8,
-      streamDurationSec: 12.4,
-      contextTokens: 128400,
-      inputTokens: 49200,
-      cacheReadTokens: 78100,
-      outputTokens: 1100,
-      thinkingTokens: 720,
-      responseTokens: 380,
-      cacheHitPct: 61.4,
-      costUsd: 0.068,
-      inCostUsd: 0.0492,
-      cacheCostUsd: 0.0078,
-      outCostUsd: 0.011,
-      createdAtMs: anchorMinMs - 88_000,
-      turnIndex: 2,
-      rootTurnIndex: 2,
-      isTurnStart: true,
-      isRootTurnStart: true,
-      isLatestTurn: true,
-      isRootLatestTurn: true,
-      turnPrompt: promptLatest,
-      rootTurnPrompt: promptLatest,
-    },
-    {
-      stepIndex: 19,
-      agentCascadeId: 'mock-main',
-      agentId: 'main',
-      agentIndex: 0,
-      isSubagent: false,
-      agentBadge: '主',
-      agentLabel: t('fmt.mainAgent'),
-      modelKey: 'MODEL_PLACEHOLDER_M667',
-      modelLabel: 'Gemini Pro Orchestrator (Carbon)',
-      modelShort: 'orchestrator-carbon',
-      rawModel: 'MODEL_PLACEHOLDER_M667',
-      modelUpstream: 'gemini-pro-orchestrator',
-      upstreamModel: 'gemini-pro-orchestrator',
-      tokPerSec: 17.8,
-      ttftSec: 19.4,
-      totalDurationSec: 31.2,
-      streamDurationSec: 11.8,
-      contextTokens: 96200,
-      inputTokens: 95400,
-      cacheReadTokens: 0,
-      outputTokens: 800,
-      thinkingTokens: 540,
-      responseTokens: 260,
-      cacheHitPct: 0,
-      costUsd: 0.198,
-      inCostUsd: 0.19,
-      cacheCostUsd: 0,
-      outCostUsd: 0.008,
-      createdAtMs: anchorMinMs - 215_000,
-      turnIndex: 1,
-      rootTurnIndex: 1,
-      isTurnStart: true,
-      isRootTurnStart: true,
-      isLatestTurn: false,
-      isRootLatestTurn: false,
-      turnPrompt: promptPrev,
-      rootTurnPrompt: promptPrev,
-    },
-  ];
-
-  const mainAgent = {
-    agentId: 'main',
-    cascadeId: 'mock-main',
-    isMain: true,
-    index: 0,
-    badgeText: '主',
-    role: t('fmt.mainAgent'),
-    isRunning: true,
-    stepCount: 16,
-    speedSampleCount: 15,
-    speedSummary: { sampleCount: 15, excludedCount: 1 },
-    latestTokPerSec: 68.4,
-    avgTokPerSec: 54.8,
-    latestTtftSec: 1.15,
-    avgTtftSec: 1.62,
-    ttftSummary: { avgSec: 1.62, sampleCount: 15 },
-    latestStepCostUsd: 0.042,
-    sessionCostUsd: 1.16,
-    latestCacheHitPct: 94.5,
-    sessionCacheHitPct: 89.2,
-    latestPromptTokens: 141380,
-    inputTokens: 152400,
-    cacheReadTokens: 1260000,
-    outputTokens: 22100,
-    totalTokens: 1434500,
-    latestModelLabel: 'Gemini 4 Carbon (High)',
-    latestModelShort: 'carbon-4-high',
-    latestRawModel: 'MODEL_PLACEHOLDER_M37',
-    latestUpstreamModel: 'gemini-4-carbon-high',
-    activeModelLabel: 'Gemini 4 Carbon (High)',
-    activeModelShort: 'carbon-4-high',
-    activeModelUpstream: 'gemini-4-carbon-high',
-    sessionUnpricedCalls: 0,
-    modelBreakdown: [
-      {
-        modelKey: 'MODEL_PLACEHOLDER_M37',
-        modelShort: 'carbon-4-high',
-        modelLabel: 'Gemini 4 Carbon (High)',
-        modelUpstream: 'gemini-4-carbon-high',
-        upstreamModel: 'gemini-4-carbon-high',
-        calls: 16,
-        inputTokens: 152400,
-        cacheReadTokens: 1260000,
-        outputTokens: 22100,
-        thinkingTokens: 14200,
-        totalTokens: 1434500,
-        costUsd: 1.16,
-        sharePct: 100,
-      },
-    ],
-    context: mainContext,
-    recentSteps: mockSteps.filter((s) => !s.isSubagent),
-  };
-
-  const subAgent1 = {
-    agentId: 'sub-1',
-    cascadeId: 'mock-sub-1',
-    isMain: false,
-    agentKind: 'subagent',
-    agentOrdinal: 1,
-    index: 1,
-    badgeText: '子1',
-    shortLabel: `${t('fmt.subAgent')} #1`,
-    role: subRole,
-    isRunning: false,
-    stepCount: 8,
-    speedSampleCount: 8,
-    speedSummary: { sampleCount: 8, excludedCount: 0 },
-    latestTokPerSec: 96.2,
-    avgTokPerSec: 88.5,
-    latestTtftSec: 0.68,
-    avgTtftSec: 0.82,
-    ttftSummary: { avgSec: 0.82, sampleCount: 8 },
-    latestStepCostUsd: 0.009,
-    sessionCostUsd: 0.12,
-    latestCacheHitPct: 88.1,
-    sessionCacheHitPct: 86.4,
-    latestPromptTokens: 72000,
-    inputTokens: 34000,
-    cacheReadTokens: 280000,
-    outputTokens: 6300,
-    totalTokens: 320300,
-    latestModelLabel: 'Gemini 3.8 Flash',
-    latestModelShort: 'flash-3.8',
-    latestRawModel: 'MODEL_PLACEHOLDER_M42',
-    latestUpstreamModel: 'gemini-3.8-flash-n',
-    activeModelLabel: 'Gemini 3.8 Flash',
-    activeModelShort: 'flash-3.8',
-    activeModelUpstream: 'gemini-3.8-flash-n',
-    sessionUnpricedCalls: 0,
-    modelBreakdown: [
-      {
-        modelKey: 'MODEL_PLACEHOLDER_M42',
-        modelShort: 'flash-3.8',
-        modelLabel: 'Gemini 3.8 Flash',
-        modelUpstream: 'gemini-3.8-flash-n',
-        upstreamModel: 'gemini-3.8-flash-n',
-        calls: 8,
-        inputTokens: 34000,
-        cacheReadTokens: 280000,
-        outputTokens: 6300,
-        thinkingTokens: 2100,
-        totalTokens: 320300,
-        costUsd: 0.12,
-        sharePct: 100,
-      },
-    ],
-    context: subContext,
-    recentSteps: mockSteps.filter((s) => s.isSubagent),
-  };
-
-  const aggregated = {
-    ...mainAgent,
-    agentId: 'all',
-    isMain: false,
-    agentKind: 'all',
-    agentOrdinal: 0,
-    badgeText: t('header.scopeAllShort'),
-    activeAgentId: 'sub-1',
-    activeAgentKind: 'subagent',
-    activeAgentOrdinal: 1,
-    stepCount: 24,
-    speedSampleCount: 23,
-    speedSummary: { sampleCount: 23, excludedCount: 1 },
-    avgTokPerSec: 59.6,
-    avgTtftSec: 1.38,
-    ttftSummary: { avgSec: 1.38, sampleCount: 23 },
-    sessionCostUsd: 1.28,
-    sessionUnpricedCalls: 0,
-    sessionCacheHitPct: 88.9,
-    inputTokens: 186400,
-    cacheReadTokens: 1540000,
-    outputTokens: 28400,
-    totalTokens: 1754800,
-    activeAgentBadge: '子1',
-    modelBreakdown: [...mainAgent.modelBreakdown, ...subAgent1.modelBreakdown],
-    recentSteps: mockSteps,
-  };
-
-  return {
-    settings: mergedSettings,
-    account: {
-      tierId: 'g1-ultra-lite-tier',
-      tierName: 'Google AI Ultra',
-      tierMultiplier: '5x',
-      planName: '5x',
-      aiCredits: 0,
-    },
-    quotas: {
-      meta: {
-        hasOfficialData: true,
-        isStale: false,
-        refreshFailed: false,
-      },
-      activePool: {
-        family: 'Gemini',
-        poolKey: 'Gemini',
-        poolLabel: 'Gemini',
-        usedPct: 36,
-        remainingPct: 64,
-        resetTime: reset5hIso,
-        weeklyUsedPct: 48,
-        weeklyRemainingPct: 52,
-        weeklyResetTime: resetWkIso,
-      },
-      pools: [
-        {
-          poolKey: 'Gemini',
-          poolLabel: 'Gemini',
-          family: 'Gemini',
-          usedPct: 36,
-          remainingPct: 64,
-          reservedPct: 1.0,
-          reservedLeaseCount: 1,
-          resetTime: reset5hIso,
-          weeklyUsedPct: 48,
-          weeklyRemainingPct: 52,
-          weeklyReservedPct: 0.5,
-          weeklyReservedLeaseCount: 1,
-          weeklyResetTime: resetWkIso,
-          cycle5h: { tokens: 1754800, costUsd: 1.28, calls: 24 },
-          cycleWeekly: { tokens: 14200000, costUsd: 11.4, calls: 186 },
-        },
-        ...(includeArgonPool
-          ? [
-              {
-                poolKey: 'Argon',
-                poolLabel: 'Gemini 4 Argon',
-                family: 'Argon',
-                has5h: false,
-                hasWeekly: true,
-                weeklyUsedPct: 58,
-                weeklyRemainingPct: 42,
-                weeklyResetTime: resetWkIso,
-                cycleWeekly: { tokens: 4200000, costUsd: 6.4, calls: 48 },
-              },
-            ]
-          : []),
-        {
-          poolKey: 'Claude & GPT',
-          poolLabel: 'Claude & GPT',
-          family: 'Claude & GPT',
-          usedPct: 68,
-          remainingPct: 32,
-          resetTime: resetClaude5hIso,
-          weeklyUsedPct: 41,
-          weeklyRemainingPct: 59,
-          weeklyResetTime: resetWkIso,
-          cycle5h: { tokens: 620000, costUsd: 2.15, calls: 11 },
-          cycleWeekly: { tokens: 5800000, costUsd: 18.6, calls: 92 },
-        },
-      ],
-      weekly: {
-        isOfficial: true,
-        usedPct: 48,
-        remainingPct: 52,
-        resetTime: resetWkIso,
-        tokens: 20000000,
-        costUsd: 30.0,
-        calls: 278,
-      },
-    },
-    runningConversations: [
-      {
-        cascadeId: 'mock-preview-conv',
-        title: sessionTitle,
-        isCurrentSelected: true,
-        isMainRunning: true,
-        isRunning: true,
-        subagentCount: 1,
-        runningSubagentCount: 0,
-        latestTokPerSec: 68.4,
-        contextUsedPct: 55.8,
-        mainActivity: {
-          phase: 'generating',
-          label: t('live.generating'),
-          stepProgress: '#24',
-          detail: 'src/auth/tokenRefresh.ts',
-          startedAtMs: Date.now() - 8000,
-          signature: 'mock-preview:24',
-        },
-        subagents: [
-          {
-            cascadeId: 'mock-sub-1',
-            index: 1,
-            badgeText: '子1',
-            shortLabel: `${t('fmt.subAgent')} #1`,
-            role: subRole,
-            isRunning: false,
-            stepCount: 8,
-            lastModifiedMs: anchorMinMs - 42_000,
-            liveActivity: {
-              phase: 'done',
-              label: t('live.done'),
-              detail: '',
-              stepProgress: '',
-              startedAtMs: anchorMinMs - 42_000,
-              signature: 'mock-sub-1:8',
-            },
-          },
-        ],
-      },
-    ],
-    activeConversation: {
-      ...mainAgent,
-      cascadeId: 'mock-preview-conv',
-      title: sessionTitle,
-      hasSubagents: true,
-      agents: [mainAgent, subAgent1],
-      aggregated,
-      recentSteps: mockSteps,
-    },
-  };
-}
-return { buildStructurePreviewTelemetry };
-})();
-
-// --- src/components/settings/CollapsibleSection.js ---
-const { CollapsibleSection } = (() => {
-/**
- * @fileoverview Reusable Section Card (`CollapsibleSection.js`)
- * for `SettingsStructureTab` — supports both accordion mode (`collapsible: true`)
- * and static 3rd-level pane card mode (`collapsible: false`).
- */
-
-
-const CollapsibleSection = defineComponent({
-  name: 'CollapsibleSection',
-  setup({ props, onCleanup }) {
-    const isCollapsible = props.collapsible !== false;
-    let expanded = isCollapsible ? Boolean(props.defaultExpanded) : true;
-    let statusTimer = null;
-
-    const chevronIcon = isCollapsible
-      ? createSvgIcon('chevron-right', {
-          size: 12,
-          className: 'collapsible-chevron',
-        })
-      : null;
-    const sectionIcon = props.icon ? createSvgIcon(props.icon, { size: 13 }) : null;
-    const titleTextEl = h('span', {
-      className: 'collapsible-title-text',
-      text: props.title || '',
-    });
-
-    const triggerChildren = [];
-    if (chevronIcon) triggerChildren.push(chevronIcon);
-    if (sectionIcon) triggerChildren.push(sectionIcon);
-    triggerChildren.push(titleTextEl);
-
-    const triggerBtn = isCollapsible
-      ? h(
-          'button',
-          {
-            type: 'button',
-            className: 'collapsible-trigger',
-            'aria-expanded': expanded ? 'true' : 'false',
-            onClick: () => {
-              setExpanded(!expanded);
-              if (typeof props.onToggle === 'function') {
-                props.onToggle(expanded);
-              }
-            },
-          },
-          triggerChildren
-        )
-      : h('div', { className: 'collapsible-title-static' }, triggerChildren);
-
-    const statusTextEl = h('span', { className: 'collapsible-status', text: '' });
-    const badgeEl = h('span', {
-      className: 'collapsible-badge text-mono',
-      hidden: !props.badgeText,
-      text: props.badgeText || '',
-    });
-
-    const resetBtnText = h('span', { text: props.resetLabel || t('settings.resetBtn') });
-    const resetBtn =
-      typeof props.onReset === 'function'
-        ? h(
-            'button',
-            {
-              type: 'button',
-              className: 'btn-ghost-sm',
-              disabled: props.resetDisabled !== false,
-              onClick: (e) => {
-                e.stopPropagation();
-                props.onReset();
-              },
-            },
-            [resetBtnText]
-          )
-        : null;
-
-    const rightChildren = [statusTextEl, badgeEl];
-    if (resetBtn) rightChildren.push(resetBtn);
-
-    const headerRow = h('div', { className: 'collapsible-header-row' }, [
-      triggerBtn,
-      h('span', { className: 'collapsible-right' }, rightChildren),
-    ]);
-
-    const bodyEl = h(
-      'div',
-      {
-        className: 'collapsible-body',
-        hidden: !expanded,
-      },
-      Array.isArray(props.children) ? props.children : []
-    );
-
-    const sectionEl = h(
-      'section',
-      {
-        className: `panel collapsible-section${expanded ? ' is-expanded' : ''}${isCollapsible ? '' : ' is-static-pane'}`,
-      },
-      [headerRow, bodyEl]
-    );
-
-    function setExpanded(next) {
-      if (!isCollapsible) return;
-      expanded = Boolean(next);
-      patchClasses(sectionEl, { 'is-expanded': expanded });
-      patchAttr(triggerBtn, 'aria-expanded', expanded ? 'true' : 'false');
-      patchAttr(bodyEl, 'hidden', !expanded);
-    }
-
-    function setTitle(text) {
-      patchText(titleTextEl, text || '');
-    }
-
-    function setBadge(text) {
-      patchAttr(badgeEl, 'hidden', !text);
-      patchText(badgeEl, text || '');
-    }
-
-    function setResetLabel(text) {
-      if (resetBtn) {
-        patchText(resetBtnText, text || t('settings.resetBtn'));
-      }
-    }
-
-    function setResetDisabled(disabled) {
-      if (resetBtn) {
-        patchAttr(resetBtn, 'disabled', Boolean(disabled));
-      }
-    }
-
-    function showStatus(text, autoClearMs = 1500) {
-      if (statusTimer) {
-        clearTimeout(statusTimer);
-        statusTimer = null;
-      }
-      patchText(statusTextEl, text || '');
-      if (text && autoClearMs > 0) {
-        statusTimer = setTimeout(() => {
-          statusTimer = null;
-          patchText(statusTextEl, '');
-        }, autoClearMs);
-      }
-    }
-
-    onCleanup(() => {
-      if (statusTimer) {
-        clearTimeout(statusTimer);
-        statusTimer = null;
-      }
-    });
-
-    return {
-      el: sectionEl,
-      refs: {
-        triggerBtn,
-        bodyEl,
-        resetBtn,
-        badgeEl,
-        statusTextEl,
-        setExpanded,
-        setTitle,
-        setBadge,
-        setResetLabel,
-        setResetDisabled,
-        showStatus,
-        isExpanded: () => expanded,
-      },
-    };
-  },
-});
-return { CollapsibleSection };
-})();
-
-// --- src/components/settings/EditableSlotList.js ---
-const { EditableSlotList } = (() => {
-/**
- * @fileoverview Reusable Drag-Sortable & `+` / `-` / `↑` / `↓` Dynamic Slot List (`EditableSlotList.js`).
- * Powers Topbar Capsule Slots (1..5), Hover Popup Modules (0..4),
- * Live Overview Modules (1..4), First-Row Metrics (1..4), and Step Table Columns (2..12).
- * Supports smooth pointer-based drag reordering with live preview callbacks (`onPreview`)
- * and single-commit persistence on drop (`onChange`).
- */
-
-
-function isNodeWithin(target, container) {
-  let cur = target;
-  while (cur) {
-    if (cur === container) return true;
-    cur = cur.parentNode || cur.host || null;
-  }
-  return false;
-}
-
-function areSlotListsEqual(a, b) {
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
-
-const EditableSlotList = defineComponent({
-  name: 'EditableSlotList',
-  setup({ props, onCleanup }) {
-    const minItems = Math.max(0, Number(props.minItems ?? 1));
-    const maxItems = Math.max(minItems, Number(props.maxItems ?? 5));
-    let currentItems = Array.isArray(props.items) ? [...props.items] : [];
-    let currentOptions = Array.isArray(props.options) ? [...props.options] : [];
-    let emptyHintText = String(props.emptyHintText || '');
-    let addBtnTextFn = typeof props.addBtnTextFn === 'function' ? props.addBtnTextFn : null;
-    let activeDrag = null;
-
-    const listEl = h('div', { className: 'editable-slot-list' });
-    const emptyEl = h('div', {
-      className: 'editable-slot-empty',
-      hidden: true,
-      text: emptyHintText,
-    });
-
-    const addBtnLabel = h('span', { text: '' });
-    const addBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'slot-add-btn',
-        onClick: () => {
-          if (currentItems.length >= maxItems) return;
-          const usedSet = new Set(currentItems);
-          const nextOpt = currentOptions.find((opt) => !usedSet.has(opt.value));
-          if (!nextOpt) return;
-          emitChange([...currentItems, nextOpt.value]);
-        },
-      },
-      [createSvgIcon('plus', { size: 11 }), addBtnLabel]
-    );
-
-    const footerEl = h('div', { className: 'editable-slot-footer' }, [addBtn]);
-    const rootEl = h('div', { className: 'editable-slot-wrap' }, [emptyEl, listEl, footerEl]);
-
-    const rowPool = [];
-
-    function emitChange(nextItems) {
-      currentItems = [...nextItems];
-      syncRows();
-      if (typeof props.onPreview === 'function') {
-        props.onPreview([...currentItems]);
-      }
-      if (typeof props.onChange === 'function') {
-        props.onChange([...currentItems]);
-      }
-    }
-
-    function teardownActiveDrag({ revert = false } = {}) {
-      if (!activeDrag) return;
-      const { startItems, hasMoved, cleanupListeners } = activeDrag;
-      activeDrag = null;
-      cleanupListeners();
-      patchClasses(listEl, { 'is-dragging-list': false });
-      for (const r of rowPool) {
-        patchClasses(r.rowEl, { 'is-dragging': false });
-      }
-      if (revert && hasMoved && !areSlotListsEqual(startItems, currentItems)) {
-        currentItems = [...startItems];
-        syncRows();
-        if (typeof props.onPreview === 'function') {
-          props.onPreview([...currentItems]);
-        }
-      }
-    }
-
-    function startPointerDrag(e, initialRowIdx) {
-      if (e && e.button != null && e.button !== 0) return;
-      if (currentItems.length <= 1) return;
-      if (activeDrag) {
-        teardownActiveDrag({ revert: false });
-      }
-
-      const startY = Number(e?.clientY ?? 0);
-      const startItems = [...currentItems];
-      let dragIdx = initialRowIdx;
-      let hasMoved = false;
-
-      const onPointerMove = (ev) => {
-        if (!activeDrag) return;
-        const clientY = Number(ev?.clientY ?? startY);
-        if (!hasMoved) {
-          if (Math.abs(clientY - startY) < 4) return;
-          hasMoved = true;
-          activeDrag.hasMoved = true;
-          for (let k = 0; k < currentItems.length; k += 1) {
-            rowPool[k]?.selectComp?.close?.();
-          }
-          patchClasses(listEl, { 'is-dragging-list': true });
-          if (rowPool[dragIdx]) {
-            patchClasses(rowPool[dragIdx].rowEl, { 'is-dragging': true });
-          }
-        }
-        ev?.preventDefault?.();
-
-        let targetIdx = dragIdx;
-        const count = currentItems.length;
-        for (let i = 0; i < dragIdx; i += 1) {
-          const rect = rowPool[i]?.rowEl?.getBoundingClientRect?.();
-          if (rect && rect.height > 0 && clientY < rect.top + rect.height * 0.5) {
-            targetIdx = i;
-            break;
-          }
-        }
-        if (targetIdx === dragIdx) {
-          for (let i = count - 1; i > dragIdx; i -= 1) {
-            const rect = rowPool[i]?.rowEl?.getBoundingClientRect?.();
-            if (rect && rect.height > 0 && clientY > rect.top + rect.height * 0.5) {
-              targetIdx = i;
-              break;
-            }
-          }
-        }
-
-        if (targetIdx !== dragIdx) {
-          if (rowPool[dragIdx]) {
-            patchClasses(rowPool[dragIdx].rowEl, { 'is-dragging': false });
-          }
-          const next = [...currentItems];
-          const [moved] = next.splice(dragIdx, 1);
-          next.splice(targetIdx, 0, moved);
-          dragIdx = targetIdx;
-          activeDrag.dragIdx = dragIdx;
-          currentItems = next;
-          syncRows();
-          if (rowPool[dragIdx]) {
-            patchClasses(rowPool[dragIdx].rowEl, { 'is-dragging': true });
-          }
-          if (typeof props.onPreview === 'function') {
-            props.onPreview([...currentItems]);
-          }
-        }
-      };
-
-      const onPointerUp = () => {
-        if (!activeDrag) return;
-        const moved = activeDrag.hasMoved;
-        const changed = !areSlotListsEqual(startItems, currentItems);
-        teardownActiveDrag({ revert: false });
-        if (moved && changed) {
-          emitChange([...currentItems]);
-        }
-      };
-
-      const onPointerCancel = () => {
-        teardownActiveDrag({ revert: true });
-      };
-
-      const onKeyDown = (ev) => {
-        if (ev?.key === 'Escape') {
-          teardownActiveDrag({ revert: true });
-        }
-      };
-
-      const docTarget =
-        typeof document !== 'undefined' && typeof document.addEventListener === 'function'
-          ? document
-          : null;
-
-      if (docTarget) {
-        docTarget.addEventListener('pointermove', onPointerMove);
-        docTarget.addEventListener('pointerup', onPointerUp);
-        docTarget.addEventListener('pointercancel', onPointerCancel);
-        docTarget.addEventListener('keydown', onKeyDown);
-      }
-
-      activeDrag = {
-        startItems,
-        dragIdx,
-        hasMoved: false,
-        cleanupListeners: () => {
-          if (docTarget && typeof docTarget.removeEventListener === 'function') {
-            docTarget.removeEventListener('pointermove', onPointerMove);
-            docTarget.removeEventListener('pointerup', onPointerUp);
-            docTarget.removeEventListener('pointercancel', onPointerCancel);
-            docTarget.removeEventListener('keydown', onKeyDown);
-          }
-        },
-      };
-    }
-
-    function createSlotRow() {
-      let rowIndex = 0;
-      const dragHandle = h(
-        'span',
-        {
-          className: 'slot-drag-handle',
-          'aria-hidden': 'true',
-          onPointerdown: (e) => {
-            e.preventDefault?.();
-            e.stopPropagation?.();
-            startPointerDrag(e, rowIndex);
-          },
-        },
-        [createSvgIcon('grip', { size: 12 })]
-      );
-      const indexBadge = h('span', { className: 'slot-index-badge text-mono', text: '1' });
-      const selectComp = CustomSelect({
-        modelValue: '',
-        options: [],
-        onUpdateModelValue: (nextVal) => {
-          if (!nextVal || currentItems[rowIndex] === nextVal) return;
-          if (currentItems.some((v, idx) => idx !== rowIndex && v === nextVal)) return;
-          const next = [...currentItems];
-          next[rowIndex] = nextVal;
-          emitChange(next);
-        },
-      });
-
-      const upBtn = h(
-        'button',
-        {
-          type: 'button',
-          className: 'slot-move-btn',
-          onClick: (e) => {
-            e.stopPropagation();
-            if (rowIndex <= 0) return;
-            const next = [...currentItems];
-            const tmp = next[rowIndex - 1];
-            next[rowIndex - 1] = next[rowIndex];
-            next[rowIndex] = tmp;
-            emitChange(next);
-          },
-        },
-        [createSvgIcon('chevron-up', { size: 12 })]
-      );
-
-      const downBtn = h(
-        'button',
-        {
-          type: 'button',
-          className: 'slot-move-btn',
-          onClick: (e) => {
-            e.stopPropagation();
-            if (rowIndex >= currentItems.length - 1) return;
-            const next = [...currentItems];
-            const tmp = next[rowIndex + 1];
-            next[rowIndex + 1] = next[rowIndex];
-            next[rowIndex] = tmp;
-            emitChange(next);
-          },
-        },
-        [createSvgIcon('chevron-down', { size: 12 })]
-      );
-
-      const removeBtn = h(
-        'button',
-        {
-          type: 'button',
-          className: 'slot-move-btn slot-remove-btn',
-          onClick: (e) => {
-            e.stopPropagation();
-            if (currentItems.length <= minItems) return;
-            const next = currentItems.filter((_, idx) => idx !== rowIndex);
-            emitChange(next);
-          },
-        },
-        [createSvgIcon('minus', { size: 12 })]
-      );
-
-      const orderBtnsEl = h('span', { className: 'slot-order-btns' }, [upBtn, downBtn, removeBtn]);
-
-      const rowEl = h(
-        'div',
-        {
-          className: 'editable-slot-row',
-          onPointerdown: (e) => {
-            if (isNodeWithin(e?.target, selectComp.el) || isNodeWithin(e?.target, orderBtnsEl)) {
-              return;
-            }
-            startPointerDrag(e, rowIndex);
-          },
-        },
-        [dragHandle, indexBadge, selectComp.el, orderBtnsEl]
-      );
-
-      return {
-        rowEl,
-        dragHandle,
-        indexBadge,
-        selectComp,
-        upBtn,
-        downBtn,
-        removeBtn,
-        setIndex(idx) {
-          rowIndex = idx;
-        },
-      };
-    }
-
-    function syncRows() {
-      const count = currentItems.length;
-      patchAttr(emptyEl, 'hidden', count > 0 || !emptyHintText);
-      if (emptyHintText) {
-        patchText(emptyEl, emptyHintText);
-      }
-      patchAttr(listEl, 'hidden', count === 0);
-
-      while (rowPool.length < count) {
-        rowPool.push(createSlotRow());
-      }
-
-      while (listEl.children && listEl.children.length > count) {
-        const tailIdx = listEl.children.length - 1;
-        const tailChild = listEl.children[tailIdx];
-        tailChild?.remove?.();
-      }
-
-      const canDrag = count > 1;
-      const dragTitle = canDrag ? t('settings.slot.dragHint') : '';
-      const canRemove = count > minItems;
-      const removeTitle = canRemove
-        ? t('settings.slot.remove')
-        : t('settings.slot.minReached', { min: minItems });
-
-      for (let i = 0; i < count; i += 1) {
-        const entry = rowPool[i];
-        const itemVal = currentItems[i];
-        entry.setIndex(i);
-        patchAttr(entry.rowEl, 'data-slot-row', String(i));
-        patchText(entry.indexBadge, String(i + 1));
-        patchClasses(entry.dragHandle, { 'is-disabled': !canDrag });
-        patchAttr(entry.dragHandle, 'title', dragTitle || null);
-
-        const otherUsed = new Set(currentItems.filter((_, idx) => idx !== i));
-        const rowOpts = currentOptions.map((opt) => {
-          const isTaken = otherUsed.has(opt.value);
-          return isTaken
-            ? {
-                ...opt,
-                disabled: true,
-                meta: t('settings.slot.alreadyAdded'),
-              }
-            : opt;
-        });
-
-        entry.selectComp.setProps({
-          modelValue: itemVal,
-          options: rowOpts,
-        });
-
-        patchAttr(entry.upBtn, 'disabled', i === 0);
-        patchAttr(entry.upBtn, 'title', t('settings.slot.moveUp'));
-        patchAttr(entry.upBtn, 'aria-label', t('settings.slot.moveUp'));
-
-        patchAttr(entry.downBtn, 'disabled', i === count - 1);
-        patchAttr(entry.downBtn, 'title', t('settings.slot.moveDown'));
-        patchAttr(entry.downBtn, 'aria-label', t('settings.slot.moveDown'));
-
-        patchAttr(entry.removeBtn, 'disabled', !canRemove);
-        patchAttr(entry.removeBtn, 'title', removeTitle);
-        patchAttr(entry.removeBtn, 'aria-label', removeTitle);
-
-        if (!listEl.children || listEl.children[i] !== entry.rowEl) {
-          listEl.appendChild(entry.rowEl);
-        }
-      }
-
-      // Close any hidden pooled selects
-      for (let j = count; j < rowPool.length; j += 1) {
-        rowPool[j].selectComp.close();
-      }
-
-      const usedAll = new Set(currentItems);
-      const hasAvailableOption = currentOptions.some((opt) => !usedAll.has(opt.value));
-      const disableAdd = count >= maxItems || !hasAvailableOption;
-      patchAttr(addBtn, 'disabled', disableAdd);
-      const addLabel = addBtnTextFn
-        ? addBtnTextFn(count, maxItems)
-        : `+ (${count}/${maxItems})`;
-      patchText(addBtnLabel, addLabel);
-    }
-
-    function setProps(next = {}) {
-      if (!activeDrag && Array.isArray(next.items)) {
-        currentItems = [...next.items];
-      }
-      if (Array.isArray(next.options)) {
-        currentOptions = [...next.options];
-      }
-      if (next.emptyHintText !== undefined) {
-        emptyHintText = String(next.emptyHintText || '');
-      }
-      if (typeof next.addBtnTextFn === 'function') {
-        addBtnTextFn = next.addBtnTextFn;
-      }
-      syncRows();
-    }
-
-    syncRows();
-
-    onCleanup(() => {
-      teardownActiveDrag({ revert: false });
-      for (const entry of rowPool) {
-        entry.selectComp.destroy();
-      }
-      rowPool.length = 0;
-    });
-
-    return {
-      el: rootEl,
-      refs: {
-        listEl,
-        addBtn,
-        emptyEl,
-        setProps,
-        getItems: () => [...currentItems],
-        getSelects: () => rowPool.slice(0, currentItems.length).map((r) => r.selectComp),
-      },
-    };
-  },
-});
-return { EditableSlotList };
+return { partitionModelSegments };
 })();
 
 // --- src/components/settings/ThemeColorPicker.js ---
@@ -30316,6024 +22829,6 @@ const BridgeStatusNotice = defineComponent({
   },
 });
 return { BridgeStatusNotice };
-})();
-
-// --- src/components/settings/SessionMigrationCard.js ---
-const { SessionMigrationCard } = (() => {
-/**
- * @fileoverview 跨端会话按需迁移设置卡片 (`SessionMigrationCard.js`)。
- * 仅当本机检测到 ≥2 个 Antigravity 客户端目录时展示，支持自由勾选根会话以完整迁移或克隆副本到目标端。
- */
-
-
-const SMIG_OUTSIDE_PROJECT_ID = 'outside-of-project';
-
-function smigGetClientLabel(clientId) {
-  if (clientId === 'cli') return t('settings.oth.migClientCli');
-  if (clientId === 'ide_legacy') return t('settings.oth.migClientIdeLegacy');
-  return t('settings.oth.migClientDesktop');
-}
-
-function smigGetModeOptions() {
-  return [
-    { value: 'move', label: t('settings.oth.migModeMove') },
-    { value: 'clone', label: t('settings.oth.migModeClone') },
-  ];
-}
-
-function smigFormatAge(epochMs) {
-  const ts = Number(epochMs || 0);
-  if (!Number.isFinite(ts) || ts <= 0) return '';
-  const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  const isEn = isEnglishLocale();
-  if (diffSec < 60) return isEn ? 'just now' : '刚刚';
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return isEn ? `${diffMin}m ago` : `${diffMin}分钟前`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return isEn ? `${diffHr}h ago` : `${diffHr}小时前`;
-  const diffDay = Math.floor(diffHr / 24);
-  return isEn ? `${diffDay}d ago` : `${diffDay}天前`;
-}
-
-const SessionMigrationCard = defineComponent({
-  name: 'SessionMigrationCard',
-  setup({ props, onCleanup }) {
-    const loadCatalogFn =
-      typeof props?.loadCatalog === 'function' ? props.loadCatalog : fetchSessionMigrationCatalog;
-    const runMigrateFn =
-      typeof props?.runMigrate === 'function' ? props.runMigrate : executeSessionMigration;
-
-    let catalog = null;
-    let hasLoadedOnce = false;
-    let isLoading = false;
-    let isMigrating = false;
-    let destroyed = false;
-    let bodyMounted = false;
-    let sourceClient = '';
-    let targetClient = '';
-    let migrationMode = 'move';
-    let targetProjectId = '';
-    let searchQuery = '';
-    const selectedIds = new Set();
-    let lastResult = null;
-    let copiedCmdId = '';
-    let copiedTimer = null;
-
-    let titleEl = null;
-    let descEl = null;
-    let refreshBtnText = null;
-    let refreshBtn = null;
-    let sourceLabelEl = null;
-    let targetLabelEl = null;
-    let modeLabelEl = null;
-    let modeSeg = null;
-    let modeHintEl = null;
-    let projectLabelEl = null;
-    let sourceSelect = null;
-    let targetSelect = null;
-    let projectSelect = null;
-    let projectFieldWrap = null;
-    let searchInput = null;
-    let searchClearBtn = null;
-    let toggleAllBtn = null;
-    let selectedCountEl = null;
-    let listEl = null;
-    let listScrollbar = null;
-    let migrateBtnText = null;
-    let migrateBtn = null;
-    let resultBoxEl = null;
-
-    const rootEl = h('section', { className: 'panel smig-panel', hidden: true });
-
-    function ensureBodyMounted() {
-      if (bodyMounted) return;
-      bodyMounted = true;
-
-      titleEl = h('span', { text: t('settings.oth.migTitle') });
-      descEl = h('p', { className: 'settings-hint-text smig-desc', text: t('settings.oth.migDesc') });
-      refreshBtnText = h('span', { text: t('settings.oth.migRefreshBtn') });
-      refreshBtn = h(
-        'button',
-        {
-          type: 'button',
-          className: 'btn-ghost-sm smig-refresh-btn',
-          onClick: () => {
-            void loadCatalog(true);
-          },
-        },
-        [createSvgIcon('refresh', { size: 12 }), refreshBtnText]
-      );
-
-      sourceLabelEl = h('span', { className: 'form-label', text: t('settings.oth.migSourceLabel') });
-      targetLabelEl = h('span', { className: 'form-label', text: t('settings.oth.migTargetLabel') });
-      modeLabelEl = h('span', { className: 'form-label', text: t('settings.oth.migModeLabel') });
-      modeSeg = SegmentedControl({
-        ariaLabel: t('settings.oth.migModeLabel'),
-        modelValue: migrationMode,
-        options: smigGetModeOptions(),
-        onUpdateModelValue: (val) => {
-          if (!val || val === migrationMode) return;
-          migrationMode = val;
-          lastResult = null;
-          syncModeControls();
-          renderResultBox();
-        },
-      });
-      modeSeg.el.classList?.add('smig-mode-seg');
-      modeHintEl = h('span', {
-        className: 'settings-hint-text smig-mode-hint',
-        text: t('settings.oth.migModeMoveHint'),
-      });
-      projectLabelEl = h('span', { className: 'form-label', text: t('settings.oth.migProjectLabel') });
-
-      sourceSelect = CustomSelect({
-        ariaLabel: t('settings.oth.migSourceLabel'),
-        modelValue: '',
-        options: [],
-        onUpdateModelValue: (val) => {
-          if (!val || val === sourceClient) return;
-          sourceClient = val;
-          selectedIds.clear();
-          lastResult = null;
-          ensureValidTarget();
-          syncControlsAndList();
-        },
-      });
-
-      targetSelect = CustomSelect({
-        ariaLabel: t('settings.oth.migTargetLabel'),
-        modelValue: '',
-        options: [],
-        onUpdateModelValue: (val) => {
-          if (!val || val === targetClient) return;
-          targetClient = val;
-          lastResult = null;
-          syncControlsAndList();
-        },
-      });
-
-      projectSelect = CustomSelect({
-        ariaLabel: t('settings.oth.migProjectLabel'),
-        modelValue: '',
-        options: [],
-        className: 'smig-project-select',
-        onUpdateModelValue: (val) => {
-          targetProjectId = String(val || '');
-        },
-      });
-
-      projectFieldWrap = h('div', { className: 'form-row smig-field' }, [
-        projectLabelEl,
-        projectSelect.el,
-      ]);
-
-      const searchBox = createSearchInput({
-        wrapClassName: 'smig-search-wrap',
-        iconClassName: 'smig-search-icon',
-        inputClassName: 'smig-search-input',
-        clearClassName: 'smig-search-clear',
-        placeholder: t('settings.oth.migSearchPlaceholder'),
-        clearAriaLabel: t('select.clearSearch'),
-        closeIconSize: 10,
-        onInput: (val) => {
-          searchQuery = String(val || '').trim();
-          renderSessionList();
-        },
-        onClear: () => {
-          searchQuery = '';
-          renderSessionList();
-          searchInput.focus?.();
-        },
-      });
-      searchInput = searchBox.inputEl;
-      searchClearBtn = searchBox.clearBtnEl;
-      const searchWrap = searchBox.el;
-
-      toggleAllBtn = h('button', {
-        type: 'button',
-        className: 'btn-ghost-sm smig-toggle-all-btn',
-        text: t('settings.oth.migSelectAll'),
-        onClick: () => {
-          const selectable = getFilteredSessions().filter((s) => !s.isRunning);
-          if (selectable.length === 0) return;
-          const allSelected = selectable.every((s) => selectedIds.has(s.cascadeId));
-          if (allSelected) {
-            for (const s of selectable) selectedIds.delete(s.cascadeId);
-          } else {
-            for (const s of selectable) selectedIds.add(s.cascadeId);
-          }
-          renderSessionList();
-        },
-      });
-
-      selectedCountEl = h('span', { className: 'smig-count-meta', text: '' });
-      listEl = h('div', { className: 'smig-list', role: 'list' });
-      listScrollbar = CustomScrollbar({
-        className: 'smig-scroll-host',
-        contentEl: listEl,
-      });
-
-      migrateBtnText = h('span', {
-        text: t('settings.oth.migActionBtn', { count: 0 }),
-      });
-      migrateBtn = h(
-        'button',
-        {
-          type: 'button',
-          className: 'btn-primary smig-migrate-btn',
-          disabled: true,
-          onClick: () => {
-            void handleMigrate();
-          },
-        },
-        [createSvgIcon('copy', { size: 12 }), migrateBtnText]
-      );
-
-      resultBoxEl = h('div', { className: 'smig-result', hidden: true });
-
-      const children = [
-        h('div', { className: 'panel-header' }, [
-          h('span', { className: 'panel-title' }, [
-            createSvgIcon('layers', { size: 13 }),
-            titleEl,
-          ]),
-          refreshBtn,
-        ]),
-        descEl,
-        h('div', { className: 'smig-direction-grid' }, [
-          h('div', { className: 'form-row smig-field' }, [sourceLabelEl, sourceSelect.el]),
-          h('div', { className: 'form-row smig-field' }, [targetLabelEl, targetSelect.el]),
-        ]),
-        h('div', { className: 'smig-mode-block' }, [
-          h('div', { className: 'settings-inline-row smig-mode-row' }, [
-            modeLabelEl,
-            modeSeg.el,
-          ]),
-          modeHintEl,
-        ]),
-        projectFieldWrap,
-        h('div', { className: 'smig-toolbar' }, [
-          searchWrap,
-          toggleAllBtn,
-          selectedCountEl,
-        ]),
-        listScrollbar.el,
-        h('div', { className: 'smig-footer' }, [migrateBtn]),
-        resultBoxEl,
-      ];
-      for (const child of children) {
-        rootEl.appendChild(child);
-      }
-    }
-
-    function getDetectedClients() {
-      return Array.isArray(catalog?.clients) ? catalog.clients.filter((c) => c.exists) : [];
-    }
-
-    function getTargetClientsFor(srcId) {
-      return getDetectedClients().filter((c) => c.canBeTarget && c.id !== srcId);
-    }
-
-    function ensureValidSelectionDefaults() {
-      const detected = getDetectedClients();
-      if (detected.length < 2) {
-        sourceClient = '';
-        targetClient = '';
-        return;
-      }
-      const validSources = detected.filter((c) => getTargetClientsFor(c.id).length > 0);
-      if (!validSources.some((c) => c.id === sourceClient)) {
-        const cliClient = validSources.find((c) => c.id === 'cli' && c.sessionCount > 0);
-        const firstWithSessions = validSources.find((c) => c.sessionCount > 0);
-        sourceClient = (cliClient || firstWithSessions || validSources[0])?.id || '';
-      }
-      ensureValidTarget();
-
-      const projects = Array.isArray(catalog?.desktopProjects) ? catalog.desktopProjects : [];
-      if (!projects.some((p) => p.projectId === targetProjectId)) {
-        const preferred = projects.find((p) => !p.isOutsideProject) || projects[0];
-        targetProjectId = preferred?.projectId || SMIG_OUTSIDE_PROJECT_ID;
-      }
-    }
-
-    function ensureValidTarget() {
-      const targets = getTargetClientsFor(sourceClient);
-      if (!targets.some((c) => c.id === targetClient)) {
-        const preferDesktop = targets.find((c) => c.id === 'desktop');
-        targetClient = (preferDesktop || targets[0])?.id || '';
-      }
-    }
-
-    function getCurrentSourceSessions() {
-      const list = catalog?.sessionsByClient?.[sourceClient];
-      return Array.isArray(list) ? list : [];
-    }
-
-    function getFilteredSessions() {
-      const all = getCurrentSourceSessions();
-      if (!searchQuery) return all;
-      const needle = searchQuery.toLowerCase();
-      return all.filter((item) => {
-        const haystack = [
-          item.title,
-          item.workspaceName,
-          item.workspacePath,
-          item.cascadeId,
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        return haystack.includes(needle);
-      });
-    }
-
-    function resolveProjectDisplayLabel(projectId) {
-      if (!projectId || projectId === SMIG_OUTSIDE_PROJECT_ID) {
-        return t('settings.oth.migProjectOutside');
-      }
-      const projects = Array.isArray(catalog?.desktopProjects) ? catalog.desktopProjects : [];
-      const found = projects.find((p) => p.projectId === projectId);
-      return found?.name || projectId.slice(0, 8);
-    }
-
-    function syncModeControls() {
-      if (!bodyMounted) return;
-      modeSeg?.setProps({
-        ariaLabel: t('settings.oth.migModeLabel'),
-        modelValue: migrationMode,
-        options: smigGetModeOptions(),
-      });
-      patchText(
-        modeHintEl,
-        migrationMode === 'clone'
-          ? t('settings.oth.migModeCloneHint')
-          : t('settings.oth.migModeMoveHint')
-      );
-    }
-
-    function formatMigrationError(code) {
-      if (code === 'source_locked') return t('settings.oth.migErrLocked');
-      if (code === 'target_already_exists') return t('settings.oth.migErrExists');
-      if (code === 'session_running') return t('settings.oth.migErrRunning');
-      return t('settings.oth.migFailed', { reason: code || 'unknown_error' });
-    }
-
-    function syncControlsAndList() {
-      const visible = Boolean(catalog?.available);
-      patchAttr(rootEl, 'hidden', !visible);
-      if (!visible) {
-        props?.onLayoutChange?.();
-        return;
-      }
-      ensureBodyMounted();
-      syncModeControls();
-
-      const detected = getDetectedClients();
-      const sourceOptions = detected
-        .filter((c) => getTargetClientsFor(c.id).length > 0)
-        .map((c) => ({
-          value: c.id,
-          label: smigGetClientLabel(c.id),
-          meta: String(c.sessionCount),
-        }));
-      const targetOptions = getTargetClientsFor(sourceClient).map((c) => ({
-        value: c.id,
-        label: smigGetClientLabel(c.id),
-      }));
-      const projectOptions = (catalog?.desktopProjects || []).map((p) =>
-        p.isOutsideProject
-          ? { value: p.projectId, label: t('settings.oth.migProjectOutside') }
-          : {
-              value: p.projectId,
-              label: p.name || p.projectId.slice(0, 8),
-              meta: p.workspacePath || '',
-            }
-      );
-
-      sourceSelect.setProps({
-        ariaLabel: t('settings.oth.migSourceLabel'),
-        modelValue: sourceClient,
-        options: sourceOptions,
-      });
-      targetSelect.setProps({
-        ariaLabel: t('settings.oth.migTargetLabel'),
-        modelValue: targetClient,
-        options: targetOptions,
-      });
-      projectSelect.setProps({
-        ariaLabel: t('settings.oth.migProjectLabel'),
-        modelValue: targetProjectId,
-        options: projectOptions,
-      });
-      patchAttr(projectFieldWrap, 'hidden', targetClient !== 'desktop');
-
-      renderSessionList();
-      renderResultBox();
-      props?.onLayoutChange?.();
-    }
-
-    function renderSessionList() {
-      const all = getCurrentSourceSessions();
-      const filtered = getFilteredSessions();
-
-      // 清理已不在当前来源中的选中 ID
-      const validSet = new Set(all.filter((s) => !s.isRunning).map((s) => s.cascadeId));
-      for (const id of [...selectedIds]) {
-        if (!validSet.has(id)) selectedIds.delete(id);
-      }
-
-      const selectableFiltered = filtered.filter((s) => !s.isRunning);
-      const allSelected =
-        selectableFiltered.length > 0 &&
-        selectableFiltered.every((s) => selectedIds.has(s.cascadeId));
-      patchText(
-        toggleAllBtn,
-        allSelected ? t('settings.oth.migClearSel') : t('settings.oth.migSelectAll')
-      );
-      patchAttr(toggleAllBtn, 'disabled', selectableFiltered.length === 0 || isMigrating);
-      patchText(
-        selectedCountEl,
-        t('settings.oth.migSelectedCount', {
-          selected: selectedIds.size,
-          total: filtered.length,
-        })
-      );
-
-      while (listEl.firstChild) {
-        listEl.removeChild(listEl.firstChild);
-      }
-
-      if (all.length === 0) {
-        listEl.appendChild(h('div', { className: 'smig-empty', text: t('settings.oth.migEmpty') }));
-      } else if (filtered.length === 0) {
-        listEl.appendChild(
-          h('div', { className: 'smig-empty', text: t('settings.oth.migNoMatch') })
-        );
-      } else {
-        for (const item of filtered) {
-          const checked = selectedIds.has(item.cascadeId);
-          const disabled = Boolean(item.isRunning || isMigrating);
-          const checkIcon = createSvgIcon('check', { size: 10 });
-          patchAttr(checkIcon, 'hidden', !checked);
-          const checkboxEl = h(
-            'span',
-            {
-              className: `select-checkbox smig-checkbox${checked ? ' is-checked' : ''}`,
-              'aria-hidden': 'true',
-            },
-            [checkIcon]
-          );
-
-          const toggleItem = () => {
-            if (item.isRunning || isMigrating) return;
-            if (selectedIds.has(item.cascadeId)) {
-              selectedIds.delete(item.cascadeId);
-            } else {
-              selectedIds.add(item.cascadeId);
-            }
-            renderSessionList();
-          };
-
-          const metaParts = [t('settings.oth.migStepsUnit', { count: item.stepCount })];
-          const age = smigFormatAge(item.lastModifiedMs);
-          if (age) metaParts.push(age);
-
-          const subChildren = [];
-          if (item.workspacePath || item.workspaceName) {
-            subChildren.push(
-              h('span', {
-                className: 'smig-item-ws',
-                text: item.workspacePath || item.workspaceName,
-                title: item.workspacePath || item.workspaceName,
-              })
-            );
-          }
-          if (item.isRunning) {
-            subChildren.push(
-              h('span', {
-                className: 'smig-item-running',
-                text: t('settings.oth.migRunningTag'),
-              })
-            );
-          }
-
-          const rowEl = h(
-            'button',
-            {
-              type: 'button',
-              role: 'checkbox',
-              'aria-checked': checked ? 'true' : 'false',
-              disabled,
-              className: `smig-item${checked ? ' is-selected' : ''}${item.isRunning ? ' is-running' : ''}`,
-              onClick: toggleItem,
-            },
-            [
-              checkboxEl,
-              h('span', { className: 'smig-item-body' }, [
-                h('span', { className: 'smig-item-top' }, [
-                  h('span', {
-                    className: 'smig-item-title',
-                    text: item.title || item.cascadeId.slice(0, 8),
-                    title: item.title || item.cascadeId,
-                  }),
-                  h('span', { className: 'smig-item-meta', text: metaParts.join(' · ') }),
-                ]),
-                ...(subChildren.length > 0
-                  ? [h('span', { className: 'smig-item-sub' }, subChildren)]
-                  : []),
-              ]),
-            ]
-          );
-          listEl.appendChild(rowEl);
-        }
-      }
-
-      listScrollbar?.refresh?.();
-
-      patchAttr(migrateBtn, 'disabled', isMigrating || selectedIds.size === 0 || !targetClient);
-      patchText(
-        migrateBtnText,
-        isMigrating
-          ? t('settings.oth.migRunningBtn')
-          : t('settings.oth.migActionBtn', { count: selectedIds.size })
-      );
-    }
-
-    function renderResultBox() {
-      if (!lastResult) {
-        patchAttr(resultBoxEl, 'hidden', true);
-        return;
-      }
-      patchAttr(resultBoxEl, 'hidden', false);
-      patchClasses(resultBoxEl, {
-        'is-ok': Boolean(lastResult.ok),
-        'is-err': !lastResult.ok,
-      });
-
-      while (resultBoxEl.firstChild) {
-        resultBoxEl.removeChild(resultBoxEl.firstChild);
-      }
-
-      if (!lastResult.ok) {
-        resultBoxEl.appendChild(
-          h('div', {
-            className: 'smig-result-msg',
-            text: formatMigrationError(lastResult.error),
-          })
-        );
-        return;
-      }
-
-      const partialSuffix =
-        lastResult.failedCount > 0
-          ? t('settings.oth.migPartialWarn', { failed: lastResult.failedCount })
-          : '';
-      const baseMsg =
-        lastResult.targetClient === 'cli'
-          ? t('settings.oth.migDoneCli', { count: lastResult.migratedCount })
-          : t('settings.oth.migDoneDesktop', {
-              count: lastResult.migratedCount,
-              project: resolveProjectDisplayLabel(lastResult.targetProjectId),
-            });
-
-      resultBoxEl.appendChild(
-        h('div', { className: 'smig-result-msg', text: `${baseMsg}${partialSuffix}` })
-      );
-
-      if (lastResult.targetClient === 'desktop' && isWindowOverlayMode()) {
-        resultBoxEl.appendChild(
-          h('div', { className: 'smig-result-actions' }, [
-            h(
-              'button',
-              {
-                type: 'button',
-                className: 'btn-secondary smig-result-btn',
-                onClick: () => {
-                  if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
-                    window.location.reload();
-                  }
-                },
-              },
-              [createSvgIcon('refresh', { size: 11 }), h('span', { text: t('settings.oth.migReloadBtn') })]
-            ),
-          ])
-        );
-      }
-
-      if (lastResult.targetClient === 'cli') {
-        const okItems = (lastResult.results || []).filter((r) => r.ok && r.resumeCommand);
-        if (okItems.length > 0) {
-          const cmdWrap = h('div', { className: 'smig-cmd-list' });
-          for (const item of okItems.slice(0, 6)) {
-            const isCopied = copiedCmdId === item.newCascadeId;
-            const copyBtn = h(
-              'button',
-              {
-                type: 'button',
-                className: 'btn-ghost-sm smig-cmd-copy',
-                text: isCopied ? t('settings.oth.migCopied') : t('settings.oth.migCopyCmd'),
-                onClick: async () => {
-                  const ok = await copyPlainTextToClipboard(item.resumeCommand);
-                  if (!ok || destroyed) return;
-                  copiedCmdId = item.newCascadeId;
-                  renderResultBox();
-                  if (copiedTimer) clearTimeout(copiedTimer);
-                  copiedTimer = setTimeout(() => {
-                    copiedTimer = null;
-                    if (!destroyed && copiedCmdId === item.newCascadeId) {
-                      copiedCmdId = '';
-                      renderResultBox();
-                    }
-                  }, 2000);
-                },
-              }
-            );
-            cmdWrap.appendChild(
-              h('div', { className: 'smig-cmd-row' }, [
-                h('code', { className: 'smig-cmd-code', text: item.resumeCommand }),
-                copyBtn,
-              ])
-            );
-          }
-          resultBoxEl.appendChild(cmdWrap);
-        }
-      }
-    }
-
-    async function loadCatalog(force = false) {
-      if (isLoading || (hasLoadedOnce && !force)) return;
-      isLoading = true;
-      if (refreshBtn) patchAttr(refreshBtn, 'disabled', true);
-      try {
-        const res = await loadCatalogFn();
-        if (destroyed) return;
-        hasLoadedOnce = true;
-        if (res && typeof res === 'object') {
-          catalog = res;
-          ensureValidSelectionDefaults();
-          syncControlsAndList();
-        }
-      } catch {
-        // 本地目录或 API 暂不可用时静默隐藏卡片，避免干扰其他设置项
-        if (!destroyed && !catalog) {
-          patchAttr(rootEl, 'hidden', true);
-        }
-      } finally {
-        isLoading = false;
-        if (refreshBtn) patchAttr(refreshBtn, 'disabled', false);
-      }
-    }
-
-    async function handleMigrate() {
-      if (isMigrating || selectedIds.size === 0 || !sourceClient || !targetClient) return;
-      isMigrating = true;
-      lastResult = null;
-      renderSessionList();
-      renderResultBox();
-      try {
-        const payload = {
-          sourceClient,
-          targetClient,
-          mode: migrationMode,
-          cascadeIds: [...selectedIds],
-          ...(targetClient === 'desktop' ? { targetProjectId } : {}),
-        };
-        const res = await runMigrateFn(payload);
-        if (destroyed) return;
-        lastResult = res || { ok: false, error: 'empty_response' };
-        if (res?.ok) {
-          selectedIds.clear();
-          void loadCatalog(true);
-        }
-      } catch (err) {
-        if (!destroyed) {
-          lastResult = { ok: false, error: err?.message || 'request_failed' };
-        }
-      } finally {
-        isMigrating = false;
-        if (!destroyed) {
-          renderSessionList();
-          renderResultBox();
-          props?.onLayoutChange?.();
-        }
-      }
-    }
-
-    function refreshLabels() {
-      if (!bodyMounted) return;
-      patchText(titleEl, t('settings.oth.migTitle'));
-      patchText(descEl, t('settings.oth.migDesc'));
-      patchText(refreshBtnText, t('settings.oth.migRefreshBtn'));
-      patchText(sourceLabelEl, t('settings.oth.migSourceLabel'));
-      patchText(targetLabelEl, t('settings.oth.migTargetLabel'));
-      patchText(modeLabelEl, t('settings.oth.migModeLabel'));
-      syncModeControls();
-      patchText(projectLabelEl, t('settings.oth.migProjectLabel'));
-      patchAttr(searchInput, 'placeholder', t('settings.oth.migSearchPlaceholder'));
-      patchAttr(searchClearBtn, 'aria-label', t('select.clearSearch'));
-      if (catalog?.available) {
-        syncControlsAndList();
-      }
-    }
-
-    onCleanup(() => {
-      destroyed = true;
-      if (copiedTimer) {
-        clearTimeout(copiedTimer);
-        copiedTimer = null;
-      }
-      modeSeg?.destroy?.();
-      listScrollbar?.destroy?.();
-      sourceSelect?.destroy?.();
-      targetSelect?.destroy?.();
-      projectSelect?.destroy?.();
-    });
-
-    return {
-      el: rootEl,
-      refs: {
-        ensureLoaded: () => loadCatalog(false),
-        reload: () => loadCatalog(true),
-        refreshLabels,
-      },
-    };
-  },
-});
-return { SessionMigrationCard };
-})();
-
-// --- src/components/settings/HostI18nCard.js ---
-const { HostI18nCard } = (() => {
-/**
- * @fileoverview Self-contained Antigravity Host UI Language card (`HostI18nCard.js`).
- *
- * Mounted inside `SettingsGeneralTab` with minimal glue; manages:
- * - Language selection (`off` or any pack listed in repository `manifest.json`),
- * - Conditional Light / Deep translation depth switching (0-network hot switch),
- * - On-demand repository pack download, update, and local cache removal,
- * - CDP bridge notice when DevTools port is unavailable,
- * - Optional collapsed developer drawer to collect untranslated UI strings.
- */
-
-
-function formatHostI18nBytes(bytes) {
-  const num = Number(bytes || 0);
-  if (!Number.isFinite(num) || num <= 0) return '';
-  if (num < 1024) return `${num} B`;
-  return `${(num / 1024).toFixed(1)} KB`;
-}
-
-function getHostI18nDepthOptions() {
-  return [
-    { value: 'light', label: t('settings.hostI18n.depthLight') },
-    { value: 'deep', label: t('settings.hostI18n.depthDeep') },
-  ];
-}
-
-const HostI18nCard = defineComponent({
-  name: 'HostI18nCard',
-  setup({ props, onCleanup }) {
-    let status = null;
-    let draftLocale = HOST_I18N_OFF_LOCALE;
-    let draftDepth = 'light';
-    let latestWindowBridge = null;
-    let latestHostPlatform = 'win32';
-    let lastBridgeRenderSig = '';
-    let hasLoadedOnce = false;
-    let isBusy = false;
-    let isCollecting = false;
-    let destroyed = false;
-    let feedbackTimer = null;
-    let devExpanded = false;
-    let lastCollected = null;
-
-    const titleEl = h('span', { text: t('settings.hostI18n.title') });
-    const statusMsgEl = h('span', {
-      className: 'text-muted host-i18n-status-msg',
-      text: '',
-    });
-
-    function showFeedback(text, { isError = false, autoClearMs = 2800 } = {}) {
-      if (feedbackTimer) {
-        clearTimeout(feedbackTimer);
-        feedbackTimer = null;
-      }
-      patchText(statusMsgEl, text || '');
-      patchClasses(statusMsgEl, { 'is-error': Boolean(isError && text) });
-      if (text && autoClearMs > 0) {
-        feedbackTimer = setTimeout(() => {
-          feedbackTimer = null;
-          if (!destroyed) {
-            patchText(statusMsgEl, '');
-            patchClasses(statusMsgEl, { 'is-error': false });
-          }
-        }, autoClearMs);
-      }
-    }
-
-    function getPackList() {
-      return Array.isArray(status?.packs) ? status.packs : [];
-    }
-
-    function findPackByLocale(locale) {
-      return getPackList().find((p) => p.locale === locale) || null;
-    }
-
-    function buildLocaleOptions() {
-      const opts = [{ value: HOST_I18N_OFF_LOCALE, label: t('settings.hostI18n.langOff') }];
-      for (const pack of getPackList()) {
-        const displayName =
-          pack.nativeName && pack.nativeName !== pack.name
-            ? `${pack.nativeName} (${pack.locale})`
-            : `${pack.name || pack.locale} (${pack.locale})`;
-        const tag = pack.installed
-          ? t('settings.hostI18n.optInstalled', { ver: pack.installedVersion || pack.remoteVersion || '1.0.0' })
-          : t('settings.hostI18n.optRemote', {
-              size: formatHostI18nBytes(pack.remoteBytes) || 'pack',
-            });
-        opts.push({
-          value: pack.locale,
-          label: `${displayName} · ${tag}`,
-        });
-      }
-      if (
-        draftLocale !== HOST_I18N_OFF_LOCALE &&
-        !opts.some((o) => o.value === draftLocale)
-      ) {
-        opts.push({ value: draftLocale, label: draftLocale });
-      }
-      return opts;
-    }
-
-    const langLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.hostI18n.langLabel'),
-    });
-    const langSelect = CustomSelect({
-      ariaLabel: t('settings.hostI18n.langLabel'),
-      icon: 'globe',
-      modelValue: draftLocale,
-      options: buildLocaleOptions(),
-      onUpdateModelValue: async (val) => {
-        if (isBusy || destroyed) return;
-        const nextLocale = normalizeHostI18nLocale(val);
-        const targetPack = findPackByLocale(nextLocale);
-        const needsDownload =
-          nextLocale !== HOST_I18N_OFF_LOCALE && !targetPack?.installed;
-        isBusy = true;
-        draftLocale = nextLocale;
-        syncControls();
-        showFeedback(
-          needsDownload
-            ? t('settings.hostI18n.downloadingMsg', { locale: nextLocale })
-            : t('settings.saving'),
-          { autoClearMs: 0 }
-        );
-        try {
-          const res = await selectHostI18nLanguage(nextLocale, draftDepth);
-          if (destroyed) return;
-          applyStatusPayload(res);
-          if (res?.ok === false) {
-            showFeedback(res.error || t('settings.hostI18n.actionFailed'), {
-              isError: true,
-              autoClearMs: 5000,
-            });
-          } else if (nextLocale === HOST_I18N_OFF_LOCALE) {
-            showFeedback(t('settings.hostI18n.disabledMsg'), { autoClearMs: 2500 });
-          } else if (res?.downloaded) {
-            showFeedback(t('settings.hostI18n.downloadedAndAppliedMsg'), { autoClearMs: 3200 });
-          } else {
-            showFeedback(t('settings.hostI18n.appliedMsg'), { autoClearMs: 2200 });
-          }
-        } catch (err) {
-          if (!destroyed) {
-            if (status) applyStatusPayload(status);
-            showFeedback(err?.message || t('settings.hostI18n.actionFailed'), {
-              isError: true,
-              autoClearMs: 5000,
-            });
-          }
-        } finally {
-          isBusy = false;
-          if (!destroyed) {
-            syncControls();
-            props.onLayoutChange?.();
-          }
-        }
-      },
-    });
-
-    const refreshManifestBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-ghost-sm host-i18n-icon-btn',
-        title: t('settings.hostI18n.refreshManifestTip'),
-        'aria-label': t('settings.hostI18n.refreshManifestTip'),
-        onClick: async () => {
-          if (isBusy || destroyed) return;
-          isBusy = true;
-          syncControls();
-          showFeedback(t('settings.hostI18n.refreshingManifestMsg'), { autoClearMs: 0 });
-          try {
-            const res = await refreshHostI18nManifest();
-            if (destroyed) return;
-            applyStatusPayload(res);
-            if (res?.ok === false) {
-              showFeedback(res.error || t('settings.hostI18n.manifestFailedMsg'), {
-                isError: true,
-                autoClearMs: 4500,
-              });
-            } else {
-              showFeedback(
-                t('settings.hostI18n.manifestSyncedMsg', { count: getPackList().length }),
-                { autoClearMs: 2600 }
-              );
-            }
-          } catch (err) {
-            if (!destroyed) {
-              showFeedback(err?.message || t('settings.hostI18n.manifestFailedMsg'), {
-                isError: true,
-                autoClearMs: 4500,
-              });
-            }
-          } finally {
-            isBusy = false;
-            if (!destroyed) {
-              syncControls();
-              props.onLayoutChange?.();
-            }
-          }
-        },
-      },
-      [createSvgIcon('refresh', { size: 12 })]
-    );
-
-    const langHintEl = h('span', {
-      className: 'settings-hint-text',
-      text: t('settings.hostI18n.langHint'),
-    });
-
-    // --- Conditional Depth Row (visible only when locale !== 'off') ---
-    const depthLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.hostI18n.depthLabel'),
-    });
-    const depthSwitch = SegmentedControl({
-      ariaLabel: t('settings.hostI18n.depthLabel'),
-      modelValue: draftDepth,
-      options: getHostI18nDepthOptions(),
-      onUpdateModelValue: async (val) => {
-        if (isBusy || destroyed) return;
-        const nextDepth = normalizeHostI18nDepth(val);
-        if (nextDepth === draftDepth) return;
-        isBusy = true;
-        draftDepth = nextDepth;
-        syncControls();
-        showFeedback(t('settings.saving'), { autoClearMs: 0 });
-        try {
-          const res = await updateHostI18nDepth(nextDepth);
-          if (destroyed) return;
-          applyStatusPayload(res);
-          showFeedback(t('settings.hostI18n.depthSwitchedMsg'), { autoClearMs: 2000 });
-        } catch (err) {
-          if (!destroyed) {
-            if (status) applyStatusPayload(status);
-            showFeedback(err?.message || t('settings.saveFailed'), {
-              isError: true,
-              autoClearMs: 3500,
-            });
-          }
-        } finally {
-          isBusy = false;
-          if (!destroyed) syncControls();
-        }
-      },
-    });
-    const depthHintEl = h('span', {
-      className: 'settings-hint-text',
-      text: t('settings.hostI18n.depthLightHint'),
-    });
-    const depthRowEl = h('div', { className: 'form-row', hidden: true }, [
-      depthLabelEl,
-      depthSwitch.el,
-      depthHintEl,
-    ]);
-
-    // --- Pack Meta & Actions Bar (visible only when locale !== 'off') ---
-    const packMetaTextEl = h('span', { className: 'host-i18n-pack-meta text-muted', text: '' });
-    const updatePackBtnText = h('span', { text: t('settings.hostI18n.redownloadBtn') });
-    const updatePackBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary',
-        onClick: async () => {
-          if (isBusy || destroyed || draftLocale === HOST_I18N_OFF_LOCALE) return;
-          isBusy = true;
-          syncControls();
-          showFeedback(t('settings.hostI18n.downloadingMsg', { locale: draftLocale }), {
-            autoClearMs: 0,
-          });
-          try {
-            const res = await installOrUpdateHostI18nPack(draftLocale);
-            if (destroyed) return;
-            applyStatusPayload(res);
-            if (res?.ok === false) {
-              showFeedback(res.error || t('settings.hostI18n.actionFailed'), {
-                isError: true,
-                autoClearMs: 5000,
-              });
-            } else {
-              showFeedback(t('settings.hostI18n.packUpdatedMsg'), { autoClearMs: 3000 });
-            }
-          } catch (err) {
-            if (!destroyed) {
-              showFeedback(err?.message || t('settings.hostI18n.actionFailed'), {
-                isError: true,
-                autoClearMs: 5000,
-              });
-            }
-          } finally {
-            isBusy = false;
-            if (!destroyed) syncControls();
-          }
-        },
-      },
-      [createSvgIcon('download', { size: 12 }), updatePackBtnText]
-    );
-
-    const removePackBtnText = h('span', { text: t('settings.hostI18n.removeCacheBtn') });
-    const removePackBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-ghost-sm',
-        onClick: async () => {
-          if (isBusy || destroyed || draftLocale === HOST_I18N_OFF_LOCALE) return;
-          isBusy = true;
-          syncControls();
-          showFeedback(t('settings.saving'), { autoClearMs: 0 });
-          try {
-            const res = await removeHostI18nPack(draftLocale);
-            if (destroyed) return;
-            applyStatusPayload(res);
-            showFeedback(t('settings.hostI18n.cacheRemovedMsg'), { autoClearMs: 2800 });
-          } catch (err) {
-            if (!destroyed) {
-              showFeedback(err?.message || t('settings.hostI18n.actionFailed'), {
-                isError: true,
-                autoClearMs: 4500,
-              });
-            }
-          } finally {
-            isBusy = false;
-            if (!destroyed) {
-              syncControls();
-              props.onLayoutChange?.();
-            }
-          }
-        },
-      },
-      [removePackBtnText]
-    );
-
-    const packBarEl = h('div', { className: 'host-i18n-pack-bar', hidden: true }, [
-      packMetaTextEl,
-      h('div', { className: 'host-i18n-pack-actions' }, [updatePackBtn, removePackBtn]),
-    ]);
-
-    // --- CDP Bridge Diagnostic Notice (shown only when active locale cannot reach CDP) ---
-    const bridgeNotice = BridgeStatusNotice({ contextMode: true });
-
-    // --- Collapsed Developer Drawer: Untranslated UI String Collector ---
-    const devChevron = createSvgIcon('chevron-right', {
-      size: 11,
-      className: 'host-i18n-dev-chevron',
-    });
-    const devToggleText = h('span', { text: t('settings.hostI18n.devToolsTitle') });
-    const devToggleBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'host-i18n-dev-toggle',
-        'aria-expanded': 'false',
-        onClick: () => {
-          devExpanded = !devExpanded;
-          patchAttr(devToggleBtn, 'aria-expanded', devExpanded ? 'true' : 'false');
-          patchClasses(devDrawerEl, { 'is-expanded': devExpanded });
-          patchAttr(devBodyEl, 'hidden', !devExpanded);
-          props.onLayoutChange?.();
-        },
-      },
-      [devChevron, devToggleText]
-    );
-
-    const devHintEl = h('span', {
-      className: 'settings-hint-text',
-      text: t('settings.hostI18n.devToolsHint'),
-    });
-    const collectBtnText = h('span', { text: t('settings.hostI18n.collectBtn') });
-    const collectResultEl = h('span', { className: 'settings-hint-text', text: '' });
-
-    const copyCollectedBtnText = h('span', { text: t('settings.hostI18n.copyJsonBtn') });
-    const copyCollectedBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-ghost-sm',
-        hidden: true,
-        onClick: async () => {
-          if (!lastCollected?.template) return;
-          await copyTextWithFeedback(JSON.stringify(lastCollected.template, null, 2), {
-            onFeedback: (msg) => showFeedback(msg, { autoClearMs: 2400 }),
-          });
-        },
-      },
-      [createSvgIcon('copy', { size: 11 }), copyCollectedBtnText]
-    );
-
-    const exportCollectedBtnText = h('span', { text: t('settings.hostI18n.exportJsonBtn') });
-    const exportCollectedBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-ghost-sm',
-        hidden: true,
-        onClick: async () => {
-          if (!lastCollected?.template) return;
-          const fileLocale = draftLocale === HOST_I18N_OFF_LOCALE ? 'en-source' : draftLocale;
-          await exportTextFileWithFeedback({
-            filename: `host-i18n-missing-${fileLocale}.json`,
-            content: JSON.stringify(lastCollected.template, null, 2) + '\n',
-            mimeType: 'application/json',
-            onFeedback: (msg) => showFeedback(msg, { autoClearMs: 3200 }),
-          });
-        },
-      },
-      [createSvgIcon('download', { size: 11 }), exportCollectedBtnText]
-    );
-
-    const collectBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary',
-        onClick: async () => {
-          if (isCollecting || destroyed) return;
-          isCollecting = true;
-          patchAttr(collectBtn, 'disabled', true);
-          patchText(collectBtnText, t('settings.hostI18n.collectingBtn'));
-          try {
-            const res = await collectHostI18nUntranslated();
-            if (destroyed) return;
-            if (res?.ok) {
-              lastCollected = res;
-              patchText(
-                collectResultEl,
-                res.count > 0
-                  ? t('settings.hostI18n.collectedResult', {
-                      count: res.count,
-                      targets: res.targets || 1,
-                    })
-                  : t('settings.hostI18n.collectedEmpty')
-              );
-              patchAttr(copyCollectedBtn, 'hidden', !(res.count > 0));
-              patchAttr(exportCollectedBtn, 'hidden', !(res.count > 0));
-            } else {
-              patchText(collectResultEl, res?.error || t('settings.hostI18n.collectFailed'));
-            }
-          } catch (err) {
-            if (!destroyed) {
-              patchText(collectResultEl, err?.message || t('settings.hostI18n.collectFailed'));
-            }
-          } finally {
-            isCollecting = false;
-            if (!destroyed) {
-              patchAttr(collectBtn, 'disabled', false);
-              patchText(collectBtnText, t('settings.hostI18n.collectBtn'));
-              props.onLayoutChange?.();
-            }
-          }
-        },
-      },
-      [createSvgIcon('search', { size: 12 }), collectBtnText]
-    );
-
-    const devBodyEl = h('div', { className: 'host-i18n-dev-body', hidden: true }, [
-      devHintEl,
-      h('div', { className: 'host-i18n-dev-actions' }, [
-        collectBtn,
-        copyCollectedBtn,
-        exportCollectedBtn,
-      ]),
-      collectResultEl,
-    ]);
-    const devDrawerEl = h('div', { className: 'host-i18n-dev-drawer' }, [
-      devToggleBtn,
-      devBodyEl,
-    ]);
-
-    const rootEl = h('section', { className: 'panel host-i18n-panel' }, [
-      h('div', { className: 'panel-header' }, [
-        h('span', { className: 'panel-title' }, [
-          createSvgIcon('globe', { size: 13 }),
-          titleEl,
-        ]),
-        statusMsgEl,
-      ]),
-      h('div', { className: 'form-row' }, [
-        langLabelEl,
-        h('div', { className: 'host-i18n-select-row' }, [langSelect.el, refreshManifestBtn]),
-        langHintEl,
-      ]),
-      depthRowEl,
-      packBarEl,
-      bridgeNotice.el,
-      devDrawerEl,
-    ]);
-
-    function applyStatusPayload(payload) {
-      if (!payload || typeof payload !== 'object') return;
-      status = payload;
-      draftLocale = normalizeHostI18nLocale(payload.locale);
-      draftDepth = normalizeHostI18nDepth(payload.depth);
-      if (payload.bridgeStatus) {
-        latestWindowBridge = payload.bridgeStatus;
-      }
-      syncControls();
-    }
-
-    function syncControls() {
-      const enabled = draftLocale !== HOST_I18N_OFF_LOCALE;
-      const activePack = enabled ? findPackByLocale(draftLocale) : null;
-
-      langSelect.setProps({
-        modelValue: draftLocale,
-        options: buildLocaleOptions(),
-        disabled: isBusy,
-      });
-      patchAttr(refreshManifestBtn, 'disabled', isBusy);
-
-      patchAttr(depthRowEl, 'hidden', !enabled);
-      depthSwitch.setProps({
-        modelValue: draftDepth,
-        options: getHostI18nDepthOptions(),
-      });
-      patchText(
-        depthHintEl,
-        draftDepth === 'deep'
-          ? t('settings.hostI18n.depthDeepHint')
-          : t('settings.hostI18n.depthLightHint')
-      );
-
-      patchAttr(packBarEl, 'hidden', !enabled);
-      if (enabled) {
-        const ver = activePack?.installedVersion || activePack?.remoteVersion || '1.0.0';
-        const stats = activePack?.stats;
-        const entryCount = stats
-          ? Number(stats.baseExact || 0) +
-            Number(draftDepth === 'deep' ? stats.deepExact || 0 : stats.lightExact || 0) +
-            Number(stats.basePatterns || 0) +
-            Number(draftDepth === 'deep' ? stats.deepPatterns || 0 : stats.lightPatterns || 0)
-          : 0;
-        const sizeStr = formatHostI18nBytes(
-          activePack?.installedBytes || activePack?.remoteBytes || 0
-        );
-        const appliedCount = Number(latestWindowBridge?.hostI18nAppliedCount || 0);
-        const metaParts = [`v${ver}`];
-        if (entryCount > 0) {
-          metaParts.push(t('settings.hostI18n.entriesCount', { count: entryCount }));
-        }
-        if (sizeStr) metaParts.push(sizeStr);
-        if (appliedCount > 0) {
-          metaParts.push(t('settings.hostI18n.appliedWindows', { count: appliedCount }));
-        }
-        patchText(packMetaTextEl, metaParts.join(' · '));
-
-        const hasUpdate = Boolean(activePack?.updateAvailable);
-        patchText(
-          updatePackBtnText,
-          hasUpdate
-            ? t('settings.hostI18n.updatePackBtn', { ver: activePack.remoteVersion })
-            : t('settings.hostI18n.redownloadBtn')
-        );
-        patchClasses(updatePackBtn, {
-          'btn-primary': hasUpdate,
-          'btn-secondary': !hasUpdate,
-        });
-        patchAttr(updatePackBtn, 'disabled', isBusy);
-        patchAttr(removePackBtn, 'disabled', isBusy || !activePack?.installed);
-      }
-
-      bridgeNotice.refs.update({
-        visible: enabled,
-        windowBridge: latestWindowBridge,
-        hostPlatform: latestHostPlatform,
-        contextMode: true,
-      });
-    }
-
-    async function load(force = false) {
-      if (destroyed) return;
-      if (hasLoadedOnce && !force) return;
-      hasLoadedOnce = true;
-      try {
-        const res = await fetchHostI18nStatus();
-        if (destroyed) return;
-        applyStatusPayload(res);
-        props.onLayoutChange?.();
-      } catch {
-        // 静默兜底，保留手动刷新入口
-      }
-    }
-
-    function renderBridgeStatus(windowBridge, hostPlatform) {
-      if (windowBridge) latestWindowBridge = windowBridge;
-      if (hostPlatform) latestHostPlatform = hostPlatform;
-      const sig = [
-        Number(latestWindowBridge?.hostI18nAppliedCount || 0),
-        Boolean(latestWindowBridge?.connected),
-        Boolean(latestWindowBridge?.available),
-        String(latestWindowBridge?.reason || ''),
-        String(latestWindowBridge?.ideStatus?.reason || ''),
-        String(latestHostPlatform || ''),
-      ].join('|');
-      if (sig === lastBridgeRenderSig) return;
-      lastBridgeRenderSig = sig;
-      syncControls();
-    }
-
-    function refreshLabels() {
-      patchText(titleEl, t('settings.hostI18n.title'));
-      patchText(langLabelEl, t('settings.hostI18n.langLabel'));
-      patchText(langHintEl, t('settings.hostI18n.langHint'));
-      patchText(depthLabelEl, t('settings.hostI18n.depthLabel'));
-      patchText(removePackBtnText, t('settings.hostI18n.removeCacheBtn'));
-      patchText(devToggleText, t('settings.hostI18n.devToolsTitle'));
-      patchText(devHintEl, t('settings.hostI18n.devToolsHint'));
-      if (!isCollecting) patchText(collectBtnText, t('settings.hostI18n.collectBtn'));
-      patchText(copyCollectedBtnText, t('settings.hostI18n.copyJsonBtn'));
-      patchText(exportCollectedBtnText, t('settings.hostI18n.exportJsonBtn'));
-      patchAttr(refreshManifestBtn, 'title', t('settings.hostI18n.refreshManifestTip'));
-      patchAttr(refreshManifestBtn, 'aria-label', t('settings.hostI18n.refreshManifestTip'));
-      bridgeNotice.refs.refreshLabels();
-      syncControls();
-    }
-
-    onCleanup(() => {
-      destroyed = true;
-      abortSidecarApiKey('host-i18n-get');
-      if (feedbackTimer) {
-        clearTimeout(feedbackTimer);
-        feedbackTimer = null;
-      }
-      langSelect.destroy();
-      depthSwitch.destroy();
-      bridgeNotice.destroy();
-    });
-
-    return {
-      el: rootEl,
-      refs: {
-        langSelect,
-        depthSwitch,
-        load,
-        renderBridgeStatus,
-        refreshLabels,
-      },
-    };
-  },
-});
-return { HostI18nCard };
-})();
-
-// --- src/views/settings/SettingsGeneralTab.js ---
-const { SettingsGeneralTab } = (() => {
-/**
- * @fileoverview Preferences Tab 1: `SettingsGeneralTab.js` ("常规").
- * Manages UI Language (`zh-CN` / `en-US` / `auto`), Theme Accent (`host` + 6 swatches),
- * Panel Font Scale (`sm` / `md` / `lg` / `xl`), Pricing Sync, and Plugin Updates.
- */
-
-
-function getLanguageOptions() {
-  return [
-    { value: 'auto', label: t('settings.gen.langAuto') },
-    { value: 'zh-CN', label: t('settings.gen.langZh') },
-    { value: 'en-US', label: t('settings.gen.langEn') },
-  ];
-}
-
-function getFontScaleOptions() {
-  return [
-    { value: 'sm', label: t('settings.gen.fontSm') },
-    { value: 'md', label: t('settings.gen.fontMd') },
-    { value: 'lg', label: t('settings.gen.fontLg') },
-    { value: 'xl', label: t('settings.gen.fontXl') },
-  ];
-}
-
-function getUpdateModeOptions() {
-  return [
-    { value: 'manual', label: t('settings.gen.updateManual') },
-    { value: 'auto', label: t('settings.gen.updateAuto') },
-    { value: 'off', label: t('settings.gen.updateOff') },
-  ];
-}
-
-function formatCloudSyncTimeText(tsMs, updatedAt) {
-  if (Number(tsMs) > 0) {
-    const d = new Date(Number(tsMs));
-    const pad = (n) => String(n).padStart(2, '0');
-    const timeStr = `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    return t('settings.gen.syncAt', { time: timeStr });
-  }
-  if (updatedAt) {
-    return t('settings.gen.pubAt', { date: String(updatedAt).slice(0, 10) });
-  }
-  return t('settings.gen.defaultPricing');
-}
-
-const SettingsGeneralTab = defineComponent({
-  name: 'SettingsGeneralTab',
-  setup({ props, onCleanup }) {
-    let draftLanguage = 'auto';
-    let draftThemeAccent = 'host';
-    let draftFontScale = 'md';
-    let draftModernUi = true;
-    let draftPluginUpdateMode = 'manual';
-    let latestSettings = null;
-    let latestCloudStatus = null;
-    let appearanceTimer = null;
-    let appearanceSaveSeq = 0;
-    let cloudTimer = null;
-
-    const appearanceStatusText = h('span', {
-      className: 'text-muted',
-      style: 'font-size: var(--fs-md);',
-      text: '',
-    });
-    const cloudStatusMsg = h('span', {
-      className: 'text-muted',
-      style: 'font-size: var(--fs-md);',
-      text: '',
-    });
-
-    function showAppearanceFeedback(text, autoClearMs = 1500) {
-      if (appearanceTimer) {
-        clearTimeout(appearanceTimer);
-        appearanceTimer = null;
-      }
-      patchText(appearanceStatusText, text);
-      if (text && autoClearMs > 0) {
-        appearanceTimer = setTimeout(() => {
-          appearanceTimer = null;
-          patchText(appearanceStatusText, '');
-        }, autoClearMs);
-      }
-    }
-
-    function showCloudFeedback(text, autoClearMs = 3500) {
-      if (cloudTimer) {
-        clearTimeout(cloudTimer);
-        cloudTimer = null;
-      }
-      patchText(cloudStatusMsg, text);
-      if (text && autoClearMs > 0) {
-        cloudTimer = setTimeout(() => {
-          cloudTimer = null;
-          patchText(cloudStatusMsg, '');
-        }, autoClearMs);
-      }
-    }
-
-    // --- Card 1: 界面与外观 ---
-    const appearanceTitleEl = h('span', { text: t('settings.gen.appearanceTitle') });
-    const langLabelEl = h('span', { className: 'form-label', text: t('settings.gen.language') });
-    const accentLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.gen.themeAccent'),
-    });
-    const fontLabelEl = h('span', { className: 'form-label', text: t('settings.gen.fontScale') });
-    const fontHintEl = h('span', {
-      className: 'settings-hint-text',
-      text: t('settings.gen.fontHint'),
-    });
-    const modernUiLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.gen.modernUi'),
-    });
-    const modernUiHintEl = h('span', {
-      className: 'settings-hint-text',
-      text: t('settings.gen.modernUiHint'),
-    });
-
-    const languageSwitch = SegmentedControl({
-      ariaLabel: t('settings.gen.language'),
-      modelValue: draftLanguage,
-      options: getLanguageOptions(),
-      onUpdateModelValue: async (val) => {
-        const nextLang = normalizeI18nLanguage(val);
-        draftLanguage = nextLang;
-        setI18nLanguage(nextLang);
-        languageSwitch.setValue(nextLang);
-        const saveToken = ++appearanceSaveSeq;
-        showAppearanceFeedback(t('settings.saving'), 0);
-        try {
-          await saveSettingsPatch({ language: nextLang });
-          if (saveToken === appearanceSaveSeq) {
-            showAppearanceFeedback(t('settings.saved'), 1500);
-          }
-        } catch {
-          if (latestSettings) renderSettings(latestSettings);
-          if (saveToken === appearanceSaveSeq) {
-            showAppearanceFeedback(t('settings.saveFailed'), 2500);
-          }
-        }
-      },
-    });
-
-    const themeColorPicker = ThemeColorPicker({
-      modelValue: draftThemeAccent,
-      onUpdateModelValue: async (val) => {
-        const nextAccent = normalizeClientThemeAccent(val);
-        draftThemeAccent = nextAccent;
-        themeColorPicker.refs.setValue(nextAccent);
-        const saveToken = ++appearanceSaveSeq;
-        showAppearanceFeedback(t('settings.saving'), 0);
-        try {
-          await saveSettingsPatch({ themeAccent: nextAccent });
-          if (saveToken === appearanceSaveSeq) {
-            showAppearanceFeedback(t('settings.saved'), 1500);
-          }
-        } catch {
-          if (latestSettings) renderSettings(latestSettings);
-          if (saveToken === appearanceSaveSeq) {
-            showAppearanceFeedback(t('settings.saveFailed'), 2500);
-          }
-        }
-      },
-    });
-
-    const fontScaleSwitch = SegmentedControl({
-      ariaLabel: t('settings.gen.fontScale'),
-      modelValue: draftFontScale,
-      options: getFontScaleOptions(),
-      onUpdateModelValue: async (val) => {
-        const nextScale = normalizeClientFontScale(val);
-        draftFontScale = nextScale;
-        fontScaleSwitch.setValue(nextScale);
-        const saveToken = ++appearanceSaveSeq;
-        showAppearanceFeedback(t('settings.saving'), 0);
-        try {
-          await saveSettingsPatch({ fontScale: nextScale });
-          if (saveToken === appearanceSaveSeq) {
-            showAppearanceFeedback(t('settings.saved'), 1500);
-          }
-          props.onLayoutChange?.();
-        } catch {
-          if (latestSettings) renderSettings(latestSettings);
-          if (saveToken === appearanceSaveSeq) {
-            showAppearanceFeedback(t('settings.saveFailed'), 2500);
-          }
-        }
-      },
-    });
-
-    const modernUiSwitch = ToggleSwitch({
-      ariaLabelKey: 'settings.gen.modernUi',
-      preset: 'modernUi',
-      modelValue: 'on',
-      onUpdateModelValue: async (val) => {
-        const nextModernUi = val !== 'off';
-        draftModernUi = nextModernUi;
-        modernUiSwitch.setValue(nextModernUi ? 'on' : 'off');
-        if (!isWindowOverlayMode() && typeof document !== 'undefined' && document.documentElement) {
-          applyAppearanceToRoot(
-            document.documentElement,
-            {
-              ...(latestSettings || {}),
-              themeAccent: draftThemeAccent,
-              fontScale: draftFontScale,
-              modernUi: nextModernUi,
-              experimentalModernUi: nextModernUi,
-            },
-            { includeFontScale: true }
-          );
-        }
-        const saveToken = ++appearanceSaveSeq;
-        showAppearanceFeedback(t('settings.saving'), 0);
-        try {
-          await saveSettingsPatch({ modernUi: nextModernUi });
-          if (saveToken === appearanceSaveSeq) {
-            showAppearanceFeedback(t('settings.saved'), 1500);
-          }
-          props.onLayoutChange?.();
-        } catch {
-          if (latestSettings) renderSettings(latestSettings);
-          if (saveToken === appearanceSaveSeq) {
-            showAppearanceFeedback(t('settings.saveFailed'), 2500);
-          }
-        }
-      },
-    });
-
-    const appearancePanel = h('section', { className: 'panel' }, [
-      h('div', { className: 'panel-header' }, [
-        h('span', { className: 'panel-title' }, [
-          createSvgIcon('sliders', { size: 13 }),
-          appearanceTitleEl,
-        ]),
-        appearanceStatusText,
-      ]),
-      h('div', { className: 'form-row' }, [langLabelEl, languageSwitch.el]),
-      h('div', { className: 'form-row' }, [accentLabelEl, themeColorPicker.el]),
-      h('div', { className: 'form-row' }, [fontLabelEl, fontScaleSwitch.el, fontHintEl]),
-      h('div', { className: 'form-row' }, [modernUiLabelEl, modernUiSwitch.el, modernUiHintEl]),
-    ]);
-
-    // --- Card 2: 版本更新 ---
-    const updateTitleEl = h('span', { text: t('settings.gen.updateTitle') });
-    const updateModeLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.gen.updateMode'),
-    });
-    const pricingCellLabelEl = h('span', {
-      className: 'cell-label',
-      text: t('settings.gen.pricingLabel'),
-    });
-    const versionCellLabelEl = h('span', {
-      className: 'cell-label',
-      text: t('settings.gen.versionLabel'),
-    });
-
-    const autoUpdateSelect = CustomSelect({
-      modelValue: 'manual',
-      icon: 'refresh',
-      options: getUpdateModeOptions(),
-      onUpdateModelValue: async (val) => {
-        const nextMode = normalizeClientUpdateMode(val);
-        draftPluginUpdateMode = nextMode;
-        autoUpdateSelect.setValue(nextMode);
-        if (latestCloudStatus) {
-          renderCloudStatus(latestCloudStatus);
-        }
-        showCloudFeedback(t('settings.saving'), 0);
-        try {
-          await saveSettingsPatch({
-            pluginUpdateMode: nextMode,
-            autoUpdatePlugin: nextMode === 'auto',
-          });
-          showCloudFeedback(t('settings.saved'), 1800);
-        } catch {
-          if (latestSettings) renderSettings(latestSettings);
-          if (latestCloudStatus) renderCloudStatus(latestCloudStatus);
-          showCloudFeedback(t('settings.saveFailed'), 2500);
-        }
-      },
-    });
-
-    const pricingCountVal = h('strong', { className: 'cell-value', text: '—' });
-    const pricingSyncSub = h('span', { className: 'cell-sub', text: t('quota.loading') });
-    const versionVal = h('strong', { className: 'cell-value', text: 'v1.4.4' });
-    const versionSub = h('span', { className: 'cell-sub', text: t('settings.gen.checkingBtn') });
-
-    const syncPricingBtnText = h('span', { text: t('settings.gen.syncBtn') });
-    const syncPricingBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary',
-        onClick: async () => {
-          patchAttr(syncPricingBtn, 'disabled', true);
-          patchText(syncPricingBtnText, t('settings.gen.syncingBtn'));
-          showCloudFeedback(t('settings.gen.syncingMsg'), 0);
-          try {
-            const res = await triggerCloudSync();
-            const cs = res?.cloudStatus;
-            if (res?.ok && cs) {
-              showCloudFeedback(t('settings.gen.syncedMsg', { count: cs.modelCount }), 3500);
-            } else {
-              showCloudFeedback(cs?.lastSyncError || t('settings.gen.syncFallbackMsg'), 4500);
-            }
-          } catch (err) {
-            showCloudFeedback(err?.message || t('settings.gen.syncFallbackMsg'), 4500);
-          } finally {
-            patchAttr(syncPricingBtn, 'disabled', false);
-            patchText(syncPricingBtnText, t('settings.gen.syncBtn'));
-          }
-        },
-      },
-      [createSvgIcon('refresh', { size: 12 }), syncPricingBtnText]
-    );
-
-    const updatePluginBtnText = h('span', { text: t('settings.gen.checkUpdateBtn') });
-    const updatePluginBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary',
-        onClick: async () => {
-          patchAttr(updatePluginBtn, 'disabled', true);
-          try {
-            if (!latestCloudStatus?.updateAvailable) {
-              patchText(updatePluginBtnText, t('settings.gen.checkingBtn'));
-              showCloudFeedback(t('settings.gen.checkingMsg'), 0);
-              const syncRes = await triggerCloudSync();
-              const cs = syncRes?.cloudStatus || latestCloudStatus;
-              if (cs) {
-                latestCloudStatus = cs;
-                renderCloudStatus(cs);
-              }
-              if (!syncRes?.ok && cs?.lastSyncError) {
-                showCloudFeedback(
-                  t('settings.gen.checkFailedMsg', { err: cs.lastSyncError }),
-                  5000
-                );
-                return;
-              }
-              if (!cs?.updateAvailable) {
-                const curVer = cs?.currentPluginVersion || '1.4.4';
-                showCloudFeedback(t('settings.gen.upToDateMsg', { ver: curVer }), 4500);
-                return;
-              }
-            }
-            patchText(updatePluginBtnText, t('capsule.updating'));
-            showCloudFeedback(t('settings.gen.downloadingMsg'), 0);
-            const res = await triggerPluginUpdate();
-            if (res?.cloudStatus) {
-              latestCloudStatus = res.cloudStatus;
-            }
-            if (res?.ok) {
-              showCloudFeedback(res.message || t('settings.gen.updatedRestartMsg'), 5000);
-            } else {
-              showCloudFeedback(res?.message || t('settings.gen.updateSkippedMsg'), 5500);
-            }
-          } catch (err) {
-            showCloudFeedback(err?.message || t('settings.gen.updateFailedMsg'), 5000);
-          } finally {
-            patchAttr(updatePluginBtn, 'disabled', false);
-            renderCloudStatus(latestCloudStatus);
-          }
-        },
-      },
-      [createSvgIcon('arrow-down', { size: 12 }), updatePluginBtnText]
-    );
-
-    const cloudPanel = h('section', { className: 'panel' }, [
-      h('div', { className: 'panel-header' }, [
-        h('span', { className: 'panel-title' }, [
-          createSvgIcon('bolt', { size: 13 }),
-          updateTitleEl,
-        ]),
-        cloudStatusMsg,
-      ]),
-      h('div', { className: 'form-row' }, [updateModeLabelEl, autoUpdateSelect.el]),
-      h('div', { className: 'dual-grid' }, [
-        h('div', { className: 'matrix-cell' }, [
-          pricingCellLabelEl,
-          pricingCountVal,
-          pricingSyncSub,
-        ]),
-        h('div', { className: 'matrix-cell' }, [versionCellLabelEl, versionVal, versionSub]),
-      ]),
-      h('div', { className: 'cloud-actions-row' }, [syncPricingBtn, updatePluginBtn]),
-    ]);
-
-    const hostI18nCard = HostI18nCard({
-      onLayoutChange: () => props.onLayoutChange?.(),
-    });
-
-    const rootEl = h('div', { className: 'settings-tab-stack' }, [
-      appearancePanel,
-      hostI18nCard.el,
-      cloudPanel,
-    ]);
-
-    function renderSettings(settings, windowBridge = null, hostPlatform = 'win32') {
-      if (windowBridge || hostPlatform) {
-        hostI18nCard.refs.renderBridgeStatus(windowBridge, hostPlatform);
-      }
-      if (!settings) return;
-      latestSettings = settings;
-      draftLanguage = normalizeI18nLanguage(settings.language);
-      draftThemeAccent = normalizeClientThemeAccent(settings.themeAccent);
-      draftFontScale = normalizeClientFontScale(settings.fontScale);
-      draftModernUi = resolveSettingsModernUi(settings);
-      draftPluginUpdateMode = normalizeClientUpdateMode(
-        settings.pluginUpdateMode,
-        settings.autoUpdatePlugin
-      );
-
-      languageSwitch.setProps({
-        modelValue: draftLanguage,
-        options: getLanguageOptions(),
-      });
-      themeColorPicker.refs.setValue(draftThemeAccent);
-      fontScaleSwitch.setProps({
-        modelValue: draftFontScale,
-        options: getFontScaleOptions(),
-      });
-      modernUiSwitch.setProps({
-        modelValue: draftModernUi ? 'on' : 'off',
-      });
-      autoUpdateSelect.setProps({
-        modelValue: draftPluginUpdateMode,
-        options: getUpdateModeOptions(),
-      });
-    }
-
-    function renderCloudStatus(cs) {
-      if (!cs) return;
-      latestCloudStatus = cs;
-      const srcLabel =
-        cs.source === 'remote'
-          ? t('settings.gen.srcRemote')
-          : cs.source === 'local'
-            ? t('settings.gen.srcLocal')
-            : t('settings.gen.srcDefault');
-      patchText(pricingCountVal, t('settings.gen.modelCount', { count: cs.modelCount || 0 }));
-      patchText(
-        pricingSyncSub,
-        `${srcLabel} · ${formatCloudSyncTimeText(cs.lastSyncedAtMs, cs.catalogUpdatedAt)}`
-      );
-
-      const curVer = cs.currentPluginVersion || '1.4.4';
-      const latVer = cs.latestPluginVersion || curVer;
-      const modeTag = cs.installMode === 'git' ? 'Git' : 'ZIP';
-      patchText(versionVal, `v${curVer}`);
-      if (cs.updateAvailable && draftPluginUpdateMode !== 'off') {
-        patchText(versionSub, t('settings.gen.canUpgradeSub', { ver: latVer, mode: modeTag }));
-        patchClasses(versionSub, { 'accent-ok': true });
-        patchText(updatePluginBtnText, t('settings.gen.upgradeToBtn', { ver: latVer }));
-        patchClasses(updatePluginBtn, { 'btn-primary': true, 'btn-secondary': false });
-      } else if (draftPluginUpdateMode === 'off') {
-        patchText(versionSub, t('settings.gen.updateOffSub', { mode: modeTag }));
-        patchClasses(versionSub, { 'accent-ok': false });
-        patchText(
-          updatePluginBtnText,
-          cs.updateAvailable
-            ? t('settings.gen.manualUpgradeBtn', { ver: latVer })
-            : t('settings.gen.checkUpdateBtn')
-        );
-        patchClasses(updatePluginBtn, { 'btn-primary': false, 'btn-secondary': true });
-      } else {
-        patchText(versionSub, t('settings.gen.latestSub', { mode: modeTag }));
-        patchClasses(versionSub, { 'accent-ok': false });
-        patchText(updatePluginBtnText, t('settings.gen.checkUpdateBtn'));
-        patchClasses(updatePluginBtn, { 'btn-primary': false, 'btn-secondary': true });
-      }
-
-      if (
-        !cloudTimer &&
-        (cs.lastUpdateError || (cs.lastUpdateResult?.ok === false && cs.lastUpdateResult?.message))
-      ) {
-        showCloudFeedback(cs.lastUpdateError || cs.lastUpdateResult.message, 5500);
-      }
-    }
-
-    function refreshLabels() {
-      patchText(appearanceTitleEl, t('settings.gen.appearanceTitle'));
-      patchText(langLabelEl, t('settings.gen.language'));
-      patchText(accentLabelEl, t('settings.gen.themeAccent'));
-      patchText(fontLabelEl, t('settings.gen.fontScale'));
-      patchText(fontHintEl, t('settings.gen.fontHint'));
-      patchText(modernUiLabelEl, t('settings.gen.modernUi'));
-      patchText(modernUiHintEl, t('settings.gen.modernUiHint'));
-      patchText(updateTitleEl, t('settings.gen.updateTitle'));
-      patchText(updateModeLabelEl, t('settings.gen.updateMode'));
-      patchText(pricingCellLabelEl, t('settings.gen.pricingLabel'));
-      patchText(versionCellLabelEl, t('settings.gen.versionLabel'));
-      if (!syncPricingBtn.hasAttribute('disabled')) {
-        patchText(syncPricingBtnText, t('settings.gen.syncBtn'));
-      }
-      languageSwitch.setProps({
-        modelValue: draftLanguage,
-        options: getLanguageOptions(),
-      });
-      themeColorPicker.refs.refreshLabels();
-      fontScaleSwitch.setProps({
-        modelValue: draftFontScale,
-        options: getFontScaleOptions(),
-      });
-      modernUiSwitch.setProps({
-        modelValue: draftModernUi ? 'on' : 'off',
-      });
-      autoUpdateSelect.setProps({
-        modelValue: draftPluginUpdateMode,
-        options: getUpdateModeOptions(),
-      });
-      if (latestCloudStatus) {
-        renderCloudStatus(latestCloudStatus);
-      } else {
-        patchText(pricingSyncSub, t('quota.loading'));
-      }
-      hostI18nCard.refs.refreshLabels();
-    }
-
-    onCleanup(() => {
-      if (appearanceTimer) clearTimeout(appearanceTimer);
-      if (cloudTimer) clearTimeout(cloudTimer);
-      languageSwitch.destroy();
-      themeColorPicker.destroy();
-      fontScaleSwitch.destroy();
-      modernUiSwitch.destroy();
-      autoUpdateSelect.destroy();
-      hostI18nCard.destroy();
-    });
-
-    return {
-      el: rootEl,
-      refs: {
-        languageSwitch,
-        themeColorPicker,
-        fontScaleSwitch,
-        modernUiSwitch,
-        autoUpdateSelect,
-        syncPricingBtn,
-        updatePluginBtn,
-        hostI18nCard,
-        loadHostI18n: (force = false) => hostI18nCard.refs.load(force),
-        renderSettings,
-        renderCloudStatus,
-        refreshLabels,
-      },
-    };
-  },
-});
-return { SettingsGeneralTab };
-})();
-
-// --- src/views/settings/SettingsStructureTab.js ---
-const { SettingsStructureTab } = (() => {
-/**
- * @fileoverview Preferences Tab 2: `SettingsStructureTab.js` ("结构").
- * Organizes the 4 structure settings panes under a dedicated 3rd-level menu bar,
- * renders live previews powered by the decoupled real UI components (`CapsuleBarWidget`,
- * `createDynamicWidgetHost` in `hover` / `overview` modes, and `StepTableWidget`)
- * with simulated telemetry, and supports smooth mouse drag-and-drop reordering.
- */
-
-
-const STRUCTURE_THIRD_TABS = Object.freeze([
-  { key: 'mount', icon: 'dock', labelKey: 'settings.str.tabMount' },
-  { key: 'hover', icon: 'layers', labelKey: 'settings.str.tabHover' },
-  { key: 'overview', icon: 'pulse', labelKey: 'settings.str.tabOverview' },
-  { key: 'steps', icon: 'table', labelKey: 'settings.str.tabSteps' },
-]);
-
-function normalizeStructureTabKey(raw) {
-  const k = String(raw || '').trim();
-  return k === 'hover' || k === 'overview' || k === 'steps' ? k : 'mount';
-}
-
-function getMountModeOptions() {
-  return [
-    { value: 'dual', label: t('settings.str.mountDual') },
-    { value: 'composer', label: t('settings.str.mountComposer') },
-    { value: 'sidebar', label: t('settings.str.mountSidebar') },
-  ];
-}
-
-function getPopoverWidthModeOptions() {
-  return [
-    { value: 'auto', label: t('settings.str.popoverWidthAuto') },
-    { value: 'custom', label: t('settings.str.popoverWidthCustom') },
-  ];
-}
-
-function getContextAgentModeOptions() {
-  return [
-    { value: 'main', label: t('settings.str.contextAgentMain') },
-    { value: 'auto', label: t('settings.str.contextAgentAuto') },
-  ];
-}
-
-function isSameList(a, b) {
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
-
-function formatCliPreviewSlot(slotKey, slotCtx, isEn) {
-  const safeCtx = slotCtx || {};
-  const quotas = safeCtx.quotas || {};
-  const quotaPct = (key, fallback) => {
-    const summary = resolveSpecificQuotaSlotSummary(quotas, key);
-    return summary && Number.isFinite(summary.roundedPct) ? summary.roundedPct : fallback;
-  };
-  switch (slotKey) {
-    case 'tps': {
-      const val = Number.isFinite(Number(safeCtx.tps)) ? Number(safeCtx.tps).toFixed(1) : '68.4';
-      return { prefix: '', text: `${val} t/s`, tone: 'good', pillPct: null };
-    }
-    case 'avg_tps': {
-      const val = Number.isFinite(Number(safeCtx.avgTps)) ? Number(safeCtx.avgTps).toFixed(1) : '59.6';
-      return {
-        prefix: '',
-        text: isEn ? `avg ${val}` : `均 ${val}`,
-        tone: 'info',
-        pillPct: null,
-      };
-    }
-    case 'ttft': {
-      const val = Number.isFinite(Number(safeCtx.ttft)) ? formatMetric(Number(safeCtx.ttft), 's') : '1.1s';
-      return { prefix: '', text: val, tone: 'good', pillPct: null };
-    }
-    case 'cost': {
-      const num = Number.isFinite(Number(safeCtx.stepCost)) ? Number(safeCtx.stepCost) : 0.042;
-      return { prefix: '', text: `$${num.toFixed(3)}`, tone: 'normal', pillPct: null };
-    }
-    case 'session_cost': {
-      const num = Number.isFinite(Number(safeCtx.sessionCost)) ? Number(safeCtx.sessionCost) : 1.28;
-      return { prefix: '', text: formatUsd(num), tone: 'normal', pillPct: null };
-    }
-    case 'cache_hit': {
-      const pct = Number.isFinite(Number(safeCtx.cacheHitPct))
-        ? Math.round(Number(safeCtx.cacheHitPct))
-        : 95;
-      return {
-        prefix: '',
-        text: isEn ? `cache ${pct}%` : `缓 ${pct}%`,
-        tone: 'good',
-        pillPct: null,
-      };
-    }
-    case 'session_tokens': {
-      const tokStr = Number.isFinite(Number(safeCtx.sessionTokens))
-        ? formatTokens(Number(safeCtx.sessionTokens))
-        : '1.8M';
-      return { prefix: '', text: `${tokStr} tok`, tone: 'muted', pillPct: null };
-    }
-    case 'quota_auto': {
-      const pct = quotaPct('quota_auto', 64);
-      return {
-        prefix: isEn ? '5h ' : '余 ',
-        text: `${pct}%`,
-        tone: 'good',
-        pillPct: pct,
-      };
-    }
-    case 'gemini_5h': {
-      const pct = quotaPct('gemini_5h', 64);
-      return {
-        prefix: 'G5h ',
-        text: `${pct}%`,
-        tone: 'good',
-        pillPct: pct,
-      };
-    }
-    case 'gemini_weekly': {
-      const pct = quotaPct('gemini_weekly', 52);
-      return {
-        prefix: isEn ? 'Gw ' : 'G周 ',
-        text: `${pct}%`,
-        tone: 'good',
-        pillPct: pct,
-      };
-    }
-    case 'argon_weekly': {
-      const pct = quotaPct('argon_weekly', 42);
-      return {
-        prefix: isEn ? 'Aw ' : 'A周 ',
-        text: `${pct}%`,
-        tone: 'good',
-        pillPct: pct,
-      };
-    }
-    case 'claude_5h': {
-      const pct = quotaPct('claude_5h', 32);
-      return {
-        prefix: 'C5h ',
-        text: `${pct}%`,
-        tone: 'good',
-        pillPct: pct,
-      };
-    }
-    case 'claude_weekly': {
-      const pct = quotaPct('claude_weekly', 59);
-      return {
-        prefix: isEn ? 'Cw ' : 'C周 ',
-        text: `${pct}%`,
-        tone: 'good',
-        pillPct: pct,
-      };
-    }
-    case 'context':
-    default: {
-      const pct = Number.isFinite(Number(safeCtx.usedPct))
-        ? Math.round(Number(safeCtx.usedPct))
-        : 56;
-      return {
-        prefix: isEn ? 'Ctx ' : '上下文 ',
-        text: `${pct}%`,
-        tone: 'accent',
-        pillPct: pct,
-      };
-    }
-  }
-}
-
-const SettingsStructureTab = defineComponent({
-  name: 'SettingsStructureTab',
-  setup({ props, onCleanup }) {
-    let activeThirdTab = normalizeStructureTabKey(uiStore.getState().settingsStructureTab);
-    let draftWindowMountMode = 'dual';
-    let draftPopoverWidthMode = 'auto';
-    let draftPopoverWidth = DEFAULT_CLIENT_POPOVER_WIDTH;
-    let draftEnableCliStatusLine = true;
-    let draftCliStatusLineSlots = null;
-    let draftShowTopbarMulti = true;
-    let draftContextAgentMode = DEFAULT_CLIENT_CONTEXT_AGENT_MODE;
-    let draftTopbarSlots = [...DEFAULT_CLIENT_TOPBAR_SLOTS];
-    let draftHoverModules = [...DEFAULT_CLIENT_HOVER_MODULES];
-    let draftOverviewModules = [...DEFAULT_CLIENT_OVERVIEW_MODULES];
-    let draftOverviewMetrics = [...DEFAULT_CLIENT_OVERVIEW_METRICS];
-    let draftShowStepTurnRail = false;
-    let draftShowStepAgentBadge = true;
-    let draftShowStepSpeedColor = false;
-    let draftShowStepFilterToolbar = false;
-    let draftStepTokenComboFormat = DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT;
-    let rawStepTokenComboText = DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT;
-    let draftStepColumns = [...DEFAULT_CLIENT_STEP_COLUMNS];
-    let latestSettings = null;
-    let latestWindowBridge = null;
-    let latestCliStatusLine = null;
-    let latestHostPlatform = 'win32';
-    let latestQuotas = null;
-
-    function getEffectiveDraftCliSlots() {
-      return resolveEffectiveClientCliStatusLineSlots({
-        cliStatusLineSlots: draftCliStatusLineSlots,
-        topbarCapsuleSlots: draftTopbarSlots,
-      });
-    }
-
-    function isStructureVisible() {
-      const st = uiStore.getState();
-      return getVisibleMonitorView(st) === 'settings' && st.settingsSubTab === 'structure';
-    }
-
-    function buildDraftTelemetry() {
-      const effectiveCliSlots = getEffectiveDraftCliSlots();
-      const includeArgonPool =
-        hasArgonWeeklyQuotaPool(latestQuotas) ||
-        draftTopbarSlots.includes('argon_weekly') ||
-        effectiveCliSlots.includes('argon_weekly');
-      return buildStructurePreviewTelemetry(
-        latestSettings,
-        {
-          windowMountMode: draftWindowMountMode,
-          enableWindowOverlay: draftWindowMountMode !== 'sidebar',
-          popoverWidthMode: draftPopoverWidthMode,
-          popoverWidth: draftPopoverWidth,
-          enableCliStatusLine: draftEnableCliStatusLine,
-          showTopbarMultiSession: draftShowTopbarMulti,
-          contextAgentMode: draftContextAgentMode,
-          topbarCapsuleSlots: draftTopbarSlots,
-          hoverModules: draftHoverModules,
-          overviewModules: draftOverviewModules,
-          overviewMetrics: draftOverviewMetrics,
-          showStepTurnRail: draftShowStepTurnRail,
-          showStepAgentBadge: draftShowStepAgentBadge,
-          showStepSpeedColor: draftShowStepSpeedColor,
-          showStepFilterToolbar: draftShowStepFilterToolbar,
-          stepTokenComboFormat: draftStepTokenComboFormat,
-          stepTableColumns: draftStepColumns,
-        },
-        { includeArgonPool }
-      );
-    }
-
-    async function persistStructurePatch(sectionComp, patchObj, successKey = 'settings.saved') {
-      sectionComp.refs.showStatus(t('settings.saving'), 0);
-      try {
-        await saveSettingsPatch(patchObj);
-        sectionComp.refs.showStatus(t(successKey), 1500);
-      } catch {
-        if (latestSettings) {
-          renderSettings(latestSettings);
-        }
-        sectionComp.refs.showStatus(t('settings.saveFailed'), 2500);
-      }
-    }
-
-    // --- 3rd-Level Navigation Bar ---
-    const thirdNavBtnMap = new Map();
-    const thirdNavBtns = STRUCTURE_THIRD_TABS.map((item) => {
-      const labelEl = h('span', {
-        className: 'structure-thirdnav-label',
-        text: t(item.labelKey),
-      });
-      const btn = h(
-        'button',
-        {
-          type: 'button',
-          className: `structure-thirdnav-btn${item.key === activeThirdTab ? ' is-active' : ''}`,
-          role: 'tab',
-          'aria-selected': item.key === activeThirdTab ? 'true' : 'false',
-          'data-structure-tab': item.key,
-          onClick: () => {
-            applyActiveThirdTab(item.key);
-            if (uiStore.getState().settingsStructureTab !== item.key) {
-              uiStore.setState({ settingsStructureTab: item.key });
-            }
-          },
-          onKeydown: (e) => {
-            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-              e.preventDefault();
-              const curIdx = Math.max(
-                0,
-                STRUCTURE_THIRD_TABS.findIndex((it) => it.key === item.key)
-              );
-              const delta = e.key === 'ArrowRight' ? 1 : -1;
-              const nextIdx =
-                (curIdx + delta + STRUCTURE_THIRD_TABS.length) % STRUCTURE_THIRD_TABS.length;
-              const nextItem = STRUCTURE_THIRD_TABS[nextIdx];
-              if (nextItem) {
-                applyActiveThirdTab(nextItem.key);
-                if (uiStore.getState().settingsStructureTab !== nextItem.key) {
-                  uiStore.setState({ settingsStructureTab: nextItem.key });
-                }
-                thirdNavBtnMap.get(nextItem.key)?.btn?.focus?.();
-              }
-            }
-          },
-        },
-        [createSvgIcon(item.icon, { size: 12 }), labelEl]
-      );
-      thirdNavBtnMap.set(item.key, { btn, labelEl, labelKey: item.labelKey });
-      return btn;
-    });
-
-    const thirdNavGlider = h('div', { className: 'thirdnav-glider', 'aria-hidden': 'true' });
-    const thirdNavBar = h(
-      'div',
-      {
-        className: 'settings-thirdnav-bar',
-        role: 'tablist',
-        'aria-label': t('settings.str.thirdTabAria'),
-      },
-      [thirdNavGlider, ...thirdNavBtns]
-    );
-    patchStyleVar(
-      thirdNavBar,
-      '--active-third-index',
-      Math.max(
-        0,
-        STRUCTURE_THIRD_TABS.findIndex((it) => it.key === activeThirdTab)
-      )
-    );
-
-    // --- Pane 1: 挂载与胶囊栏 (`mount`) ---
-    const capsulePreviewWidget = CapsuleBarWidget({});
-    const mountPreviewCanvas = h('div', { className: 'structure-preview-canvas' }, [
-      capsulePreviewWidget.el,
-    ]);
-
-    const mountModeLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.mountMode'),
-    });
-    const popoverWidthLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.popoverWidthLabel'),
-    });
-    const multiToggleLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.multiToggle'),
-    });
-    const contextAgentModeLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.contextAgentModeLabel'),
-    });
-    const cliCapsuleLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.cliCapsuleToggle'),
-    });
-    const cliSlotsLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.cliSlotsLabel'),
-    });
-    const cliStatusHintEl = h('span', {
-      className: 'settings-hint-text cli-status-hint',
-    });
-    let cliActionBusy = false;
-    let activeCliStatusAction = '';
-    const cliStatusActionBtn = h('button', {
-      type: 'button',
-      className: 'cli-status-action-btn',
-      hidden: true,
-      text: t('settings.str.cliRestoreBtn'),
-      onClick: async () => {
-        if (cliActionBusy || !activeCliStatusAction) return;
-        cliActionBusy = true;
-        const actionToRun = activeCliStatusAction;
-        patchAttr(cliStatusActionBtn, 'disabled', true);
-        patchText(cliStatusActionBtn, t('settings.str.cliRestoringBtn'));
-        mountSection.refs.showStatus(t('settings.saving'), 0);
-        try {
-          const res = await triggerCliStatusLineAction(actionToRun);
-          if (res?.cliStatusLine) {
-            latestCliStatusLine = res.cliStatusLine;
-          }
-          if (res?.settings && typeof res.settings === 'object') {
-            latestSettings = { ...(latestSettings || {}), ...res.settings };
-            draftEnableCliStatusLine = latestSettings.enableCliStatusLine !== false;
-          }
-          mountSection.refs.showStatus(
-            res?.ok === false ? t('settings.saveFailed') : t('settings.saved'),
-            1800
-          );
-        } catch {
-          mountSection.refs.showStatus(t('settings.saveFailed'), 2500);
-        } finally {
-          cliActionBusy = false;
-          patchAttr(cliStatusActionBtn, 'disabled', false);
-          syncMountSectionMeta();
-          props.onLayoutChange?.();
-        }
-      },
-    });
-    const capsuleSlotsLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.capsuleSlotsLabel'),
-    });
-
-    const windowMountSelect = CustomSelect({
-      modelValue: draftWindowMountMode,
-      icon: 'dock',
-      options: getMountModeOptions(),
-      onUpdateModelValue: (val) => {
-        const nextMode = normalizeClientWindowMountMode(val);
-        draftWindowMountMode = nextMode;
-        syncMountSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(mountSection, {
-          windowMountMode: nextMode,
-          enableWindowOverlay: nextMode !== 'sidebar',
-        });
-      },
-    });
-
-    const popoverWidthStepper = CustomNumberInput({
-      modelValue: draftPopoverWidth,
-      min: MIN_CLIENT_POPOVER_WIDTH,
-      max: MAX_CLIENT_POPOVER_WIDTH,
-      step: 10,
-      ariaLabel: t('settings.str.popoverWidthLabel'),
-      onUpdateModelValue: (val) => {
-        const nextWidth = normalizeClientPopoverWidth(val);
-        draftPopoverWidth = nextWidth;
-        syncMountSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(mountSection, {
-          popoverWidthMode: draftPopoverWidthMode,
-          popoverWidth: draftPopoverWidth,
-        });
-      },
-    });
-
-    const popoverWidthNumWrap = h(
-      'span',
-      { className: 'settings-number-wrap', hidden: draftPopoverWidthMode !== 'custom' },
-      [popoverWidthStepper.el, h('span', { className: 'settings-number-unit', text: 'px' })]
-    );
-
-    const popoverWidthModeToggle = SegmentedControl({
-      ariaLabel: t('settings.str.popoverWidthLabel'),
-      modelValue: draftPopoverWidthMode,
-      options: getPopoverWidthModeOptions(),
-      onUpdateModelValue: (val) => {
-        draftPopoverWidthMode = normalizeClientPopoverWidthMode(val);
-        syncMountSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(mountSection, {
-          popoverWidthMode: draftPopoverWidthMode,
-          popoverWidth: draftPopoverWidth,
-        });
-      },
-    });
-
-    const multiSessionToggle = ToggleSwitch({
-      ariaLabelKey: 'settings.str.multiToggle',
-      preset: 'visibility',
-      modelValue: 'show',
-      onUpdateModelValue: (val) => {
-        draftShowTopbarMulti = val !== 'hide';
-        syncMountSectionMeta();
-        void persistStructurePatch(mountSection, {
-          showTopbarMultiSession: draftShowTopbarMulti,
-        });
-      },
-    });
-
-    const contextAgentModeToggle = SegmentedControl({
-      ariaLabel: t('settings.str.contextAgentModeLabel'),
-      modelValue: draftContextAgentMode,
-      options: getContextAgentModeOptions(),
-      onUpdateModelValue: (val) => {
-        const nextMode = normalizeClientContextAgentMode(val);
-        draftContextAgentMode = nextMode;
-        uiStore.setState({ ctxInspectorAgentId: nextMode });
-        syncMountSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(mountSection, {
-          contextAgentMode: nextMode,
-        });
-      },
-    });
-
-    const cliCapsuleToggle = ToggleSwitch({
-      ariaLabelKey: 'settings.str.cliCapsuleToggle',
-      preset: 'enable',
-      modelValue: 'on',
-      onUpdateModelValue: (val) => {
-        draftEnableCliStatusLine = val !== 'off';
-        syncMountSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(mountSection, {
-          enableCliStatusLine: draftEnableCliStatusLine,
-        });
-      },
-    });
-
-    const cliPreviewMultiTextEl = h('span', {
-      text: t('settings.str.cliPreviewRunning', { count: 1 }),
-    });
-    const cliPreviewMultiEl = h('span', { className: 'cli-preview-multi' }, [
-      h('span', { className: 'cli-preview-dot', 'aria-hidden': 'true', text: '●' }),
-      cliPreviewMultiTextEl,
-    ]);
-    const cliPreviewSlotParts = [];
-    const cliPreviewSepEls = [];
-    const cliPreviewChildren = [cliPreviewMultiEl];
-    for (let i = 0; i < 6; i += 1) {
-      if (i > 0) {
-        const sepEl = h('span', {
-          className: 'cli-preview-sep',
-          'aria-hidden': 'true',
-          text: '|',
-        });
-        cliPreviewSepEls.push(sepEl);
-        cliPreviewChildren.push(sepEl);
-      }
-      const prefixEl = h('span', { className: 'cli-preview-prefix' });
-      const valueEl = h('span', { className: 'cli-preview-val' });
-      const slotEl = h('span', { className: 'cli-preview-slot' }, [
-        prefixEl,
-        valueEl,
-      ]);
-      cliPreviewSlotParts.push({ slotEl, prefixEl, valueEl });
-      cliPreviewChildren.push(slotEl);
-    }
-    const cliPreviewEl = h('div', { className: 'cli-status-preview' }, cliPreviewChildren);
-
-    const cliSlotsList = EditableSlotList({
-      items: getEffectiveDraftCliSlots(),
-      options: getCapsuleMetricOptions(),
-      minItems: 1,
-      maxItems: 6,
-      addBtnTextFn: (count, max) => t('settings.str.addCliSlot', { count, max }),
-      onPreview: (previewItems) => {
-        draftCliStatusLineSlots = normalizeClientCliStatusLineSlots(previewItems);
-        refreshCliPreview();
-      },
-      onChange: (nextItems) => {
-        draftCliStatusLineSlots = normalizeClientCliStatusLineSlots(nextItems);
-        syncMountSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(mountSection, {
-          cliStatusLineSlots: draftCliStatusLineSlots,
-        });
-      },
-    });
-
-    const cliStatusFooterEl = h('div', { className: 'cli-status-footer', hidden: true }, [
-      cliStatusHintEl,
-      cliStatusActionBtn,
-    ]);
-
-    const cliStatusDetailEl = h('div', { className: 'cli-statusline-detail' }, [
-      cliPreviewEl,
-      h('div', { className: 'form-row' }, [cliSlotsLabelEl, cliSlotsList.el]),
-      cliStatusFooterEl,
-    ]);
-
-    const cliStatusGroupEl = h('div', { className: 'cli-statusline-group', hidden: true }, [
-      h('div', { className: 'settings-divider' }),
-      h('div', { className: 'settings-inline-row' }, [cliCapsuleLabelEl, cliCapsuleToggle.el]),
-      cliStatusDetailEl,
-    ]);
-
-    const topbarSlotsList = EditableSlotList({
-      items: draftTopbarSlots,
-      options: getCapsuleMetricOptions(),
-      minItems: 1,
-      maxItems: 5,
-      addBtnTextFn: (count, max) => t('settings.str.addCapsuleSlot', { count, max }),
-      onPreview: (previewItems) => {
-        draftTopbarSlots = normalizeClientTopbarSlots(previewItems);
-        refreshMountPreview();
-      },
-      onChange: (nextItems) => {
-        draftTopbarSlots = normalizeClientTopbarSlots(nextItems);
-        syncMountSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(mountSection, {
-          topbarCapsuleSlots: draftTopbarSlots,
-        });
-      },
-    });
-
-    const mountBridgeNotice = BridgeStatusNotice({});
-
-    const mountSection = CollapsibleSection({
-      collapsible: false,
-      icon: 'dock',
-      title: t('settings.str.mountSection'),
-      badgeText: t('settings.str.mountBadge', { count: draftTopbarSlots.length }),
-      onReset: () => {
-        draftWindowMountMode = 'dual';
-        draftPopoverWidthMode = 'auto';
-        draftPopoverWidth = DEFAULT_CLIENT_POPOVER_WIDTH;
-        popoverWidthStepper.setProps({ modelValue: DEFAULT_CLIENT_POPOVER_WIDTH });
-        draftEnableCliStatusLine = true;
-        draftCliStatusLineSlots = null;
-        draftShowTopbarMulti = true;
-        draftContextAgentMode = DEFAULT_CLIENT_CONTEXT_AGENT_MODE;
-        draftTopbarSlots = [...DEFAULT_CLIENT_TOPBAR_SLOTS];
-        uiStore.setState({ ctxInspectorAgentId: DEFAULT_CLIENT_CONTEXT_AGENT_MODE });
-        syncMountSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(
-          mountSection,
-          {
-            windowMountMode: 'dual',
-            enableWindowOverlay: true,
-            popoverWidthMode: 'auto',
-            popoverWidth: DEFAULT_CLIENT_POPOVER_WIDTH,
-            enableCliStatusLine: true,
-            cliStatusLineSlots: null,
-            showTopbarMultiSession: true,
-            contextAgentMode: DEFAULT_CLIENT_CONTEXT_AGENT_MODE,
-            topbarCapsuleSlots: [...DEFAULT_CLIENT_TOPBAR_SLOTS],
-          },
-          'settings.resetDone'
-        );
-      },
-      children: [
-        mountPreviewCanvas,
-        h('div', { className: 'settings-divider' }),
-        h('div', { className: 'form-row' }, [mountModeLabelEl, windowMountSelect.el]),
-        mountBridgeNotice.el,
-        h('div', { className: 'settings-inline-row' }, [
-          popoverWidthLabelEl,
-          h('div', { className: 'settings-inline-controls' }, [
-            popoverWidthModeToggle.el,
-            popoverWidthNumWrap,
-          ]),
-        ]),
-        h('div', { className: 'settings-inline-row' }, [
-          multiToggleLabelEl,
-          multiSessionToggle.el,
-        ]),
-        h('div', { className: 'settings-inline-row' }, [
-          contextAgentModeLabelEl,
-          contextAgentModeToggle.el,
-        ]),
-        h('div', { className: 'form-row' }, [capsuleSlotsLabelEl, topbarSlotsList.el]),
-        cliStatusGroupEl,
-      ],
-    });
-
-    function refreshCliPreview(previewData = null) {
-      const effectiveSlots = getEffectiveDraftCliSlots();
-      const isEn = getEffectiveLocale() === 'en-US';
-      const mockData = previewData || buildDraftTelemetry();
-      const { scopedConv, ctxAgent, aggregated } = resolveScopedConversation(
-        mockData,
-        'all',
-        resolveOverlayCtxInspectorAgentId(mockData, 'auto')
-      );
-      const slotCtx = buildCapsuleSlotContext(mockData, { scopedConv, ctxAgent, aggregated });
-      const runningCount = Math.max(
-        1,
-        Array.isArray(mockData?.runningConversations) ? mockData.runningConversations.length : 1
-      );
-      patchAttr(cliPreviewMultiEl, 'hidden', !draftShowTopbarMulti);
-      patchText(cliPreviewMultiTextEl, t('settings.str.cliPreviewRunning', { count: runningCount }));
-      for (let i = 0; i < cliPreviewSlotParts.length; i += 1) {
-        const parts = cliPreviewSlotParts[i];
-        const sepEl = i > 0 ? cliPreviewSepEls[i - 1] : null;
-        const key = effectiveSlots[i];
-        const visible = Boolean(key);
-        patchAttr(parts.slotEl, 'hidden', !visible);
-        if (sepEl) patchAttr(sepEl, 'hidden', !visible);
-        if (visible) {
-          const item = formatCliPreviewSlot(key, slotCtx, isEn);
-          const isPill = Number.isFinite(item.pillPct);
-          patchAttr(parts.slotEl, 'data-metric', key);
-          patchText(parts.prefixEl, item.prefix || '');
-          patchText(parts.valueEl, item.text || '');
-          patchStyleVar(parts.slotEl, '--cli-pill-pct', isPill ? `${item.pillPct}%` : '');
-          patchClasses(parts.slotEl, {
-            'is-pill': isPill,
-            'tone-good': item.tone === 'good',
-            'tone-info': item.tone === 'info',
-            'tone-accent': item.tone === 'accent',
-            'tone-muted': item.tone === 'muted',
-          });
-        }
-      }
-    }
-
-    function refreshMountPreview() {
-      if (!isStructureVisible() || activeThirdTab !== 'mount') return;
-      const mockData = buildDraftTelemetry();
-      capsulePreviewWidget.refs.update({ data: mockData });
-      refreshCliPreview(mockData);
-    }
-
-    function syncMountSectionMeta() {
-      windowMountSelect.setProps({
-        modelValue: draftWindowMountMode,
-        options: getMountModeOptions(),
-      });
-      mountBridgeNotice.refs.update({
-        visible: draftWindowMountMode !== 'sidebar',
-        windowBridge: latestWindowBridge,
-        hostPlatform: latestHostPlatform,
-      });
-      popoverWidthModeToggle.setProps({
-        modelValue: draftPopoverWidthMode,
-        options: getPopoverWidthModeOptions(),
-      });
-      patchAttr(popoverWidthNumWrap, 'hidden', draftPopoverWidthMode !== 'custom');
-      if (document?.activeElement !== popoverWidthStepper.refs.textField) {
-        popoverWidthStepper.setProps({
-          modelValue: draftPopoverWidth,
-          ariaLabel: t('settings.str.popoverWidthLabel'),
-        });
-      }
-      multiSessionToggle.setProps({
-        modelValue: draftShowTopbarMulti ? 'show' : 'hide',
-      });
-      contextAgentModeToggle.setProps({
-        modelValue: draftContextAgentMode,
-        options: getContextAgentModeOptions(),
-        ariaLabel: t('settings.str.contextAgentModeLabel'),
-      });
-      const cliInstalled = Boolean(latestCliStatusLine?.installed);
-      patchAttr(cliStatusGroupEl, 'hidden', !cliInstalled);
-      cliCapsuleToggle.setProps({
-        modelValue: draftEnableCliStatusLine ? 'on' : 'off',
-      });
-      patchAttr(cliStatusDetailEl, 'hidden', !draftEnableCliStatusLine);
-      const effectiveCliSlots = getEffectiveDraftCliSlots();
-      cliSlotsList.refs.setProps({
-        items: effectiveCliSlots,
-        options: getCapsuleMetricOptions({
-          quotas: latestQuotas,
-          selectedSlots: effectiveCliSlots,
-        }),
-        addBtnTextFn: (count, max) => t('settings.str.addCliSlot', { count, max }),
-      });
-      const preservedCustom = Boolean(latestCliStatusLine?.preservedCustom);
-      const isConfigured = Boolean(latestCliStatusLine?.configured);
-      const hasInlineSlotFlags = /(?:^|\s)--(?:slots|preset)(?:=|\s|$)/i.test(
-        String(latestCliStatusLine?.managedFlags || '')
-      );
-      const isPausedInCli = cliInstalled && !preservedCustom && !isConfigured && draftEnableCliStatusLine;
-      const cliHintText = preservedCustom
-        ? t('settings.str.cliCustomCmdHint')
-        : isPausedInCli
-          ? t('settings.str.cliPausedHint')
-          : hasInlineSlotFlags
-            ? t('settings.str.cliFlagsOverrideHint')
-            : '';
-      patchAttr(cliStatusFooterEl, 'hidden', !cliHintText);
-      patchClasses(cliStatusHintEl, { 'is-warn': preservedCustom || isPausedInCli });
-      patchText(cliStatusHintEl, cliHintText);
-      activeCliStatusAction = preservedCustom || isPausedInCli
-        ? 'force_install'
-        : hasInlineSlotFlags
-          ? 'clear_flags'
-          : '';
-      patchAttr(cliStatusActionBtn, 'hidden', !activeCliStatusAction);
-      patchClasses(cliStatusActionBtn, { 'is-warn': preservedCustom });
-      if (!cliActionBusy && activeCliStatusAction) {
-        patchText(
-          cliStatusActionBtn,
-          preservedCustom
-            ? t('settings.str.cliRestoreBtn')
-            : isPausedInCli
-              ? t('settings.str.cliEnableBtn')
-              : t('settings.str.cliClearFlagsBtn')
-        );
-      }
-      refreshCliPreview();
-      topbarSlotsList.refs.setProps({
-        items: draftTopbarSlots,
-        options: getCapsuleMetricOptions({
-          quotas: latestQuotas,
-          selectedSlots: draftTopbarSlots,
-        }),
-        addBtnTextFn: (count, max) => t('settings.str.addCapsuleSlot', { count, max }),
-      });
-      mountSection.refs.setBadge(
-        t('settings.str.mountBadge', { count: draftTopbarSlots.length })
-      );
-      const isDefault =
-        draftWindowMountMode === 'dual' &&
-        draftPopoverWidthMode === 'auto' &&
-        draftPopoverWidth === DEFAULT_CLIENT_POPOVER_WIDTH &&
-        draftEnableCliStatusLine === true &&
-        draftCliStatusLineSlots === null &&
-        draftShowTopbarMulti === true &&
-        draftContextAgentMode === DEFAULT_CLIENT_CONTEXT_AGENT_MODE &&
-        isSameList(draftTopbarSlots, DEFAULT_CLIENT_TOPBAR_SLOTS);
-      mountSection.refs.setResetDisabled(isDefault);
-      refreshMountPreview();
-    }
-
-    // --- Pane 2: 鼠标悬浮窗 (`hover`) ---
-    const hoverWidgetsContainerEl = h('div', { className: 'wm-hover-widgets' });
-    const hoverPreviewTipEl = h('div', { className: 'wm-hover-tip is-preview' }, [
-      hoverWidgetsContainerEl,
-    ]);
-    const hoverPreviewEmptyEl = h('div', {
-      className: 'structure-preview-empty',
-      hidden: true,
-      text: t('settings.str.hoverEmptyHint'),
-    });
-    const hoverPreviewHost = createDynamicWidgetHost({
-      containerEl: hoverWidgetsContainerEl,
-      mode: 'hover',
-      preview: true,
-      isVisibleFn: () => isStructureVisible() && activeThirdTab === 'hover',
-      initialModuleKeys: [],
-      getCtxAgentId: () =>
-        resolveOverlayCtxInspectorAgentId(
-          { settings: { contextAgentMode: draftContextAgentMode } },
-          'auto'
-        ),
-    });
-    const hoverPreviewCanvas = h('div', { className: 'structure-preview-canvas' }, [
-      hoverPreviewTipEl,
-      hoverPreviewEmptyEl,
-    ]);
-
-    const hoverModulesLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.hoverModulesLabel'),
-    });
-
-    const hoverModulesList = EditableSlotList({
-      items: draftHoverModules,
-      options: getOverviewModuleOptions(),
-      minItems: 0,
-      maxItems: 4,
-      emptyHintText: t('settings.str.hoverEmptyHint'),
-      addBtnTextFn: (count, max) => t('settings.str.addHoverModule', { count, max }),
-      onPreview: (previewItems) => {
-        draftHoverModules = normalizeClientHoverModules(previewItems);
-        refreshHoverPreview();
-      },
-      onChange: (nextItems) => {
-        draftHoverModules = normalizeClientHoverModules(nextItems);
-        syncHoverSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(hoverSection, {
-          hoverModules: draftHoverModules,
-        });
-      },
-    });
-
-    const hoverSection = CollapsibleSection({
-      collapsible: false,
-      icon: 'layers',
-      title: t('settings.str.hoverSection'),
-      badgeText: t('settings.str.hoverBadgeCount', { count: draftHoverModules.length }),
-      onReset: () => {
-        draftHoverModules = [...DEFAULT_CLIENT_HOVER_MODULES];
-        syncHoverSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(
-          hoverSection,
-          { hoverModules: [...DEFAULT_CLIENT_HOVER_MODULES] },
-          'settings.resetDone'
-        );
-      },
-      children: [
-        hoverPreviewCanvas,
-        h('div', { className: 'settings-divider' }),
-        h('div', { className: 'form-row' }, [hoverModulesLabelEl, hoverModulesList.el]),
-      ],
-    });
-
-    function refreshHoverPreview() {
-      if (!isStructureVisible() || activeThirdTab !== 'hover') return;
-      const hasModules = draftHoverModules.length > 0;
-      patchAttr(hoverPreviewTipEl, 'hidden', !hasModules);
-      patchAttr(hoverPreviewEmptyEl, 'hidden', hasModules);
-      patchText(hoverPreviewEmptyEl, t('settings.str.hoverEmptyHint'));
-      hoverPreviewHost.update({
-        moduleKeys: draftHoverModules,
-        data: buildDraftTelemetry(),
-      });
-    }
-
-    function syncHoverSectionMeta() {
-      hoverModulesList.refs.setProps({
-        items: draftHoverModules,
-        options: getOverviewModuleOptions(),
-        emptyHintText: t('settings.str.hoverEmptyHint'),
-        addBtnTextFn: (count, max) => t('settings.str.addHoverModule', { count, max }),
-      });
-      hoverSection.refs.setBadge(
-        draftHoverModules.length === 0
-          ? t('settings.str.hoverBadgeOff')
-          : t('settings.str.hoverBadgeCount', { count: draftHoverModules.length })
-      );
-      hoverSection.refs.setResetDisabled(
-        isSameList(draftHoverModules, DEFAULT_CLIENT_HOVER_MODULES)
-      );
-      refreshHoverPreview();
-    }
-
-    // --- Pane 3: 实时监控布局 (`overview`) ---
-    const overviewPreviewContainerEl = h('div', { className: 'overview-modules-host is-preview' });
-    const overviewPreviewHost = createDynamicWidgetHost({
-      containerEl: overviewPreviewContainerEl,
-      mode: 'overview',
-      preview: true,
-      isVisibleFn: () => isStructureVisible() && activeThirdTab === 'overview',
-      initialModuleKeys: [],
-    });
-    const overviewPreviewCanvas = h('div', { className: 'structure-preview-canvas' }, [
-      overviewPreviewContainerEl,
-    ]);
-
-    const overviewModulesLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.overviewModulesLabel'),
-    });
-    const overviewMetricsLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.overviewMetricsLabel'),
-    });
-    const overviewMetricsHintEl = h('span', {
-      className: 'settings-hint-text',
-      hidden: true,
-      text: t('settings.str.overviewMetricsInactiveHint'),
-    });
-
-    const overviewModulesList = EditableSlotList({
-      items: draftOverviewModules,
-      options: getOverviewModuleOptions(),
-      minItems: 1,
-      maxItems: 4,
-      addBtnTextFn: (count, max) => t('settings.str.addOverviewModule', { count, max }),
-      onPreview: (previewItems) => {
-        draftOverviewModules = normalizeClientOverviewModules(previewItems);
-        patchAttr(overviewMetricsHintEl, 'hidden', draftOverviewModules.includes('metrics'));
-        refreshOverviewPreview();
-      },
-      onChange: (nextItems) => {
-        draftOverviewModules = normalizeClientOverviewModules(nextItems);
-        syncOverviewSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(overviewSection, {
-          overviewModules: draftOverviewModules,
-        });
-      },
-    });
-
-    const overviewMetricsList = EditableSlotList({
-      items: draftOverviewMetrics,
-      options: getOverviewMetricOptions(),
-      minItems: 1,
-      maxItems: 4,
-      addBtnTextFn: (count, max) => t('settings.str.addOverviewMetric', { count, max }),
-      onPreview: (previewItems) => {
-        draftOverviewMetrics = normalizeClientOverviewMetrics(previewItems);
-        refreshOverviewPreview();
-      },
-      onChange: (nextItems) => {
-        draftOverviewMetrics = normalizeClientOverviewMetrics(nextItems);
-        syncOverviewSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(overviewSection, {
-          overviewMetrics: draftOverviewMetrics,
-        });
-      },
-    });
-
-    const overviewSection = CollapsibleSection({
-      collapsible: false,
-      icon: 'pulse',
-      title: t('settings.str.overviewSection'),
-      badgeText: t('settings.str.overviewBadge', {
-        modCount: draftOverviewModules.length,
-        metCount: draftOverviewMetrics.length,
-      }),
-      onReset: () => {
-        draftOverviewModules = [...DEFAULT_CLIENT_OVERVIEW_MODULES];
-        draftOverviewMetrics = [...DEFAULT_CLIENT_OVERVIEW_METRICS];
-        syncOverviewSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(
-          overviewSection,
-          {
-            overviewModules: [...DEFAULT_CLIENT_OVERVIEW_MODULES],
-            overviewMetrics: [...DEFAULT_CLIENT_OVERVIEW_METRICS],
-          },
-          'settings.resetDone'
-        );
-      },
-      children: [
-        overviewPreviewCanvas,
-        h('div', { className: 'settings-divider' }),
-        h('div', { className: 'form-row' }, [overviewModulesLabelEl, overviewModulesList.el]),
-        h('div', { className: 'settings-divider' }),
-        h('div', { className: 'form-row' }, [
-          overviewMetricsLabelEl,
-          overviewMetricsHintEl,
-          overviewMetricsList.el,
-        ]),
-      ],
-    });
-
-    function refreshOverviewPreview() {
-      if (!isStructureVisible() || activeThirdTab !== 'overview') return;
-      overviewPreviewHost.update({
-        moduleKeys: draftOverviewModules,
-        data: buildDraftTelemetry(),
-      });
-    }
-
-    function syncOverviewSectionMeta() {
-      overviewModulesList.refs.setProps({
-        items: draftOverviewModules,
-        options: getOverviewModuleOptions(),
-        addBtnTextFn: (count, max) => t('settings.str.addOverviewModule', { count, max }),
-      });
-      overviewMetricsList.refs.setProps({
-        items: draftOverviewMetrics,
-        options: getOverviewMetricOptions(),
-        addBtnTextFn: (count, max) => t('settings.str.addOverviewMetric', { count, max }),
-      });
-      const metricsModuleActive = draftOverviewModules.includes('metrics');
-      patchAttr(overviewMetricsHintEl, 'hidden', metricsModuleActive);
-      overviewSection.refs.setBadge(
-        t('settings.str.overviewBadge', {
-          modCount: draftOverviewModules.length,
-          metCount: draftOverviewMetrics.length,
-        })
-      );
-      const isDefault =
-        isSameList(draftOverviewModules, DEFAULT_CLIENT_OVERVIEW_MODULES) &&
-        isSameList(draftOverviewMetrics, DEFAULT_CLIENT_OVERVIEW_METRICS);
-      overviewSection.refs.setResetDisabled(isDefault);
-      refreshOverviewPreview();
-    }
-
-    // --- Pane 4: 调用明细字段 (`steps`) ---
-    const stepTablePreview = StepTableWidget({
-      standalone: true,
-      interactiveBadges: false,
-    });
-    const stepsPreviewCanvas = h('div', { className: 'structure-preview-canvas' }, [
-      stepTablePreview.el,
-    ]);
-
-    const stepTurnRailLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.stepTurnRailToggle'),
-    });
-    const stepAgentBadgeLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.stepAgentBadgeToggle'),
-    });
-    const stepSpeedColorLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.stepSpeedColorToggle'),
-    });
-    const stepFilterToolbarLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.stepFilterToolbarToggle'),
-    });
-    const stepTokenComboLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.stepTokenComboLabel'),
-    });
-    const stepTokenComboHintEl = h('span', {
-      className: 'settings-hint-text',
-      text: t('settings.str.stepTokenComboHint'),
-    });
-    const stepColsLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.str.stepsColsLabel'),
-    });
-
-    const stepTurnRailToggle = ToggleSwitch({
-      ariaLabelKey: 'settings.str.stepTurnRailToggle',
-      preset: 'visibility',
-      modelValue: 'hide',
-      onUpdateModelValue: (val) => {
-        draftShowStepTurnRail = val !== 'hide';
-        syncStepsSectionMeta();
-        void persistStructurePatch(stepsSection, {
-          showStepTurnRail: draftShowStepTurnRail,
-        });
-      },
-    });
-
-    const stepAgentBadgeToggle = ToggleSwitch({
-      ariaLabelKey: 'settings.str.stepAgentBadgeToggle',
-      preset: 'visibility',
-      modelValue: 'show',
-      onUpdateModelValue: (val) => {
-        draftShowStepAgentBadge = val !== 'hide';
-        syncStepsSectionMeta();
-        void persistStructurePatch(stepsSection, {
-          showStepAgentBadge: draftShowStepAgentBadge,
-        });
-      },
-    });
-
-    const stepSpeedColorToggle = ToggleSwitch({
-      ariaLabelKey: 'settings.str.stepSpeedColorToggle',
-      preset: 'enable',
-      modelValue: 'off',
-      onUpdateModelValue: (val) => {
-        draftShowStepSpeedColor = val !== 'off';
-        syncStepsSectionMeta();
-        void persistStructurePatch(stepsSection, {
-          showStepSpeedColor: draftShowStepSpeedColor,
-        });
-      },
-    });
-
-    const stepFilterToolbarToggle = ToggleSwitch({
-      ariaLabelKey: 'settings.str.stepFilterToolbarToggle',
-      preset: 'enable',
-      modelValue: 'off',
-      onUpdateModelValue: (val) => {
-        draftShowStepFilterToolbar = val !== 'off';
-        syncStepsSectionMeta();
-        void persistStructurePatch(stepsSection, {
-          showStepFilterToolbar: draftShowStepFilterToolbar,
-        });
-      },
-    });
-
-    function commitStepTokenComboInput() {
-      const rawTrimmed = String(stepTokenComboInput.value || '').trim();
-      const normFmt = normalizeClientStepTokenComboFormat(rawTrimmed);
-      rawStepTokenComboText = normFmt;
-      draftStepTokenComboFormat = normFmt;
-      stepTokenComboInput.value = normFmt;
-      if (rawTrimmed && !draftStepColumns.includes('tokens_custom')) {
-        const comboIdx = draftStepColumns.findIndex(
-          (k) => k === 'tokens_combo' || k === 'tokens_io_cache'
-        );
-        if (comboIdx >= 0) {
-          const nextCols = [...draftStepColumns];
-          nextCols[comboIdx] = 'tokens_custom';
-          draftStepColumns = normalizeClientStepColumns(nextCols);
-        } else {
-          draftStepColumns = normalizeClientStepColumns([...draftStepColumns, 'tokens_custom']);
-        }
-      }
-      syncStepsSectionMeta();
-      props.onLayoutChange?.();
-      void persistStructurePatch(stepsSection, {
-        stepTokenComboFormat: draftStepTokenComboFormat,
-        stepTableColumns: draftStepColumns,
-      });
-    }
-
-    const stepTokenComboInput = h('input', {
-      type: 'text',
-      className: 'settings-text-input',
-      spellcheck: 'false',
-      value: rawStepTokenComboText,
-      placeholder: t('settings.str.stepTokenComboPlaceholder'),
-      'aria-label': t('settings.str.stepTokenComboLabel'),
-      onInput: () => {
-        rawStepTokenComboText = stepTokenComboInput.value;
-        draftStepTokenComboFormat = normalizeClientStepTokenComboFormat(rawStepTokenComboText);
-        stepColumnsList.refs.setProps({
-          items: draftStepColumns,
-          options: getStepColumnOptions(draftStepTokenComboFormat),
-          addBtnTextFn: (count, max) => t('settings.str.addStepCol', { count, max }),
-        });
-        refreshStepsPreview();
-      },
-      onChange: () => {
-        commitStepTokenComboInput();
-      },
-      onKeydown: (e) => {
-        if (e?.key === 'Enter') {
-          e.preventDefault();
-          stepTokenComboInput.blur();
-        }
-      },
-    });
-
-    const stepColumnsList = EditableSlotList({
-      items: draftStepColumns,
-      options: getStepColumnOptions(draftStepTokenComboFormat),
-      minItems: 2,
-      maxItems: 14,
-      addBtnTextFn: (count, max) => t('settings.str.addStepCol', { count, max }),
-      onPreview: (previewItems) => {
-        draftStepColumns = normalizeClientStepColumns(previewItems);
-        refreshStepsPreview();
-      },
-      onChange: (nextItems) => {
-        draftStepColumns = normalizeClientStepColumns(nextItems);
-        syncStepsSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(stepsSection, {
-          stepTableColumns: draftStepColumns,
-        });
-      },
-    });
-
-    const stepsSection = CollapsibleSection({
-      collapsible: false,
-      icon: 'table',
-      title: t('settings.str.stepsSection'),
-      badgeText: t('settings.str.stepsBadge', { count: draftStepColumns.length }),
-      onReset: () => {
-        draftShowStepTurnRail = false;
-        draftShowStepAgentBadge = true;
-        draftShowStepSpeedColor = false;
-        draftShowStepFilterToolbar = false;
-        draftStepTokenComboFormat = DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT;
-        rawStepTokenComboText = DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT;
-        stepTokenComboInput.value = DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT;
-        draftStepColumns = [...DEFAULT_CLIENT_STEP_COLUMNS];
-        syncStepsSectionMeta();
-        props.onLayoutChange?.();
-        void persistStructurePatch(
-          stepsSection,
-          {
-            showStepTurnRail: false,
-            showStepAgentBadge: true,
-            showStepSpeedColor: false,
-            showStepFilterToolbar: false,
-            stepTokenComboFormat: DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT,
-            stepTableColumns: [...DEFAULT_CLIENT_STEP_COLUMNS],
-          },
-          'settings.resetDone'
-        );
-      },
-      children: [
-        stepsPreviewCanvas,
-        h('div', { className: 'settings-divider' }),
-        h('div', { className: 'settings-inline-row' }, [
-          stepTurnRailLabelEl,
-          stepTurnRailToggle.el,
-        ]),
-        h('div', { className: 'settings-inline-row' }, [
-          stepAgentBadgeLabelEl,
-          stepAgentBadgeToggle.el,
-        ]),
-        h('div', { className: 'settings-inline-row' }, [
-          stepSpeedColorLabelEl,
-          stepSpeedColorToggle.el,
-        ]),
-        h('div', { className: 'settings-inline-row' }, [
-          stepFilterToolbarLabelEl,
-          stepFilterToolbarToggle.el,
-        ]),
-        h('div', { className: 'settings-divider' }),
-        h('div', { className: 'form-row' }, [
-          stepTokenComboLabelEl,
-          stepTokenComboInput,
-          stepTokenComboHintEl,
-        ]),
-        h('div', { className: 'form-row' }, [stepColsLabelEl, stepColumnsList.el]),
-      ],
-    });
-
-    function refreshStepsPreview() {
-      if (!isStructureVisible() || activeThirdTab !== 'steps') return;
-      const mockData = buildDraftTelemetry();
-      const mockSteps = mockData.activeConversation?.recentSteps || [];
-      const previewCols =
-        document?.activeElement === stepTokenComboInput &&
-        String(rawStepTokenComboText || '').trim() &&
-        !draftStepColumns.includes('tokens_custom')
-          ? normalizeClientStepColumns(
-              draftStepColumns.some((k) => k === 'tokens_combo' || k === 'tokens_io_cache')
-                ? draftStepColumns.map((k) =>
-                    k === 'tokens_combo' || k === 'tokens_io_cache' ? 'tokens_custom' : k
-                  )
-                : [...draftStepColumns, 'tokens_custom']
-            )
-          : draftStepColumns;
-      stepTablePreview.refs.renderStepTable(
-        mockSteps,
-        'mock-preview-conv',
-        previewCols,
-        getEffectiveLocale(),
-        {
-          effectiveScopes: ['all'],
-          hasSubagents: true,
-          isMergedMultiAgents: true,
-          showStepTurnRail: draftShowStepTurnRail,
-          showStepAgentBadge: draftShowStepAgentBadge,
-          showStepSpeedColor: draftShowStepSpeedColor,
-          stepTokenComboFormat: draftStepTokenComboFormat,
-          displaySettings: mockData.settings,
-        }
-      );
-    }
-
-    function syncStepsSectionMeta() {
-      stepTurnRailToggle.setProps({
-        modelValue: draftShowStepTurnRail ? 'show' : 'hide',
-      });
-      stepAgentBadgeToggle.setProps({
-        modelValue: draftShowStepAgentBadge ? 'show' : 'hide',
-      });
-      stepSpeedColorToggle.setProps({
-        modelValue: draftShowStepSpeedColor ? 'on' : 'off',
-      });
-      stepFilterToolbarToggle.setProps({
-        modelValue: draftShowStepFilterToolbar ? 'on' : 'off',
-      });
-      if (document?.activeElement !== stepTokenComboInput) {
-        stepTokenComboInput.value = rawStepTokenComboText;
-      }
-      stepColumnsList.refs.setProps({
-        items: draftStepColumns,
-        options: getStepColumnOptions(draftStepTokenComboFormat),
-        addBtnTextFn: (count, max) => t('settings.str.addStepCol', { count, max }),
-      });
-      stepsSection.refs.setBadge(t('settings.str.stepsBadge', { count: draftStepColumns.length }));
-      const isDefault =
-        draftShowStepTurnRail === false &&
-        draftShowStepAgentBadge === true &&
-        draftShowStepSpeedColor === false &&
-        draftShowStepFilterToolbar === false &&
-        draftStepTokenComboFormat === DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT &&
-        isSameList(draftStepColumns, DEFAULT_CLIENT_STEP_COLUMNS);
-      stepsSection.refs.setResetDisabled(isDefault);
-      refreshStepsPreview();
-    }
-
-    function syncPreviewTickers() {
-      const visible = isStructureVisible();
-      if (visible && activeThirdTab === 'hover') {
-        hoverPreviewHost.resumeTickers();
-      } else {
-        hoverPreviewHost.pauseTickers();
-      }
-      if (visible && activeThirdTab === 'overview') {
-        overviewPreviewHost.resumeTickers();
-      } else {
-        overviewPreviewHost.pauseTickers();
-      }
-      if (!visible || activeThirdTab !== 'steps') {
-        stepTablePreview.refs.hideTurnTip();
-      }
-    }
-
-    function refreshActivePreview() {
-      if (!isStructureVisible()) return;
-      if (activeThirdTab === 'mount') refreshMountPreview();
-      else if (activeThirdTab === 'hover') refreshHoverPreview();
-      else if (activeThirdTab === 'overview') refreshOverviewPreview();
-      else if (activeThirdTab === 'steps') refreshStepsPreview();
-    }
-
-    function applyActiveThirdTab(nextRawTab) {
-      const nextTab = normalizeStructureTabKey(nextRawTab);
-      activeThirdTab = nextTab;
-      const activeIdx = Math.max(
-        0,
-        STRUCTURE_THIRD_TABS.findIndex((it) => it.key === nextTab)
-      );
-      patchStyleVar(thirdNavBar, '--active-third-index', activeIdx);
-      for (const [key, entry] of thirdNavBtnMap.entries()) {
-        const isActive = key === nextTab;
-        patchClasses(entry.btn, { 'is-active': isActive });
-        patchAttr(entry.btn, 'aria-selected', isActive ? 'true' : 'false');
-      }
-      patchAttr(mountSection.el, 'hidden', nextTab !== 'mount');
-      patchAttr(hoverSection.el, 'hidden', nextTab !== 'hover');
-      patchAttr(overviewSection.el, 'hidden', nextTab !== 'overview');
-      patchAttr(stepsSection.el, 'hidden', nextTab !== 'steps');
-      refreshActivePreview();
-      syncPreviewTickers();
-      props.onLayoutChange?.();
-    }
-
-    const rootEl = h('div', { className: 'settings-tab-stack' }, [
-      mountSection.el,
-      hoverSection.el,
-      overviewSection.el,
-      stepsSection.el,
-    ]);
-
-    function renderSettings(
-      settings,
-      windowBridge = latestWindowBridge,
-      hostPlatform = latestHostPlatform,
-      cliStatusLine = latestCliStatusLine,
-      quotas = latestQuotas
-    ) {
-      if (!settings) return;
-      latestSettings = settings;
-      if (windowBridge !== undefined) latestWindowBridge = windowBridge;
-      if (hostPlatform) latestHostPlatform = hostPlatform;
-      if (cliStatusLine !== undefined) latestCliStatusLine = cliStatusLine;
-      if (quotas !== undefined) latestQuotas = quotas;
-      draftWindowMountMode = normalizeClientWindowMountMode(
-        settings.windowMountMode,
-        settings.enableWindowOverlay
-      );
-      draftPopoverWidthMode = normalizeClientPopoverWidthMode(settings.popoverWidthMode);
-      draftPopoverWidth = normalizeClientPopoverWidth(settings.popoverWidth);
-      draftEnableCliStatusLine = settings.enableCliStatusLine !== false;
-      draftCliStatusLineSlots = normalizeClientCliStatusLineSlots(settings.cliStatusLineSlots);
-      draftShowTopbarMulti = settings.showTopbarMultiSession !== false;
-      draftContextAgentMode = normalizeClientContextAgentMode(settings.contextAgentMode);
-      draftTopbarSlots = normalizeClientTopbarSlots(settings.topbarCapsuleSlots);
-      draftHoverModules = normalizeClientHoverModules(settings.hoverModules);
-      draftOverviewModules = normalizeClientOverviewModules(settings.overviewModules);
-      draftOverviewMetrics = normalizeClientOverviewMetrics(settings.overviewMetrics);
-      draftShowStepTurnRail = settings.showStepTurnRail === true;
-      draftShowStepAgentBadge = settings.showStepAgentBadge !== false;
-      draftShowStepSpeedColor = settings.showStepSpeedColor === true;
-      draftShowStepFilterToolbar = settings.showStepFilterToolbar === true;
-      draftStepTokenComboFormat = normalizeClientStepTokenComboFormat(
-        settings.stepTokenComboFormat
-      );
-      rawStepTokenComboText = draftStepTokenComboFormat;
-      draftStepColumns = normalizeClientStepColumns(settings.stepTableColumns);
-
-      syncMountSectionMeta();
-      syncHoverSectionMeta();
-      syncOverviewSectionMeta();
-      syncStepsSectionMeta();
-    }
-
-    function refreshLabels() {
-      patchAttr(thirdNavBar, 'aria-label', t('settings.str.thirdTabAria'));
-      for (const entry of thirdNavBtnMap.values()) {
-        patchText(entry.labelEl, t(entry.labelKey));
-      }
-
-      mountSection.refs.setTitle(t('settings.str.mountSection'));
-      mountSection.refs.setResetLabel(t('settings.resetBtn'));
-      patchText(mountModeLabelEl, t('settings.str.mountMode'));
-      patchText(popoverWidthLabelEl, t('settings.str.popoverWidthLabel'));
-      popoverWidthStepper.setProps({ ariaLabel: t('settings.str.popoverWidthLabel') });
-      patchText(multiToggleLabelEl, t('settings.str.multiToggle'));
-      patchText(contextAgentModeLabelEl, t('settings.str.contextAgentModeLabel'));
-      patchText(cliCapsuleLabelEl, t('settings.str.cliCapsuleToggle'));
-      patchText(cliSlotsLabelEl, t('settings.str.cliSlotsLabel'));
-      patchText(capsuleSlotsLabelEl, t('settings.str.capsuleSlotsLabel'));
-
-      hoverSection.refs.setTitle(t('settings.str.hoverSection'));
-      hoverSection.refs.setResetLabel(t('settings.resetBtn'));
-      patchText(hoverModulesLabelEl, t('settings.str.hoverModulesLabel'));
-
-      overviewSection.refs.setTitle(t('settings.str.overviewSection'));
-      overviewSection.refs.setResetLabel(t('settings.resetBtn'));
-      patchText(overviewModulesLabelEl, t('settings.str.overviewModulesLabel'));
-      patchText(overviewMetricsLabelEl, t('settings.str.overviewMetricsLabel'));
-      patchText(overviewMetricsHintEl, t('settings.str.overviewMetricsInactiveHint'));
-
-      stepsSection.refs.setTitle(t('settings.str.stepsSection'));
-      stepsSection.refs.setResetLabel(t('settings.resetBtn'));
-      patchText(stepTurnRailLabelEl, t('settings.str.stepTurnRailToggle'));
-      patchText(stepAgentBadgeLabelEl, t('settings.str.stepAgentBadgeToggle'));
-      patchText(stepSpeedColorLabelEl, t('settings.str.stepSpeedColorToggle'));
-      patchText(stepFilterToolbarLabelEl, t('settings.str.stepFilterToolbarToggle'));
-      stepFilterToolbarToggle.setProps({ ariaLabel: t('settings.str.stepFilterToolbarToggle') });
-      patchText(stepTokenComboLabelEl, t('settings.str.stepTokenComboLabel'));
-      patchText(stepTokenComboHintEl, t('settings.str.stepTokenComboHint'));
-      patchAttr(stepTokenComboInput, 'placeholder', t('settings.str.stepTokenComboPlaceholder'));
-      patchAttr(stepTokenComboInput, 'aria-label', t('settings.str.stepTokenComboLabel'));
-      patchText(stepColsLabelEl, t('settings.str.stepsColsLabel'));
-
-      syncMountSectionMeta();
-      syncHoverSectionMeta();
-      syncOverviewSectionMeta();
-      syncStepsSectionMeta();
-    }
-
-    let wasStructureVisible = isStructureVisible();
-    const unsubUi = uiStore.subscribe(
-      (st) => ({
-        activeView: getVisibleMonitorView(st),
-        settingsSubTab: st.settingsSubTab,
-        settingsStructureTab: st.settingsStructureTab,
-      }),
-      (slice) => {
-        const nowVisible =
-          slice.activeView === 'settings' && slice.settingsSubTab === 'structure';
-        const enteredStructure = nowVisible && !wasStructureVisible;
-        wasStructureVisible = nowVisible;
-        if (normalizeStructureTabKey(slice.settingsStructureTab) !== activeThirdTab) {
-          applyActiveThirdTab(slice.settingsStructureTab);
-        } else {
-          if (enteredStructure) {
-            refreshActivePreview();
-          }
-          syncPreviewTickers();
-        }
-      }
-    );
-
-    syncMountSectionMeta();
-    syncHoverSectionMeta();
-    syncOverviewSectionMeta();
-    syncStepsSectionMeta();
-    applyActiveThirdTab(activeThirdTab);
-
-    onCleanup(() => {
-      unsubUi();
-      mountBridgeNotice.destroy();
-      capsulePreviewWidget.destroy();
-      hoverPreviewHost.destroy();
-      overviewPreviewHost.destroy();
-      stepTablePreview.destroy();
-      windowMountSelect.destroy();
-      popoverWidthStepper.destroy();
-      popoverWidthModeToggle.destroy();
-      multiSessionToggle.destroy();
-      contextAgentModeToggle.destroy();
-      cliCapsuleToggle.destroy();
-      cliSlotsList.destroy();
-      topbarSlotsList.destroy();
-      hoverModulesList.destroy();
-      overviewModulesList.destroy();
-      overviewMetricsList.destroy();
-      stepTurnRailToggle.destroy();
-      stepAgentBadgeToggle.destroy();
-      stepSpeedColorToggle.destroy();
-      stepFilterToolbarToggle.destroy();
-      stepColumnsList.destroy();
-      mountSection.destroy();
-      hoverSection.destroy();
-      overviewSection.destroy();
-      stepsSection.destroy();
-    });
-
-    return {
-      el: rootEl,
-      refs: {
-        thirdNavBar,
-        capsulePreviewWidget,
-        mountBridgeNotice,
-        hoverPreviewHost,
-        overviewPreviewHost,
-        stepTablePreview,
-        windowMountSelect,
-        multiSessionToggle,
-        contextAgentModeToggle,
-        cliCapsuleToggle,
-        cliStatusGroupEl,
-        cliStatusDetailEl,
-        cliPreviewEl,
-        cliSlotsList,
-        cliStatusFooterEl,
-        cliStatusHintEl,
-        cliStatusActionBtn,
-        topbarSlotsList,
-        hoverModulesList,
-        overviewModulesList,
-        overviewMetricsList,
-        stepTurnRailToggle,
-        stepAgentBadgeToggle,
-        stepSpeedColorToggle,
-        stepFilterToolbarToggle,
-        stepColumnsList,
-        mountSection,
-        hoverSection,
-        overviewSection,
-        stepsSection,
-        renderSettings,
-        refreshLabels,
-      },
-    };
-  },
-});
-return { SettingsStructureTab };
-})();
-
-// --- src/views/settings/SettingsAccountTab.js ---
-const { SettingsAccountTab } = (() => {
-/**
- * @fileoverview Multi-account switcher, quota trajectory chart, risk gate, and passphrase vault UI.
- * Reuses `SegmentedControl`, `CustomSelect`, `AccountQuotaTrendCard`, `.ctx-risk-mask`,
- * `.settings-bridge-notice`, `.status-tag`, `.btn-ghost-sm`, `.btn-danger-confirm`, and `.quota-pool-row`.
- */
-
-
-const key = (name) => `settings.account.${name}`;
-const fmtPct = (v) => String(+Number(v).toFixed(1));
-
-let warmAccountCache = null;
-
-const errors = new Set([
-  'unsupported', 'invalidEmail', 'invalidCredential', 'credentialTooLarge', 'notFound',
-  'noCurrentCredential', 'busy', 'storeFailed', 'rollbackFailed', 'credentialAccessDenied',
-  'credentialChanged', 'credentialRejected', 'identityMismatch', 'oauthClientUnavailable',
-  'oauthUnavailable', 'quotaUnavailable',
-  'switchStartFailed', 'clientCloseFailed', 'clientRestartFailed',
-  'loginStartFailed', 'loginExchangeFailed', 'loginExpired', 'loginDenied',
-  'vaultLocked', 'wrongPassword', 'invalidPassword', 'passwordMismatch',
-  'passwordRateLimited', 'vaultDecryptFailed', 'invalidActionNonce', 'riskNotAccepted',
-]);
-
-const okToastKeys = new Set([
-  'saved', 'removed', 'switched',
-  'pwdEnabledToast', 'pwdChangedToast', 'pwdDisabledToast',
-  'vaultUnlockedToast', 'vaultLockedToast', 'vaultResetToast',
-]);
-
-function getAccountRefreshOptions() {
-  return [
-    { value: 10, label: t(key('refresh10m')) },
-    { value: 30, label: t(key('refresh30m')) },
-    { value: 60, label: t(key('refresh1h')) },
-    { value: 180, label: t(key('refresh3h')) },
-    { value: 360, label: t(key('refresh6h')) },
-    { value: 720, label: t(key('refresh12h')) },
-    { value: 1440, label: t(key('refresh24h')) },
-  ];
-}
-
-function getPwdModeOptions() {
-  return [
-    { value: 'change', label: t(key('pwdTabChange')) },
-    { value: 'disable', label: t(key('pwdTabDisable')) },
-  ];
-}
-
-function formatValidCountdown(isoTime) {
-  if (!isoTime) return '';
-  const ms = Date.parse(isoTime);
-  if (!Number.isFinite(ms) || ms <= Date.now()) return '';
-  return formatCountdown(isoTime);
-}
-
-function syncRemainingMeter(wrapEl, quotaLabelEl, resetEl, fillEl, hasData, labelText, remVal, resetTime) {
-  patchAttr(wrapEl, 'hidden', !hasData);
-  if (!hasData) return;
-  const clamped = Math.max(0, Math.min(100, Number(remVal) || 0));
-  patchText(quotaLabelEl, labelText);
-  const cd = formatValidCountdown(resetTime);
-  patchText(resetEl, cd);
-  patchAttr(resetEl, 'hidden', !cd);
-  patchStyleVar(fillEl, '--fill-w', `${+clamped.toFixed(1)}%`);
-  patchClasses(fillEl, {
-    'tone-warn': clamped > 15 && clamped <= 30,
-    'tone-danger': clamped <= 15,
-  });
-}
-
-function renderQuotaRows(container, quotaPools) {
-  const locale = getEffectiveLocale();
-  const pools = (Array.isArray(quotaPools) ? quotaPools : []).filter(
-    (pool) => Number.isFinite(pool?.remainingPct) || Number.isFinite(pool?.weeklyRemainingPct)
-  );
-  patchKeyedList(container, pools, {
-    keyFn: (pool) => pool.poolKey || pool.poolLabel,
-    sigFn: (pool, idx) =>
-      JSON.stringify([
-        idx > 0,
-        locale,
-        pool.poolLabel,
-        pool.remainingPct,
-        pool.weeklyRemainingPct,
-        pool.resetTime,
-        pool.weeklyResetTime,
-      ]),
-    createRow: () => {
-      const poolTitle = h('div', { className: 'account-pool-label' });
-
-      const label5h = h('span', { className: 'quota-win-title settings-account-quota text-mono' });
-      const reset5h = h('span', { className: 'panel-meta quota-win-meta text-mono', hidden: true });
-      const fill5h = h('div', { className: 'progress-fill' });
-      const meter5h = h('div', { className: 'account-meter-col' }, [
-        h('div', { className: 'panel-header quota-win-head' }, [
-          h('span', { className: 'quota-win-left' }, [label5h]),
-          reset5h,
-        ]),
-        h('div', { className: 'progress-track' }, [fill5h]),
-      ]);
-
-      const labelWk = h('span', { className: 'quota-win-title settings-account-quota text-mono' });
-      const resetWk = h('span', { className: 'panel-meta quota-win-meta text-mono', hidden: true });
-      const fillWk = h('div', { className: 'progress-fill' });
-      const meterWk = h('div', { className: 'account-meter-col' }, [
-        h('div', { className: 'panel-header quota-win-head' }, [
-          h('span', { className: 'quota-win-left' }, [labelWk]),
-          resetWk,
-        ]),
-        h('div', { className: 'progress-track' }, [fillWk]),
-      ]);
-
-      const gridEl = h('div', { className: 'account-pool-meters' }, [meter5h, meterWk]);
-      const el = h('div', { className: 'quota-pool-row' }, [poolTitle, gridEl]);
-      return {
-        el,
-        refs: { el, poolTitle, gridEl, meter5h, label5h, reset5h, fill5h, meterWk, labelWk, resetWk, fillWk },
-      };
-    },
-    updateRow: (refs, pool, idx) => {
-      patchClasses(refs.el, { 'has-divider': idx > 0 });
-      patchText(refs.poolTitle, pool.poolLabel || pool.poolKey);
-      const has5h = Number.isFinite(pool.remainingPct);
-      const hasWk = Number.isFinite(pool.weeklyRemainingPct);
-      patchClasses(refs.gridEl, { 'is-single': (has5h ? 1 : 0) + (hasWk ? 1 : 0) <= 1 });
-
-      syncRemainingMeter(
-        refs.meter5h,
-        refs.label5h,
-        refs.reset5h,
-        refs.fill5h,
-        has5h,
-        has5h ? t(key('quota5h'), { percent: fmtPct(pool.remainingPct) }) : '',
-        pool.remainingPct,
-        pool.resetTime
-      );
-      syncRemainingMeter(
-        refs.meterWk,
-        refs.labelWk,
-        refs.resetWk,
-        refs.fillWk,
-        hasWk,
-        hasWk ? t(key('quotaWeekly'), { percent: fmtPct(pool.weeklyRemainingPct) }) : '',
-        pool.weeklyRemainingPct,
-        pool.weeklyResetTime
-      );
-    },
-  });
-  patchAttr(container, 'hidden', pools.length === 0);
-  return pools.length;
-}
-
-function needsLegacyUltraTierRefresh(cached) {
-  if (!cached || cached.tierId || cached.tierMultiplier) return false;
-  const name = String(cached.tierName || '');
-  return /\bultra\b/i.test(name) && !/\b(?:5x|20x)\b/i.test(name);
-}
-
-function isValidVaultPassphrase(raw) {
-  return typeof raw === 'string' && raw.length >= 4 && raw.length <= 128 && Boolean(raw.trim());
-}
-
-const SettingsAccountTab = defineComponent({
-  name: 'SettingsAccountTab',
-  setup({ props, onCleanup }) {
-    const initialSettings = telemetryStore.getState().telemetry?.settings;
-    let account = null;
-    let quotas = null;
-    let refreshMinutes = normalizeAccountQuotaRefreshMinutes(
-      initialSettings?.accountQuotaRefreshMinutes ?? DEFAULT_ACCOUNT_QUOTA_REFRESH_MINUTES
-    );
-    let draftRiskAccepted = Boolean(initialSettings?.accountSwitchRiskAccepted);
-    let acceptingRisk = false;
-    let riskLockedFromServer = warmAccountCache ? Boolean(warmAccountCache.riskLocked) : true;
-    let accounts = warmAccountCache ? [...warmAccountCache.accounts] : [];
-    let selectedEmail = warmAccountCache ? warmAccountCache.selectedEmail : '';
-    let supported = warmAccountCache ? warmAccountCache.supported : null;
-    let vaultSecurity = warmAccountCache?.vaultSecurity
-      ? { ...warmAccountCache.vaultSecurity }
-      : { enabled: false, unlocked: true };
-    let quotaHistory = warmAccountCache?.quotaHistory ? { ...warmAccountCache.quotaHistory } : {};
-    let actionNonce = warmAccountCache?.actionNonce || '';
-    let operation = '';
-    let status = '';
-    let statusClearTimer = null;
-    let confirmTarget = null;
-    let confirmClearTimer = null;
-    let switchState = null;
-    let importOpen = false;
-    let pwdDrawerOpen = false;
-    let pwdManageMode = 'change';
-    let forgotResetOpen = false;
-    let refreshingSavedQuotas = false;
-    let disposed = false;
-    let loginSession = null;
-    let loginTimer;
-    let loginGeneration = 0;
-    let loginRefreshEmail = '';
-    const savedQuotas = new Map(warmAccountCache ? warmAccountCache.savedQuotasEntries : []);
-    const quotaInFlight = new Set();
-    const quotaVisibleLoading = new Set();
-    const quotaErrors = new Map();
-
-    function isVaultLocked() {
-      return Boolean(vaultSecurity?.enabled && !vaultSecurity?.unlocked);
-    }
-
-    function syncWarmCache() {
-      if (supported !== true) return;
-      warmAccountCache = {
-        supported,
-        riskLocked: riskLockedFromServer,
-        accounts: [...accounts],
-        selectedEmail,
-        savedQuotasEntries: [...savedQuotas.entries()],
-        vaultSecurity: { ...vaultSecurity },
-        quotaHistory: { ...quotaHistory },
-        actionNonce,
-      };
-    }
-
-    function clearConfirmTarget(shouldRender = false) {
-      if (confirmClearTimer) {
-        clearTimeout(confirmClearTimer);
-        confirmClearTimer = null;
-      }
-      if (!confirmTarget) return;
-      confirmTarget = null;
-      if (shouldRender && !disposed) render();
-    }
-
-    function armOrRunConfirm(type, targetKey, runFn) {
-      if (confirmTarget && confirmTarget.type === type && confirmTarget.key === targetKey) {
-        clearConfirmTarget(false);
-        runFn();
-        return;
-      }
-      if (confirmClearTimer) clearTimeout(confirmClearTimer);
-      confirmTarget = { type, key: targetKey };
-      confirmClearTimer = setTimeout(() => clearConfirmTarget(true), 4500);
-      render();
-    }
-
-    function setTransientStatus(nextStatus, autoClearMs = 0) {
-      if (statusClearTimer) {
-        clearTimeout(statusClearTimer);
-        statusClearTimer = null;
-      }
-      status = nextStatus;
-      if (nextStatus && autoClearMs > 0) {
-        statusClearTimer = setTimeout(() => {
-          statusClearTimer = null;
-          if (!disposed && status === nextStatus) {
-            status = '';
-            render();
-          }
-        }, autoClearMs);
-      }
-    }
-
-    function clearPasswordInputs() {
-      unlockInput.value = '';
-      pwdCurrentInput.value = '';
-      pwdNewInput.value = '';
-      pwdConfirmInput.value = '';
-    }
-
-    // --- Section 1: Active Account Card Host ---
-    const activeCardHost = h('div', { className: 'account-cards-stack' });
-
-    // --- Section 2: Quota Trend Line Chart Card ---
-    const quotaTrendCard = AccountQuotaTrendCard();
-
-    // --- Section 3: Multi-Account Toolbar, Drawers, Backup Cards & Risk Gate ---
-    const loginBtnLabel = h('span');
-    const loginButton = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-primary settings-account-login',
-        onClick: () => {
-          clearConfirmTarget(false);
-          void request('loginStart', { language: getEffectiveLocale() });
-        },
-      },
-      [createSvgIcon('plus', { size: 12 }), loginBtnLabel]
-    );
-    const cancelLogin = h('button', {
-      type: 'button',
-      className: 'btn-secondary settings-account-login-cancel',
-      hidden: true,
-      onClick: () => request('loginCancel', { id: loginSession?.id }),
-    });
-    const importToggleLabel = h('span');
-    const importToggleBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary',
-        onClick: () => {
-          clearConfirmTarget(false);
-          importOpen = !importOpen;
-          if (importOpen) {
-            pwdDrawerOpen = false;
-            clearPasswordInputs();
-          }
-          render();
-          if (importOpen) credential.focus?.();
-        },
-      },
-      [importToggleLabel]
-    );
-
-    const pwdToggleIcon = createSvgIcon('lock', { size: 12 });
-    const pwdToggleLabel = h('span');
-    const pwdToggleBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary settings-account-pwd-toggle',
-        onClick: () => {
-          clearConfirmTarget(false);
-          pwdDrawerOpen = !pwdDrawerOpen;
-          if (pwdDrawerOpen) {
-            importOpen = false;
-            pwdManageMode = 'change';
-            pwdModeSegment.setProps({ modelValue: 'change', options: getPwdModeOptions() });
-          }
-          clearPasswordInputs();
-          render();
-          if (pwdDrawerOpen) {
-            (vaultSecurity.enabled ? pwdCurrentInput : pwdNewInput).focus?.();
-          }
-        },
-      },
-      [pwdToggleIcon, pwdToggleLabel]
-    );
-
-    const lockNowLabel = h('span');
-    const lockNowBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary settings-account-lock-now',
-        hidden: true,
-        onClick: () => {
-          clearConfirmTarget(false);
-          pwdDrawerOpen = false;
-          importOpen = false;
-          clearPasswordInputs();
-          void request('lockVault');
-        },
-      },
-      [createSvgIcon('lock', { size: 12 }), lockNowLabel]
-    );
-
-    const feedback = h('span', {
-      className: 'settings-action-desc account-status-inline',
-      role: 'status',
-      hidden: true,
-    });
-    const refreshIntervalSelect = CustomSelect({
-      className: 'account-refresh-select',
-      icon: 'clock',
-      modelValue: refreshMinutes,
-      options: getAccountRefreshOptions(),
-      onUpdateModelValue: async (nextVal) => {
-        const nextMins = normalizeAccountQuotaRefreshMinutes(nextVal);
-        refreshMinutes = nextMins;
-        refreshIntervalSelect.setValue(nextMins);
-        void refreshSavedQuotas();
-        try {
-          await saveSettingsPatch({ accountQuotaRefreshMinutes: nextMins });
-        } catch {
-          // Keep selected interval locally if save fails transiently
-        }
-      },
-    });
-    patchAttr(refreshIntervalSelect.refs.triggerBtn, 'aria-label', t(key('refreshFreqAria')));
-    patchAttr(refreshIntervalSelect.refs.triggerBtn, 'title', t(key('refreshFreqAria')));
-
-    const reload = h(
-      'button',
-      {
-        type: 'button',
-        className: 'icon-btn',
-        onClick: () => request('list'),
-      },
-      [createSvgIcon('refresh', { size: 13 })]
-    );
-
-    // Locked Vault Notice (reusing `.settings-bridge-notice`)
-    const unlockHintLabel = h('span', { className: 'settings-bridge-title' });
-    const forgotToggleBtn = h('button', {
-      type: 'button',
-      className: 'btn-ghost-sm settings-account-forgot-btn',
-      onClick: () => {
-        forgotResetOpen = !forgotResetOpen;
-        clearConfirmTarget(false);
-        render();
-      },
-    });
-    const unlockInput = h('input', {
-      type: 'password',
-      className: 'settings-text-input account-import-input settings-account-unlock-input',
-      autocomplete: 'off',
-      spellcheck: 'false',
-      maxlength: 128,
-    });
-    const unlockSubmitBtn = h('button', {
-      type: 'submit',
-      className: 'btn-primary settings-account-unlock-submit',
-    });
-    const unlockForm = h(
-      'form',
-      {
-        className: 'account-import-row',
-        autocomplete: 'off',
-        onSubmit: submitUnlock,
-      },
-      [unlockInput, unlockSubmitBtn]
-    );
-    const resetHintEl = h('p', { className: 'settings-bridge-desc', hidden: true });
-    const resetVaultBtn = h('button', {
-      type: 'button',
-      className: 'btn-secondary btn-danger-confirm settings-account-reset-vault',
-      hidden: true,
-      onClick: () => {
-        armOrRunConfirm('resetVault', 'vault', () => {
-          void request('resetVault', { confirmReset: 'RESET' });
-        });
-      },
-    });
-    const unlockBox = h(
-      'div',
-      { className: 'settings-bridge-notice settings-account-unlock-box', hidden: true },
-      [
-        h('div', { className: 'settings-bridge-head' }, [
-          h('span', { className: 'settings-bridge-head-main' }, [
-            createSvgIcon('lock', { size: 13, className: 'settings-bridge-icon' }),
-            unlockHintLabel,
-          ]),
-          forgotToggleBtn,
-        ]),
-        unlockForm,
-        resetHintEl,
-        h('div', { className: 'settings-bridge-actions', hidden: true }, [resetVaultBtn]),
-      ]
-    );
-    const resetActionsWrap = resetVaultBtn.parentElement;
-
-    // Passphrase Setup / Manage Drawer (reusing `SegmentedControl`!)
-    const pwdModeSegment = SegmentedControl({
-      ariaLabel: t(key('pwdBtnManage')),
-      modelValue: pwdManageMode,
-      options: getPwdModeOptions(),
-      onUpdateModelValue: (val) => {
-        pwdManageMode = val === 'disable' ? 'disable' : 'change';
-        pwdModeSegment.setProps({ modelValue: pwdManageMode, options: getPwdModeOptions() });
-        clearPasswordInputs();
-        render();
-      },
-    });
-    const pwdCurrentInput = h('input', {
-      type: 'password',
-      className: 'settings-text-input account-import-input settings-account-pwd-current',
-      autocomplete: 'off',
-      spellcheck: 'false',
-      maxlength: 128,
-      hidden: true,
-    });
-    const pwdNewInput = h('input', {
-      type: 'password',
-      className: 'settings-text-input account-import-input settings-account-pwd-new',
-      autocomplete: 'off',
-      spellcheck: 'false',
-      maxlength: 128,
-    });
-    const pwdConfirmInput = h('input', {
-      type: 'password',
-      className: 'settings-text-input account-import-input settings-account-pwd-confirm',
-      autocomplete: 'off',
-      spellcheck: 'false',
-      maxlength: 128,
-    });
-    const pwdSubmitBtn = h('button', {
-      type: 'submit',
-      className: 'btn-primary settings-account-pwd-submit',
-    });
-    const pwdHint = h('div', { className: 'settings-action-desc' });
-    const pwdForm = h(
-      'form',
-      {
-        className: 'account-import-drawer settings-account-pwd-form',
-        autocomplete: 'off',
-        hidden: true,
-        onSubmit: submitPasswordDrawer,
-      },
-      [
-        pwdModeSegment.el,
-        h('div', { className: 'account-import-row' }, [
-          pwdCurrentInput,
-          pwdNewInput,
-          pwdConfirmInput,
-          pwdSubmitBtn,
-        ]),
-        pwdHint,
-      ]
-    );
-
-    // Credential Import Drawer
-    const credential = h('input', {
-      type: 'password',
-      className: 'settings-text-input account-import-input',
-      required: true,
-      autocomplete: 'off',
-      spellcheck: 'false',
-      maxlength: 16384,
-    });
-    const save = h('button', {
-      type: 'submit',
-      className: 'btn-primary',
-    });
-    const importHint = h('div', { className: 'settings-action-desc' });
-    const form = h(
-      'form',
-      {
-        className: 'settings-account-form account-import-drawer',
-        autocomplete: 'off',
-        hidden: true,
-        onSubmit: importCredential,
-      },
-      [
-        h('div', { className: 'account-import-row' }, [credential, save]),
-        importHint,
-      ]
-    );
-
-    // OAuth Browser Login & Switch Notices (reusing `.settings-bridge-notice`)
-    const loginMessage = h('p', {
-      className: 'settings-bridge-desc settings-action-desc',
-      role: 'status',
-      hidden: true,
-    });
-    const loginLink = h('a', {
-      className: 'settings-bridge-relaunch-btn',
-      target: '_blank',
-      rel: 'noopener noreferrer',
-      hidden: true,
-    });
-    const loginStrip = h(
-      'div',
-      { className: 'settings-bridge-notice is-restart', hidden: true },
-      [loginMessage, h('div', { className: 'settings-bridge-actions' }, [loginLink])]
-    );
-    const loginLinkWrap = loginLink.parentElement;
-
-    const pendingDesc = h('p', { className: 'settings-bridge-desc', role: 'status' });
-    const pending = h('div', { className: 'settings-bridge-notice', hidden: true }, [pendingDesc]);
-
-    const toolbarPanel = h('section', { className: 'panel account-toolbar-panel' }, [
-      h('div', { className: 'account-toolbar-row' }, [
-        h('div', { className: 'account-toolbar-left' }, [
-          loginButton,
-          cancelLogin,
-          importToggleBtn,
-          pwdToggleBtn,
-          lockNowBtn,
-        ]),
-        h('div', { className: 'account-toolbar-right' }, [
-          feedback,
-          refreshIntervalSelect.el,
-          reload,
-        ]),
-      ]),
-      unlockBox,
-      pwdForm,
-      form,
-      loginStrip,
-      pending,
-    ]);
-
-    const backupCardsHost = h('div', { className: 'account-cards-stack' });
-    const emptyPanel = h('section', { className: 'panel account-empty-panel', hidden: true }, [
-      h('div', { className: 'settings-action-desc account-empty-text' }),
-    ]);
-    const emptyTextEl = emptyPanel.firstChild;
-
-    // Risk Gate Stage (100% shared `.ctx-risk-stage` / `.ctx-risk-mask` with `SettingsOtherTab`)
-    const riskTitleEl = h('strong', {
-      className: 'ctx-risk-title',
-      text: t('settings.oth.ctxRiskTitle'),
-    });
-    const riskBodyEl = h('p', {
-      className: 'ctx-risk-desc',
-      text: t(key('riskBody')),
-    });
-    const riskAcceptBtnText = h('span', { text: t('settings.oth.ctxRiskAcceptBtn') });
-    const riskAcceptBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary btn-danger-confirm ctx-risk-accept-btn settings-account-risk-accept',
-        onClick: async () => {
-          if (acceptingRisk || draftRiskAccepted) return;
-          acceptingRisk = true;
-          draftRiskAccepted = true;
-          render();
-          try {
-            await saveSettingsPatch({ accountSwitchRiskAccepted: true });
-            await request('list');
-          } catch {
-            draftRiskAccepted = false;
-            setTransientStatus('storeFailed', 2800);
-          } finally {
-            acceptingRisk = false;
-            if (!disposed) render();
-          }
-        },
-      },
-      [createSvgIcon('warning', { size: 12 }), riskAcceptBtnText]
-    );
-    const riskMask = h(
-      'div',
-      {
-        className: 'ctx-risk-mask settings-account-risk-mask',
-        role: 'region',
-        'aria-label': t('settings.oth.ctxRiskTitle'),
-      },
-      [
-        h('div', { className: 'ctx-risk-head' }, [
-          createSvgIcon('warning', { size: 14, className: 'ctx-risk-icon' }),
-          riskTitleEl,
-        ]),
-        riskBodyEl,
-        riskAcceptBtn,
-      ]
-    );
-    const managedControlsBody = h('div', { className: 'ctx-controls-body is-locked' }, [
-      toolbarPanel,
-      backupCardsHost,
-    ]);
-    const riskStage = h('div', { className: 'ctx-risk-stage' }, [managedControlsBody, riskMask]);
-
-    function resolveActiveEmail() {
-      return account?.status === 'signedIn' ? (account.email || '').trim().toLowerCase() : '';
-    }
-
-    function createAccountCardDom(entry) {
-      const emailEl = h('span', {
-        className: 'settings-account-identity account-card-email',
-        text: entry.email,
-        title: entry.email,
-      });
-      const tierPill = h('span', { className: 'status-tag state-synced', hidden: true });
-      const statePill = h('span', { className: 'status-tag', hidden: true });
-
-      const captureBtn = h('button', {
-        type: 'button',
-        className: 'btn-ghost-sm',
-        hidden: true,
-        onClick: () => {
-          clearConfirmTarget(false);
-          void request('capture');
-        },
-      });
-      const selectBtn = h('button', {
-        type: 'button',
-        className: 'btn-ghost-sm',
-        hidden: true,
-        onClick: () => {
-          armOrRunConfirm('switch', entry.email, () => {
-            const curActive = resolveActiveEmail();
-            void request('switch', {
-              email: entry.email,
-              ...(curActive ? { activeEmail: curActive } : {}),
-            });
-          });
-        },
-      });
-      const loadQuotaBtn = h(
-        'button',
-        {
-          type: 'button',
-          className: 'icon-btn settings-account-load-quota',
-          hidden: true,
-          onClick: () => {
-            clearConfirmTarget(false);
-            void request('quota', { email: entry.email, manual: true });
-          },
-        },
-        [createSvgIcon('refresh', { size: 12 })]
-      );
-      const removeBtn = h(
-        'button',
-        {
-          type: 'button',
-          className: 'icon-btn slot-remove-btn settings-account-remove',
-          hidden: true,
-          onClick: () => {
-            armOrRunConfirm('remove', entry.email, () => {
-              void request('remove', { email: entry.email });
-            });
-          },
-        },
-        [createSvgIcon('close', { size: 12 })]
-      );
-      const removeConfirmBtn = h('button', {
-        type: 'button',
-        className: 'btn-ghost-sm btn-danger-confirm settings-account-remove-confirm',
-        hidden: true,
-        onClick: () => {
-          armOrRunConfirm('remove', entry.email, () => {
-            void request('remove', { email: entry.email });
-          });
-        },
-      });
-
-      const actionsWrap = h('div', { className: 'account-card-actions' }, [
-        captureBtn,
-        selectBtn,
-        loadQuotaBtn,
-        removeBtn,
-        removeConfirmBtn,
-      ]);
-      const poolsWrap = h('div', { className: 'account-pools-stack' });
-      const noteEl = h('div', { className: 'settings-action-desc account-card-note', hidden: true });
-
-      const cardEl = h('section', { className: 'panel account-card' }, [
-        h('div', { className: 'panel-header account-card-head' }, [
-          h('div', { className: 'account-card-meta' }, [emailEl, tierPill, statePill]),
-          actionsWrap,
-        ]),
-        poolsWrap,
-        noteEl,
-      ]);
-      return {
-        el: cardEl,
-        refs: {
-          cardEl,
-          emailEl,
-          tierPill,
-          statePill,
-          actionsWrap,
-          captureBtn,
-          selectBtn,
-          loadQuotaBtn,
-          removeBtn,
-          removeConfirmBtn,
-          poolsWrap,
-          noteEl,
-        },
-      };
-    }
-
-    function updateAccountCardDom(row, entry, ctx) {
-      const addr = entry.email;
-      const active = entry.isActive;
-      const isSaved = entry.isSaved;
-      const written = addr === selectedEmail && !active && switchState?.state === 'written';
-      const cached = active ? null : savedQuotas.get(addr);
-      const tierText = active
-        ? ctx.activeTierBadge
-        : cached?.tierName || cached?.tierId
-          ? formatAccountTierBadge({
-              tierId: cached.tierId,
-              tierName: cached.tierName,
-              tierMultiplier: cached.tierMultiplier,
-            })
-          : '';
-      const isSpinning = !active && quotaVisibleLoading.has(addr);
-      const canSwitch = !active && isSaved && ctx.riskAccepted;
-      const armedSwitch = confirmTarget?.type === 'switch' && confirmTarget.key === addr;
-      const armedRemove = confirmTarget?.type === 'remove' && confirmTarget.key === addr;
-
-      patchClasses(row.cardEl, { 'is-active-account': active });
-      patchText(row.emailEl, addr);
-      patchAttr(row.emailEl, 'title', addr);
-
-      patchText(row.tierPill, tierText);
-      patchAttr(row.tierPill, 'hidden', !tierText);
-
-      patchText(row.statePill, active ? t(key('active')) : written ? t(key('written')) : '');
-      patchClasses(row.statePill, { 'state-warn': written && !active });
-      patchAttr(row.statePill, 'hidden', !active && !written);
-
-      const showCapture = active && !isSaved && ctx.riskAccepted && supported !== false;
-      const showRemove = isSaved && ctx.riskAccepted;
-      const showQuotaRefresh = !active && isSaved && ctx.riskAccepted;
-      const hasAnyAction = showCapture || canSwitch || showQuotaRefresh || showRemove;
-      patchAttr(row.actionsWrap, 'hidden', !hasAnyAction);
-
-      patchText(row.captureBtn, t(key('capture')));
-      patchAttr(row.captureBtn, 'hidden', !showCapture);
-      patchAttr(row.captureBtn, 'disabled', !ctx.canWrite);
-
-      patchText(row.selectBtn, t(key(armedSwitch ? 'switchConfirm' : 'switch')));
-      patchAttr(row.selectBtn, 'title', t(key('switchHint')));
-      patchClasses(row.selectBtn, {
-        'settings-account-switch': canSwitch,
-        'btn-danger-confirm': armedSwitch,
-      });
-      patchAttr(row.selectBtn, 'hidden', !canSwitch);
-      patchAttr(row.selectBtn, 'disabled', !ctx.canWrite);
-
-      patchAttr(row.loadQuotaBtn, 'title', t(key(isSpinning ? 'loadingQuota' : 'loadQuota')));
-      patchAttr(row.loadQuotaBtn, 'aria-label', t(key('loadQuota')));
-      patchClasses(row.loadQuotaBtn, { 'is-spinning': isSpinning });
-      patchAttr(row.loadQuotaBtn, 'hidden', !showQuotaRefresh);
-      patchAttr(row.loadQuotaBtn, 'disabled', !ctx.canWrite || isSpinning);
-
-      patchAttr(row.removeBtn, 'title', t(key('remove')));
-      patchAttr(row.removeBtn, 'aria-label', t(key('remove')));
-      patchAttr(row.removeBtn, 'hidden', !showRemove || armedRemove);
-      patchAttr(row.removeBtn, 'disabled', !ctx.canWrite);
-
-      patchText(row.removeConfirmBtn, t(key('removeConfirm')));
-      patchAttr(row.removeConfirmBtn, 'hidden', !showRemove || !armedRemove);
-      patchAttr(row.removeConfirmBtn, 'disabled', !ctx.canWrite);
-
-      const displayedPools = active ? quotas?.pools || [] : cached?.pools || [];
-      const poolCount = renderQuotaRows(row.poolsWrap, displayedPools);
-      const quotaError = active ? '' : quotaErrors.get(addr);
-
-      let noteText = '';
-      if (quotaError) {
-        noteText = t(key(quotaError));
-      } else if (active && poolCount > 0 && quotas?.meta?.isStale) {
-        noteText = t(key('quotaStale'));
-      } else if (active && poolCount === 0) {
-        noteText = t(key('noQuota'));
-      } else if (!active && cached && poolCount === 0) {
-        noteText = t(key('emptyCredentialQuota'));
-      }
-      patchText(row.noteEl, noteText);
-      patchClasses(row.noteEl, { 'is-error': Boolean(quotaError) });
-      patchAttr(row.noteEl, 'hidden', !noteText);
-    }
-
-    function render() {
-      const signedIn = account?.status === 'signedIn';
-      const activeEmail = resolveActiveEmail();
-      if (activeEmail && selectedEmail === activeEmail && switchState?.state !== 'starting') {
-        selectedEmail = '';
-      }
-      const riskAccepted = Boolean(draftRiskAccepted);
-      if (!riskAccepted) {
-        refreshIntervalSelect.close?.();
-      }
-      const vaultLocked = isVaultLocked();
-      const canOperateVault =
-        riskAccepted &&
-        supported === true &&
-        !operation &&
-        status !== 'restarting' &&
-        switchState?.state !== 'starting';
-      const canWrite = canOperateVault && !vaultLocked;
-      const locale = getEffectiveLocale();
-      const activeTierBadge =
-        signedIn && (account?.tierName || account?.planName)
-          ? formatAccountTierBadge(account)
-          : '';
-      const cardCtx = { riskAccepted, canWrite, activeTierBadge };
-
-      // 1. Active Logged-in Account Card
-      const activeEntries = activeEmail
-        ? [
-            {
-              email: activeEmail,
-              isActive: true,
-              isSaved: riskAccepted && accounts.includes(activeEmail),
-            },
-          ]
-        : [];
-      patchAttr(activeCardHost, 'hidden', activeEntries.length === 0);
-      patchKeyedList(activeCardHost, activeEntries, {
-        keyFn: (entry) => entry.email,
-        sigFn: (entry) =>
-          JSON.stringify([
-            locale,
-            entry.isSaved,
-            riskAccepted,
-            canWrite,
-            confirmTarget?.key === entry.email ? confirmTarget.type : '',
-            quotas,
-            activeTierBadge,
-          ]),
-        createRow: createAccountCardDom,
-        updateRow: (row, entry) => updateAccountCardDom(row, entry, cardCtx),
-      });
-
-      // 2. Quota Trend Line Chart Card (always visible; locked to activeEmail when !riskAccepted)
-      quotaTrendCard.refs.update({
-        activeEmail,
-        activePools: quotas?.pools || [],
-        riskAccepted,
-        accounts,
-        savedQuotas,
-        quotaHistory,
-      });
-
-      // 3. Risk Gate Stage & Multi-Account Controls
-      patchClasses(managedControlsBody, { 'is-locked': !riskAccepted });
-      patchAttr(managedControlsBody, 'inert', !riskAccepted);
-      patchAttr(managedControlsBody, 'aria-hidden', riskAccepted ? null : 'true');
-      patchAttr(riskMask, 'hidden', riskAccepted);
-      patchAttr(riskMask, 'aria-label', t('settings.oth.ctxRiskTitle'));
-      patchText(riskTitleEl, t('settings.oth.ctxRiskTitle'));
-      patchText(riskBodyEl, t(key('riskBody')));
-      patchText(riskAcceptBtnText, t('settings.oth.ctxRiskAcceptBtn'));
-      patchAttr(riskAcceptBtn, 'disabled', acceptingRisk);
-
-      const loginActive = ['waiting', 'exchanging', 'saving'].includes(loginSession?.status);
-      patchText(loginBtnLabel, t(key('googleLogin')));
-      patchAttr(loginButton, 'disabled', !canWrite || loginActive);
-      patchText(cancelLogin, t(key('cancelLogin')));
-      patchAttr(cancelLogin, 'hidden', !loginActive);
-      patchAttr(cancelLogin, 'disabled', Boolean(operation) || loginSession?.status === 'saving');
-
-      patchText(importToggleLabel, t(key('importExisting')));
-      patchClasses(importToggleBtn, { 'is-open': importOpen });
-      patchAttr(importToggleBtn, 'hidden', supported === false);
-      patchAttr(importToggleBtn, 'disabled', !canWrite);
-
-      patchSvgIcon(pwdToggleIcon, vaultSecurity.enabled ? 'unlock' : 'lock');
-      patchText(pwdToggleLabel, t(key(vaultSecurity.enabled ? 'pwdBtnManage' : 'pwdBtnSet')));
-      patchClasses(pwdToggleBtn, { 'is-open': pwdDrawerOpen });
-      patchAttr(pwdToggleBtn, 'hidden', supported === false || vaultLocked);
-      patchAttr(pwdToggleBtn, 'disabled', !canOperateVault);
-
-      patchText(lockNowLabel, t(key('lockNow')));
-      patchAttr(lockNowBtn, 'title', t(key('lockNowTip')));
-      patchAttr(lockNowBtn, 'hidden', !vaultSecurity.enabled || vaultLocked || supported === false);
-      patchAttr(lockNowBtn, 'disabled', !canOperateVault);
-
-      // Unlock Notice
-      patchAttr(unlockBox, 'hidden', !riskAccepted || supported !== true || !vaultLocked);
-      patchText(unlockHintLabel, t(key('vaultLockedHint')));
-      patchText(forgotToggleBtn, t(key('forgotPwdToggle')));
-      patchAttr(unlockInput, 'placeholder', t(key('unlockPlaceholder')));
-      patchAttr(unlockInput, 'disabled', !canOperateVault);
-      patchText(unlockSubmitBtn, t(key('unlockBtn')));
-      patchAttr(unlockSubmitBtn, 'disabled', !canOperateVault);
-      const showResetSection = forgotResetOpen && vaultLocked;
-      patchAttr(resetHintEl, 'hidden', !showResetSection);
-      patchAttr(resetActionsWrap, 'hidden', !showResetSection);
-      patchAttr(resetVaultBtn, 'hidden', !showResetSection);
-      patchText(resetHintEl, t(key('resetVaultHint')));
-      const armedVaultReset =
-        confirmTarget?.type === 'resetVault' && confirmTarget.key === 'vault';
-      patchText(resetVaultBtn, t(key(armedVaultReset ? 'resetVaultConfirm' : 'resetVaultBtn')));
-      patchAttr(resetVaultBtn, 'disabled', !canOperateVault);
-
-      // Passphrase Drawer (`SegmentedControl` for Change / Disable)
-      const showPwdDrawer = riskAccepted && pwdDrawerOpen && !vaultLocked && supported === true;
-      patchAttr(pwdForm, 'hidden', !showPwdDrawer);
-      if (showPwdDrawer) {
-        const isSetNew = !vaultSecurity.enabled;
-        const isDisableMode = !isSetNew && pwdManageMode === 'disable';
-        patchAttr(pwdModeSegment.el, 'hidden', isSetNew);
-        if (!isSetNew) {
-          pwdModeSegment.setProps({ modelValue: pwdManageMode, options: getPwdModeOptions() });
-        }
-
-        patchAttr(pwdCurrentInput, 'hidden', isSetNew);
-        patchAttr(pwdCurrentInput, 'placeholder', t(key('pwdCurrentPlaceholder')));
-        patchAttr(pwdCurrentInput, 'disabled', !canOperateVault);
-
-        patchAttr(pwdNewInput, 'hidden', isDisableMode);
-        patchAttr(pwdNewInput, 'placeholder', t(key('pwdNewPlaceholder')));
-        patchAttr(pwdNewInput, 'disabled', !canOperateVault);
-
-        patchAttr(pwdConfirmInput, 'hidden', isDisableMode);
-        patchAttr(pwdConfirmInput, 'placeholder', t(key('pwdConfirmPlaceholder')));
-        patchAttr(pwdConfirmInput, 'disabled', !canOperateVault);
-
-        patchText(
-          pwdSubmitBtn,
-          t(key(isSetNew ? 'pwdEnableSubmit' : isDisableMode ? 'pwdDisableSubmit' : 'pwdChangeSubmit'))
-        );
-        patchClasses(pwdSubmitBtn, {
-          'btn-primary': !isDisableMode,
-          'btn-secondary': isDisableMode,
-          'btn-danger-confirm': isDisableMode,
-        });
-        patchAttr(pwdSubmitBtn, 'disabled', !canOperateVault);
-        patchText(pwdHint, t(key(isSetNew ? 'pwdSetHint' : 'pwdManageHint')));
-      }
-
-      refreshIntervalSelect.setProps({
-        modelValue: refreshMinutes,
-        options: getAccountRefreshOptions(),
-      });
-      patchAttr(refreshIntervalSelect.refs.triggerBtn, 'aria-label', t(key('refreshFreqAria')));
-      patchAttr(refreshIntervalSelect.refs.triggerBtn, 'title', t(key('refreshFreqAria')));
-      patchAttr(refreshIntervalSelect.el, 'hidden', supported === false);
-
-      patchAttr(reload, 'title', t(key('reload')));
-      patchAttr(reload, 'aria-label', t(key('reload')));
-      patchAttr(reload, 'disabled', Boolean(operation));
-      patchClasses(reload, { 'is-spinning': operation === 'list' });
-
-      patchAttr(form, 'hidden', !riskAccepted || !importOpen || vaultLocked || supported === false);
-      patchAttr(credential, 'placeholder', t(key('credentialPlaceholder')));
-      patchAttr(credential, 'disabled', !canWrite);
-      patchText(save, t(key('save')));
-      patchAttr(save, 'disabled', !canWrite);
-      patchText(importHint, t(key('importHint')));
-
-      const loginStatusKeys = {
-        waiting: 'loginWaiting',
-        exchanging: 'loginFinishing',
-        saving: 'loginFinishing',
-        success: 'loginSuccess',
-        cancelled: 'loginCancelled',
-        expired: 'loginExpired',
-      };
-      const hasLoginSession = Boolean(loginSession?.status);
-      const loginIsError =
-        loginSession?.status === 'error' ||
-        loginSession?.status === 'expired' ||
-        loginSession?.error === 'loginDenied';
-      const loginMessageKey =
-        loginSession?.status === 'error'
-          ? errors.has(loginSession.error)
-            ? loginSession.error
-            : 'loginExchangeFailed'
-          : loginSession?.error === 'loginDenied'
-            ? 'loginDenied'
-            : loginStatusKeys[loginSession?.status] || '';
-      patchText(loginMessage, loginMessageKey ? t(key(loginMessageKey)) : '');
-      patchAttr(loginMessage, 'hidden', !loginMessageKey);
-
-      const authUrl =
-        loginSession?.status === 'waiting' &&
-        loginSession.url?.startsWith('https://accounts.google.com/o/oauth2/v2/auth?')
-          ? loginSession.url
-          : '';
-      patchText(loginLink, t(key('openLoginPage')));
-      patchAttr(loginLink, 'href', authUrl || null);
-      patchAttr(loginLink, 'hidden', !authUrl);
-      patchAttr(loginLinkWrap, 'hidden', !authUrl);
-      patchClasses(loginStrip, { 'is-restart': !loginIsError });
-      patchAttr(loginStrip, 'hidden', !hasLoginSession || !loginMessageKey);
-
-      const failedSwitch =
-        switchState?.state === 'failed' && errors.has(switchState.error) ? switchState.error : '';
-      const message =
-        status ||
-        failedSwitch ||
-        (operation === 'switch'
-          ? 'switching'
-          : operation === 'save' || operation === 'capture'
-            ? 'verifying'
-            : '');
-      const isFeedbackError = Boolean(errors.has(message));
-      const isFeedbackOk = okToastKeys.has(message);
-      patchText(feedback, message ? t(key(message)) : '');
-      patchAttr(feedback, 'title', message ? t(key(message)) : null);
-      patchClasses(feedback, {
-        'is-error': isFeedbackError,
-        'is-ok': isFeedbackOk,
-      });
-      patchAttr(feedback, 'hidden', !message);
-
-      const waiting =
-        Boolean(selectedEmail) &&
-        activeEmail !== selectedEmail &&
-        switchState?.state === 'written' &&
-        status !== 'restarting';
-      patchText(pendingDesc, waiting ? t(key('pending'), { email: selectedEmail }) : '');
-      patchAttr(pending, 'hidden', !waiting);
-
-      const backupEntries = riskAccepted
-        ? accounts
-            .filter((addr) => addr && addr !== activeEmail)
-            .map((addr) => ({ email: addr, isActive: false, isSaved: true }))
-        : [];
-      patchAttr(backupCardsHost, 'hidden', backupEntries.length === 0);
-      patchKeyedList(backupCardsHost, backupEntries, {
-        keyFn: (entry) => entry.email,
-        sigFn: (entry) =>
-          JSON.stringify([
-            locale,
-            selectedEmail,
-            switchState?.state || '',
-            canWrite,
-            confirmTarget?.key === entry.email ? confirmTarget.type : '',
-            savedQuotas.get(entry.email),
-            quotaVisibleLoading.has(entry.email),
-            quotaErrors.get(entry.email),
-          ]),
-        createRow: createAccountCardDom,
-        updateRow: (row, entry) => updateAccountCardDom(row, entry, cardCtx),
-      });
-
-      const showEmpty = !activeEmail && (!riskAccepted || backupEntries.length === 0);
-      patchText(
-        emptyTextEl,
-        t(
-          key(
-            supported === null && !activeEmail
-              ? 'loading'
-              : account?.status === 'signedOut'
-                ? 'signedOut'
-                : 'empty'
-          )
-        )
-      );
-      patchAttr(emptyPanel, 'hidden', !showEmpty);
-
-      props.onLayoutChange?.();
-    }
-
-    async function dispatchAccountPost(action, fields) {
-      let res = await callSidecarApi('/api/accounts/update', {
-        method: 'POST',
-        body: {
-          action,
-          ...fields,
-          ...(actionNonce ? { actionNonce } : {}),
-        },
-        cdpTimeoutMs: 40000,
-      });
-      if (res?.actionNonce) {
-        actionNonce = res.actionNonce;
-      }
-      if (res?.error === 'invalidActionNonce' && actionNonce) {
-        res = await callSidecarApi('/api/accounts/update', {
-          method: 'POST',
-          body: {
-            action,
-            ...fields,
-            actionNonce,
-          },
-          cdpTimeoutMs: 40000,
-        });
-        if (res?.actionNonce) {
-          actionNonce = res.actionNonce;
-        }
-      }
-      return res;
-    }
-
-    async function request(action, fields = {}) {
-      if (action !== 'list' && !draftRiskAccepted) return;
-      if (action === 'quota') return refreshQuota(fields.email, Boolean(fields.manual));
-      if (operation) return;
-      operation = action;
-      if (action === 'loginStart' || action === 'loginCancel') {
-        clearTimeout(loginTimer);
-        loginGeneration += 1;
-      }
-      setTransientStatus('');
-      render();
-      try {
-        const result =
-          action === 'list'
-            ? await callSidecarApi('/api/accounts')
-            : await dispatchAccountPost(action, fields);
-        if (disposed) return;
-        if (typeof result?.actionNonce === 'string' && result.actionNonce) {
-          actionNonce = result.actionNonce;
-        }
-        if (result?.quotaHistory && typeof result.quotaHistory === 'object') {
-          quotaHistory = { ...quotaHistory, ...result.quotaHistory };
-        }
-        if (result?.error) {
-          if (result.error === 'unsupported') supported = false;
-          if (result.error === 'vaultLocked') {
-            vaultSecurity = { enabled: true, unlocked: false };
-            syncWarmCache();
-          }
-          setTransientStatus(errors.has(result.error) ? result.error : 'storeFailed', 3600);
-          return;
-        }
-        if (action === 'loginStart' || action === 'loginCancel') {
-          applyLogin(result.login);
-          if (result.login?.status === 'success') loginRefreshEmail = result.login.email;
-          return;
-        }
-        supported = result?.supported === true;
-        riskLockedFromServer = Boolean(result?.riskLocked);
-        accounts = result?.accounts || [];
-        selectedEmail = result?.selectedEmail || '';
-        switchState = result?.switchState || null;
-        if (result?.security) {
-          vaultSecurity = {
-            enabled: Boolean(result.security.enabled),
-            unlocked: result.security.unlocked !== false,
-          };
-        } else {
-          vaultSecurity = { enabled: false, unlocked: true };
-        }
-        if (result.login) applyLogin(result.login);
-        if (action === 'resetVault') {
-          savedQuotas.clear();
-          quotaErrors.clear();
-        }
-        for (const [addr, snapshot] of Object.entries(result?.quotas || {})) {
-          savedQuotas.set(addr, snapshot);
-        }
-        syncWarmCache();
-        if (action !== 'switch' && draftRiskAccepted && !riskLockedFromServer && !isVaultLocked()) {
-          void refreshSavedQuotas();
-        }
-        if (action === 'save' || action === 'capture') {
-          importOpen = false;
-          setTransientStatus('saved', 2600);
-        } else if (action === 'remove') {
-          savedQuotas.delete(fields.email);
-          quotaErrors.delete(fields.email);
-          syncWarmCache();
-          setTransientStatus('removed', 2600);
-        } else if (action === 'switch') {
-          setTransientStatus(result.restarting ? 'restarting' : 'switchStartFailed');
-        } else if (action === 'setPassword') {
-          pwdDrawerOpen = false;
-          setTransientStatus('pwdEnabledToast', 2600);
-        } else if (action === 'changePassword') {
-          pwdDrawerOpen = false;
-          setTransientStatus('pwdChangedToast', 2600);
-        } else if (action === 'disablePassword') {
-          pwdDrawerOpen = false;
-          setTransientStatus('pwdDisabledToast', 2600);
-        } else if (action === 'unlockVault') {
-          forgotResetOpen = false;
-          quotaErrors.clear();
-          setTransientStatus('vaultUnlockedToast', 2200);
-        } else if (action === 'lockVault') {
-          pwdDrawerOpen = false;
-          importOpen = false;
-          setTransientStatus('vaultLockedToast', 2200);
-        } else if (action === 'resetVault') {
-          forgotResetOpen = false;
-          setTransientStatus('vaultResetToast', 2600);
-        }
-      } catch {
-        setTransientStatus('storeFailed', 3200);
-      } finally {
-        operation = '';
-        if (!disposed) {
-          render();
-          if (loginRefreshEmail) {
-            const email = loginRefreshEmail;
-            loginRefreshEmail = '';
-            void refreshLoginAccount(email);
-          }
-        }
-      }
-    }
-
-    async function refreshLoginAccount(email) {
-      if (disposed || !email) return;
-      if (operation) {
-        loginRefreshEmail = email;
-        return;
-      }
-      await request('list');
-      if (!disposed && draftRiskAccepted && !isVaultLocked() && email !== resolveActiveEmail()) {
-        void refreshQuota(email, false);
-      }
-    }
-
-    function applyLogin(session) {
-      loginSession = session;
-      clearTimeout(loginTimer);
-      if (['waiting', 'exchanging', 'saving'].includes(session?.status)) {
-        loginTimer = setTimeout(() => pollLogin(session.id, loginGeneration), 1000);
-      }
-    }
-
-    async function pollLogin(id, generation) {
-      try {
-        const result = await callSidecarApi('/api/accounts/update', {
-          method: 'POST',
-          body: { action: 'loginStatus', id, ...(actionNonce ? { actionNonce } : {}) },
-          cdpTimeoutMs: 10000,
-        });
-        if (disposed || generation !== loginGeneration) return;
-        if (typeof result?.actionNonce === 'string' && result.actionNonce) {
-          actionNonce = result.actionNonce;
-        }
-        if (result.error) throw new Error(result.error);
-        applyLogin(result.login);
-        if (loginSession?.status === 'success') await refreshLoginAccount(loginSession.email);
-      } catch {
-        if (disposed || generation !== loginGeneration) return;
-        loginSession = { id, status: 'error', error: 'loginStartFailed' };
-      }
-      if (!disposed) render();
-    }
-
-    async function refreshSavedQuotas() {
-      if (refreshingSavedQuotas || !draftRiskAccepted || isVaultLocked()) return;
-      refreshingSavedQuotas = true;
-      try {
-        const activeEmail = resolveActiveEmail();
-        const ttlMs = refreshMinutes * 60_000;
-        const staleTargets = accounts.filter((addr) => {
-          if (!addr || addr === activeEmail) return false;
-          const cached = savedQuotas.get(addr);
-          if (needsLegacyUltraTierRefresh(cached)) return true;
-          return Date.now() - (cached?.fetchedAt || 0) >= ttlMs;
-        });
-        const BATCH_SIZE = 3;
-        for (let i = 0; i < staleTargets.length; i += BATCH_SIZE) {
-          if (disposed || operation === 'switch' || !draftRiskAccepted || isVaultLocked()) break;
-          const batch = staleTargets.slice(i, i + BATCH_SIZE);
-          await Promise.all(batch.map((addr) => refreshQuota(addr, false)));
-        }
-      } finally {
-        refreshingSavedQuotas = false;
-      }
-    }
-
-    async function refreshQuota(addr, manual = false) {
-      const activeEmail = resolveActiveEmail();
-      if (
-        !addr ||
-        addr === activeEmail ||
-        !draftRiskAccepted ||
-        isVaultLocked() ||
-        quotaInFlight.has(addr) ||
-        disposed
-      ) {
-        return;
-      }
-      const hasCachedPools = Boolean(savedQuotas.get(addr)?.pools?.length);
-      const showSpinner = manual || !hasCachedPools;
-      quotaInFlight.add(addr);
-      if (showSpinner) quotaVisibleLoading.add(addr);
-      quotaErrors.delete(addr);
-      if (showSpinner || quotaErrors.size > 0) render();
-      try {
-        const result = await callSidecarApi('/api/accounts/update', {
-          method: 'POST',
-          body: { action: 'quota', email: addr, ...(actionNonce ? { actionNonce } : {}) },
-          cdpTimeoutMs: 40000,
-        });
-        if (typeof result?.actionNonce === 'string' && result.actionNonce) {
-          actionNonce = result.actionNonce;
-        }
-        if (result?.error === 'vaultLocked') {
-          vaultSecurity = { enabled: true, unlocked: false };
-          syncWarmCache();
-          return;
-        }
-        if (result?.error) {
-          if (manual || !hasCachedPools) {
-            quotaErrors.set(addr, errors.has(result.error) ? result.error : 'quotaUnavailable');
-          }
-        } else {
-          const prev = savedQuotas.get(addr) || {};
-          const nextTierId = result.tierId || prev.tierId || '';
-          const nextTierName = result.tierName || prev.tierName || '';
-          const nextTierMult = result.tierMultiplier || prev.tierMultiplier || '';
-          const fetchedAt = result.fetchedAt || Date.now();
-          savedQuotas.set(addr, {
-            pools: result.pools,
-            fetchedAt,
-            ...(nextTierId ? { tierId: nextTierId } : {}),
-            ...(nextTierName ? { tierName: nextTierName } : {}),
-            ...(nextTierMult ? { tierMultiplier: nextTierMult } : {}),
-          });
-          syncWarmCache();
-        }
-      } catch {
-        if (manual || !hasCachedPools) {
-          quotaErrors.set(addr, 'quotaUnavailable');
-        }
-      } finally {
-        quotaInFlight.delete(addr);
-        quotaVisibleLoading.delete(addr);
-        if (!disposed) render();
-      }
-    }
-
-    function submitUnlock(event) {
-      event.preventDefault();
-      if (operation) return;
-      const pwd = unlockInput.value;
-      unlockInput.value = '';
-      if (!isValidVaultPassphrase(pwd)) {
-        setTransientStatus('wrongPassword', 3000);
-        render();
-        return;
-      }
-      void request('unlockVault', { password: pwd });
-    }
-
-    function submitPasswordDrawer(event) {
-      event.preventDefault();
-      if (operation) return;
-      const curPwd = pwdCurrentInput.value;
-      const nextPwd = pwdNewInput.value;
-      const confirmPwd = pwdConfirmInput.value;
-      clearPasswordInputs();
-
-      if (!vaultSecurity.enabled) {
-        if (!isValidVaultPassphrase(nextPwd)) {
-          setTransientStatus('invalidPassword', 3200);
-          render();
-          return;
-        }
-        if (nextPwd !== confirmPwd) {
-          setTransientStatus('passwordMismatch', 3200);
-          render();
-          return;
-        }
-        void request('setPassword', { newPassword: nextPwd });
-        return;
-      }
-
-      if (!isValidVaultPassphrase(curPwd)) {
-        setTransientStatus('wrongPassword', 3000);
-        render();
-        return;
-      }
-      if (pwdManageMode === 'disable') {
-        void request('disablePassword', { currentPassword: curPwd });
-        return;
-      }
-      if (!isValidVaultPassphrase(nextPwd)) {
-        setTransientStatus('invalidPassword', 3200);
-        render();
-        return;
-      }
-      if (nextPwd !== confirmPwd) {
-        setTransientStatus('passwordMismatch', 3200);
-        render();
-        return;
-      }
-      void request('changePassword', { currentPassword: curPwd, newPassword: nextPwd });
-    }
-
-    function importCredential(event) {
-      event.preventDefault();
-      if (operation) return;
-      const input = credential.value;
-      credential.value = '';
-      void request('save', { credential: input });
-    }
-
-    function renderAccount(value, quotaData, settingsData) {
-      const nextRefreshMins =
-        settingsData?.accountQuotaRefreshMinutes !== undefined
-          ? normalizeAccountQuotaRefreshMinutes(settingsData.accountQuotaRefreshMinutes)
-          : refreshMinutes;
-      const nextRiskAccepted =
-        acceptingRisk || settingsData?.accountSwitchRiskAccepted === undefined
-          ? draftRiskAccepted
-          : Boolean(settingsData.accountSwitchRiskAccepted);
-      if (
-        account === value &&
-        quotas === quotaData &&
-        refreshMinutes === nextRefreshMins &&
-        draftRiskAccepted === nextRiskAccepted
-      ) {
-        return;
-      }
-      const becameRiskUnlocked = !draftRiskAccepted && nextRiskAccepted;
-      account = value;
-      quotas = quotaData;
-      refreshMinutes = nextRefreshMins;
-      draftRiskAccepted = nextRiskAccepted;
-      render();
-      if (becameRiskUnlocked && riskLockedFromServer && !operation) {
-        void request('list');
-      }
-    }
-
-    const quotaScheduleTimer = setInterval(() => {
-      if (!disposed && draftRiskAccepted && accounts.length > 0 && !operation && !isVaultLocked()) {
-        void refreshSavedQuotas();
-      }
-    }, 60_000);
-    quotaScheduleTimer.unref?.();
-
-    const root = h('div', { className: 'settings-tab-stack settings-account-root' }, [
-      quotaTrendCard.el,
-      activeCardHost,
-      emptyPanel,
-      riskStage,
-    ]);
-    render();
-    onCleanup(() => {
-      disposed = true;
-      clearTimeout(loginTimer);
-      clearInterval(quotaScheduleTimer);
-      if (statusClearTimer) clearTimeout(statusClearTimer);
-      if (confirmClearTimer) clearTimeout(confirmClearTimer);
-      refreshIntervalSelect.destroy();
-      pwdModeSegment.destroy();
-      quotaTrendCard.destroy();
-      loginGeneration += 1;
-      credential.value = '';
-      clearPasswordInputs();
-    });
-    return {
-      el: root,
-      refs: {
-        renderAccount,
-        refreshLabels: () => {
-          quotaTrendCard.refs.refreshLabels();
-          render();
-        },
-        preload: () => (supported === null ? request('list') : Promise.resolve()),
-        load: () =>
-          supported === null || (draftRiskAccepted && riskLockedFromServer)
-            ? request('list')
-            : draftRiskAccepted
-              ? refreshSavedQuotas()
-              : Promise.resolve(),
-      },
-    };
-  },
-});
-return { SettingsAccountTab };
-})();
-
-// --- src/views/settings/SettingsOtherTab.js ---
-const { SettingsOtherTab } = (() => {
-/**
- * @fileoverview Preferences Tab 3: `SettingsOtherTab.js` ("其他").
- * Houses Model Identifier Formatting, Per-Model Context Windows,
- * Local Trajectory Cache Rebuild, and Two-Step Factory Preference Reset.
- */
-
-
-function formatQuotaReservationLogForClipboard(snapshot) {
-  const safe = snapshot && typeof snapshot === 'object' ? snapshot : {};
-  const buckets = Array.isArray(safe.buckets) ? safe.buckets : [];
-  const events = Array.isArray(safe.events) ? safe.events : [];
-  const bucketLines = buckets.map((b) => `    ${JSON.stringify(b)}`).join(',\n');
-  const eventLines = events.map((e) => `    ${JSON.stringify(e)}`).join(',\n');
-  return [
-    '{',
-    `  "generatedAt": ${JSON.stringify(safe.generatedAt || new Date().toISOString())},`,
-    `  "count": ${events.length},`,
-    `  "buckets": [${bucketLines ? `\n${bucketLines}\n  ` : ''}],`,
-    `  "events": [${eventLines ? `\n${eventLines}\n  ` : ''}]`,
-    '}',
-  ].join('\n');
-}
-
-function getStepModelDisplayOptions() {
-  return [
-    { value: 'short', label: t('settings.oth.modelShort') },
-    { value: 'upstream', label: t('settings.oth.modelUpstream') },
-    { value: 'upstream_compact', label: t('settings.oth.modelUpstreamCompact') },
-  ];
-}
-
-function getOrchestratorIdDisplayOptions() {
-  return [
-    { value: 'compact', label: t('settings.oth.orchCompact') },
-    { value: 'full', label: t('settings.oth.orchFull') },
-  ];
-}
-
-const SettingsOtherTab = defineComponent({
-  name: 'SettingsOtherTab',
-  setup({ onCleanup, getProps }) {
-    let draftModelDisplayMode = 'short';
-    let draftOrchestratorIdMode = 'compact';
-    let draftExperimentalQuotaReservation = true;
-    let draftContextRiskAccepted = false;
-    let acceptingContextRisk = false;
-    let draftContextMainEnabled = true;
-    let draftContextSwarmEnabled = false;
-    let savingContextScope = false;
-    let latestSettings = null;
-    let latestWindowBridge = null;
-    let latestCloudCodeProxy = null;
-    let latestHostPlatform = 'win32';
-    let contextWindowModels = [];
-    let contextModelId = '';
-    let savingContextWindow = false;
-    let contextFeedback = '';
-    let modelTimer = null;
-    let expTimer = null;
-    let maintTimer = null;
-    let resetConfirmTimer = null;
-    let resetConfirmArmed = false;
-    let isRebuilding = false;
-    let isResetting = false;
-
-    const modelStatusText = h('span', {
-      className: 'text-muted',
-      style: 'font-size: var(--fs-md);',
-      text: '',
-    });
-    const expStatusText = h('span', {
-      className: 'text-muted',
-      style: 'font-size: var(--fs-md);',
-      text: '',
-    });
-    const maintStatusText = h('span', {
-      className: 'text-muted settings-panel-status',
-      text: '',
-    });
-
-    function showExpFeedback(text, autoClearMs = 1500) {
-      if (expTimer) {
-        clearTimeout(expTimer);
-        expTimer = null;
-      }
-      patchText(expStatusText, text);
-      if (text && autoClearMs > 0) {
-        expTimer = setTimeout(() => {
-          expTimer = null;
-          patchText(expStatusText, '');
-        }, autoClearMs);
-      }
-    }
-
-    function showModelFeedback(text, autoClearMs = 1500) {
-      if (modelTimer) {
-        clearTimeout(modelTimer);
-        modelTimer = null;
-      }
-      patchText(modelStatusText, text);
-      if (text && autoClearMs > 0) {
-        modelTimer = setTimeout(() => {
-          modelTimer = null;
-          patchText(modelStatusText, '');
-        }, autoClearMs);
-      }
-    }
-
-    function showMaintFeedback(text, autoClearMs = 2500) {
-      if (maintTimer) {
-        clearTimeout(maintTimer);
-        maintTimer = null;
-      }
-      patchText(maintStatusText, text);
-      patchAttr(maintStatusText, 'title', text || null);
-      if (text && autoClearMs > 0) {
-        maintTimer = setTimeout(() => {
-          maintTimer = null;
-          patchText(maintStatusText, '');
-          patchAttr(maintStatusText, 'title', null);
-        }, autoClearMs);
-      }
-    }
-
-    // --- Card 1: 模型标识显示 ---
-    const modelCardTitleEl = h('span', { text: t('settings.oth.modelTitle') });
-    const modelFormatLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.oth.modelFormat'),
-    });
-    const orchFormatLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.oth.orchFormat'),
-    });
-
-    const stepModelSelect = CustomSelect({
-      modelValue: 'short',
-      icon: 'table',
-      options: getStepModelDisplayOptions(),
-      onUpdateModelValue: async (val) => {
-        const nextMode = normalizeClientModelDisplayMode(val);
-        draftModelDisplayMode = nextMode;
-        stepModelSelect.setValue(nextMode);
-        showModelFeedback(t('settings.saving'), 0);
-        try {
-          await saveSettingsPatch({
-            modelDisplayMode: nextMode,
-            showUpstreamModel: nextMode !== 'short',
-          });
-          showModelFeedback(t('settings.saved'), 1500);
-        } catch {
-          if (latestSettings) renderSettings(latestSettings);
-          showModelFeedback(t('settings.saveFailed'), 2500);
-        }
-      },
-    });
-
-    const orchestratorIdSelect = CustomSelect({
-      modelValue: 'compact',
-      icon: 'layers',
-      options: getOrchestratorIdDisplayOptions(),
-      onUpdateModelValue: async (val) => {
-        const nextMode = normalizeClientOrchestratorIdMode(val);
-        draftOrchestratorIdMode = nextMode;
-        orchestratorIdSelect.setValue(nextMode);
-        showModelFeedback(t('settings.saving'), 0);
-        try {
-          await saveSettingsPatch({ orchestratorIdMode: nextMode });
-          showModelFeedback(t('settings.saved'), 1500);
-        } catch {
-          if (latestSettings) renderSettings(latestSettings);
-          showModelFeedback(t('settings.saveFailed'), 2500);
-        }
-      },
-    });
-
-    const modelPanel = h('section', { className: 'panel' }, [
-      h('div', { className: 'panel-header' }, [
-        h('span', { className: 'panel-title' }, [
-          createSvgIcon('sliders', { size: 13 }),
-          modelCardTitleEl,
-        ]),
-        modelStatusText,
-      ]),
-      h('div', { className: 'form-row' }, [modelFormatLabelEl, stepModelSelect.el]),
-      h('div', { className: 'form-row' }, [orchFormatLabelEl, orchestratorIdSelect.el]),
-    ]);
-
-    // --- Card 2: 试验性功能 ---
-    const expTitleEl = h('span', { text: t('settings.oth.expTitle') });
-    const quotaReserveLabelEl = h('span', {
-      className: 'settings-action-title',
-      text: t('settings.oth.quotaReserveLabel'),
-    });
-    const quotaReserveBadgeEl = h('span', {
-      className: 'settings-experimental-badge',
-      text: t('settings.oth.expBadge'),
-    });
-    const quotaReserveDescEl = h('span', {
-      className: 'settings-action-desc',
-      text: t('settings.oth.quotaReserveDesc'),
-    });
-    const quotaReserveLogLabelEl = h('span', {
-      className: 'settings-action-title',
-      text: t('settings.oth.quotaReserveLogLabel'),
-    });
-    const quotaReserveLogDescEl = h('span', {
-      className: 'settings-action-desc',
-      text: t('settings.oth.quotaReserveLogDesc'),
-    });
-    const exportReserveLogBtnText = h('span', {
-      text: t('settings.oth.exportReserveLogBtn'),
-    });
-    let isExportingReserveLog = false;
-
-    const exportReserveLogBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary',
-        onClick: async () => {
-          if (isExportingReserveLog) return;
-          isExportingReserveLog = true;
-          patchAttr(exportReserveLogBtn, 'disabled', true);
-          try {
-            const snapshot = await fetchQuotaReservationLog();
-            const text = formatQuotaReservationLogForClipboard(snapshot);
-            const count = Array.isArray(snapshot?.events) ? snapshot.events.length : 0;
-            const successMsg =
-              count > 0
-                ? t('settings.oth.exportReserveLogCopied', { count })
-                : t('settings.oth.exportReserveLogEmpty');
-            const ok = await copyTextWithFeedback(text, successMsg);
-            showExpFeedback(ok ? successMsg : t('settings.oth.exportReserveLogFailed'), 2800);
-          } catch {
-            showExpFeedback(t('settings.oth.exportReserveLogFailed'), 2800);
-          } finally {
-            isExportingReserveLog = false;
-            patchAttr(exportReserveLogBtn, 'disabled', false);
-          }
-        },
-      },
-      [createSvgIcon('copy', { size: 12 }), exportReserveLogBtnText]
-    );
-
-    const quotaReserveToggle = ToggleSwitch({
-      modelValue: 'on',
-      ariaLabelKey: 'settings.oth.quotaReserveLabel',
-      preset: 'enable',
-      onUpdateModelValue: async (val) => {
-        const nextEnabled = val === 'on';
-        draftExperimentalQuotaReservation = nextEnabled;
-        quotaReserveToggle.setProps({
-          modelValue: nextEnabled ? 'on' : 'off',
-        });
-        showExpFeedback(t('settings.saving'), 0);
-        try {
-          await saveSettingsPatch({ experimentalQuotaReservation: nextEnabled });
-          showExpFeedback(t('settings.saved'), 1500);
-        } catch {
-          if (latestSettings) renderSettings(latestSettings);
-          showExpFeedback(t('settings.saveFailed'), 2500);
-        }
-      },
-    });
-
-    const experimentalPanel = h('section', { className: 'panel', hidden: true }, [
-      h('div', { className: 'panel-header' }, [
-        h('span', { className: 'panel-title' }, [
-          createSvgIcon('pulse', { size: 13 }),
-          expTitleEl,
-        ]),
-        expStatusText,
-      ]),
-      h('div', { className: 'settings-action-block' }, [
-        h('div', { className: 'settings-action-info' }, [
-          h('div', { className: 'settings-experimental-label-group' }, [
-            quotaReserveLabelEl,
-            quotaReserveBadgeEl,
-          ]),
-          quotaReserveDescEl,
-        ]),
-        quotaReserveToggle.el,
-      ]),
-      h('div', { className: 'settings-action-block' }, [
-        h('div', { className: 'settings-action-info' }, [
-          quotaReserveLogLabelEl,
-          quotaReserveLogDescEl,
-        ]),
-        exportReserveLogBtn,
-      ]),
-    ]);
-
-    // --- Card 2: 按模型设置上下文窗口 ---
-    const baselineTitleEl = h('span', { text: t('settings.oth.baselineTitle') });
-    const ctxModelLabel = h('span', { className: 'form-label' });
-    const ctxWindowLabel = h('span', { className: 'form-label' });
-    const ctxHint = h('span', { className: 'settings-hint-text' });
-    const ctxStatus = h('span', {
-      className: 'text-muted settings-panel-status',
-      role: 'status',
-    });
-    const ctxModelSelect = CustomSelect({
-      className: 'settings-context-model',
-      searchable: true,
-      searchThreshold: 8,
-      options: [],
-      onUpdateModelValue: (id) => {
-        if (!draftContextRiskAccepted || savingContextWindow) return;
-        contextModelId = id;
-        contextFeedback = '';
-        renderContextWindows();
-      },
-    });
-    const ctxWindowSelect = CustomSelect({
-      options: [],
-      onUpdateModelValue: async (value) => {
-        if (!draftContextRiskAccepted || savingContextWindow || !contextModelId) return;
-        savingContextWindow = true;
-        contextFeedback = 'settings.saving';
-        renderContextWindows();
-        try {
-          const modelContextWindows = await saveModelContextWindow(contextModelId, value || null);
-          latestSettings = { ...latestSettings, modelContextWindows };
-          contextFeedback = 'settings.saved';
-        } catch {
-          contextFeedback = 'settings.saveFailed';
-        } finally {
-          savingContextWindow = false;
-          renderContextWindows();
-        }
-      },
-    });
-    const ctxBridgeNotice = BridgeStatusNotice({ contextMode: true });
-    const ctxMainLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.oth.ctxMainLabel'),
-    });
-    const ctxMainToggle = ToggleSwitch({
-      modelValue: 'on',
-      ariaLabelKey: 'settings.oth.ctxMainLabel',
-      preset: 'enable',
-      onUpdateModelValue: async (val) => {
-        if (!draftContextRiskAccepted || savingContextScope) return;
-        const nextEnabled = val === 'on';
-        const prevEnabled = draftContextMainEnabled;
-        savingContextScope = true;
-        draftContextMainEnabled = nextEnabled;
-        latestSettings = { ...(latestSettings || {}), contextWindowMainEnabled: nextEnabled };
-        contextFeedback = 'settings.saving';
-        renderContextWindows();
-        try {
-          await saveSettingsPatch({ contextWindowMainEnabled: nextEnabled });
-          contextFeedback = 'settings.saved';
-        } catch {
-          draftContextMainEnabled = prevEnabled;
-          latestSettings = { ...(latestSettings || {}), contextWindowMainEnabled: prevEnabled };
-          contextFeedback = 'settings.saveFailed';
-        } finally {
-          savingContextScope = false;
-          renderContextWindows();
-        }
-      },
-    });
-    const ctxSwarmLabelEl = h('span', {
-      className: 'form-label',
-      text: t('settings.oth.ctxSwarmLabel'),
-    });
-    const ctxSwarmToggle = ToggleSwitch({
-      modelValue: 'off',
-      ariaLabelKey: 'settings.oth.ctxSwarmLabel',
-      preset: 'enable',
-      onUpdateModelValue: async (val) => {
-        if (!draftContextRiskAccepted || savingContextScope) return;
-        const nextEnabled = val === 'on';
-        const prevEnabled = draftContextSwarmEnabled;
-        savingContextScope = true;
-        draftContextSwarmEnabled = nextEnabled;
-        latestSettings = { ...(latestSettings || {}), contextWindowSwarmEnabled: nextEnabled };
-        contextFeedback = 'settings.saving';
-        renderContextWindows();
-        try {
-          await saveSettingsPatch({ contextWindowSwarmEnabled: nextEnabled });
-          contextFeedback = 'settings.saved';
-        } catch {
-          draftContextSwarmEnabled = prevEnabled;
-          latestSettings = { ...(latestSettings || {}), contextWindowSwarmEnabled: prevEnabled };
-          contextFeedback = 'settings.saveFailed';
-        } finally {
-          savingContextScope = false;
-          renderContextWindows();
-        }
-      },
-    });
-    const ctxMainRow = h('div', { className: 'form-row' }, [ctxMainLabelEl, ctxMainToggle.el]);
-    const ctxSwarmRow = h('div', { className: 'form-row' }, [ctxSwarmLabelEl, ctxSwarmToggle.el]);
-    const ctxSyncStatusEl = h('span', {
-      className: 'settings-hint-text ctx-sync-status is-error',
-      hidden: true,
-    });
-    const ctxModelRow = h('div', { className: 'form-row' }, [ctxModelLabel, ctxModelSelect.el]);
-    const ctxWindowRow = h('div', { className: 'form-row' }, [ctxWindowLabel, ctxWindowSelect.el]);
-    const ctxControlsBody = h('div', { className: 'ctx-controls-body is-locked' }, [
-      ctxBridgeNotice.el,
-      ctxMainRow,
-      ctxSwarmRow,
-      ctxSyncStatusEl,
-      ctxModelRow,
-      ctxWindowRow,
-      h('div', { className: 'form-row' }, [ctxHint]),
-    ]);
-
-    const ctxRiskTitleEl = h('strong', {
-      className: 'ctx-risk-title',
-      text: t('settings.oth.ctxRiskTitle'),
-    });
-    const ctxRiskBodyEl = h('p', {
-      className: 'ctx-risk-desc',
-      text: t('settings.oth.ctxRiskBody'),
-    });
-    const ctxRiskAcceptBtnText = h('span', { text: t('settings.oth.ctxRiskAcceptBtn') });
-    const ctxRiskAcceptBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary btn-danger-confirm ctx-risk-accept-btn',
-        onClick: async () => {
-          if (acceptingContextRisk || draftContextRiskAccepted) return;
-          acceptingContextRisk = true;
-          draftContextRiskAccepted = true;
-          latestSettings = { ...(latestSettings || {}), contextWindowRiskAccepted: true };
-          contextFeedback = 'settings.saving';
-          renderContextWindows();
-          try {
-            await saveSettingsPatch({ contextWindowRiskAccepted: true });
-            contextFeedback = 'settings.saved';
-          } catch {
-            draftContextRiskAccepted = false;
-            latestSettings = { ...(latestSettings || {}), contextWindowRiskAccepted: false };
-            contextFeedback = 'settings.saveFailed';
-          } finally {
-            acceptingContextRisk = false;
-            renderContextWindows();
-          }
-        },
-      },
-      [createSvgIcon('warning', { size: 12 }), ctxRiskAcceptBtnText]
-    );
-    const ctxRiskMask = h(
-      'div',
-      {
-        className: 'ctx-risk-mask',
-        role: 'region',
-        'aria-label': t('settings.oth.ctxRiskTitle'),
-      },
-      [
-        h('div', { className: 'ctx-risk-head' }, [
-          createSvgIcon('warning', { size: 14, className: 'ctx-risk-icon' }),
-          ctxRiskTitleEl,
-        ]),
-        ctxRiskBodyEl,
-        ctxRiskAcceptBtn,
-      ]
-    );
-    const ctxRiskStage = h('div', { className: 'ctx-risk-stage' }, [ctxControlsBody, ctxRiskMask]);
-
-    function renderContextWindows() {
-      const unlocked = Boolean(draftContextRiskAccepted);
-      if (!unlocked) {
-        ctxModelSelect.close();
-        ctxWindowSelect.close();
-      }
-      patchClasses(ctxControlsBody, { 'is-locked': !unlocked });
-      patchAttr(ctxControlsBody, 'inert', !unlocked);
-      patchAttr(ctxControlsBody, 'aria-hidden', unlocked ? null : 'true');
-      patchAttr(ctxRiskMask, 'hidden', unlocked);
-      patchAttr(ctxRiskMask, 'aria-label', t('settings.oth.ctxRiskTitle'));
-      patchText(ctxRiskTitleEl, t('settings.oth.ctxRiskTitle'));
-      patchText(ctxRiskBodyEl, t('settings.oth.ctxRiskBody'));
-      patchText(ctxRiskAcceptBtnText, t('settings.oth.ctxRiskAcceptBtn'));
-      patchAttr(ctxRiskAcceptBtn, 'disabled', acceptingContextRisk);
-
-      const saved = latestSettings?.modelContextWindows || {};
-      const wbState = String(latestWindowBridge?.state || '').trim();
-      const isBridgeMissing = wbState === 'no_devtools_port' || wbState === 'cdp_unreachable';
-      const proxyState = String(latestCloudCodeProxy?.state || 'disabled');
-      const isProxyActive = Boolean(latestCloudCodeProxy?.active && proxyState === 'active');
-
-      patchText(ctxMainLabelEl, t('settings.oth.ctxMainLabel'));
-      ctxMainToggle.setProps({
-        modelValue: draftContextMainEnabled ? 'on' : 'off',
-      });
-      patchText(ctxSwarmLabelEl, t('settings.oth.ctxSwarmLabel'));
-      ctxSwarmToggle.setProps({
-        modelValue: draftContextSwarmEnabled ? 'on' : 'off',
-      });
-
-      const syncErrorText =
-        draftContextSwarmEnabled && proxyState === 'error' && latestCloudCodeProxy?.error
-          ? t('settings.oth.ctxSwarmError', { error: latestCloudCodeProxy.error })
-          : '';
-      patchAttr(ctxSyncStatusEl, 'hidden', !syncErrorText);
-      patchText(ctxSyncStatusEl, syncErrorText);
-
-      ctxBridgeNotice.refs.update({
-        visible: unlocked && draftContextMainEnabled,
-        windowBridge: latestWindowBridge,
-        hostPlatform: latestHostPlatform,
-      });
-      const models = new Map(contextWindowModels.map((model) => [model.id, model]));
-      const knownIds = new Set(contextWindowModels.flatMap(({ id, members = [] }) => [id, ...members]));
-      for (const id of Object.keys(saved)) {
-        if (!knownIds.has(id)) models.set(id, { id, label: id.replace(/^model:/, ''), options: [] });
-      }
-      if (!models.has(contextModelId)) contextModelId = '';
-      const mixed = '\u0000mixed';
-      const getSelection = ({ id, members = [] }) => {
-        const legacy = new Set(members.map((member) => saved[member]).filter(Boolean));
-        return saved[id] || (legacy.size > 1 ? mixed : legacy.values().next().value) || '';
-      };
-      const formatLimit = (value) => /^\d+$/.test(value) ? t('settings.oth.ctxTokens', { count: Number(value).toLocaleString() }) : value;
-      const isAvailable = (model, value) => model.options.some(({ name }) => name === value) ||
-        (/^[1-9]\d*$/.test(value) && Number(value) <= model.capacity);
-      const current = models.get(contextModelId);
-      const options = current?.options || [];
-      const selected = current ? getSelection(current) : '';
-      const choices = [
-        { value: '', label: t('settings.oth.ctxDefault') },
-        ...options.map(({ name, expensive, tokens }) => ({
-          value: name,
-          label: tokens ? formatLimit(name) :
-            (expensive ? t('settings.oth.ctxExpensive', { name }) : name),
-        })),
-      ];
-      if (selected && !choices.some((item) => item.value === selected)) {
-        let label = t('settings.oth.ctxMixed');
-        if (selected !== mixed) {
-          const name = formatLimit(selected);
-          label = isAvailable(current, selected) ? name : t('settings.oth.ctxUnavailable', { name });
-        }
-        choices.push({ value: selected, label, disabled: true });
-      }
-      ctxModelSelect.setProps({
-        modelValue: contextModelId,
-        options: [
-          { value: '', label: t('settings.oth.ctxChooseModel') },
-          ...[...models.values()].map((model) => {
-            const value = getSelection(model);
-            let meta = t('settings.oth.ctxDefault');
-            if (value === mixed) meta = t('settings.oth.ctxMixed');
-            else if (value) {
-              const name = formatLimit(value);
-              if (!isAvailable(model, value)) meta = t('settings.oth.ctxUnavailable', { name });
-              else if (
-                isBridgeMissing &&
-                draftContextMainEnabled &&
-                !(draftContextSwarmEnabled && isProxyActive)
-              ) {
-                meta = t('settings.oth.ctxPendingBridge', { name });
-              }
-              else if (/^\d+$/.test(value) && model.reportedLimitTokens && Number(value) !== model.reportedLimitTokens) {
-                meta = t('settings.oth.ctxConfiguredReported', {
-                  name,
-                  reported: formatLimit(String(model.reportedLimitTokens)),
-                });
-              } else meta = t('settings.oth.ctxConfigured', { name });
-            }
-            else if (model.reportedLimitTokens) meta = t('settings.oth.ctxDefaultReported', { name: formatLimit(String(model.reportedLimitTokens)) });
-            return { value: model.id, label: model.label, meta };
-          }),
-        ],
-      });
-      ctxWindowSelect.setProps({ modelValue: selected, options: choices });
-      patchAttr(ctxModelSelect.refs.triggerBtn, 'disabled', !unlocked || savingContextWindow);
-      patchAttr(ctxWindowSelect.refs.triggerBtn, 'disabled', !unlocked || savingContextWindow || (!options.length && !selected));
-      patchAttr(ctxModelSelect.refs.triggerBtn, 'aria-label', t('settings.oth.ctxModel'));
-      patchAttr(ctxWindowSelect.refs.triggerBtn, 'aria-label', t('settings.oth.ctxBaselineLabel'));
-      patchAttr(ctxModelRow, 'hidden', !models.size);
-      patchAttr(ctxWindowRow, 'hidden', !contextModelId);
-      patchText(ctxModelLabel, t('settings.oth.ctxModel'));
-      patchText(ctxWindowLabel, t('settings.oth.ctxBaselineLabel'));
-      const hint = !models.size ? 'ctxNoModels' : selected === mixed ? 'ctxMixedHint' :
-        contextModelId && !options.length ? 'ctxNoOptions' : 'ctxBaselineHint';
-      const reported = current?.reportedLimitTokens;
-      patchText(ctxHint, [t(`settings.oth.${hint}`), reported &&
-        t('settings.oth.ctxReported', { name: formatLimit(String(reported)) })].filter(Boolean).join(' '));
-      patchText(ctxStatus, contextFeedback ? t(contextFeedback) : '');
-      getProps().onLayoutChange?.();
-    }
-
-    const baselinePanel = h('section', { className: 'panel' }, [
-      h('div', { className: 'panel-header settings-panel-header' }, [
-        h('span', { className: 'panel-title' }, [
-          createSvgIcon('layers', { size: 13 }),
-          baselineTitleEl,
-        ]),
-        ctxStatus,
-      ]),
-      ctxRiskStage,
-    ]);
-    renderContextWindows();
-
-    // --- Card 3: 缓存与重置 ---
-    const maintTitleEl = h('span', { text: t('settings.oth.maintTitle') });
-    const cacheLabelEl = h('span', {
-      className: 'settings-action-title',
-      text: t('settings.oth.cacheLabel'),
-    });
-    const cacheDescEl = h('span', {
-      className: 'settings-action-desc',
-      text: t('settings.oth.cacheDesc'),
-    });
-
-    const rebuildBtnText = h('span', { text: t('settings.oth.rebuildBtn') });
-    const rebuildCacheBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary',
-        onClick: async () => {
-          if (isRebuilding) return;
-          isRebuilding = true;
-          patchAttr(rebuildCacheBtn, 'disabled', true);
-          patchText(rebuildBtnText, t('settings.oth.rebuildingBtn'));
-          showMaintFeedback(t('settings.oth.rebuildingBtn'), 0);
-          try {
-            const res = await rebuildTrajectoryCache();
-            if (res?.ok !== false) {
-              showMaintFeedback(t('settings.oth.rebuildDone'), 2800);
-            } else {
-              showMaintFeedback(t('settings.oth.rebuildFailed'), 3000);
-            }
-          } catch {
-            showMaintFeedback(t('settings.oth.rebuildFailed'), 3000);
-          } finally {
-            isRebuilding = false;
-            patchAttr(rebuildCacheBtn, 'disabled', false);
-            patchText(rebuildBtnText, t('settings.oth.rebuildBtn'));
-          }
-        },
-      },
-      [createSvgIcon('refresh', { size: 12 }), rebuildBtnText]
-    );
-
-    const resetLabelEl = h('span', {
-      className: 'settings-action-title',
-      text: t('settings.oth.resetLabel'),
-    });
-    const resetDescEl = h('span', {
-      className: 'settings-action-desc',
-      text: t('settings.oth.resetDesc'),
-    });
-
-    const resetBtnText = h('span', { text: t('settings.oth.resetAllBtn') });
-
-    function disarmResetConfirm() {
-      resetConfirmArmed = false;
-      if (resetConfirmTimer) {
-        clearTimeout(resetConfirmTimer);
-        resetConfirmTimer = null;
-      }
-      patchClasses(resetAllBtn, { 'btn-danger-confirm': false });
-      if (!isResetting) {
-        patchText(resetBtnText, t('settings.oth.resetAllBtn'));
-      }
-    }
-
-    const resetAllBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary',
-        onClick: async () => {
-          if (isResetting) return;
-          if (!resetConfirmArmed) {
-            resetConfirmArmed = true;
-            patchClasses(resetAllBtn, { 'btn-danger-confirm': true });
-            patchText(resetBtnText, t('settings.oth.resetConfirmBtn'));
-            if (resetConfirmTimer) clearTimeout(resetConfirmTimer);
-            resetConfirmTimer = setTimeout(() => {
-              disarmResetConfirm();
-            }, 3000);
-            return;
-          }
-
-          disarmResetConfirm();
-          isResetting = true;
-          patchAttr(resetAllBtn, 'disabled', true);
-          patchText(resetBtnText, t('settings.oth.resettingBtn'));
-          showMaintFeedback(t('settings.oth.resettingBtn'), 0);
-          try {
-            const res = await resetAllSettings();
-            setI18nLanguage(res?.settings?.language || 'auto');
-            showMaintFeedback(t('settings.oth.resetAllDone'), 2800);
-          } catch {
-            showMaintFeedback(t('settings.saveFailed'), 2800);
-          } finally {
-            isResetting = false;
-            patchAttr(resetAllBtn, 'disabled', false);
-            patchText(resetBtnText, t('settings.oth.resetAllBtn'));
-          }
-        },
-      },
-      [resetBtnText]
-    );
-
-    const backupLabelEl = h('span', {
-      className: 'settings-action-title',
-      text: t('settings.oth.backupLabel'),
-    });
-    const backupDescEl = h('span', {
-      className: 'settings-action-desc',
-      text: t('settings.oth.backupDesc'),
-    });
-    const exportJsonBtnText = h('span', { text: t('settings.oth.exportJsonBtn') });
-    const importJsonBtnText = h('span', { text: t('settings.oth.importJsonBtn') });
-    let isImportingSettings = false;
-
-    async function applyImportedSettingsText(rawText) {
-      const parsed = parseImportedSettingsJson(rawText);
-      if (!parsed.ok) {
-        showMaintFeedback(t('settings.oth.importInvalid'), 3200);
-        return false;
-      }
-      isImportingSettings = true;
-      patchAttr(importJsonBtn, 'disabled', true);
-      showMaintFeedback(t('settings.saving'), 0);
-      try {
-        await saveSettingsPatch(parsed.patch);
-        if (parsed.patch.language) {
-          setI18nLanguage(parsed.patch.language);
-        }
-        showMaintFeedback(
-          t('settings.oth.importDone', { count: parsed.appliedCount }),
-          2800
-        );
-        return true;
-      } catch {
-        showMaintFeedback(t('settings.saveFailed'), 2800);
-        return false;
-      } finally {
-        isImportingSettings = false;
-        patchAttr(importJsonBtn, 'disabled', false);
-      }
-    }
-
-    const importFileInput = h('input', {
-      type: 'file',
-      accept: '.json,application/json',
-      className: 'settings-hidden-file-input',
-      hidden: true,
-    });
-    importFileInput.addEventListener?.('change', async () => {
-      const file = importFileInput.files?.[0];
-      importFileInput.value = '';
-      if (!file || isImportingSettings) return;
-      try {
-        const text =
-          typeof file.text === 'function' ? await file.text() : String(file.content || '');
-        await applyImportedSettingsText(text);
-      } catch {
-        showMaintFeedback(t('settings.oth.importInvalid'), 3200);
-      }
-    });
-
-    const exportJsonBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary',
-        onClick: async () => {
-          const json = buildExportableSettingsJson(latestSettings || {});
-          const res = await exportTextFileWithFeedback(
-            'antigravity-usage-monitor-settings.json',
-            json,
-            'application/json;charset=utf-8'
-          );
-          if (res?.ok) {
-            showMaintFeedback(
-              res.filePath ? `${t('settings.oth.exportDone')} · ${res.filePath}` : t('settings.oth.exportDone'),
-              4200
-            );
-          }
-        },
-      },
-      [createSvgIcon('download', { size: 12 }), exportJsonBtnText]
-    );
-
-    const importJsonBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'btn-secondary',
-        onClick: () => {
-          if (isImportingSettings) return;
-          importFileInput.click?.();
-        },
-      },
-      [createSvgIcon('upload', { size: 12 }), importJsonBtnText]
-    );
-
-    const backupActionsWrap = h('div', { className: 'settings-backup-actions' }, [
-      exportJsonBtn,
-      importJsonBtn,
-      importFileInput,
-    ]);
-
-    const maintPanel = h('section', { className: 'panel' }, [
-      h('div', { className: 'panel-header settings-panel-header' }, [
-        h('span', { className: 'panel-title' }, [
-          createSvgIcon('refresh', { size: 13 }),
-          maintTitleEl,
-        ]),
-        maintStatusText,
-      ]),
-      h('div', { className: 'settings-action-block' }, [
-        h('div', { className: 'settings-action-info' }, [cacheLabelEl, cacheDescEl]),
-        rebuildCacheBtn,
-      ]),
-      h('div', { className: 'settings-action-block' }, [
-        h('div', { className: 'settings-action-info' }, [resetLabelEl, resetDescEl]),
-        resetAllBtn,
-      ]),
-      h('div', { className: 'settings-action-block' }, [
-        h('div', { className: 'settings-action-info' }, [backupLabelEl, backupDescEl]),
-        backupActionsWrap,
-      ]),
-    ]);
-
-    const sessionMigrationCard = SessionMigrationCard({
-      onLayoutChange: () => {
-        getProps()?.onLayoutChange?.();
-      },
-    });
-
-    const rootEl = h('div', { className: 'settings-tab-stack' }, [
-      modelPanel,
-      experimentalPanel,
-      baselinePanel,
-      maintPanel,
-      sessionMigrationCard.el,
-    ]);
-
-    function renderSettings(
-      settings,
-      models = contextWindowModels,
-      windowBridge = latestWindowBridge,
-      hostPlatform = latestHostPlatform,
-      cloudCodeProxy = latestCloudCodeProxy
-    ) {
-      if (!settings) return;
-      latestSettings = settings;
-      contextWindowModels = models;
-      if (windowBridge !== undefined) latestWindowBridge = windowBridge;
-      if (hostPlatform) latestHostPlatform = hostPlatform;
-      if (cloudCodeProxy !== undefined) latestCloudCodeProxy = cloudCodeProxy;
-      draftModelDisplayMode = normalizeClientModelDisplayMode(
-        settings.modelDisplayMode,
-        settings.showUpstreamModel
-      );
-      draftOrchestratorIdMode = normalizeClientOrchestratorIdMode(settings.orchestratorIdMode);
-      draftExperimentalQuotaReservation = normalizeClientExperimentalQuotaReservation(
-        settings.experimentalQuotaReservation
-      );
-      if (!acceptingContextRisk) {
-        draftContextRiskAccepted = Boolean(settings.contextWindowRiskAccepted);
-      }
-      if (!savingContextScope) {
-        draftContextMainEnabled = settings.contextWindowMainEnabled !== false;
-        draftContextSwarmEnabled = settings.contextWindowSwarmEnabled === true;
-      }
-      stepModelSelect.setProps({
-        modelValue: draftModelDisplayMode,
-        options: getStepModelDisplayOptions(),
-      });
-      orchestratorIdSelect.setProps({
-        modelValue: draftOrchestratorIdMode,
-        options: getOrchestratorIdDisplayOptions(),
-      });
-      quotaReserveToggle.setProps({
-        modelValue: draftExperimentalQuotaReservation ? 'on' : 'off',
-      });
-      renderContextWindows();
-      void sessionMigrationCard.refs.ensureLoaded();
-    }
-
-    function refreshLabels() {
-      patchText(modelCardTitleEl, t('settings.oth.modelTitle'));
-      patchText(modelFormatLabelEl, t('settings.oth.modelFormat'));
-      patchText(orchFormatLabelEl, t('settings.oth.orchFormat'));
-      patchText(expTitleEl, t('settings.oth.expTitle'));
-      patchText(quotaReserveLabelEl, t('settings.oth.quotaReserveLabel'));
-      patchText(quotaReserveBadgeEl, t('settings.oth.expBadge'));
-      patchText(quotaReserveDescEl, t('settings.oth.quotaReserveDesc'));
-      patchText(quotaReserveLogLabelEl, t('settings.oth.quotaReserveLogLabel'));
-      patchText(quotaReserveLogDescEl, t('settings.oth.quotaReserveLogDesc'));
-      patchText(exportReserveLogBtnText, t('settings.oth.exportReserveLogBtn'));
-      quotaReserveToggle.setProps({
-        modelValue: draftExperimentalQuotaReservation ? 'on' : 'off',
-      });
-      patchText(baselineTitleEl, t('settings.oth.baselineTitle'));
-      renderContextWindows();
-      patchText(maintTitleEl, t('settings.oth.maintTitle'));
-      patchText(backupLabelEl, t('settings.oth.backupLabel'));
-      patchText(backupDescEl, t('settings.oth.backupDesc'));
-      patchText(exportJsonBtnText, t('settings.oth.exportJsonBtn'));
-      patchText(importJsonBtnText, t('settings.oth.importJsonBtn'));
-      patchText(cacheLabelEl, t('settings.oth.cacheLabel'));
-      patchText(cacheDescEl, t('settings.oth.cacheDesc'));
-      patchText(resetLabelEl, t('settings.oth.resetLabel'));
-      patchText(resetDescEl, t('settings.oth.resetDesc'));
-
-      if (!isRebuilding) {
-        patchText(rebuildBtnText, t('settings.oth.rebuildBtn'));
-      }
-      if (!isResetting) {
-        patchText(
-          resetBtnText,
-          resetConfirmArmed ? t('settings.oth.resetConfirmBtn') : t('settings.oth.resetAllBtn')
-        );
-      }
-
-      stepModelSelect.setProps({
-        modelValue: draftModelDisplayMode,
-        options: getStepModelDisplayOptions(),
-      });
-      orchestratorIdSelect.setProps({
-        modelValue: draftOrchestratorIdMode,
-        options: getOrchestratorIdDisplayOptions(),
-      });
-      sessionMigrationCard.refs.refreshLabels();
-    }
-
-    onCleanup(() => {
-      if (modelTimer) clearTimeout(modelTimer);
-      if (expTimer) clearTimeout(expTimer);
-      if (maintTimer) clearTimeout(maintTimer);
-      if (resetConfirmTimer) clearTimeout(resetConfirmTimer);
-      stepModelSelect.destroy();
-      orchestratorIdSelect.destroy();
-      quotaReserveToggle.destroy();
-      ctxBridgeNotice.destroy();
-      ctxMainToggle.destroy();
-      ctxSwarmToggle.destroy();
-      ctxModelSelect.destroy();
-      ctxWindowSelect.destroy();
-      sessionMigrationCard.destroy();
-    });
-
-    return {
-      el: rootEl,
-      refs: {
-        stepModelSelect,
-        orchestratorIdSelect,
-        quotaReserveToggle,
-        exportReserveLogBtn,
-        ctxBridgeNotice,
-        ctxMainToggle,
-        ctxSwarmToggle,
-        ctxModelSelect,
-        ctxWindowSelect,
-        sessionMigrationCard,
-        rebuildCacheBtn,
-        resetAllBtn,
-        exportJsonBtn,
-        importJsonBtn,
-        importFileInput,
-        applyImportedSettingsText,
-        renderSettings,
-        refreshLabels,
-      },
-    };
-  },
-});
-return { SettingsOtherTab };
 })();
 
 // --- src/components/layout/TopSessionHeader.js ---
@@ -36768,6 +23263,964 @@ const TopSessionHeader = defineComponent({
 return { TopSessionHeader };
 })();
 
+// --- src/views/StepsDetailView.js ---
+const { mergeSelectedAgentUnits, StepsDetailView } = (() => {
+/**
+ * @fileoverview View 3: StepsDetailView (步骤明细与总汇总分析视图).
+ * 提供“按步查看”与“总汇总”双子视图切换：
+ * - 单步测速表通过 `stepColumnRegistry.js` 动态渲染用户自选的 2..12 个字段列，并支持行级增量对账；
+ * - 总汇总视图提供会话线性走势图、多模型同图趋势拟合曲线与极简高密度模型总览卡片。
+ */
+
+
+function getStepModelGroupKey(step) {
+  if (!step || typeof step !== 'object') return t('fmt.unknownModel');
+  const rawLabel = String(step.baseModelLabel || step.modelLabel || step.label || '')
+    .replace(/\s*\[自动压缩\]\s*$/u, '')
+    .replace(/\s*\((?:Max|XHigh|High|Medium|Low|Thinking|Extra Low|Tiered)\)\s*$/i, '')
+    .trim();
+  if (rawLabel) return rawLabel;
+  const rawShort = String(step.baseModelShort || step.modelShort || step.shortName || '')
+    .replace(/·(?:压缩|Compact)\s*$/iu, '')
+    .trim();
+  return rawShort || t('fmt.unknownModel');
+}
+
+function mergeSelectedAgentUnits(units) {
+  const combinedSteps = [];
+  const modelMap = new Map();
+
+  for (const ag of units) {
+    if (!ag || typeof ag !== 'object') continue;
+    if (Array.isArray(ag.recentSteps)) {
+      for (const step of ag.recentSteps) combinedSteps.push(step);
+    }
+    const breakdown = Array.isArray(ag.modelBreakdown) ? ag.modelBreakdown : [];
+    for (const m of breakdown) {
+      if (!m || typeof m !== 'object') continue;
+      const gk = getStepModelGroupKey(m);
+      let acc = modelMap.get(gk);
+      if (!acc) {
+        acc = {
+          label: m.label || gk,
+          shortName: m.shortName || gk,
+          rawModel: m.rawModel || '',
+          upstreamName: m.upstreamName || m.upstreamModel || '',
+          upstreamSet: new Set(
+            Array.isArray(m.upstreamModels) ? m.upstreamModels.filter(Boolean) : []
+          ),
+          calls: 0,
+          inputTokens: 0,
+          cacheReadTokens: 0,
+          outputTokens: 0,
+          thinkingTokens: 0,
+          responseTokens: 0,
+          totalTokens: 0,
+          costUsd: 0,
+          unpricedCalls: 0,
+          anomalySteps: 0,
+          anomalyCount: 0,
+          anomalyDangerCount: 0,
+          anomalyTotalDelaySec: 0,
+          anomalyByKind: {},
+          _hasAnySpeedSummary: false,
+          _speedTokens: 0,
+          _speedSeconds: 0,
+          _speedSampleCount: 0,
+          _speedExcludedCount: 0,
+          _speedExcludedReasons: {},
+          _ttftWeightedSum: 0,
+          _ttftWeight: 0,
+          _ttftSampleCount: 0,
+        };
+        if (acc.upstreamName) acc.upstreamSet.add(acc.upstreamName);
+        modelMap.set(gk, acc);
+      }
+      if (!acc.upstreamName && (m.upstreamName || m.upstreamModel)) {
+        acc.upstreamName = m.upstreamName || m.upstreamModel;
+      }
+      if (m.upstreamName) acc.upstreamSet.add(m.upstreamName);
+      if (Array.isArray(m.upstreamModels)) {
+        for (const u of m.upstreamModels) {
+          if (u) acc.upstreamSet.add(u);
+        }
+      }
+      const calls = Math.max(0, Number(m.calls || 0));
+      const inTok = Math.max(0, Number(m.inputTokens || 0));
+      const cacheTok = Math.max(0, Number(m.cacheReadTokens || 0));
+      const outTok = Math.max(0, Number(m.outputTokens || 0));
+      const thinkTok = Math.max(0, Number(m.thinkingTokens || 0));
+      const respTok =
+        m.responseTokens != null
+          ? Math.max(0, Number(m.responseTokens))
+          : Math.max(0, outTok - thinkTok);
+      const totTok = Math.max(0, Number(m.totalTokens ?? inTok + cacheTok + outTok));
+      const costUsd = Number.isFinite(Number(m.costUsd)) ? Math.max(0, Number(m.costUsd)) : 0;
+      const unpricedCalls = Math.max(0, Number(m.unpricedCalls || 0));
+
+      acc.calls += calls;
+      acc.inputTokens += inTok;
+      acc.cacheReadTokens += cacheTok;
+      acc.outputTokens += outTok;
+      acc.thinkingTokens += thinkTok;
+      acc.responseTokens += respTok;
+      acc.totalTokens += totTok;
+      acc.costUsd += costUsd;
+      acc.unpricedCalls += unpricedCalls;
+      acc.anomalySteps += Math.max(0, Number(m.anomalySteps || 0));
+      acc.anomalyCount += Math.max(0, Number(m.anomalyCount || 0));
+      acc.anomalyDangerCount += Math.max(0, Number(m.anomalyDangerCount || 0));
+      acc.anomalyTotalDelaySec += Math.max(0, Number(m.anomalyTotalDelaySec || 0));
+      if (m.anomalyByKind && typeof m.anomalyByKind === 'object') {
+        for (const [kind, cnt] of Object.entries(m.anomalyByKind)) {
+          const n = Math.max(0, Number(cnt || 0));
+          if (n > 0) acc.anomalyByKind[kind] = (acc.anomalyByKind[kind] || 0) + n;
+        }
+      }
+
+      const rawSpeedTok = Number(m.speedSummary?.tokens);
+      const rawSpeedSec = Number(m.speedSummary?.seconds);
+      if (
+        Number.isFinite(rawSpeedTok) &&
+        Number.isFinite(rawSpeedSec) &&
+        rawSpeedSec > 0 &&
+        rawSpeedTok >= 0
+      ) {
+        acc._hasAnySpeedSummary = true;
+        acc._speedTokens += rawSpeedTok;
+        acc._speedSeconds += rawSpeedSec;
+      } else if (Number.isFinite(Number(m.avgTokPerSec)) && Number(m.avgTokPerSec) > 0) {
+        const fallbackTok = outTok > 0 ? outTok : Math.max(1, calls || 1);
+        acc._speedTokens += fallbackTok;
+        acc._speedSeconds += fallbackTok / Number(m.avgTokPerSec);
+      }
+      if (m.speedSummary) {
+        acc._hasAnySpeedSummary = true;
+        acc._speedSampleCount += Math.max(0, Number(m.speedSummary.sampleCount || 0));
+        acc._speedExcludedCount += Math.max(0, Number(m.speedSummary.excludedCount || 0));
+        if (m.speedSummary.excludedReasons && typeof m.speedSummary.excludedReasons === 'object') {
+          for (const [rk, rv] of Object.entries(m.speedSummary.excludedReasons)) {
+            const cnt = Math.max(0, Number(rv || 0));
+            if (cnt > 0) acc._speedExcludedReasons[rk] = (acc._speedExcludedReasons[rk] || 0) + cnt;
+          }
+        }
+      }
+      if (
+        m.avgTtftSec != null &&
+        Number.isFinite(Number(m.avgTtftSec)) &&
+        Number(m.avgTtftSec) >= 0
+      ) {
+        const ttftSamples = Math.max(0, Number(m.ttftSampleCount || 0));
+        const w = ttftSamples > 0 ? ttftSamples : Math.max(1, calls || 1);
+        acc._ttftWeightedSum += Number(m.avgTtftSec) * w;
+        acc._ttftWeight += w;
+        acc._ttftSampleCount += ttftSamples;
+      }
+    }
+  }
+
+  combinedSteps.sort(
+    (a, b) =>
+      (Number(b?.createdAtMs) || 0) - (Number(a?.createdAtMs) || 0) ||
+      (Number(b?.agentIndex) || 0) - (Number(a?.agentIndex) || 0) ||
+      (Number(b?.stepIndex) || 0) - (Number(a?.stepIndex) || 0)
+  );
+
+  const mergedModels = Array.from(modelMap.values())
+    .map((acc) => {
+      const promptTok = acc.inputTokens + acc.cacheReadTokens;
+      const rawAvgTps = acc._speedSeconds > 0 ? acc._speedTokens / acc._speedSeconds : null;
+      return {
+        label: acc.label,
+        shortName: acc.shortName,
+        rawModel: acc.rawModel,
+        upstreamName: acc.upstreamName,
+        upstreamModels: Array.from(acc.upstreamSet),
+        calls: acc.calls,
+        inputTokens: acc.inputTokens,
+        cacheReadTokens: acc.cacheReadTokens,
+        outputTokens: acc.outputTokens,
+        thinkingTokens: acc.thinkingTokens,
+        responseTokens: acc.responseTokens,
+        totalTokens: acc.totalTokens,
+        costUsd: +acc.costUsd.toFixed(6),
+        unpricedCalls: acc.unpricedCalls,
+        avgTokPerSec: rawAvgTps !== null ? +rawAvgTps.toFixed(1) : null,
+        avgTtftSec:
+          acc._ttftWeight > 0 ? +(acc._ttftWeightedSum / acc._ttftWeight).toFixed(1) : null,
+        ttftSampleCount: acc._ttftSampleCount,
+        ...(acc._hasAnySpeedSummary
+          ? {
+              speedSummary: {
+                tokens: acc._speedTokens,
+                seconds: +acc._speedSeconds.toFixed(6),
+                sampleCount: acc._speedSampleCount,
+                excludedCount: acc._speedExcludedCount,
+                excludedReasons: acc._speedExcludedReasons,
+                avgTokPerSec: rawAvgTps,
+              },
+            }
+          : {}),
+        cacheHitPct: promptTok > 0 ? +((acc.cacheReadTokens / promptTok) * 100).toFixed(1) : 0,
+        ...(acc.anomalyCount > 0
+          ? {
+              anomalySteps: acc.anomalySteps,
+              anomalyCount: acc.anomalyCount,
+              anomalyDangerCount: acc.anomalyDangerCount,
+              anomalyTotalDelaySec: +acc.anomalyTotalDelaySec.toFixed(1),
+              anomalyByKind: acc.anomalyByKind,
+            }
+          : {}),
+      };
+    })
+    .sort((a, b) => b.totalTokens - a.totalTokens || b.calls - a.calls);
+
+  return { steps: combinedSteps, models: mergedModels };
+}
+
+const LEGACY_FIVE_COL_SIG = 'step,model,tps,ttft,cost';
+function resolveStepDisplayColumns(rawCols, isEmbedded) {
+  const cols = normalizeClientStepColumns(rawCols);
+  if (isEmbedded && cols.join(',') === LEGACY_FIVE_COL_SIG) {
+    return ['step', 'model', 'tps', 'ttft', 'cache', 'cost'];
+  }
+  return cols;
+}
+
+const StepsDetailView = defineComponent({
+  name: 'StepsDetailView',
+  setup({ props, onCleanup }) {
+    const isEmbedded = Boolean(props?.embedded);
+    const onLayoutChange = typeof props?.onLayoutChange === 'function' ? props.onLayoutChange : null;
+    const isStepsViewActive = (view = getVisibleMonitorView()) =>
+      isEmbedded ? view === 'overview' || view === 'steps' : view === 'steps';
+    let selectedAgentScopes = [uiStore.getState().selectedAgentScope || 'all'];
+    let lastSyncedUiScope = uiStore.getState().selectedAgentScope || 'all';
+    let selectedTableModels = ['__all__'];
+    let onlyAnomalies = false;
+    let anomalyKindFilter = '';
+    let stepSearchQuery = '';
+    let stepQuickChip = '';
+    let currentTableSteps = [];
+    let currentAllConvSteps = [];
+    let currentDisplaySettings = {};
+    let sortKey = '';
+    let sortDir = '';
+    let cachedSortSrc = null;
+    let cachedSortSig = '';
+    let cachedSortedOut = [];
+
+    function applyAgentScopesSelection(nextScopes) {
+      selectedAgentScopes = nextScopes;
+      const mappedSingle =
+        nextScopes.length === 1 && nextScopes[0] !== 'all' ? nextScopes[0] : 'all';
+      const prevUiScope = uiStore.getState().selectedAgentScope;
+      lastSyncedUiScope = mappedSingle;
+      if (prevUiScope !== mappedSingle) {
+        const curCtxId = uiStore.getState().ctxInspectorAgentId;
+        const shouldResetSubCtx =
+          mappedSingle === 'all' && curCtxId && curCtxId !== 'main' && curCtxId !== 'auto';
+        uiStore.setState({
+          selectedAgentScope: mappedSingle,
+          ...(shouldResetSubCtx
+            ? {
+                ctxInspectorAgentId: getDefaultCtxInspectorAgentId(
+                  telemetryStore.getState().telemetry?.settings
+                ),
+              }
+            : {}),
+        });
+      } else if (latestSlice) {
+        renderStepsData(latestSlice);
+      }
+    }
+
+    const inlineScopeSelect = CustomSelect({
+      multiple: true,
+      allValue: 'all',
+      collapseAll: true,
+      multiUnit: t('steps.unitAgent'),
+      modelValue: selectedAgentScopes,
+      placeholder: t('steps.allAgents'),
+      className: 'steps-inline-scope-select',
+      options: [{ value: 'all', label: t('steps.allAgents') }],
+      onUpdateModelValue: (nextScopes) => {
+        if (!Array.isArray(nextScopes) || nextScopes.length === 0) return;
+        applyAgentScopesSelection(nextScopes);
+      },
+    });
+    inlineScopeSelect.el.setAttribute('hidden', '');
+
+    const stepsModelSelect = CustomSelect({
+      multiple: true,
+      allValue: '__all__',
+      collapseAll: false,
+      multiUnit: t('steps.unitModel'),
+      modelValue: selectedTableModels,
+      placeholder: t('steps.allModels'),
+      className: 'steps-inline-model-select',
+      options: [{ value: '__all__', label: t('steps.allModels') }],
+      onUpdateModelValue: (nextModels) => {
+        if (!Array.isArray(nextModels) || nextModels.length === 0) return;
+        selectedTableModels = nextModels;
+        if (latestSlice) renderStepsData(latestSlice);
+      },
+    });
+    stepsModelSelect.el.setAttribute('hidden', '');
+
+    const stepsTitleTextEl = h('span', { text: t('steps.detailTitle') });
+    const stepsTitleEl = h('span', { className: 'panel-title' }, [
+      createSvgIcon('table', { size: 13 }),
+      stepsTitleTextEl,
+    ]);
+
+    // --- 单步明细表（委托给可复用的 `StepTableWidget` 解耦组件） ---
+    let stepsScroll = null;
+    const stepTableWidget = StepTableWidget({
+      onSelectAgentScopes: applyAgentScopesSelection,
+      onVirtualHeightChange: () => stepsScroll?.refresh(),
+      onSortChange: (nextKey, nextDir) => {
+        sortKey = nextKey || '';
+        sortDir = nextDir || '';
+        if (latestSlice) renderStepsData(latestSlice);
+      },
+    });
+    const {
+      stepsTablePane,
+      stepsTableEl,
+      stepsTheadRow,
+      stepsTbody,
+      turnTipEl,
+      anomalyTipEl,
+      hideTurnTip,
+      showAnomalyTip,
+      hideAnomalyTip,
+      syncTableHeaderColumns,
+      renderStepTable,
+      refreshViewport: refreshStepTableViewport,
+    } = stepTableWidget.refs;
+    stepsScroll = CustomScrollbar({
+      contentEl: stepsTablePane,
+      className: 'table-scroll-host',
+    });
+
+    const anomalyFilterLabelEl = h('span', { className: 'steps-anomaly-filter-label text-mono' });
+    const anomalyFilterClearBtn = h('button', {
+      type: 'button',
+      className: 'btn-ghost-sm steps-anomaly-filter-clear',
+      text: t('steps.anomalyFilterAll'),
+      onclick: () => {
+        onlyAnomalies = false;
+        anomalyKindFilter = '';
+        if (stepQuickChip === 'anomaly') stepQuickChip = '';
+        if (latestSlice) renderStepsData(latestSlice);
+      },
+    });
+    const anomalyFilterBarEl = h(
+      'div',
+      { className: 'steps-anomaly-filterbar', hidden: true },
+      [anomalyFilterLabelEl, anomalyFilterClearBtn]
+    );
+
+    // --- 步骤搜索栏及快捷诊断芯片 ---
+    const stepSearchBox = createSearchInput({
+      wrapClassName: 'steps-search-wrap',
+      iconClassName: 'steps-search-icon',
+      inputClassName: 'steps-search-input',
+      clearClassName: 'steps-search-clear',
+      placeholder: t('steps.searchPlaceholder'),
+      ariaLabel: t('steps.searchPlaceholder'),
+      clearAriaLabel: t('steps.searchClearAria'),
+      closeIconSize: 11,
+      onInput: (val) => {
+        stepSearchQuery = String(val ?? '');
+        if (latestSlice) renderStepsData(latestSlice);
+      },
+      onClear: () => {
+        stepSearchQuery = '';
+        if (latestSlice) renderStepsData(latestSlice);
+        stepSearchInput.focus?.();
+      },
+      onKeydown: (e) => {
+        if (e?.key === 'Escape') {
+          e.stopPropagation?.();
+          if (stepSearchQuery) {
+            stepSearchQuery = '';
+            stepSearchBox.setValue('');
+            if (latestSlice) renderStepsData(latestSlice);
+          } else {
+            stepSearchInput.blur?.();
+          }
+        }
+      },
+    });
+    const stepSearchWrapEl = stepSearchBox.el;
+    const stepSearchInput = stepSearchBox.inputEl;
+    const stepSearchClearBtn = stepSearchBox.clearBtnEl;
+
+    const QUICK_CHIP_DEFS = [
+      { key: 'anomaly', i18nKey: 'steps.chipAnomaly', tone: 'is-warn' },
+      { key: 'compaction', i18nKey: 'steps.chipCompaction', tone: 'is-info' },
+      { key: 'low_cache', i18nKey: 'steps.chipLowCache', tipKey: 'steps.chipLowCacheTip', tone: 'is-warn' },
+      { key: 'slow_ttft', i18nKey: 'steps.chipSlowTtft', tipKey: 'steps.chipSlowTtftTip', tone: 'is-danger' },
+    ];
+    const quickChipBtns = QUICK_CHIP_DEFS.map((def) => {
+      const btn = h('button', {
+        type: 'button',
+        className: `steps-chip-btn ${def.tone}`,
+        'data-chip': def.key,
+        hidden: true,
+        onclick: () => {
+          if (def.key === 'anomaly') {
+            const nextOn = !(onlyAnomalies || stepQuickChip === 'anomaly');
+            onlyAnomalies = nextOn;
+            anomalyKindFilter = '';
+            stepQuickChip = nextOn ? 'anomaly' : '';
+          } else {
+            const nextKey = stepQuickChip === def.key ? '' : def.key;
+            stepQuickChip = nextKey;
+            if (nextKey) {
+              onlyAnomalies = false;
+              anomalyKindFilter = '';
+            }
+          }
+          if (latestSlice) renderStepsData(latestSlice);
+        },
+      });
+      return { def, btn };
+    });
+    const stepQuickChipsEl = h(
+      'div',
+      { className: 'steps-quick-chips', hidden: true },
+      quickChipBtns.map((c) => c.btn)
+    );
+    const stepsExportMenu = ActionMenu({
+      ariaLabel: t('steps.exportMenuAria'),
+      className: 'steps-export-menu',
+      items: [
+        {
+          key: 'xlsx',
+          icon: 'download',
+          label: t('steps.exportXlsx'),
+          title: t('steps.exportXlsxTip'),
+          onSelect: () => {
+            if (currentTableSteps.length === 0) return;
+            const bytes = buildStepsXlsx(currentTableSteps, {
+              title: latestSlice?.activeConversation?.title || '',
+              cascadeId: latestSlice?.cascadeId || latestSlice?.activeConversation?.cascadeId || '',
+              displaySettings: currentDisplaySettings,
+            });
+            const baseName = buildStepsExportBaseName(
+              latestSlice?.activeConversation?.title || '',
+              latestSlice?.cascadeId || latestSlice?.activeConversation?.cascadeId || ''
+            );
+            void exportBinaryFileWithFeedback(
+              sanitizeExportFilename(baseName, 'xlsx'),
+              bytes
+            );
+          },
+        },
+        {
+          key: 'md',
+          icon: 'copy',
+          label: t('steps.exportMd'),
+          title: t('steps.exportMdTip'),
+          onSelect: () => {
+            if (currentTableSteps.length === 0) return;
+            const md = buildStepsMarkdownReport(currentTableSteps, {
+              title: latestSlice?.activeConversation?.title || '',
+              cascadeId: latestSlice?.cascadeId || latestSlice?.activeConversation?.cascadeId || '',
+              displaySettings: currentDisplaySettings,
+            });
+            void copyTextWithFeedback(md, t('steps.exportMdDone'));
+          },
+        },
+      ],
+    });
+    stepsExportMenu.refs.setHidden(true);
+    const stepsFilterToolbarEl = h(
+      'div',
+      { className: 'steps-filter-toolbar', hidden: true },
+      [stepSearchWrapEl, stepQuickChipsEl]
+    );
+
+    const headerFiltersEl = h('div', { className: 'steps-header-filters', hidden: true }, [
+      inlineScopeSelect.el,
+      stepsModelSelect.el,
+    ]);
+
+    const panelEl = h(
+      'section',
+      {
+        className: isEmbedded ? 'panel steps-embedded-panel' : 'panel',
+        ...(isEmbedded
+          ? {}
+          : { style: 'flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative;' }),
+      },
+      [
+        h('div', { className: 'panel-header steps-panel-header' }, [
+          h('div', { className: 'steps-header-controls' }, [
+            stepsTitleEl,
+            h('div', { className: 'steps-header-right' }, [
+              headerFiltersEl,
+              stepsExportMenu.el,
+            ]),
+          ]),
+        ]),
+        stepsFilterToolbarEl,
+        anomalyFilterBarEl,
+        stepsScroll.el,
+        turnTipEl,
+        anomalyTipEl,
+      ]
+    );
+    stepTableWidget.refs.setBoundsElGetter(() => panelEl);
+
+    const rootEl = isEmbedded ? panelEl : h('div', { className: 'view-pane' }, [panelEl]);
+
+    let latestSlice = null;
+    let isDirty = false;
+    let lastSyncedCascadeId = null;
+
+    function normalizeMultiModelSelection(rawSelection, availableModelKeys) {
+      if (availableModelKeys.size <= 1) return ['__all__'];
+      const arr = Array.isArray(rawSelection) ? rawSelection : [];
+      if (arr.length === 0 || arr.includes('__all__')) return ['__all__'];
+      const valid = Array.from(new Set(arr.filter((k) => availableModelKeys.has(k))));
+      if (valid.length === 0) return ['__all__'];
+      return valid;
+    }
+
+    function refreshStaticLocaleLabels() {
+      patchText(anomalyFilterClearBtn, t('steps.anomalyFilterAll'));
+      patchAttr(stepSearchInput, 'placeholder', t('steps.searchPlaceholder'));
+      patchAttr(stepSearchInput, 'aria-label', t('steps.searchPlaceholder'));
+      patchAttr(stepSearchClearBtn, 'aria-label', t('steps.searchClearAria'));
+      stepsExportMenu.refs.setAriaLabel(t('steps.exportMenuAria'));
+      stepsExportMenu.refs.updateItemLabels({
+        xlsx: { label: t('steps.exportXlsx'), title: t('steps.exportXlsxTip') },
+        md: { label: t('steps.exportMd'), title: t('steps.exportMdTip') },
+      });
+      const colKeys = resolveStepDisplayColumns(latestSlice?.stepTableColumns, isEmbedded);
+      syncTableHeaderColumns(colKeys);
+      patchText(stepsTitleTextEl, t('steps.detailTitle'));
+    }
+
+    function renderStepsData(slice, { allowNewRowFade = false } = {}) {
+      if (!slice) return;
+      const uiSt = uiStore.getState();
+      const locale = getEffectiveLocale();
+
+      const currentCid = String(slice.cascadeId || slice.activeConversation?.cascadeId || '');
+      if (currentCid !== lastSyncedCascadeId) {
+        if (lastSyncedCascadeId !== null) {
+          selectedAgentScopes = [uiSt.selectedAgentScope || 'all'];
+          lastSyncedUiScope = uiSt.selectedAgentScope || 'all';
+          selectedTableModels = ['__all__'];
+          onlyAnomalies = false;
+          anomalyKindFilter = '';
+          stepSearchQuery = '';
+          stepSearchInput.value = '';
+          patchAttr(stepSearchClearBtn, 'hidden', true);
+          stepQuickChip = '';
+          sortKey = '';
+          sortDir = '';
+        }
+        lastSyncedCascadeId = currentCid;
+      }
+
+      const baseScope = resolveScopedConversation(
+        { activeConversation: slice.activeConversation },
+        'all',
+        uiSt.ctxInspectorAgentId,
+        true
+      );
+      const { hasSubagents, agents, subagents, mainAgent, aggregated } = baseScope;
+
+      let effectiveScopes = ['main'];
+      let isMergedMultiAgents = false;
+      let steps = [];
+      let models = [];
+
+      patchAttr(inlineScopeSelect.el, 'hidden', !hasSubagents);
+      if (hasSubagents) {
+        const validAgentIds = ['main', ...subagents.map((s) => s.agentId)];
+        const validSet = new Set(validAgentIds);
+        if (selectedAgentScopes.length === 0 || selectedAgentScopes.includes('all')) {
+          effectiveScopes = ['all'];
+        } else {
+          const filtered = selectedAgentScopes.filter((id) => validSet.has(id));
+          effectiveScopes =
+            filtered.length === 0 || filtered.length >= validAgentIds.length
+              ? ['all']
+              : filtered;
+        }
+        selectedAgentScopes = effectiveScopes;
+
+        const scopeOpts = [
+          {
+            value: 'all',
+            label: t('steps.allAgents'),
+            meta: t('header.convMetaSteps', { count: aggregated?.stepCount ?? 0 }),
+          },
+          {
+            value: 'main',
+            label: t('fmt.mainAgent'),
+            meta: t('header.convMetaSteps', { count: mainAgent?.stepCount ?? 0 }),
+          },
+          ...subagents.map((s) => ({
+            value: s.agentId,
+            label: formatAgentLabel(s),
+            meta: t('header.convMetaSteps', { count: s.stepCount || 0 }),
+          })),
+        ];
+        inlineScopeSelect.setProps({
+          modelValue: effectiveScopes,
+          options: scopeOpts,
+          placeholder: t('steps.allAgents'),
+          multiUnit: t('steps.unitAgent'),
+        });
+
+        if (effectiveScopes[0] === 'all') {
+          steps = aggregated?.recentSteps || [];
+          models = aggregated?.modelBreakdown || [];
+          isMergedMultiAgents = true;
+        } else if (effectiveScopes.length === 1) {
+          const targetId = effectiveScopes[0];
+          const unit =
+            targetId === 'main'
+              ? mainAgent
+              : agents.find((a) => a.agentId === targetId) || mainAgent;
+          steps = unit?.recentSteps || [];
+          models = unit?.modelBreakdown || [];
+          isMergedMultiAgents = false;
+        } else {
+          const scopeSet = new Set(effectiveScopes);
+          const selectedUnits = agents.filter((a) =>
+            scopeSet.has(a.isMain ? 'main' : a.agentId)
+          );
+          const merged = mergeSelectedAgentUnits(selectedUnits);
+          steps = merged.steps;
+          models = merged.models;
+          isMergedMultiAgents = true;
+        }
+      } else {
+        inlineScopeSelect.close();
+        steps = slice.recentSteps || [];
+        models = slice.sessionModelBreakdown || [];
+      }
+
+      const displaySettings = {
+        modelDisplayMode: normalizeModelDisplayMode(
+          slice.modelDisplayMode,
+          slice.showUpstreamModel
+        ),
+        showUpstreamModel: Boolean(slice.showUpstreamModel),
+        orchestratorIdMode: slice.orchestratorIdMode,
+      };
+
+      const showAgentPrefix = isMergedMultiAgents;
+
+      const availableModelKeys = new Set();
+      const perModelOptions = [];
+      let breakdownCalls = 0;
+      for (const m of models) {
+        if (!m || typeof m !== 'object') continue;
+        breakdownCalls += Math.max(0, Number(m.calls || 0));
+        const gk = getStepModelGroupKey(m);
+        if (availableModelKeys.has(gk)) continue;
+        availableModelKeys.add(gk);
+        const disp = resolveModelDisplayInfo(m, displaySettings, {
+          preferLabelInShort: false,
+          fallback: gk,
+        });
+        perModelOptions.push({
+          value: gk,
+          label: disp.baseText || disp.text || gk,
+          meta: t('header.convMetaSteps', { count: Number(m.calls || 0) }),
+        });
+      }
+
+      const needStepModelFallback =
+        steps.length > 0 && (models.length === 0 || breakdownCalls < steps.length);
+      if (needStepModelFallback) {
+        const stepModelOptionMap = new Map();
+        for (const st of steps) {
+          const gk = getStepModelGroupKey(st);
+          if (!stepModelOptionMap.has(gk)) {
+            const disp = resolveModelDisplayInfo(st, displaySettings, { fallback: gk });
+            stepModelOptionMap.set(gk, {
+              label: disp.baseText || disp.text || gk,
+              calls: 0,
+            });
+          }
+          stepModelOptionMap.get(gk).calls += 1;
+        }
+        for (const [gk, info] of stepModelOptionMap.entries()) {
+          if (!availableModelKeys.has(gk)) {
+            availableModelKeys.add(gk);
+            perModelOptions.push({
+              value: gk,
+              label: info.label,
+              meta: t('header.convMetaSteps', { count: info.calls }),
+            });
+          }
+        }
+      }
+
+      const hasMultipleModels = availableModelKeys.size > 1;
+      const modelSelectOptions = [
+        {
+          value: '__all__',
+          label: t('steps.allModels'),
+          meta: t('header.convMetaSteps', { count: steps.length }),
+        },
+        ...perModelOptions,
+      ];
+
+      // 1. 动态列头同步与表格行级增量对账
+      selectedTableModels = normalizeMultiModelSelection(
+        selectedTableModels,
+        availableModelKeys
+      );
+      const showStepsModelFilter = hasMultipleModels;
+      patchAttr(stepsModelSelect.el, 'hidden', !showStepsModelFilter);
+      patchAttr(headerFiltersEl, 'hidden', !hasSubagents && !showStepsModelFilter);
+      if (hasMultipleModels) {
+        stepsModelSelect.setProps({
+          modelValue: selectedTableModels,
+          options: modelSelectOptions,
+          placeholder: t('steps.allModels'),
+          multiUnit: t('steps.unitModel'),
+        });
+        if (!showStepsModelFilter) stepsModelSelect.close();
+      } else {
+        stepsModelSelect.close();
+      }
+
+      const tableModelFilterSet = selectedTableModels.includes('__all__')
+        ? null
+        : new Set(selectedTableModels);
+      const modelFilteredSteps = tableModelFilterSet
+        ? steps.filter((st) => tableModelFilterSet.has(getStepModelGroupKey(st)))
+        : steps;
+
+      const filterToolbarEnabled = slice.showStepFilterToolbar === true;
+      if (!filterToolbarEnabled) {
+        if (stepSearchQuery) {
+          stepSearchQuery = '';
+          stepSearchInput.value = '';
+          patchAttr(stepSearchClearBtn, 'hidden', true);
+        }
+        if (stepQuickChip && stepQuickChip !== 'anomaly') {
+          stepQuickChip = '';
+        }
+      }
+      const chipCounts = computeStepQuickChipCounts(modelFilteredSteps);
+      const effectiveQuickChip = onlyAnomalies
+        ? 'anomaly'
+        : filterToolbarEnabled
+          ? stepQuickChip
+          : '';
+      const showFilterToolbar = filterToolbarEnabled && steps.length > 0;
+      patchAttr(stepsFilterToolbarEl, 'hidden', !showFilterToolbar);
+      stepsExportMenu.refs.setHidden(steps.length === 0);
+      if (showFilterToolbar) {
+        let visibleChipsCount = 0;
+        for (const { def, btn } of quickChipBtns) {
+          const cnt = chipCounts[def.key] || 0;
+          const isActive = effectiveQuickChip === def.key;
+          const showChip = cnt > 0 || isActive;
+          patchAttr(btn, 'hidden', !showChip);
+          if (showChip) {
+            visibleChipsCount += 1;
+            patchText(btn, t(def.i18nKey, { count: cnt }));
+            if (def.tipKey) patchAttr(btn, 'title', t(def.tipKey));
+            patchClasses(btn, { 'is-active': isActive });
+            patchAttr(btn, 'aria-pressed', isActive ? 'true' : 'false');
+          }
+        }
+        patchAttr(stepQuickChipsEl, 'hidden', visibleChipsCount === 0);
+      }
+
+      const filteredTableSteps = filterStepsBySearchAndChip(modelFilteredSteps, {
+        query: filterToolbarEnabled ? stepSearchQuery : '',
+        quickChip: effectiveQuickChip,
+        anomalyKindFilter: onlyAnomalies ? anomalyKindFilter : '',
+        displaySettings,
+      });
+
+      const normTokenFmt = normalizeClientStepTokenComboFormat(slice.stepTokenComboFormat);
+      const sortSig = `${sortKey}:${sortDir}:${normTokenFmt}:${displaySettings.modelDisplayMode}:${displaySettings.showUpstreamModel ? 1 : 0}:${displaySettings.orchestratorIdMode}`;
+      let tableSteps = filteredTableSteps;
+      if (sortKey && sortDir) {
+        if (cachedSortSrc === filteredTableSteps && cachedSortSig === sortSig) {
+          tableSteps = cachedSortedOut;
+        } else {
+          tableSteps = sortStepsByColumn(filteredTableSteps, sortKey, sortDir, {
+            stepTokenComboFormat: normTokenFmt,
+            displaySettings,
+          });
+          cachedSortSrc = filteredTableSteps;
+          cachedSortSig = sortSig;
+          cachedSortedOut = tableSteps;
+        }
+      } else {
+        cachedSortSrc = null;
+        cachedSortSig = '';
+        cachedSortedOut = [];
+      }
+
+      const showAnomalyFilterBar = onlyAnomalies;
+      patchAttr(anomalyFilterBarEl, 'hidden', !showAnomalyFilterBar);
+      if (showAnomalyFilterBar) {
+        const baseLabel = t('steps.anomalyFilterLabel', { count: tableSteps.length });
+        const kindSuffix = anomalyKindFilter
+          ? ` · ${formatAnomalyKindLabel(anomalyKindFilter)}`
+          : '';
+        patchText(anomalyFilterLabelEl, `${baseLabel}${kindSuffix}`);
+      }
+
+      const allConversationSteps = hasSubagents
+        ? aggregated?.recentSteps || []
+        : slice.recentSteps || [];
+      currentTableSteps = tableSteps;
+      currentAllConvSteps = allConversationSteps;
+      currentDisplaySettings = displaySettings;
+      const shouldAnimateNewRows = Boolean(allowNewRowFade && slice.experimentalModernUi);
+      const colKeys = resolveStepDisplayColumns(slice.stepTableColumns, isEmbedded);
+      renderStepTable(tableSteps, slice.cascadeId, colKeys, locale, {
+        effectiveScopes,
+        hasSubagents,
+        isMergedMultiAgents,
+        showStepTurnRail: slice.showStepTurnRail === true,
+        showStepAgentBadge: slice.showStepAgentBadge !== false,
+        showStepSpeedColor: slice.showStepSpeedColor === true,
+        stepTokenComboFormat: slice.stepTokenComboFormat,
+        displaySettings,
+        allConversationSteps,
+        allowNewRowFade: shouldAnimateNewRows,
+        sortKey,
+        sortDir,
+      });
+      stepsScroll.refresh();
+      onLayoutChange?.();
+    }
+
+    const unsubTelemetry = telemetryStore.subscribe(
+      (st) => ({
+        activeConversation: st.telemetry?.activeConversation,
+        cascadeId: st.telemetry?.activeConversation?.cascadeId,
+        recentSteps: st.telemetry?.activeConversation?.recentSteps,
+        sessionModelBreakdown: st.telemetry?.activeConversation?.modelBreakdown,
+        modelDisplayMode: normalizeModelDisplayMode(
+          st.telemetry?.settings?.modelDisplayMode,
+          st.telemetry?.settings?.showUpstreamModel
+        ),
+        showUpstreamModel: Boolean(st.telemetry?.settings?.showUpstreamModel),
+        orchestratorIdMode: normalizeOrchestratorIdDisplayMode(
+          st.telemetry?.settings?.orchestratorIdMode
+        ),
+        showStepTurnRail: st.telemetry?.settings?.showStepTurnRail === true,
+        showStepAgentBadge: st.telemetry?.settings?.showStepAgentBadge !== false,
+        showStepSpeedColor: st.telemetry?.settings?.showStepSpeedColor === true,
+        showStepFilterToolbar: st.telemetry?.settings?.showStepFilterToolbar === true,
+        stepTokenComboFormat: normalizeClientStepTokenComboFormat(
+          st.telemetry?.settings?.stepTokenComboFormat
+        ),
+        stepTableColumns: st.telemetry?.settings?.stepTableColumns,
+        experimentalModernUi: resolveSettingsModernUi(st.telemetry?.settings),
+      }),
+      (slice) => {
+        latestSlice = slice;
+        if (!isStepsViewActive()) {
+          isDirty = true;
+          return;
+        }
+        isDirty = false;
+        renderStepsData(slice, {
+          allowNewRowFade: true,
+        });
+      }
+    );
+
+    let prevScope = uiStore.getState().selectedAgentScope;
+    let prevActiveView = getVisibleMonitorView();
+
+    const unsubView = uiStore.subscribe(
+      (st) => ({
+        activeView: getVisibleMonitorView(st),
+        selectedAgentScope: st.selectedAgentScope,
+      }),
+      (uiSlice) => {
+        const scopeChanged = uiSlice.selectedAgentScope !== prevScope;
+        if (uiSlice.selectedAgentScope !== lastSyncedUiScope) {
+          lastSyncedUiScope = uiSlice.selectedAgentScope;
+          selectedAgentScopes = [uiSlice.selectedAgentScope || 'all'];
+        }
+        const viewEntered = isStepsViewActive(uiSlice.activeView) && !isStepsViewActive(prevActiveView);
+        prevScope = uiSlice.selectedAgentScope;
+        prevActiveView = uiSlice.activeView;
+        if (!isStepsViewActive(uiSlice.activeView)) {
+          hideTurnTip();
+          hideAnomalyTip();
+          if (scopeChanged) isDirty = true;
+          return;
+        }
+        if ((isDirty || scopeChanged || viewEntered) && latestSlice) {
+          isDirty = false;
+          renderStepsData(latestSlice);
+        }
+      }
+    );
+
+    const unsubI18n = i18nStore.subscribe(
+      (st) => st.locale,
+      () => {
+        refreshStaticLocaleLabels();
+        if (isStepsViewActive() && latestSlice) {
+          renderStepsData(latestSlice);
+        } else {
+          isDirty = true;
+        }
+      }
+    );
+
+    onCleanup(() => {
+      stepsExportMenu.destroy();
+      unsubTelemetry();
+      unsubView();
+      unsubI18n();
+      stepTableWidget.destroy();
+      inlineScopeSelect.destroy();
+      stepsModelSelect.destroy();
+      stepsScroll.destroy();
+    });
+
+    return {
+      el: rootEl,
+      refs: {
+        stepsTableEl,
+        stepsTheadRow,
+        stepsTbody,
+        turnTipEl,
+        anomalyTipEl,
+        anomalyFilterBarEl,
+        stepsFilterToolbarEl,
+        stepSearchInput,
+        stepQuickChipsEl,
+        stepsExportMenu,
+        inlineScopeSelect,
+        stepsModelSelect,
+        stepsScroll,
+        refreshStepTableViewport,
+      },
+    };
+  },
+});
+return { mergeSelectedAgentUnits, StepsDetailView };
+})();
+
 // --- src/views/LiveOverviewView.js ---
 const { LiveOverviewView } = (() => {
 /**
@@ -36779,22 +24232,38 @@ const { LiveOverviewView } = (() => {
 
 
 
+function resolveOverviewModules(raw) {
+  const filtered = normalizeClientOverviewModules(raw).filter((k) => k !== 'quotas');
+  return filtered.length > 0 ? filtered : ['metrics', 'context', 'live_tasks'];
+}
+
 const LiveOverviewView = defineComponent({
   name: 'LiveOverviewView',
   setup({ onCleanup }) {
-    const overviewInner = h('div', {
+    const overviewModulesEl = h('div', {
       className: 'overview-modules-host',
     });
 
     const widgetHost = createDynamicWidgetHost({
-      containerEl: overviewInner,
+      containerEl: overviewModulesEl,
       mode: 'overview',
       isVisibleFn: () => getVisibleMonitorView() === 'overview',
-      initialModuleKeys: DEFAULT_CLIENT_OVERVIEW_MODULES,
+      initialModuleKeys: resolveOverviewModules(DEFAULT_CLIENT_OVERVIEW_MODULES),
     });
 
-    const viewScrollbar = CustomScrollbar({
-      contentEl: overviewInner,
+    let viewScrollbar = null;
+    const stepsView = StepsDetailView({
+      embedded: true,
+      onLayoutChange: () => viewScrollbar?.refresh(),
+    });
+
+    const overviewContentEl = h('div', { className: 'overview-merged-stack' }, [
+      overviewModulesEl,
+      stepsView.el,
+    ]);
+
+    viewScrollbar = CustomScrollbar({
+      contentEl: overviewContentEl,
       className: 'view-pane',
     });
 
@@ -36825,7 +24294,7 @@ const LiveOverviewView = defineComponent({
 
     function renderData(data) {
       if (!data) return;
-      const moduleKeys = normalizeClientOverviewModules(data.settings?.overviewModules);
+      const moduleKeys = resolveOverviewModules(data.settings?.overviewModules);
       const minuteTick = Math.floor(Date.now() / 30000);
       widgetHost.update({
         moduleKeys,
@@ -36893,7 +24362,7 @@ const LiveOverviewView = defineComponent({
           // Refresh initial skeleton labels even before telemetry arrives
           if (!latestData) {
             widgetHost.update({
-              moduleKeys: DEFAULT_CLIENT_OVERVIEW_MODULES,
+              moduleKeys: resolveOverviewModules(DEFAULT_CLIENT_OVERVIEW_MODULES),
               data: null,
             });
           }
@@ -36903,7 +24372,7 @@ const LiveOverviewView = defineComponent({
           renderData(latestData);
         } else {
           widgetHost.update({
-            moduleKeys: DEFAULT_CLIENT_OVERVIEW_MODULES,
+            moduleKeys: resolveOverviewModules(DEFAULT_CLIENT_OVERVIEW_MODULES),
             data: null,
           });
         }
@@ -36916,12 +24385,13 @@ const LiveOverviewView = defineComponent({
       unsubView();
       unsubI18n();
       widgetHost.destroy();
+      stepsView.destroy();
       viewScrollbar.destroy();
     });
 
     return {
       el: viewScrollbar.el,
-      refs: { viewScrollbar, widgetHost },
+      refs: { viewScrollbar, widgetHost, stepsView },
     };
   },
 });
@@ -37165,7 +24635,7 @@ const ConsumptionView = defineComponent({
       ]
     );
 
-    // --- Section 1: 用量概览矩阵 (上层 3 列核心总量 + 下层 3 列新输入/缓存读取/输出拆分 + 底部 4 段比例条) ---
+    // --- Section 1: 用量概览矩阵 (4 列核心指标 + Token 构成小字 + 底部 4 段比例条) ---
     const dateSpanBadge = h('span', { className: 'cons-badge text-mono', text: '-- ~ --' });
     const cyclePoolSelect = CustomSelect({
       className: 'cons-cycle-pool-select',
@@ -37178,21 +24648,29 @@ const ConsumptionView = defineComponent({
     patchAttr(cyclePoolSelect.el, 'hidden', true);
     patchAttr(cyclePoolSelect.refs.triggerBtn, 'aria-label', t('cons.cyclePoolAria'));
     const heroTotalTokens = h('strong', { className: 'cons-hero-num text-mono', text: '0' });
-    const heroTotalCalls = h('span', { className: 'text-muted text-mono', style: 'font-size: var(--fs-md);', text: t('cons.callsCount', { calls: 0 }) });
+    const heroSplitInputLabel = h('span', { text: t('cons.footInput') });
+    const heroSplitInputVal = h('span', { text: '0' });
+    const heroSplitCacheLabel = h('span', { text: t('cons.footCache') });
+    const heroSplitCacheVal = h('span', { text: '0' });
+    const heroSplitOutputLabel = h('span', { text: t('cons.footOutput') });
+    const heroSplitOutputVal = h('span', { text: '0' });
+    const heroTokenSplitSub = h('span', { className: 'cons-hero-sub text-mono' }, [
+      h('span', { className: 'cons-hero-sub-item' }, [
+        h('span', { className: 'dot-swatch seg-input', 'aria-hidden': 'true' }),
+        h('span', {}, [heroSplitInputLabel, heroSplitInputVal]),
+      ]),
+      h('span', { className: 'cons-hero-sub-item' }, [
+        h('span', { className: 'dot-swatch seg-cached', 'aria-hidden': 'true' }),
+        h('span', {}, [heroSplitCacheLabel, heroSplitCacheVal]),
+      ]),
+      h('span', { className: 'cons-hero-sub-item' }, [
+        h('span', { className: 'dot-swatch seg-output', 'aria-hidden': 'true' }),
+        h('span', {}, [heroSplitOutputLabel, heroSplitOutputVal]),
+      ]),
+    ]);
     const heroCostUsd = h('strong', { className: 'cons-hero-cost text-mono', text: '$0.00' });
-    const heroCostCny = h('span', { className: 'text-muted text-mono', style: 'font-size: var(--fs-md);', text: '≈ ¥0' });
-
     const cacheHitPctEl = h('strong', { className: 'cons-hero-cache text-mono', text: '0%' });
-    const cacheTokensEl = h('span', { className: 'text-muted text-mono', style: 'font-size: var(--fs-md);', text: t('cons.cacheHitTokens', { tokens: 0 }) });
-
-    const inputSharePct = h('span', { className: 'text-muted text-mono', style: 'font-size: var(--fs-md);', text: '0%' });
-    const inputMainTokens = h('strong', { className: 'cons-hero-num text-mono', text: '0' });
-
-    const cacheSharePct = h('span', { className: 'text-muted text-mono', style: 'font-size: var(--fs-md);', text: '0%' });
-    const cacheMainTokens = h('strong', { className: 'cons-hero-num text-mono', text: '0' });
-
-    const outputSharePct = h('span', { className: 'text-muted text-mono', style: 'font-size: var(--fs-md);', text: '0%' });
-    const outputMainTokens = h('strong', { className: 'cons-hero-num text-mono', text: '0' });
+    const heroAvgSpeedEl = h('strong', { className: 'cons-hero-speed text-mono', text: '--' });
 
     const overviewSegBar = createFourSegmentBar();
     const consExportMenu = ActionMenu({
@@ -37250,49 +24728,29 @@ const ConsumptionView = defineComponent({
     const totalTokensLabel = h('span', { className: 'text-muted', style: 'font-size: var(--fs-md);', text: t('cons.totalTokens') });
     const estCostLabel = h('span', { className: 'text-muted', style: 'font-size: var(--fs-md);', text: t('cons.estCost') });
     const cacheHitRateLabel = h('span', { text: t('cons.cacheHitRate') });
-    const newInputLabel = h('span', { text: t('cons.newInput') });
-    const cacheReadLabel = h('span', { text: t('cons.cacheRead') });
-    const outputUsageLabel = h('span', { text: t('cons.outputUsage') });
+    const avgSpeedLabel = h('span', { className: 'text-muted', style: 'font-size: var(--fs-md);', text: t('cons.avgOutputSpeed') });
 
     const unifiedMatrixEl = h('div', { className: 'cons-box cons-unified-matrix' }, [
-      h('div', { className: 'cons-split-3' }, [
+      h('div', { className: 'cons-split-4' }, [
         h('div', { className: 'cons-col' }, [
           totalTokensLabel,
-          h('div', { className: 'cons-baseline' }, [heroTotalTokens, heroTotalCalls]),
+          h('div', { className: 'cons-baseline' }, [heroTotalTokens]),
+          heroTokenSplitSub,
         ]),
         h('div', { className: 'cons-col is-bordered-col' }, [
           estCostLabel,
-          h('div', { className: 'cons-baseline' }, [heroCostUsd, heroCostCny]),
+          h('div', { className: 'cons-baseline' }, [heroCostUsd]),
         ]),
         h('div', { className: 'cons-col is-bordered-col' }, [
-          h('span', { className: 'legend-left', style: 'font-size: var(--fs-md);' }, [
+          h('span', { className: 'legend-left text-muted', style: 'font-size: var(--fs-md);' }, [
             h('span', { className: 'dot-swatch seg-cached' }),
             cacheHitRateLabel,
           ]),
-          h('div', { className: 'cons-baseline' }, [cacheHitPctEl, cacheTokensEl]),
-        ]),
-      ]),
-      h('div', { className: 'cons-split-3 cons-matrix-bottom' }, [
-        h('div', { className: 'cons-col' }, [
-          h('span', { className: 'legend-left text-muted', style: 'font-size: var(--fs-md);' }, [
-            h('span', { className: 'dot-swatch seg-input' }),
-            newInputLabel,
-          ]),
-          h('div', { className: 'cons-baseline' }, [inputMainTokens, inputSharePct]),
+          h('div', { className: 'cons-baseline' }, [cacheHitPctEl]),
         ]),
         h('div', { className: 'cons-col is-bordered-col' }, [
-          h('span', { className: 'legend-left text-muted', style: 'font-size: var(--fs-md);' }, [
-            h('span', { className: 'dot-swatch seg-cached' }),
-            cacheReadLabel,
-          ]),
-          h('div', { className: 'cons-baseline' }, [cacheMainTokens, cacheSharePct]),
-        ]),
-        h('div', { className: 'cons-col is-bordered-col' }, [
-          h('span', { className: 'legend-left text-muted', style: 'font-size: var(--fs-md);' }, [
-            h('span', { className: 'dot-swatch seg-output' }),
-            outputUsageLabel,
-          ]),
-          h('div', { className: 'cons-baseline' }, [outputMainTokens, outputSharePct]),
+          avgSpeedLabel,
+          h('div', { className: 'cons-baseline' }, [heroAvgSpeedEl]),
         ]),
       ]),
     ]);
@@ -37317,7 +24775,6 @@ const ConsumptionView = defineComponent({
       const minMs = floorToStartOfMinuteMs(startMs);
       const maxMs = ceilToEndOfMinuteMs(endMs);
       if (!(minMs > 0) || !(maxMs > minMs)) return;
-      hideBreakdownPopover();
       draftStartMs = minMs;
       draftEndMs = maxMs;
       hasUncommittedCustomDraft = false;
@@ -37333,12 +24790,6 @@ const ConsumptionView = defineComponent({
     // --- Section 2: 历史趋势 (交互式 SVG 平滑曲线图 / 7×W 四态热力格子图 + 悬停明细浮层 + 点击时段下钻) ---
     let heatmapViewMode = 'day';
     const trendTitleSpan = h('span', { text: t('cons.trendTitle') });
-    const trendRangeBadge = h('span', { className: 'cons-badge', text: t('cons.allTime') });
-    const trendGranularityHint = h('span', {
-      className: 'cons-trend-hint text-muted text-mono',
-      style: 'font-size: var(--fs-sm);',
-      text: t('cons.trendPointsHintHourly', { points: 0 }),
-    });
     const heatmapModeSwitch = SegmentedControl({
       ariaLabel: t('cons.hmModeAria'),
       modelValue: heatmapViewMode,
@@ -37365,455 +24816,111 @@ const ConsumptionView = defineComponent({
       h('div', { className: 'panel-header cons-trend-head' }, [
         h('span', { className: 'panel-title' }, [
           trendTitleSpan,
-          trendRangeBadge,
         ]),
         h('div', { className: 'cons-trend-head-right' }, [
-          trendGranularityHint,
           heatmapModeSwitch.el,
         ]),
       ]),
       trendChart.el,
     ]);
 
-    // --- Section 3: 统一排行卡片（分段切换「模型排行 | 项目排行 | 会话排行」，右侧联动对应排序切换） ---
-    let activeRankingTab = 'models';
-    let modelsSortBy = 'tokens';
-    let topConvsSortBy = 'cost';
-    let lastModelsCount = 0;
-    let lastWorkspacesCount = 0;
-    let lastConvsCount = 0;
-    let hasCompletedInitialDraw = false;
-    let lastAnimatedRangeSig = '';
-    let lastAnimatedRankingKey = '';
-    let lastAnimatedSortSig = '';
-    const consAnimTimers = new Map();
-    const TRANSIENT_CONS_CLASSES = ['is-bars-revealing'];
-
-    function cleanupConsAnim(el) {
-      const rec = consAnimTimers.get(el);
-      if (!rec) return;
-      clearTimeout(rec.tid);
-      el?.removeEventListener?.('animationend', rec.onEnd);
-      el?.classList?.remove(...TRANSIENT_CONS_CLASSES);
-      consAnimTimers.delete(el);
+    // --- Section 3: Magpie 风格模型用量表格（按 Token 降序，单行清晰展示全部关键指标） ---
+    function formatModelSpeedCell(tps) {
+      const n = Number(tps);
+      if (!Number.isFinite(n) || n <= 0) return '--';
+      return n >= 100 ? `${Math.round(n)} tok/s` : `${n.toFixed(1)} tok/s`;
     }
 
-    function triggerConsAnim(el, cls, fallbackMs = 650) {
-      if (
-        !el ||
-        !el.classList ||
-        typeof window === 'undefined' ||
-        typeof window.getComputedStyle !== 'function' ||
-        window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
-      ) {
-        return;
-      }
-      cleanupConsAnim(el);
-      el.classList.remove(...TRANSIENT_CONS_CLASSES);
-      void el.offsetWidth;
-      const onEnd = (ev) => {
-        if (ev && ev.target && ev.target !== el) return;
-        cleanupConsAnim(el);
-      };
-      const tid = setTimeout(() => cleanupConsAnim(el), fallbackMs);
-      consAnimTimers.set(el, { cls, tid, onEnd });
-      el.addEventListener?.('animationend', onEnd);
-      el.classList.add(cls);
-    }
-
-    function clearConsAnimTimers() {
-      for (const el of Array.from(consAnimTimers.keys())) {
-        cleanupConsAnim(el);
-      }
-    }
-
-    function getRankingTabOptions(
-      modelsCount = lastModelsCount,
-      convsCount = lastConvsCount,
-      workspacesCount = lastWorkspacesCount
-    ) {
-      const opts = [
-        {
-          value: 'models',
-          label:
-            modelsCount > 0
-              ? t('cons.rankTabModelsCount', { count: modelsCount })
-              : t('cons.topModels'),
-        },
-      ];
-      if (workspacesCount > 0) {
-        opts.push({
-          value: 'workspaces',
-          label: t('cons.rankTabWorkspacesCount', { count: workspacesCount }),
-        });
-      }
-      opts.push({
-        value: 'sessions',
-        label:
-          convsCount > 0
-            ? t('cons.rankTabSessionsCount', { count: convsCount })
-            : t('cons.rankTabSessions'),
-      });
-      return opts;
-    }
-
-    function getModelsSortOptions() {
-      return [
-        { value: 'tokens', label: t('cons.modelsSortTokens') },
-        { value: 'cost', label: t('cons.modelsSortCost') },
-        { value: 'speed', label: t('cons.modelsSortSpeed') },
-        { value: 'calls', label: t('cons.modelsSortCalls') },
-      ];
-    }
-
-    function getTopConvsSortOptions() {
-      return [
-        { value: 'cost', label: t('cons.topConvsSortCost') },
-        { value: 'tokens', label: t('cons.topConvsSortTokens') },
-      ];
-    }
-
-    const rankingTabSwitch = SegmentedControl({
-      ariaLabel: t('cons.rankTabAria'),
-      modelValue: activeRankingTab,
-      options: getRankingTabOptions(0, 0, 0),
-      onUpdateModelValue: (nextTab) => {
-        if (nextTab !== 'models' && nextTab !== 'sessions' && nextTab !== 'workspaces') return;
-        activeRankingTab = nextTab;
-        rankingTabSwitch.setValue(nextTab);
-        if (latestSlice) {
-          renderConsumptionData(latestSlice);
-        }
-      },
-    });
-
-    const modelsSortSwitch = SegmentedControl({
-      ariaLabel: t('cons.modelsSortAria'),
-      modelValue: modelsSortBy,
-      options: getModelsSortOptions(),
-      onUpdateModelValue: (nextSort) => {
-        if (!['tokens', 'cost', 'speed', 'calls'].includes(nextSort)) return;
-        modelsSortBy = nextSort;
-        modelsSortSwitch.setValue(nextSort);
-        if (latestSlice) {
-          renderConsumptionData(latestSlice);
-        }
-      },
-    });
-
-    const topConvsSortSwitch = SegmentedControl({
-      ariaLabel: t('cons.topConvsSortAria'),
-      modelValue: topConvsSortBy,
-      options: getTopConvsSortOptions(),
-      onUpdateModelValue: (nextSort) => {
-        if (nextSort !== 'cost' && nextSort !== 'tokens') return;
-        topConvsSortBy = nextSort;
-        topConvsSortSwitch.setValue(nextSort);
-        if (latestSlice) {
-          renderConsumptionData(latestSlice);
-        }
-      },
-    });
-    patchAttr(topConvsSortSwitch.el, 'hidden', true);
-
-    const rankingSortWrap = h('div', { className: 'cons-ranking-sort-wrap' }, [
-      modelsSortSwitch.el,
-      topConvsSortSwitch.el,
-    ]);
-    const modelsListEl = h('div', { className: 'cons-item-list' });
-    const topConvsListEl = h('div', { className: 'cons-item-list', hidden: true });
-    const workspacesListEl = h('div', { className: 'cons-item-list', hidden: true });
-    const topConvsEmptyEl = h('div', {
-      className: 'cons-ranking-empty text-muted',
-      hidden: true,
-      text: t('cons.topConvsEmpty'),
-    });
-    const rankingPanel = h('section', { className: 'panel cons-ranking-panel' }, [
-      h('div', { className: 'panel-header cons-ranking-head' }, [
-        rankingTabSwitch.el,
-        rankingSortWrap,
-      ]),
-      modelsListEl,
-      topConvsListEl,
-      workspacesListEl,
-      topConvsEmptyEl,
-    ]);
-
-    // --- Section 4: 客户端来源列表 ---
-    const sourcesTitleSpan = h('span', { className: 'panel-title', text: t('cons.clientSources') });
-    const sourcesHoverHint = h('span', {
-      className: 'text-muted text-mono',
-      style: 'font-size: var(--fs-sm);',
-      text: t('cons.hoverModelsHint'),
-    });
-    const sourcesListEl = h('div', { className: 'cons-item-list' });
-    const sourcesPanel = h('section', { className: 'panel' }, [
-      h('div', { className: 'panel-header' }, [
-        sourcesTitleSpan,
-        sourcesHoverHint,
-      ]),
-      sourcesListEl,
-    ]);
-
-    // --- Section 5: 按月细分 (12 个月垂直按模型配色堆叠柱状图 + 悬停明细浮层) ---
-    const monthlyTitleSpan = h('span', { text: t('cons.monthlyTitle') });
-    const monthlyYearBadge = h('span', { className: 'cons-badge text-mono', text: '2026' });
-    const monthlyHoverHint = h('span', {
-      className: 'text-muted text-mono',
-      style: 'font-size: var(--fs-sm);',
-      text: t('cons.hoverModelsHint'),
-    });
-
-    let activeHoverTargetEl = null;
-    let activeHoverPayload = null;
-    let cachedBreakdownRootRect = null;
-    let cachedBreakdownAnchorRect = null;
-
-    const popoverContent = createConsumptionBreakdownContent({
-      showModelDot: true,
-      monoTitle: false,
-    });
-    const breakdownPopoverEl = h(
-      'div',
-      { className: 'cons-breakdown-popover is-rich-breakdown', hidden: true },
-      popoverContent.children
-    );
-
-    function hideBreakdownPopover() {
-      cachedBreakdownRootRect = null;
-      cachedBreakdownAnchorRect = null;
-      activeHoverPayload = null;
-      if (activeHoverTargetEl) {
-        patchClasses(activeHoverTargetEl, { 'is-hovered': false });
-        activeHoverTargetEl = null;
-      }
-      patchAttr(breakdownPopoverEl, 'hidden', true);
-      patchClasses(breakdownPopoverEl, { 'is-tracking': false });
-    }
-
-    function positionBreakdownPopover(anchorEl, pointerClientX = null, pointerClientY = null) {
-      if (!cachedBreakdownRootRect) {
-        cachedBreakdownRootRect = rootEl.getBoundingClientRect?.() || {
-          left: 0,
-          top: 0,
-          width: 360,
-          height: 600,
-        };
-      }
-      const rootRect = cachedBreakdownRootRect;
-      if (!cachedBreakdownAnchorRect) {
-        cachedBreakdownAnchorRect = anchorEl?.getBoundingClientRect?.() || {
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 0,
-          height: 0,
-        };
-      }
-      const anchorRect = cachedBreakdownAnchorRect;
-      const tipW = Number(breakdownPopoverEl.offsetWidth || 0) || 216;
-      const tipH = Number(breakdownPopoverEl.offsetHeight || 0) || 108;
-      const rootW = rootRect.width > 0 ? rootRect.width : 360;
-      const rootH = rootRect.height > 0 ? rootRect.height : 600;
-
-      const hasPointerX = Number.isFinite(pointerClientX) && pointerClientX > 0 && rootRect.width > 0;
-      const hasPointerY = Number.isFinite(pointerClientY) && pointerClientY > 0 && rootRect.height > 0;
-
-      const centerX = hasPointerX
-        ? pointerClientX - rootRect.left
-        : anchorRect.left - rootRect.left + anchorRect.width / 2;
-      const anchorY = hasPointerY
-        ? pointerClientY - rootRect.top
-        : anchorRect.top - rootRect.top;
-
-      const maxLeft = Math.max(8, rootW - tipW - 8);
-      let leftPx = Math.max(8, Math.min(maxLeft, centerX - tipW / 2));
-
-      const aboveTop = anchorY - tipH - (hasPointerY ? 14 : 8);
-      const belowTop = hasPointerY ? anchorY + 18 : anchorRect.bottom - rootRect.top + 8;
-      let topPx;
-      if (aboveTop >= 6) {
-        topPx = Math.min(Math.max(6, rootH - tipH - 6), aboveTop);
-      } else if (hasPointerX && centerX + 16 + tipW <= rootW - 8) {
-        leftPx = centerX + 16;
-        topPx = Math.max(6, Math.min(Math.max(6, rootH - tipH - 6), anchorY - tipH / 2));
-      } else if (hasPointerX && centerX - 16 - tipW >= 8) {
-        leftPx = centerX - 16 - tipW;
-        topPx = Math.max(6, Math.min(Math.max(6, rootH - tipH - 6), anchorY - tipH / 2));
-      } else {
-        topPx = Math.min(Math.max(6, rootH - tipH - 6), Math.max(6, belowTop));
-      }
-
-      patchStyleVar(breakdownPopoverEl, '--pop-x', `${Math.round(leftPx)}px`);
-      patchStyleVar(breakdownPopoverEl, '--pop-y', `${Math.round(topPx)}px`);
-    }
-
-    function showBreakdownPopover(
-      anchorEl,
-      payload,
-      pointerClientX = null,
-      pointerClientY = null
-    ) {
-      if (!payload || !(payload.totalTokens > 0 || payload.calls > 0)) {
-        hideBreakdownPopover();
-        return;
-      }
-      const wasHidden = breakdownPopoverEl.hasAttribute('hidden');
-      const sameTargetAndPayload =
-        !wasHidden && activeHoverTargetEl === anchorEl && activeHoverPayload === payload;
-      if (activeHoverTargetEl && activeHoverTargetEl !== anchorEl) {
-        patchClasses(activeHoverTargetEl, { 'is-hovered': false });
-        cachedBreakdownAnchorRect = null;
-      } else if (!activeHoverTargetEl) {
-        cachedBreakdownRootRect = null;
-        cachedBreakdownAnchorRect = null;
-      }
-      activeHoverTargetEl = anchorEl;
-      activeHoverPayload = payload;
-      patchClasses(anchorEl, { 'is-hovered': true });
-
-      if (!sameTargetAndPayload) {
-        popoverContent.update({
-          title: payload.title || '—',
-          calls: payload.calls || 0,
-          totalTokens: payload.totalTokens || 0,
-          costText: payload.costText || '$0.00',
-          inputTokens: payload.inputTokens,
-          cacheReadTokens: payload.cacheReadTokens,
-          thinkingTokens: payload.thinkingTokens,
-          responseTokens: payload.responseTokens,
-          outputTokens: payload.outputTokens,
-          segments: Array.isArray(payload.segments) ? payload.segments : [],
-        });
-      }
-
-      patchAttr(breakdownPopoverEl, 'hidden', false);
-      positionBreakdownPopover(anchorEl, pointerClientX, pointerClientY);
-      if (wasHidden) {
-        patchClasses(breakdownPopoverEl, { 'is-tracking': false });
-        void breakdownPopoverEl.offsetWidth;
-        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-          window.requestAnimationFrame(() => {
-            if (!breakdownPopoverEl.hasAttribute('hidden')) {
-              patchClasses(breakdownPopoverEl, { 'is-tracking': true });
-            }
-          });
-        } else {
-          patchClasses(breakdownPopoverEl, { 'is-tracking': true });
+    function resolveAggregateAvgSpeed(acct, models) {
+      const direct = Number(acct?.avgTokPerSec);
+      if (Number.isFinite(direct) && direct > 0) return direct;
+      let sumTok = 0;
+      let sumSec = 0;
+      for (const m of models || []) {
+        const ss = m?.speedSummary;
+        const dur = Number(ss?.durationSec);
+        const tok = Number(ss?.outputTokens || ss?.tokens);
+        if (Number.isFinite(dur) && dur > 0 && Number.isFinite(tok) && tok > 0) {
+          sumTok += tok;
+          sumSec += dur;
         }
       }
-    }
-
-    function createMonthModelSegment() {
-      const segEl = h('div', { className: 'month-seg cons-model-seg' });
-      return { el: segEl, refs: { segEl } };
-    }
-
-    let monthlyGridEl = null;
-    const monthlyColByEl = new Map();
-
-    function findMonthlyColForNode(node) {
-      let cur = node;
-      while (cur && cur !== monthlyGridEl) {
-        const hit = monthlyColByEl.get(cur);
-        if (hit) return hit;
-        cur = cur.parentNode || null;
+      if (sumSec > 0 && sumTok > 0) return sumTok / sumSec;
+      let weightedSum = 0;
+      let weightCalls = 0;
+      for (const m of models || []) {
+        const tps = Number(m?.avgTokPerSec);
+        const calls = Number(m?.calls || 0);
+        if (Number.isFinite(tps) && tps > 0 && calls > 0) {
+          weightedSum += tps * calls;
+          weightCalls += calls;
+        }
       }
-      return null;
+      return weightCalls > 0 ? weightedSum / weightCalls : 0;
     }
 
-    const monthlyCols = Array.from({ length: 12 }, (_, idx) => {
-      const costText = h('span', { className: 'month-cost text-mono', text: '' });
-      const stackWrap = h('div', { className: 'month-stack' });
-      const zeroDot = h('span', { className: 'month-zero-dot' });
-      const monthLabel = h('span', { className: 'month-label', text: t('cons.monthLabel', { m: idx + 1 }) });
-      const tokText = h('span', { className: 'month-tok text-mono', text: '' });
-
-      const colState = { hoverPayload: null, monthRange: null };
-      const colEl = h(
-        'div',
-        {
-          className: 'month-col',
-          onClick: () => {
-            if (colState.monthRange) {
-              drillDownToTimeRange(colState.monthRange.startMs, colState.monthRange.endMs);
-            }
-          },
-          onMouseEnter: (e) => {
-            if (colState.hoverPayload) {
-              showBreakdownPopover(
-                colEl,
-                colState.hoverPayload,
-                e?.clientX ?? null,
-                e?.clientY ?? null
-              );
-            } else {
-              if (activeHoverTargetEl && monthlyColByEl.has(activeHoverTargetEl)) {
-                hideBreakdownPopover();
-              }
-              e?.stopPropagation?.();
-            }
-          },
-          onMouseMove: (e) => {
-            if (colState.hoverPayload && activeHoverTargetEl === colEl) {
-              positionBreakdownPopover(colEl, e?.clientX ?? null, e?.clientY ?? null);
-            }
-          },
-          onMouseLeave: (e) => {
-            if (activeHoverTargetEl !== colEl) return;
-            const nextEl = e?.relatedTarget || null;
-            if (nextEl) {
-              const nextCol = findMonthlyColForNode(nextEl);
-              if ((nextCol && nextCol.colState.hoverPayload) || nextEl === monthlyGridEl) {
-                return;
-              }
-            }
-            hideBreakdownPopover();
-          },
-        },
-        [
-          costText,
-          h('div', { className: 'month-bar-well' }, [stackWrap, zeroDot]),
-          monthLabel,
-          tokText,
-        ]
-      );
-      const colRec = {
-        el: colEl,
-        costText,
-        stackWrap,
-        zeroDot,
-        monthLabel,
-        tokText,
-        colState,
-      };
-      monthlyColByEl.set(colEl, colRec);
-      return colRec;
-    });
-
-    monthlyGridEl = h(
-      'div',
-      {
-        className: 'monthly-grid',
-        onMouseLeave: () => {
-          if (activeHoverTargetEl && monthlyColByEl.has(activeHoverTargetEl)) {
-            hideBreakdownPopover();
-          }
-        },
-      },
-      monthlyCols.map((c) => c.el)
-    );
-
-    const monthlyPanel = h('section', { className: 'panel' }, [
-      h('div', { className: 'panel-header' }, [
-        h('span', { className: 'panel-title' }, [
-          monthlyTitleSpan,
-          monthlyYearBadge,
+    const modelsTitleSpan = h('span', { className: 'panel-title', text: t('cons.modelsTableTitle') });
+    const thColModel = h('th', { className: 'col-model', text: t('cons.colModel') });
+    const thColShare = h('th', { className: 'is-num', text: t('cons.colShare') });
+    const thColTokens = h('th', { className: 'is-num', text: t('cons.colTokens') });
+    const thColCost = h('th', { className: 'is-num', text: t('cons.colCost') });
+    const thColCache = h('th', { className: 'is-num', text: t('cons.colCache') });
+    const thColSpeed = h('th', { className: 'is-num', text: t('cons.colSpeed') });
+    const thColTtft = h('th', { className: 'is-num', text: t('cons.colTtft') });
+    const thColCalls = h('th', { className: 'is-num', text: t('cons.colCalls') });
+    const modelsTbodyEl = h('tbody');
+    const modelsTableWrapEl = h('div', { className: 'cons-models-table-wrap' }, [
+      h('table', { className: 'cons-models-table' }, [
+        h('thead', {}, [
+          h('tr', {}, [
+            thColModel,
+            thColShare,
+            thColTokens,
+            thColCost,
+            thColCache,
+            thColSpeed,
+            thColTtft,
+            thColCalls,
+          ]),
         ]),
-        monthlyHoverHint,
+        modelsTbodyEl,
       ]),
-      monthlyGridEl,
     ]);
+    const modelsEmptyEl = h('div', {
+      className: 'cons-models-empty text-muted',
+      hidden: true,
+      text: t('cons.modelsTableEmpty'),
+    });
+    const modelsPanel = h('section', { className: 'panel cons-models-panel' }, [
+      h('div', { className: 'panel-header' }, [modelsTitleSpan]),
+      modelsTableWrapEl,
+      modelsEmptyEl,
+    ]);
+
+    function createModelTableRow() {
+      const nameEl = h('td', { className: 'col-model' });
+      const shareEl = h('td', { className: 'is-num text-mono' });
+      const tokEl = h('td', { className: 'is-num text-mono' });
+      const costEl = h('td', { className: 'is-num text-mono' });
+      const cacheEl = h('td', { className: 'is-num text-mono' });
+      const speedEl = h('td', { className: 'is-num text-mono' });
+      const ttftEl = h('td', { className: 'is-num text-mono' });
+      const callsEl = h('td', { className: 'is-num text-mono' });
+      const el = h('tr', { className: 'cons-model-tr' }, [
+        nameEl,
+        shareEl,
+        tokEl,
+        costEl,
+        cacheEl,
+        speedEl,
+        ttftEl,
+        callsEl,
+      ]);
+      return {
+        el,
+        refs: { nameEl, shareEl, tokEl, costEl, cacheEl, speedEl, ttftEl, callsEl },
+      };
+    }
 
     const scrollInner = h(
       'div',
@@ -37823,9 +24930,7 @@ const ConsumptionView = defineComponent({
       [
         overviewPanel,
         trendPanel,
-        rankingPanel,
-        sourcesPanel,
-        monthlyPanel,
+        modelsPanel,
       ]
     );
 
@@ -37833,45 +24938,16 @@ const ConsumptionView = defineComponent({
       contentEl: scrollInner,
       className: 'view-pane',
     });
-    viewScrollbar.el.addEventListener?.('scroll', hideBreakdownPopover, { passive: true });
 
     const rootEl = h('div', { className: 'cons-view-stage' }, [
       viewScrollbar.el,
-      breakdownPopoverEl,
     ]);
-
-    const {
-      createSourceBreakdownRow,
-      updateSourceBreakdownRow,
-      createTopConversationRow,
-      updateTopConversationRow,
-    } = createConsumptionBreakdownRowBuilders({
-      showPopover: showBreakdownPopover,
-      movePopover: positionBreakdownPopover,
-      hidePopover: hideBreakdownPopover,
-      isHoveredTarget: (targetEl) => activeHoverTargetEl === targetEl,
-      onSelectConversation: (cascadeId) => {
-        selectConversation(cascadeId);
-        uiStore.setState({
-          activeView: 'steps',
-          stepsSubTab: 'steps',
-          selectedAgentScope: 'all',
-          ctxInspectorAgentId: getDefaultCtxInspectorAgentId(
-            telemetryStore.getState().telemetry?.settings
-          ),
-        });
-      },
-    });
 
     let latestSlice = null;
     let isDirty = false;
     let prefetchedOnCurrentVisit = false;
 
     let lastRenderedTuple = null;
-    let cachedMonthlySeriesRef = null;
-    let cachedMonthlyDisplayKey = '';
-    let cachedMonthsMergedModels = null;
-    let cachedAllMonthMergedModels = null;
 
     function isSameRenderTuple(prev, next) {
       if (!prev || prev.length !== next.length) return false;
@@ -37882,7 +24958,7 @@ const ConsumptionView = defineComponent({
     }
 
     /**
-     * 将遥测状态切片同步渲染至消费统计视图的 5 个子面板。
+     * 将遥测状态切片同步渲染至消费统计视图的 4 个子面板。
      */
     function renderConsumptionData(slice) {
       if (!slice) return;
@@ -37938,9 +25014,6 @@ const ConsumptionView = defineComponent({
       const cycleOptionsSig = showCyclePoolSelect
         ? cyclePoolOptions.map((o) => `${o.value}:${o.label}:${o.meta || ''}`).join('|')
         : '';
-      const now = new Date();
-      const currentMonthIdx = now.getMonth();
-      const monthlyYear = cons.monthlyYear || now.getFullYear();
       const locale = i18nStore.getState().locale;
       const renderTuple = [
         locale,
@@ -37958,94 +25031,18 @@ const ConsumptionView = defineComponent({
         acct,
         cons.trendSeries,
         slice.modelBreakdown,
-        activeRankingTab,
-        modelsSortBy,
-        cons.topConversations,
-        topConvsSortBy,
-        cons.sourcesBreakdown,
-        monthlyYear,
-        currentMonthIdx,
-        cons.monthlySeries,
       ];
       if (isSameRenderTuple(lastRenderedTuple, renderTuple)) return;
       drawConsumptionData(slice, {
         cons,
-        preset,
         acct,
         rangeInfo,
-        activePoolFilter,
         dateSpan,
-        currentMonthIdx,
-        monthlyYear,
       });
       lastRenderedTuple = renderTuple;
     }
 
-    function drawConsumptionData(
-      slice,
-      { cons, preset, acct, rangeInfo, activePoolFilter, dateSpan, currentMonthIdx, monthlyYear }
-    ) {
-      // 1. 同步用量概览矩阵及顶部 4 段比例条
-      patchText(dateSpanBadge, dateSpan);
-      patchAttr(
-        dateSpanBadge,
-        'title',
-        slice.range === 'cycle'
-          ? formatCycleMinuteSpanTip(
-              rangeInfo.startMs,
-              rangeInfo.endMs,
-              Boolean(rangeInfo.isFallbackWeek)
-            )
-          : null
-      );
-      const totalTokens = Number(acct.totalTokens || 0);
-      const inputTokens = Number(acct.inputTokens || 0);
-      const cacheTokens = Number(acct.cacheReadTokens || 0);
-      const outputTokens = Number(acct.outputTokens || 0);
-      const responseTokens = Number(acct.responseTokens || 0);
-      const thinkingTokens = Number(acct.thinkingTokens || 0);
-      const costUsd = Number(acct.costUsd || 0);
-
-      patchText(heroTotalTokens, formatTokensPrecise(totalTokens));
-      patchText(heroTotalCalls, t('cons.callsCount', { calls: acct.calls || 0 }));
-      patchText(heroCostUsd, formatUsd(costUsd));
-      patchText(heroCostCny, formatCnyApprox(costUsd));
-
-      patchText(cacheHitPctEl, formatPctNumber(acct.cacheHitPct ?? 0, { withSymbol: true }));
-      patchText(cacheTokensEl, t('cons.cacheHitTokens', { tokens: formatTokensPrecise(cacheTokens) }));
-
-      let inPct = 0;
-      let cachePct = 0;
-      let outPct = 0;
-      if (totalTokens > 0) {
-        const scaled = scaleBucketsExact(
-          { in: inputTokens, cache: cacheTokens, out: outputTokens },
-          ['in', 'cache', 'out'],
-          1000
-        );
-        inPct = +(scaled.in / 10).toFixed(1);
-        cachePct = +(scaled.cache / 10).toFixed(1);
-        outPct = +(scaled.out / 10).toFixed(1);
-      }
-
-      patchText(inputSharePct, `${inPct}%`);
-      patchText(inputMainTokens, formatTokensPrecise(inputTokens));
-
-      patchText(cacheSharePct, `${cachePct}%`);
-      patchText(cacheMainTokens, formatTokensPrecise(cacheTokens));
-
-      patchText(outputSharePct, `${outPct}%`);
-      patchText(outputMainTokens, formatTokensPrecise(outputTokens));
-      consExportMenu.refs.setHidden(!(totalTokens > 0 || Number(acct.calls || 0) > 0));
-
-      overviewSegBar.update({
-        inputTokens,
-        cacheReadTokens: cacheTokens,
-        responseTokens,
-        thinkingTokens,
-      });
-
-      // 2-5. 统一解析展示模式与全局确定性模型配色映射（确保趋势浮层、模型排行圆点、客户端来源条、月度堆叠柱四处完全同色）
+    function drawConsumptionData(slice, { cons, acct, rangeInfo, dateSpan }) {
       const localeSig = i18nStore.getState().locale;
       const displaySettings = {
         modelDisplayMode: normalizeModelDisplayMode(
@@ -38067,91 +25064,47 @@ const ConsumptionView = defineComponent({
 
       const models = mergeModelsByDisplayName(slice.modelBreakdown || [], displaySettings, {
         preferLabelInShort: true,
-      }).sort((a, b) => {
-        if (modelsSortBy === 'cost') {
-          return (b.costUsd || 0) - (a.costUsd || 0) || (b.totalTokens || 0) - (a.totalTokens || 0);
-        }
-        if (modelsSortBy === 'speed') {
-          const sa = Number(a.avgTokPerSec) > 0 ? Number(a.avgTokPerSec) : -1;
-          const sb = Number(b.avgTokPerSec) > 0 ? Number(b.avgTokPerSec) : -1;
-          return sb - sa || (b.totalTokens || 0) - (a.totalTokens || 0);
-        }
-        if (modelsSortBy === 'calls') {
-          return (b.calls || 0) - (a.calls || 0) || (b.totalTokens || 0) - (a.totalTokens || 0);
-        }
-        return (b.totalTokens || 0) - (a.totalTokens || 0) || (b.calls || 0) - (a.calls || 0);
+      }).sort((a, b) => (b.totalTokens || 0) - (a.totalTokens || 0) || (b.calls || 0) - (a.calls || 0));
+
+      // 1. 同步用量概览矩阵（4 列核心指标 + Token 构成小字 + 底部 4 段比例条）
+      patchText(dateSpanBadge, dateSpan);
+      patchAttr(
+        dateSpanBadge,
+        'title',
+        slice.range === 'cycle'
+          ? formatCycleMinuteSpanTip(
+              rangeInfo.startMs,
+              rangeInfo.endMs,
+              Boolean(rangeInfo.isFallbackWeek)
+            )
+          : null
+      );
+      const totalTokens = Number(acct.totalTokens || 0);
+      const inputTokens = Number(acct.inputTokens || 0);
+      const cacheTokens = Number(acct.cacheReadTokens || 0);
+      const outputTokens = Number(acct.outputTokens || 0);
+      const responseTokens = Number(acct.responseTokens || 0);
+      const thinkingTokens = Number(acct.thinkingTokens || 0);
+      const costUsd = Number(acct.costUsd || 0);
+      const avgSpeed = resolveAggregateAvgSpeed(acct, models);
+
+      patchText(heroTotalTokens, formatTokensPrecise(totalTokens));
+      patchText(heroSplitInputVal, formatTokensPrecise(inputTokens));
+      patchText(heroSplitCacheVal, formatTokensPrecise(cacheTokens));
+      patchText(heroSplitOutputVal, formatTokensPrecise(outputTokens));
+      patchText(heroCostUsd, formatUsd(costUsd));
+      patchText(cacheHitPctEl, formatPctNumber(acct.cacheHitPct ?? 0, { withSymbol: true }));
+      patchText(heroAvgSpeedEl, formatModelSpeedCell(avgSpeed));
+      consExportMenu.refs.setHidden(!(totalTokens > 0 || Number(acct.calls || 0) > 0));
+
+      overviewSegBar.update({
+        inputTokens,
+        cacheReadTokens: cacheTokens,
+        responseTokens,
+        thinkingTokens,
       });
+
       const modelsTotalTok = models.reduce((s, m) => s + Number(m.totalTokens || 0), 0);
-      const modelsTotalCost = models.reduce((s, m) => s + Math.max(0, Number(m.costUsd || 0)), 0);
-      const modelsTotalCalls = models.reduce((s, m) => s + Math.max(0, Number(m.calls || 0)), 0);
-      const modelsMaxAvgTps = models.reduce((mx, m) => {
-        const v = Number(m.avgTokPerSec || 0);
-        return Number.isFinite(v) && v > mx ? v : mx;
-      }, 0);
-      const modelsTotalsCtx = {
-        totalTokens: modelsTotalTok,
-        totalCost: modelsTotalCost,
-        totalCalls: modelsTotalCalls,
-        maxAvgTps: modelsMaxAvgTps,
-      };
-
-      const rawTopConvs = Array.isArray(cons.topConversations) ? cons.topConversations : [];
-      const allTopConvMergedModels = [];
-      const topConvsWithModels = rawTopConvs.map((c) => {
-        const mergedModels = mergeAndSortBucketModels(c.models);
-        for (const m of mergedModels) {
-          allTopConvMergedModels.push(m);
-        }
-        return { ...c, mergedModels };
-      });
-
-      const rawTopWorkspaces = Array.isArray(cons.topWorkspaces) ? cons.topWorkspaces : [];
-      const allWorkspaceMergedModels = [];
-      const topWorkspacesWithModels = rawTopWorkspaces.map((w) => {
-        const mergedModels = mergeAndSortBucketModels(w.models);
-        for (const m of mergedModels) {
-          allWorkspaceMergedModels.push(m);
-        }
-        return { ...w, isWorkspaceRow: true, mergedModels };
-      });
-
-      const rawSources = cons.sourcesBreakdown || [];
-      const sourcesTotalTok = rawSources.reduce((s, x) => s + Number(x.totalTokens || 0), 0);
-      const allSourceMergedModels = [];
-      const sourcesWithModels = rawSources.map((s) => {
-        const mergedModels = mergeAndSortBucketModels(s.models);
-        for (const m of mergedModels) {
-          allSourceMergedModels.push(m);
-        }
-        return { ...s, mergedModels };
-      });
-
-      const monthlySeries = cons.monthlySeries || [];
-      const monthlyDisplayKey = `${displaySettings.modelDisplayMode}|${displaySettings.showUpstreamModel ? 1 : 0}|${displaySettings.orchestratorIdMode}`;
-      let monthsMergedModels;
-      let allMonthMergedModels;
-      if (
-        cachedMonthlySeriesRef === monthlySeries &&
-        cachedMonthlyDisplayKey === monthlyDisplayKey &&
-        cachedMonthsMergedModels &&
-        cachedAllMonthMergedModels
-      ) {
-        monthsMergedModels = cachedMonthsMergedModels;
-        allMonthMergedModels = cachedAllMonthMergedModels;
-      } else {
-        allMonthMergedModels = [];
-        monthsMergedModels = Array.from({ length: 12 }, (_, idx) => {
-          const merged = mergeAndSortBucketModels(monthlySeries[idx]?.models);
-          for (const m of merged) {
-            allMonthMergedModels.push(m);
-          }
-          return merged;
-        });
-        cachedMonthlySeriesRef = monthlySeries;
-        cachedMonthlyDisplayKey = monthlyDisplayKey;
-        cachedMonthsMergedModels = monthsMergedModels;
-        cachedAllMonthMergedModels = allMonthMergedModels;
-      }
 
       const rawTrendSeries = cons.trendSeries || [];
       const allTrendMergedModels = [];
@@ -38166,26 +25119,10 @@ const ConsumptionView = defineComponent({
 
       const modelColorMap = buildDeterministicModelColorMap([
         ...models,
-        ...allSourceMergedModels,
-        ...allTopConvMergedModels,
-        ...allWorkspaceMergedModels,
-        ...allMonthMergedModels,
         ...allTrendMergedModels,
       ]);
 
-      // 2. 同步历史趋势交互式 SVG 面积图 / 类 GitHub 每日热力图（>90天）及悬停分模型浮层
-      const rangeBadgeText =
-        slice.range === 'cycle'
-          ? `${rangeInfo.isFallbackWeek || slice.weeklyLimitMode === 'custom_tokens' || slice.weeklyLimitMode === 'custom_cost' ? t('cons.cycleFallbackWeek') : t('cons.currentCycle')}${
-              activePoolFilter && activePoolFilter !== 'all'
-                ? ` · ${rangeInfo.poolLabel || activePoolFilter}`
-                : ''
-            }`
-          : isEnglishLocale()
-            ? getConsumptionTimeRangeOptions().find((o) => o.value === slice.range)?.label ||
-              t('cons.allTime')
-            : preset?.label || rangeInfo.label || t('cons.allTime');
-      patchText(trendRangeBadge, rangeBadgeText);
+      // 2. 同步历史趋势交互式 SVG 面积图 / 近一年热力图
       const firstTrendSlot = rawTrendSeries[0] || null;
       const isMinuteTrend = firstTrendSlot?.granularity === 'minute';
       const isHourlyTrend =
@@ -38194,21 +25131,8 @@ const ConsumptionView = defineComponent({
           (firstTrendSlot?.label || '').includes(':'));
       const isHeatmapTrend =
         !isMinuteTrend && !isHourlyTrend && rawTrendSeries.length > HEATMAP_DAYS_THRESHOLD;
-      patchAttr(trendGranularityHint, 'hidden', isHeatmapTrend);
       patchAttr(heatmapModeSwitch.el, 'hidden', !isHeatmapTrend);
-      if (!isHeatmapTrend) {
-        patchText(
-          trendGranularityHint,
-          isMinuteTrend
-            ? t('cons.trendPointsHintMinute', {
-                minutes: Math.max(1, Number(firstTrendSlot?.stepMinutes) || 5),
-                points: rawTrendSeries.length || 0,
-              })
-            : isHourlyTrend
-              ? t('cons.trendPointsHintHourly', { points: rawTrendSeries.length || 0 })
-              : t('cons.trendPointsHintDaily', { points: rawTrendSeries.length || 0 })
-        );
-      } else {
+      if (isHeatmapTrend) {
         heatmapModeSwitch.setValue(heatmapViewMode);
       }
       const buildTrendModelSegments = (mergedSlotModels) =>
@@ -38230,259 +25154,38 @@ const ConsumptionView = defineComponent({
         buildModelSegments: buildTrendModelSegments,
       });
 
-      // 3. 同步统一排行卡片（分段切换「模型排行 | 项目排行 | 会话排行」及对应排序控制）
-      const sortedTopConvs = [...topConvsWithModels].sort((a, b) =>
-        topConvsSortBy === 'tokens'
-          ? (b.totalTokens || 0) - (a.totalTokens || 0) || (b.costUsd || 0) - (a.costUsd || 0)
-          : (b.costUsd || 0) - (a.costUsd || 0) || (b.totalTokens || 0) - (a.totalTokens || 0)
-      );
-      const sortedTopWorkspaces = [...topWorkspacesWithModels].sort((a, b) =>
-        topConvsSortBy === 'tokens'
-          ? (b.totalTokens || 0) - (a.totalTokens || 0) || (b.costUsd || 0) - (a.costUsd || 0)
-          : (b.costUsd || 0) - (a.costUsd || 0) || (b.totalTokens || 0) - (a.totalTokens || 0)
-      );
-      if (activeRankingTab === 'workspaces' && sortedTopWorkspaces.length === 0) {
-        activeRankingTab = 'models';
-      }
-      lastModelsCount = models.length;
-      lastWorkspacesCount = sortedTopWorkspaces.length;
-      lastConvsCount = sortedTopConvs.length;
-      rankingTabSwitch.setProps({
-        ariaLabel: t('cons.rankTabAria'),
-        modelValue: activeRankingTab,
-        options: getRankingTabOptions(
-          models.length,
-          sortedTopConvs.length,
-          sortedTopWorkspaces.length
-        ),
-      });
-      const showSessionsTab = activeRankingTab === 'sessions';
-      const showWorkspacesTab = activeRankingTab === 'workspaces' && sortedTopWorkspaces.length > 0;
-      const showModelsTab = !showSessionsTab && !showWorkspacesTab;
-      patchAttr(modelsSortSwitch.el, 'hidden', !showModelsTab);
-      patchAttr(
-        topConvsSortSwitch.el,
-        'hidden',
-        showModelsTab ||
-          (showSessionsTab && sortedTopConvs.length === 0) ||
-          (showWorkspacesTab && sortedTopWorkspaces.length === 0)
-      );
-      patchAttr(modelsListEl, 'hidden', !showModelsTab);
-      patchAttr(topConvsListEl, 'hidden', !showSessionsTab || sortedTopConvs.length === 0);
-      patchAttr(workspacesListEl, 'hidden', !showWorkspacesTab);
-      patchAttr(topConvsEmptyEl, 'hidden', !showSessionsTab || sortedTopConvs.length > 0);
-      patchText(topConvsEmptyEl, t('cons.topConvsEmpty'));
+      // 3. 同步 Magpie 风格模型用量表格（按 Token 降序，单行展示全部关键指标）
+      patchAttr(modelsTableWrapEl, 'hidden', models.length === 0);
+      patchAttr(modelsEmptyEl, 'hidden', models.length > 0);
+      patchText(modelsEmptyEl, t('cons.modelsTableEmpty'));
 
-      const nextRangeSig = `${slice.range || ''}:${activePoolFilter || 'all'}:${slice.customStartMs || 0}:${slice.customEndMs || 0}`;
-      const nextRankingKey = showWorkspacesTab
-        ? 'workspaces'
-        : showSessionsTab
-          ? 'sessions'
-          : 'models';
-      const nextSortSig = showModelsTab ? `m:${modelsSortBy}` : `c:${topConvsSortBy}`;
-      const activeRankingEl = showWorkspacesTab
-        ? workspacesListEl
-        : showSessionsTab
-          ? sortedTopConvs.length > 0
-            ? topConvsListEl
-            : topConvsEmptyEl
-          : modelsListEl;
-
-      const rangeSwitched = hasCompletedInitialDraw && nextRangeSig !== lastAnimatedRangeSig;
-      const tabSwitched =
-        hasCompletedInitialDraw && !rangeSwitched && nextRankingKey !== lastAnimatedRankingKey;
-      const sortSwitched =
-        hasCompletedInitialDraw &&
-        !rangeSwitched &&
-        !tabSwitched &&
-        nextSortSig !== lastAnimatedSortSig;
-
-      patchKeyedList(modelsListEl, models, {
+      patchKeyedList(modelsTbodyEl, models, {
         keyFn: (m) => m.displayText || m.label || m.shortName,
         sigFn: (m) =>
-          `${localeSig}:${modelsSortBy}:${m.displayText}:${m.displayTitle}:${m.totalTokens}:${m.inputTokens}:${m.cacheReadTokens}:${m.responseTokens}:${m.thinkingTokens}:${m.costUsd}:${m.unpricedCalls}:${m.calls}:${m.avgTokPerSec ?? ''}:${m.avgTtftSec ?? ''}:${m.cacheHitPct ?? ''}:${modelsTotalTok}:${modelsTotalCost.toFixed(4)}:${modelsTotalCalls}:${modelsMaxAvgTps}`,
-        createRow: createBreakdownItemRow,
+          `${localeSig}:${m.displayText}:${m.displayTitle}:${m.totalTokens}:${m.costUsd}:${m.unpricedCalls}:${m.calls}:${m.avgTokPerSec ?? ''}:${m.avgTtftSec ?? ''}:${m.cacheHitPct ?? ''}:${modelsTotalTok}`,
+        createRow: createModelTableRow,
         updateRow: (refs, m) => {
-          updateBreakdownItemRow(
-            refs,
-            { ...m, label: m.displayText, title: m.displayTitle },
-            modelsTotalsCtx,
-            modelsSortBy
-          );
-        },
-      });
-
-      const topConvsBaseTokens =
-        totalTokens > 0
-          ? totalTokens
-          : sortedTopConvs.reduce((s, c) => s + Number(c.totalTokens || 0), 0);
-      const topConvsBaseCost =
-        costUsd > 0
-          ? costUsd
-          : sortedTopConvs.reduce((s, c) => s + Math.max(0, Number(c.costUsd || 0)), 0);
-      const topConvsBases = { tokens: topConvsBaseTokens, cost: topConvsBaseCost };
-      patchKeyedList(topConvsListEl, sortedTopConvs, {
-        keyFn: (c) => c.cascadeId,
-        sigFn: (c) => {
-          const modelsSig = c.mergedModels
-            .map((m) => {
-              const seed = getCanonicalModelColorSeed(m);
-              return `${m.displayText}:${m.totalTokens}:${m.inputTokens || 0}:${m.cacheReadTokens || 0}:${m.thinkingTokens || 0}:${m.responseTokens || 0}:${m.calls}:${modelColorMap.get(seed) || ''}`;
-            })
-            .join('|');
-          return `${localeSig}:${topConvsSortBy}:${c.cascadeId}:${c.title}:${c.totalTokens}:${c.inputTokens || 0}:${c.cacheReadTokens || 0}:${c.thinkingTokens || 0}:${c.responseTokens || 0}:${c.costUsd}:${c.unpricedCalls}:${c.calls}:${c.cacheHitPct}:${c.sourceName}:${c.canJump ? 1 : 0}:${topConvsBaseTokens}:${topConvsBaseCost.toFixed(4)}:${modelsSig}`;
-        },
-        createRow: createTopConversationRow,
-        updateRow: (refs, c) =>
-          updateTopConversationRow(refs, c, topConvsBases, modelColorMap, topConvsSortBy),
-      });
-
-      const topWsBaseTokens =
-        totalTokens > 0
-          ? totalTokens
-          : sortedTopWorkspaces.reduce((s, w) => s + Number(w.totalTokens || 0), 0);
-      const topWsBaseCost =
-        costUsd > 0
-          ? costUsd
-          : sortedTopWorkspaces.reduce((s, w) => s + Math.max(0, Number(w.costUsd || 0)), 0);
-      const topWsBases = { tokens: topWsBaseTokens, cost: topWsBaseCost };
-      patchKeyedList(workspacesListEl, sortedTopWorkspaces, {
-        keyFn: (w) => w.workspaceKey,
-        sigFn: (w) => {
-          const modelsSig = w.mergedModels
-            .map((m) => {
-              const seed = getCanonicalModelColorSeed(m);
-              return `${m.displayText}:${m.totalTokens}:${m.inputTokens || 0}:${m.cacheReadTokens || 0}:${m.thinkingTokens || 0}:${m.responseTokens || 0}:${m.calls}:${modelColorMap.get(seed) || ''}`;
-            })
-            .join('|');
-          return `${localeSig}:${topConvsSortBy}:${w.workspaceKey}:${w.label}:${w.sessionCount}:${w.totalTokens}:${w.inputTokens || 0}:${w.cacheReadTokens || 0}:${w.thinkingTokens || 0}:${w.responseTokens || 0}:${w.costUsd}:${w.unpricedCalls}:${w.calls}:${w.cacheHitPct}:${w.latestCascadeId}:${w.canJump ? 1 : 0}:${topWsBaseTokens}:${topWsBaseCost.toFixed(4)}:${modelsSig}`;
-        },
-        createRow: createTopConversationRow,
-        updateRow: (refs, w) =>
-          updateTopConversationRow(refs, w, topWsBases, modelColorMap, topConvsSortBy),
-      });
-
-      // 4. 同步客户端来源列表（长尾合并分段配色 + 右侧总调用数 + 悬停进度条弹出明细浮层）
-      patchKeyedList(sourcesListEl, sourcesWithModels, {
-        keyFn: (s) => s.name,
-        sigFn: (s) => {
-          const modelsSig = s.mergedModels
-            .map((m) => {
-              const seed = getCanonicalModelColorSeed(m);
-              return `${m.displayText}:${m.totalTokens}:${m.inputTokens || 0}:${m.cacheReadTokens || 0}:${m.thinkingTokens || 0}:${m.responseTokens || 0}:${m.calls}:${modelColorMap.get(seed) || ''}`;
-            })
-            .join('|');
-          return `${localeSig}:${s.name}:${s.totalTokens}:${s.inputTokens || 0}:${s.cacheReadTokens || 0}:${s.thinkingTokens || 0}:${s.responseTokens || 0}:${s.costUsd}:${s.unpricedCalls}:${s.calls}:${sourcesTotalTok}:${modelsSig}`;
-        },
-        createRow: createSourceBreakdownRow,
-        updateRow: (refs, s) => updateSourceBreakdownRow(refs, s, sourcesTotalTok, modelColorMap),
-      });
-
-      if (tabSwitched || sortSwitched) {
-        triggerConsAnim(activeRankingEl, 'is-bars-revealing');
-      }
-      if (!hasCompletedInitialDraw) {
-        hasCompletedInitialDraw = true;
-        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-          window.requestAnimationFrame(() => {
-            rootEl.classList?.add('is-ready');
-          });
-        } else {
-          rootEl.classList?.add('is-ready');
-        }
-      }
-      lastAnimatedRangeSig = nextRangeSig;
-      lastAnimatedRankingKey = nextRankingKey;
-      lastAnimatedSortSig = nextSortSig;
-
-      // 5. 同步 12 个月垂直堆叠柱状图（按模型配色堆叠 + 长尾合并 + 悬停弹出明细浮层）
-      patchText(monthlyYearBadge, String(monthlyYear));
-      const maxMonthTokens = Math.max(
-        1,
-        ...monthlySeries.map((m) => Number(m.totalTokens || 0))
-      );
-
-      for (let i = 0; i < 12; i++) {
-        const col = monthlyCols[i];
-        const m = monthlySeries[i] || { totalTokens: 0, costUsd: 0, calls: 0 };
-        const mTot = Number(m.totalTokens || 0);
-        const mCalls = Number(m.calls || 0);
-        const hasData = mTot > 0;
-
-        patchClasses(col.el, { 'is-interactive': hasData || mCalls > 0 });
-        patchClasses(col.monthLabel, { 'is-current': i === currentMonthIdx });
-        patchAttr(col.stackWrap, 'hidden', !hasData);
-        patchAttr(col.zeroDot, 'hidden', hasData);
-
-        if (!hasData) {
-          patchText(col.costText, '');
-          patchText(col.tokText, '');
-          col.colState.hoverPayload = null;
-          col.colState.monthRange = null;
-          patchKeyedList(col.stackWrap, [], {
-            keyFn: (x) => x.key,
-            sigFn: (x) => x.key,
-            createRow: createMonthModelSegment,
-            updateRow: () => {},
-          });
-        } else {
+          const nameText = m.displayText || m.label || m.shortName || '--';
+          patchText(refs.nameEl, nameText);
+          patchAttr(refs.nameEl, 'title', m.displayTitle || null);
+          const tokVal = Number(m.totalTokens || 0);
+          const sharePct = modelsTotalTok > 0 ? (tokVal / modelsTotalTok) * 100 : 0;
+          patchText(refs.shareEl, formatPctNumber(sharePct, { withSymbol: true }));
+          patchText(refs.tokEl, formatTokensPrecise(tokVal));
+          const calls = Number(m.calls || 0);
           const cVal = Number(m.costUsd || 0);
-          const isMonthUnpriced =
-            mCalls > 0 && Number(m.unpricedCalls || 0) >= mCalls && !(cVal > 0);
+          const isUnpriced = calls > 0 && Number(m.unpricedCalls || 0) >= calls && !(cVal > 0);
           patchText(
-            col.costText,
-            isMonthUnpriced ? '—' : cVal >= 10 ? `$${Math.round(cVal)}` : `$${cVal.toFixed(2)}`
+            refs.costEl,
+            isUnpriced ? '—' : formatUsd(cVal, { precise: cVal > 0 && cVal < 0.01 })
           );
-          patchText(col.tokText, formatTokensPrecise(mTot));
-
-          const totalHeightPct = Math.max(8, Math.min(100, (mTot / maxMonthTokens) * 100));
-          patchStyleVar(col.stackWrap, '--bar-h', `${totalHeightPct.toFixed(1)}%`);
-
-          const monthModels = monthsMergedModels[i] || [];
-          const barPartitioned = partitionModelSegments(monthModels, modelColorMap, {
-            maxMain: 5,
-            minSharePct: 1.5,
-          });
-          // 垂直柱状图底端放主力模型、顶端叠放小占比及「其他」，视觉重心稳定
-          const verticalSegments =
-            barPartitioned.length > 0
-              ? [...barPartitioned].reverse()
-              : [{ key: '__month_fallback__', pct: 100, color: 'var(--accent-primary)' }];
-
-          patchKeyedList(col.stackWrap, verticalSegments, {
-            keyFn: (seg) => seg.key,
-            sigFn: (seg) => `${seg.key}:${seg.pct.toFixed(2)}:${seg.color}`,
-            createRow: createMonthModelSegment,
-            updateRow: (segRefs, seg) => {
-              patchStyleVar(segRefs.segEl, '--seg-h', `${seg.pct.toFixed(2)}%`);
-              patchStyleVar(segRefs.segEl, '--seg-color', seg.color);
-            },
-          });
-
-          col.colState.monthRange = {
-            startMs: new Date(monthlyYear, i, 1, 0, 0, 0, 0).getTime(),
-            endMs: new Date(monthlyYear, i + 1, 0, 23, 59, 59, 999).getTime(),
-          };
-          col.colState.hoverPayload = {
-            title: t('cons.monthFullLabel', { year: monthlyYear, m: i + 1 }),
-            calls: mCalls,
-            totalTokens: mTot,
-            costText: formatUsd(isMonthUnpriced ? null : cVal, {
-              precise: cVal > 0 && cVal < 0.1,
-            }),
-            inputTokens: m.inputTokens,
-            cacheReadTokens: m.cacheReadTokens,
-            thinkingTokens: m.thinkingTokens,
-            responseTokens: m.responseTokens,
-            outputTokens: m.outputTokens,
-            segments: barPartitioned,
-          };
-        }
-      }
-
-      if (activeHoverTargetEl && activeHoverTargetEl.isConnected === false) {
-        hideBreakdownPopover();
-      }
+          patchText(refs.cacheEl, formatPctNumber(m.cacheHitPct ?? 0, { withSymbol: true }));
+          patchText(refs.speedEl, formatModelSpeedCell(m.avgTokPerSec));
+          const ttftVal = m.avgTtftSec != null ? Number(m.avgTtftSec) : NaN;
+          patchText(refs.ttftEl, Number.isFinite(ttftVal) ? `${ttftVal.toFixed(1)}s` : '--');
+          patchText(refs.callsEl, String(calls));
+        },
+      });
 
       viewScrollbar.refresh();
     }
@@ -38509,7 +25212,6 @@ const ConsumptionView = defineComponent({
       (slice) => {
         latestSlice = slice;
         if (getVisibleMonitorView() !== 'consumption') {
-          hideBreakdownPopover();
           isDirty = true;
           return;
         }
@@ -38527,7 +25229,6 @@ const ConsumptionView = defineComponent({
       (activeView) => {
         if (activeView !== 'consumption') {
           prefetchedOnCurrentVisit = false;
-          hideBreakdownPopover();
           return;
         }
         if (isDirty) {
@@ -38552,11 +25253,12 @@ const ConsumptionView = defineComponent({
       patchText(applyCustomBtnLabel, t('cons.applyFilter'));
       patchText(rangeToSpan, t('cons.rangeTo'));
       patchText(totalTokensLabel, t('cons.totalTokens'));
+      patchText(heroSplitInputLabel, t('cons.footInput'));
+      patchText(heroSplitCacheLabel, t('cons.footCache'));
+      patchText(heroSplitOutputLabel, t('cons.footOutput'));
       patchText(estCostLabel, t('cons.estCost'));
       patchText(cacheHitRateLabel, t('cons.cacheHitRate'));
-      patchText(newInputLabel, t('cons.newInput'));
-      patchText(cacheReadLabel, t('cons.cacheRead'));
-      patchText(outputUsageLabel, t('cons.outputUsage'));
+      patchText(avgSpeedLabel, t('cons.avgOutputSpeed'));
       consExportMenu.refs.setAriaLabel(t('cons.exportMenuAria'));
       consExportMenu.refs.updateItemLabels({
         xlsx: { label: t('cons.exportXlsx'), title: t('cons.exportXlsxTip') },
@@ -38568,27 +25270,16 @@ const ConsumptionView = defineComponent({
         modelValue: heatmapViewMode,
         options: getHeatmapModeOptions(),
       });
-      rankingTabSwitch.setProps({
-        ariaLabel: t('cons.rankTabAria'),
-        modelValue: activeRankingTab,
-        options: getRankingTabOptions(),
-      });
-      modelsSortSwitch.setProps({
-        ariaLabel: t('cons.modelsSortAria'),
-        options: getModelsSortOptions(),
-      });
-      topConvsSortSwitch.setProps({
-        ariaLabel: t('cons.topConvsSortAria'),
-        options: getTopConvsSortOptions(),
-      });
-      patchText(topConvsEmptyEl, t('cons.topConvsEmpty'));
-      patchText(sourcesTitleSpan, t('cons.clientSources'));
-      patchText(sourcesHoverHint, t('cons.hoverModelsHint'));
-      patchText(monthlyTitleSpan, t('cons.monthlyTitle'));
-      patchText(monthlyHoverHint, t('cons.hoverModelsHint'));
-      for (let i = 0; i < 12; i++) {
-        patchText(monthlyCols[i].monthLabel, t('cons.monthLabel', { m: i + 1 }));
-      }
+      patchText(modelsTitleSpan, t('cons.modelsTableTitle'));
+      patchText(thColModel, t('cons.colModel'));
+      patchText(thColShare, t('cons.colShare'));
+      patchText(thColTokens, t('cons.colTokens'));
+      patchText(thColCost, t('cons.colCost'));
+      patchText(thColCache, t('cons.colCache'));
+      patchText(thColSpeed, t('cons.colSpeed'));
+      patchText(thColTtft, t('cons.colTtft'));
+      patchText(thColCalls, t('cons.colCalls'));
+      patchText(modelsEmptyEl, t('cons.modelsTableEmpty'));
     }
 
     const unsubI18n = i18nStore.subscribe(
@@ -38605,8 +25296,6 @@ const ConsumptionView = defineComponent({
     );
 
     onCleanup(() => {
-      clearConsAnimTimers();
-      hideBreakdownPopover();
       unsub();
       unsubView();
       unsubI18n();
@@ -38614,9 +25303,6 @@ const ConsumptionView = defineComponent({
       cyclePoolSelect.destroy();
       heatmapModeSwitch.destroy();
       trendChart.destroy?.();
-      rankingTabSwitch.destroy();
-      modelsSortSwitch.destroy();
-      topConvsSortSwitch.destroy();
       timeFilterSwitch.destroy();
       startPicker.destroy();
       endPicker.destroy();
@@ -38633,7 +25319,6 @@ const ConsumptionView = defineComponent({
         startPicker,
         endPicker,
         viewScrollbar,
-        breakdownPopoverEl,
         consExportMenu,
       },
     };
@@ -38642,1845 +25327,53 @@ const ConsumptionView = defineComponent({
 return { ConsumptionView };
 })();
 
-// --- src/views/StepsDetailView.js ---
-const { mergeSelectedAgentUnits, StepsDetailView } = (() => {
-/**
- * @fileoverview View 3: StepsDetailView (步骤明细与总汇总分析视图).
- * 提供“按步查看”与“总汇总”双子视图切换：
- * - 单步测速表通过 `stepColumnRegistry.js` 动态渲染用户自选的 2..12 个字段列，并支持行级增量对账；
- * - 总汇总视图提供会话线性走势图、多模型同图趋势拟合曲线与极简高密度模型总览卡片。
- */
-
-
-function mergeSelectedAgentUnits(units) {
-  const combinedSteps = [];
-  const modelMap = new Map();
-
-  for (const ag of units) {
-    if (!ag || typeof ag !== 'object') continue;
-    if (Array.isArray(ag.recentSteps)) {
-      for (const step of ag.recentSteps) combinedSteps.push(step);
-    }
-    const breakdown = Array.isArray(ag.modelBreakdown) ? ag.modelBreakdown : [];
-    for (const m of breakdown) {
-      if (!m || typeof m !== 'object') continue;
-      const gk = getStepModelGroupKey(m);
-      let acc = modelMap.get(gk);
-      if (!acc) {
-        acc = {
-          label: m.label || gk,
-          shortName: m.shortName || gk,
-          rawModel: m.rawModel || '',
-          upstreamName: m.upstreamName || m.upstreamModel || '',
-          upstreamSet: new Set(
-            Array.isArray(m.upstreamModels) ? m.upstreamModels.filter(Boolean) : []
-          ),
-          calls: 0,
-          inputTokens: 0,
-          cacheReadTokens: 0,
-          outputTokens: 0,
-          thinkingTokens: 0,
-          responseTokens: 0,
-          totalTokens: 0,
-          costUsd: 0,
-          unpricedCalls: 0,
-          anomalySteps: 0,
-          anomalyCount: 0,
-          anomalyDangerCount: 0,
-          anomalyTotalDelaySec: 0,
-          anomalyByKind: {},
-          _hasAnySpeedSummary: false,
-          _speedTokens: 0,
-          _speedSeconds: 0,
-          _speedSampleCount: 0,
-          _speedExcludedCount: 0,
-          _speedExcludedReasons: {},
-          _ttftWeightedSum: 0,
-          _ttftWeight: 0,
-          _ttftSampleCount: 0,
-        };
-        if (acc.upstreamName) acc.upstreamSet.add(acc.upstreamName);
-        modelMap.set(gk, acc);
-      }
-      if (!acc.upstreamName && (m.upstreamName || m.upstreamModel)) {
-        acc.upstreamName = m.upstreamName || m.upstreamModel;
-      }
-      if (m.upstreamName) acc.upstreamSet.add(m.upstreamName);
-      if (Array.isArray(m.upstreamModels)) {
-        for (const u of m.upstreamModels) {
-          if (u) acc.upstreamSet.add(u);
-        }
-      }
-      const calls = Math.max(0, Number(m.calls || 0));
-      const inTok = Math.max(0, Number(m.inputTokens || 0));
-      const cacheTok = Math.max(0, Number(m.cacheReadTokens || 0));
-      const outTok = Math.max(0, Number(m.outputTokens || 0));
-      const thinkTok = Math.max(0, Number(m.thinkingTokens || 0));
-      const respTok =
-        m.responseTokens != null
-          ? Math.max(0, Number(m.responseTokens))
-          : Math.max(0, outTok - thinkTok);
-      const totTok = Math.max(0, Number(m.totalTokens ?? inTok + cacheTok + outTok));
-      const costUsd = Number.isFinite(Number(m.costUsd)) ? Math.max(0, Number(m.costUsd)) : 0;
-      const unpricedCalls = Math.max(0, Number(m.unpricedCalls || 0));
-
-      acc.calls += calls;
-      acc.inputTokens += inTok;
-      acc.cacheReadTokens += cacheTok;
-      acc.outputTokens += outTok;
-      acc.thinkingTokens += thinkTok;
-      acc.responseTokens += respTok;
-      acc.totalTokens += totTok;
-      acc.costUsd += costUsd;
-      acc.unpricedCalls += unpricedCalls;
-      acc.anomalySteps += Math.max(0, Number(m.anomalySteps || 0));
-      acc.anomalyCount += Math.max(0, Number(m.anomalyCount || 0));
-      acc.anomalyDangerCount += Math.max(0, Number(m.anomalyDangerCount || 0));
-      acc.anomalyTotalDelaySec += Math.max(0, Number(m.anomalyTotalDelaySec || 0));
-      if (m.anomalyByKind && typeof m.anomalyByKind === 'object') {
-        for (const [kind, cnt] of Object.entries(m.anomalyByKind)) {
-          const n = Math.max(0, Number(cnt || 0));
-          if (n > 0) acc.anomalyByKind[kind] = (acc.anomalyByKind[kind] || 0) + n;
-        }
-      }
-
-      const rawSpeedTok = Number(m.speedSummary?.tokens);
-      const rawSpeedSec = Number(m.speedSummary?.seconds);
-      if (
-        Number.isFinite(rawSpeedTok) &&
-        Number.isFinite(rawSpeedSec) &&
-        rawSpeedSec > 0 &&
-        rawSpeedTok >= 0
-      ) {
-        acc._hasAnySpeedSummary = true;
-        acc._speedTokens += rawSpeedTok;
-        acc._speedSeconds += rawSpeedSec;
-      } else if (Number.isFinite(Number(m.avgTokPerSec)) && Number(m.avgTokPerSec) > 0) {
-        const fallbackTok = outTok > 0 ? outTok : Math.max(1, calls || 1);
-        acc._speedTokens += fallbackTok;
-        acc._speedSeconds += fallbackTok / Number(m.avgTokPerSec);
-      }
-      if (m.speedSummary) {
-        acc._hasAnySpeedSummary = true;
-        acc._speedSampleCount += Math.max(0, Number(m.speedSummary.sampleCount || 0));
-        acc._speedExcludedCount += Math.max(0, Number(m.speedSummary.excludedCount || 0));
-        if (m.speedSummary.excludedReasons && typeof m.speedSummary.excludedReasons === 'object') {
-          for (const [rk, rv] of Object.entries(m.speedSummary.excludedReasons)) {
-            const cnt = Math.max(0, Number(rv || 0));
-            if (cnt > 0) acc._speedExcludedReasons[rk] = (acc._speedExcludedReasons[rk] || 0) + cnt;
-          }
-        }
-      }
-      if (
-        m.avgTtftSec != null &&
-        Number.isFinite(Number(m.avgTtftSec)) &&
-        Number(m.avgTtftSec) >= 0
-      ) {
-        const ttftSamples = Math.max(0, Number(m.ttftSampleCount || 0));
-        const w = ttftSamples > 0 ? ttftSamples : Math.max(1, calls || 1);
-        acc._ttftWeightedSum += Number(m.avgTtftSec) * w;
-        acc._ttftWeight += w;
-        acc._ttftSampleCount += ttftSamples;
-      }
-    }
-  }
-
-  combinedSteps.sort(
-    (a, b) =>
-      (Number(b?.createdAtMs) || 0) - (Number(a?.createdAtMs) || 0) ||
-      (Number(b?.agentIndex) || 0) - (Number(a?.agentIndex) || 0) ||
-      (Number(b?.stepIndex) || 0) - (Number(a?.stepIndex) || 0)
-  );
-
-  const mergedModels = Array.from(modelMap.values())
-    .map((acc) => {
-      const promptTok = acc.inputTokens + acc.cacheReadTokens;
-      const rawAvgTps = acc._speedSeconds > 0 ? acc._speedTokens / acc._speedSeconds : null;
-      return {
-        label: acc.label,
-        shortName: acc.shortName,
-        rawModel: acc.rawModel,
-        upstreamName: acc.upstreamName,
-        upstreamModels: Array.from(acc.upstreamSet),
-        calls: acc.calls,
-        inputTokens: acc.inputTokens,
-        cacheReadTokens: acc.cacheReadTokens,
-        outputTokens: acc.outputTokens,
-        thinkingTokens: acc.thinkingTokens,
-        responseTokens: acc.responseTokens,
-        totalTokens: acc.totalTokens,
-        costUsd: +acc.costUsd.toFixed(6),
-        unpricedCalls: acc.unpricedCalls,
-        avgTokPerSec: rawAvgTps !== null ? +rawAvgTps.toFixed(1) : null,
-        avgTtftSec:
-          acc._ttftWeight > 0 ? +(acc._ttftWeightedSum / acc._ttftWeight).toFixed(1) : null,
-        ttftSampleCount: acc._ttftSampleCount,
-        ...(acc._hasAnySpeedSummary
-          ? {
-              speedSummary: {
-                tokens: acc._speedTokens,
-                seconds: +acc._speedSeconds.toFixed(6),
-                sampleCount: acc._speedSampleCount,
-                excludedCount: acc._speedExcludedCount,
-                excludedReasons: acc._speedExcludedReasons,
-                avgTokPerSec: rawAvgTps,
-              },
-            }
-          : {}),
-        cacheHitPct: promptTok > 0 ? +((acc.cacheReadTokens / promptTok) * 100).toFixed(1) : 0,
-        ...(acc.anomalyCount > 0
-          ? {
-              anomalySteps: acc.anomalySteps,
-              anomalyCount: acc.anomalyCount,
-              anomalyDangerCount: acc.anomalyDangerCount,
-              anomalyTotalDelaySec: +acc.anomalyTotalDelaySec.toFixed(1),
-              anomalyByKind: acc.anomalyByKind,
-            }
-          : {}),
-      };
-    })
-    .sort((a, b) => b.totalTokens - a.totalTokens || b.calls - a.calls);
-
-  return { steps: combinedSteps, models: mergedModels };
-}
-
-function getLineMetricSwitchOptions() {
-  return [
-    { value: 'totalTokens', label: t('steps.metricTotalTokens') },
-    { value: 'context', label: t('steps.metricContext') },
-    { value: 'tps', label: t('steps.metricTps') },
-    { value: 'ttft', label: t('steps.metricTtft') },
-    { value: 'cost', label: t('steps.metricCost') },
-  ];
-}
-
-function getFitMetricSwitchOptions() {
-  return [
-    { value: 'tps', label: t('steps.metricTps') },
-    { value: 'ttft', label: t('steps.metricTtft') },
-    { value: 'cache', label: t('steps.metricCache') },
-    { value: 'cost', label: t('steps.metricCost') },
-  ];
-}
-
-const StepsDetailView = defineComponent({
-  name: 'StepsDetailView',
-  setup({ onCleanup }) {
-    let selectedAgentScopes = [uiStore.getState().selectedAgentScope || 'all'];
-    let lastSyncedUiScope = uiStore.getState().selectedAgentScope || 'all';
-    let selectedTableModels = ['__all__'];
-    let selectedLineModels = ['__all__'];
-    let onlyAnomalies = false;
-    let anomalyKindFilter = '';
-    let stepSearchQuery = '';
-    let stepQuickChip = '';
-    let currentTableSteps = [];
-    let currentAllConvSteps = [];
-    let currentDisplaySettings = {};
-    let sortKey = '';
-    let sortDir = '';
-    let cachedSortSrc = null;
-    let cachedSortSig = '';
-    let cachedSortedOut = [];
-
-    function applyAgentScopesSelection(nextScopes) {
-      selectedAgentScopes = nextScopes;
-      const mappedSingle =
-        nextScopes.length === 1 && nextScopes[0] !== 'all' ? nextScopes[0] : 'all';
-      const prevUiScope = uiStore.getState().selectedAgentScope;
-      lastSyncedUiScope = mappedSingle;
-      if (prevUiScope !== mappedSingle) {
-        const curCtxId = uiStore.getState().ctxInspectorAgentId;
-        const shouldResetSubCtx =
-          mappedSingle === 'all' && curCtxId && curCtxId !== 'main' && curCtxId !== 'auto';
-        uiStore.setState({
-          selectedAgentScope: mappedSingle,
-          ...(shouldResetSubCtx
-            ? {
-                ctxInspectorAgentId: getDefaultCtxInspectorAgentId(
-                  telemetryStore.getState().telemetry?.settings
-                ),
-              }
-            : {}),
-        });
-      } else if (latestSlice) {
-        renderStepsData(latestSlice);
-      }
-    }
-
-    const inlineScopeSelect = CustomSelect({
-      multiple: true,
-      allValue: 'all',
-      collapseAll: true,
-      multiUnit: t('steps.unitAgent'),
-      modelValue: selectedAgentScopes,
-      placeholder: t('steps.allAgents'),
-      className: 'steps-inline-scope-select',
-      options: [{ value: 'all', label: t('steps.allAgents') }],
-      onUpdateModelValue: (nextScopes) => {
-        if (!Array.isArray(nextScopes) || nextScopes.length === 0) return;
-        applyAgentScopesSelection(nextScopes);
-      },
-    });
-    inlineScopeSelect.el.setAttribute('hidden', '');
-
-    const stepsModelSelect = CustomSelect({
-      multiple: true,
-      allValue: '__all__',
-      collapseAll: false,
-      multiUnit: t('steps.unitModel'),
-      modelValue: selectedTableModels,
-      placeholder: t('steps.allModels'),
-      className: 'steps-inline-model-select',
-      options: [{ value: '__all__', label: t('steps.allModels') }],
-      onUpdateModelValue: (nextModels) => {
-        if (!Array.isArray(nextModels) || nextModels.length === 0) return;
-        selectedTableModels = nextModels;
-        if (latestSlice) renderStepsData(latestSlice);
-      },
-    });
-    stepsModelSelect.el.setAttribute('hidden', '');
-
-    const subTabSwitch = SegmentedControl({
-      ariaLabel: t('steps.title'),
-      modelValue: uiStore.getState().stepsSubTab,
-      options: [
-        { value: 'steps', label: t('steps.tabSteps', { count: 0 }) },
-        { value: 'models', label: t('steps.tabModels') },
-      ],
-      onUpdateModelValue: (nextTab) => {
-        uiStore.setState({ stepsSubTab: nextTab });
-      },
-    });
-
-    // --- 子视图 1：单步明细表（委托给可复用的 `StepTableWidget` 解耦组件） ---
-    let stepsScroll = null;
-    const stepTableWidget = StepTableWidget({
-      onSelectAgentScopes: applyAgentScopesSelection,
-      onVirtualHeightChange: () => stepsScroll?.refresh(),
-      onSortChange: (nextKey, nextDir) => {
-        sortKey = nextKey || '';
-        sortDir = nextDir || '';
-        if (latestSlice) renderStepsData(latestSlice);
-      },
-    });
-    const {
-      stepsTablePane,
-      stepsTableEl,
-      stepsTheadRow,
-      stepsTbody,
-      turnTipEl,
-      anomalyTipEl,
-      hideTurnTip,
-      showAnomalyTip,
-      hideAnomalyTip,
-      syncTableHeaderColumns,
-      renderStepTable,
-      refreshViewport: refreshStepTableViewport,
-    } = stepTableWidget.refs;
-    stepsScroll = CustomScrollbar({
-      contentEl: stepsTablePane,
-      className: 'table-scroll-host',
-    });
-
-    const anomalyFilterLabelEl = h('span', { className: 'steps-anomaly-filter-label text-mono' });
-    const anomalyFilterClearBtn = h('button', {
-      type: 'button',
-      className: 'btn-ghost-sm steps-anomaly-filter-clear',
-      text: t('steps.anomalyFilterAll'),
-      onclick: () => {
-        onlyAnomalies = false;
-        anomalyKindFilter = '';
-        if (stepQuickChip === 'anomaly') stepQuickChip = '';
-        if (latestSlice) renderStepsData(latestSlice);
-      },
-    });
-    const anomalyFilterBarEl = h(
-      'div',
-      { className: 'steps-anomaly-filterbar', hidden: true },
-      [anomalyFilterLabelEl, anomalyFilterClearBtn]
-    );
-
-    // --- 步骤搜索栏及快捷诊断芯片 ---
-    const stepSearchBox = createSearchInput({
-      wrapClassName: 'steps-search-wrap',
-      iconClassName: 'steps-search-icon',
-      inputClassName: 'steps-search-input',
-      clearClassName: 'steps-search-clear',
-      placeholder: t('steps.searchPlaceholder'),
-      ariaLabel: t('steps.searchPlaceholder'),
-      clearAriaLabel: t('steps.searchClearAria'),
-      closeIconSize: 11,
-      onInput: (val) => {
-        stepSearchQuery = String(val ?? '');
-        if (latestSlice) renderStepsData(latestSlice);
-      },
-      onClear: () => {
-        stepSearchQuery = '';
-        if (latestSlice) renderStepsData(latestSlice);
-        stepSearchInput.focus?.();
-      },
-      onKeydown: (e) => {
-        if (e?.key === 'Escape') {
-          e.stopPropagation?.();
-          if (stepSearchQuery) {
-            stepSearchQuery = '';
-            stepSearchBox.setValue('');
-            if (latestSlice) renderStepsData(latestSlice);
-          } else {
-            stepSearchInput.blur?.();
-          }
-        }
-      },
-    });
-    const stepSearchWrapEl = stepSearchBox.el;
-    const stepSearchInput = stepSearchBox.inputEl;
-    const stepSearchClearBtn = stepSearchBox.clearBtnEl;
-
-    const QUICK_CHIP_DEFS = [
-      { key: 'anomaly', i18nKey: 'steps.chipAnomaly', tone: 'is-warn' },
-      { key: 'compaction', i18nKey: 'steps.chipCompaction', tone: 'is-info' },
-      { key: 'low_cache', i18nKey: 'steps.chipLowCache', tipKey: 'steps.chipLowCacheTip', tone: 'is-warn' },
-      { key: 'slow_ttft', i18nKey: 'steps.chipSlowTtft', tipKey: 'steps.chipSlowTtftTip', tone: 'is-danger' },
-    ];
-    const quickChipBtns = QUICK_CHIP_DEFS.map((def) => {
-      const btn = h('button', {
-        type: 'button',
-        className: `steps-chip-btn ${def.tone}`,
-        'data-chip': def.key,
-        hidden: true,
-        onclick: () => {
-          if (def.key === 'anomaly') {
-            const nextOn = !(onlyAnomalies || stepQuickChip === 'anomaly');
-            onlyAnomalies = nextOn;
-            anomalyKindFilter = '';
-            stepQuickChip = nextOn ? 'anomaly' : '';
-          } else {
-            const nextKey = stepQuickChip === def.key ? '' : def.key;
-            stepQuickChip = nextKey;
-            if (nextKey) {
-              onlyAnomalies = false;
-              anomalyKindFilter = '';
-            }
-          }
-          if (latestSlice) renderStepsData(latestSlice);
-        },
-      });
-      return { def, btn };
-    });
-    const stepQuickChipsEl = h(
-      'div',
-      { className: 'steps-quick-chips', hidden: true },
-      quickChipBtns.map((c) => c.btn)
-    );
-    const stepsExportMenu = ActionMenu({
-      ariaLabel: t('steps.exportMenuAria'),
-      className: 'steps-export-menu',
-      items: [
-        {
-          key: 'xlsx',
-          icon: 'download',
-          label: t('steps.exportXlsx'),
-          title: t('steps.exportXlsxTip'),
-          onSelect: () => {
-            if (currentTableSteps.length === 0) return;
-            const bytes = buildStepsXlsx(currentTableSteps, {
-              title: latestSlice?.activeConversation?.title || '',
-              cascadeId: latestSlice?.cascadeId || latestSlice?.activeConversation?.cascadeId || '',
-              displaySettings: currentDisplaySettings,
-            });
-            const baseName = buildStepsExportBaseName(
-              latestSlice?.activeConversation?.title || '',
-              latestSlice?.cascadeId || latestSlice?.activeConversation?.cascadeId || ''
-            );
-            void exportBinaryFileWithFeedback(
-              sanitizeExportFilename(baseName, 'xlsx'),
-              bytes
-            );
-          },
-        },
-        {
-          key: 'md',
-          icon: 'copy',
-          label: t('steps.exportMd'),
-          title: t('steps.exportMdTip'),
-          onSelect: () => {
-            if (currentTableSteps.length === 0) return;
-            const md = buildStepsMarkdownReport(currentTableSteps, {
-              title: latestSlice?.activeConversation?.title || '',
-              cascadeId: latestSlice?.cascadeId || latestSlice?.activeConversation?.cascadeId || '',
-              displaySettings: currentDisplaySettings,
-            });
-            void copyTextWithFeedback(md, t('steps.exportMdDone'));
-          },
-        },
-      ],
-    });
-    stepsExportMenu.refs.setHidden(true);
-    const stepsFilterToolbarEl = h(
-      'div',
-      { className: 'steps-filter-toolbar', hidden: true },
-      [stepSearchWrapEl, stepQuickChipsEl]
-    );
-
-    // --- 子视图 2：总汇总分析面板 ---
-    let selectedLineMetric = 'totalTokens';
-    let selectedFitMetric = 'tps';
-
-    let fitLockedCascadeId = null;
-    let fitLockedModelKeys = [];
-    let fitPinnedWhileVisible = false;
-    let fitUserPicked = false;
-
-    const lineTitleEl = h('span', { className: 'sstep-card-title', text: t('steps.lineTitle') });
-    const lineSummaryBadge = h('span', {
-      className: 'cons-badge text-mono',
-      text: t('header.convMetaSteps', { count: 0 }),
-    });
-    const lineModelSelect = CustomSelect({
-      multiple: true,
-      allValue: '__all__',
-      collapseAll: false,
-      multiUnit: t('steps.unitModel'),
-      modelValue: selectedLineModels,
-      placeholder: t('steps.allModels'),
-      className: 'sstep-fit-model-select sstep-line-model-select',
-      options: [{ value: '__all__', label: t('steps.allModels') }],
-      onUpdateModelValue: (nextModels) => {
-        if (!Array.isArray(nextModels) || nextModels.length === 0) return;
-        selectedLineModels = nextModels;
-        if (latestSlice) renderStepsData(latestSlice);
-      },
-    });
-    lineModelSelect.el.setAttribute('hidden', '');
-
-    const lineMetricSwitch = SegmentedControl({
-      ariaLabel: t('steps.lineTitle'),
-      modelValue: selectedLineMetric,
-      options: getLineMetricSwitchOptions(),
-      onUpdateModelValue: (nextMetric) => {
-        selectedLineMetric = nextMetric;
-        if (latestSlice) renderStepsData(latestSlice);
-      },
-    });
-    const sessionLineChart = createSessionLineChart();
-    const sessionLineCard = h('div', { className: 'sstep-card sstep-line-card' }, [
-      h('div', { className: 'sstep-card-head' }, [
-        h('div', { className: 'sstep-card-title-group' }, [lineTitleEl, lineSummaryBadge]),
-        h('div', { className: 'sstep-fit-controls' }, [
-          lineModelSelect.el,
-          lineMetricSwitch.el,
-        ]),
-      ]),
-      sessionLineChart.el,
-    ]);
-
-    const fitTitleEl = h('span', { className: 'sstep-card-title', text: t('steps.fitTitle') });
-    const fitSummaryBadge = h('span', {
-      className: 'cons-badge text-mono',
-      text: t('header.convMetaSteps', { count: 0 }),
-    });
-    const fitModelSelect = CustomSelect({
-      multiple: true,
-      allValue: '__all__',
-      collapseAll: false,
-      multiUnit: t('steps.unitModel'),
-      modelValue: ['__all__'],
-      placeholder: t('steps.selectModel'),
-      className: 'sstep-fit-model-select',
-      options: [{ value: '__all__', label: t('steps.allModels') }],
-      onUpdateModelValue: (nextModelKeys) => {
-        if (!Array.isArray(nextModelKeys) || nextModelKeys.length === 0) return;
-        fitLockedModelKeys = nextModelKeys;
-        fitUserPicked = true;
-        fitPinnedWhileVisible = true;
-        if (latestSlice) renderStepsData(latestSlice);
-      },
-    });
-    fitModelSelect.el.setAttribute('hidden', '');
-
-    const fitMetricSwitch = SegmentedControl({
-      ariaLabel: t('steps.fitTitle'),
-      modelValue: selectedFitMetric,
-      options: getFitMetricSwitchOptions(),
-      onUpdateModelValue: (nextMetric) => {
-        selectedFitMetric = nextMetric;
-        if (latestSlice) renderStepsData(latestSlice);
-      },
-    });
-    const modelFitChart = createModelFitChart();
-    const modelFitCard = h('div', { className: 'sstep-card sstep-fit-card' }, [
-      h('div', { className: 'sstep-card-head' }, [
-        h('div', { className: 'sstep-card-title-group' }, [fitTitleEl, fitSummaryBadge]),
-        h('div', { className: 'sstep-fit-controls' }, [fitModelSelect.el, fitMetricSwitch.el]),
-      ]),
-      modelFitChart.el,
-    ]);
-
-    const modelsSectionTitleEl = h('span', {
-      className: 'sstep-card-title',
-      text: t('steps.modelsTitle'),
-    });
-    const modelsSummaryMeta = h('span', {
-      className: 'cons-badge text-mono',
-      text: t('cons.callsCount', { calls: 0 }),
-    });
-    const modelsAnomalyMetaEl = h('button', {
-      type: 'button',
-      className: 'steps-anomaly-strip-meta text-mono',
-      onclick: () => {
-        hideAnomalyTip();
-        selectedTableModels = ['__all__'];
-        onlyAnomalies = true;
-        anomalyKindFilter = '';
-        uiStore.setState({ stepsSubTab: 'steps' });
-      },
-    });
-    const modelsAnomalyTagsEl = h('div', { className: 'steps-anomaly-strip-tags' });
-    const modelsAnomalyStripEl = h(
-      'div',
-      { className: 'steps-anomaly-strip', hidden: true },
-      [modelsAnomalyMetaEl, modelsAnomalyTagsEl]
-    );
-    let lastAnomalyStripSig = '';
-    const modelsEmptyEl = h('div', {
-      className: 'smodel-empty text-muted',
-      text: t('steps.modelsEmpty'),
-    });
-    const modelsListEl = h('div', { className: 'smodel-list' });
-    const modelsSummarySection = h('div', { className: 'smodel-section' }, [
-      h('div', { className: 'smodel-section-head' }, [modelsSectionTitleEl, modelsSummaryMeta]),
-      modelsAnomalyStripEl,
-      modelsEmptyEl,
-      modelsListEl,
-    ]);
-
-    const modelsAnalyticsPane = h('div', { className: 'table-viewport models-analytics-pane' }, [
-      sessionLineCard,
-      modelFitCard,
-      modelsSummarySection,
-    ]);
-    const onModelsPaneScroll = () => hideAnomalyTip();
-    modelsAnalyticsPane.addEventListener('scroll', onModelsPaneScroll, { passive: true });
-    const modelsScroll = CustomScrollbar({
-      contentEl: modelsAnalyticsPane,
-      className: 'table-scroll-host',
-    });
-    modelsScroll.el.setAttribute('hidden', '');
-
-    const headerFiltersEl = h('div', { className: 'steps-header-filters', hidden: true }, [
-      inlineScopeSelect.el,
-      stepsModelSelect.el,
-    ]);
-
-    const panelEl = h(
-      'section',
-      {
-        className: 'panel',
-        style: 'flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative;',
-      },
-      [
-        h('div', { className: 'panel-header steps-panel-header' }, [
-          h('div', { className: 'steps-header-controls' }, [
-            subTabSwitch.el,
-            h('div', { className: 'steps-header-right' }, [
-              headerFiltersEl,
-              stepsExportMenu.el,
-            ]),
-          ]),
-        ]),
-        stepsFilterToolbarEl,
-        anomalyFilterBarEl,
-        stepsScroll.el,
-        modelsScroll.el,
-        turnTipEl,
-        anomalyTipEl,
-      ]
-    );
-    stepTableWidget.refs.setBoundsElGetter(() => panelEl);
-
-    const rootEl = h('div', { className: 'view-pane' }, [panelEl]);
-
-    let latestSlice = null;
-    let isDirty = false;
-    let cachedChronoSrc = null;
-    let cachedChronoMerged = false;
-    let cachedChronoOut = [];
-
-    function getMemoizedChronoSteps(steps, isMergedMultiAgents) {
-      if (cachedChronoSrc === steps && cachedChronoMerged === isMergedMultiAgents) {
-        return cachedChronoOut;
-      }
-      cachedChronoSrc = steps;
-      cachedChronoMerged = isMergedMultiAgents;
-      cachedChronoOut = toChronologicalSteps(steps, isMergedMultiAgents);
-      return cachedChronoOut;
-    }
-
-    function resolveDefaultActiveModelKey(scopedConv, chronoSteps, models, availableModelKeys) {
-      if (scopedConv?.hasKnownModel !== false) {
-        const activeCand = getStepModelGroupKey({
-          baseModelLabel: scopedConv?.activeBaseModelLabel,
-          baseModelShort: scopedConv?.activeBaseModelShort,
-          modelLabel: scopedConv?.activeModelLabel,
-          modelShort: scopedConv?.activeModelShort,
-        });
-        if (
-          activeCand &&
-          activeCand !== t('fmt.unknownModel') &&
-          availableModelKeys.has(activeCand)
-        ) {
-          return activeCand;
-        }
-      }
-      for (let i = chronoSteps.length - 1; i >= 0; i--) {
-        const st = chronoSteps[i];
-        if (!st || st.isCompactionStep) continue;
-        const gk = getStepModelGroupKey(st);
-        if (gk && availableModelKeys.has(gk)) return gk;
-      }
-      if (chronoSteps.length > 0) {
-        const gk = getStepModelGroupKey(chronoSteps[chronoSteps.length - 1]);
-        if (gk && availableModelKeys.has(gk)) return gk;
-      }
-      if (models.length > 0) {
-        const firstKey = getStepModelGroupKey(models[0]);
-        if (firstKey && availableModelKeys.has(firstKey)) return firstKey;
-      }
-      return '__all__';
-    }
-
-    function normalizeMultiModelSelection(rawSelection, availableModelKeys) {
-      if (availableModelKeys.size <= 1) return ['__all__'];
-      const arr = Array.isArray(rawSelection) ? rawSelection : [];
-      if (arr.length === 0 || arr.includes('__all__')) return ['__all__'];
-      const valid = Array.from(new Set(arr.filter((k) => availableModelKeys.has(k))));
-      if (valid.length === 0) return ['__all__'];
-      return valid;
-    }
-
-    function refreshStaticLocaleLabels() {
-      patchText(lineTitleEl, t('steps.lineTitle'));
-      patchText(fitTitleEl, t('steps.fitTitle'));
-      patchText(modelsSectionTitleEl, t('steps.modelsTitle'));
-      patchText(modelsEmptyEl, t('steps.modelsEmpty'));
-      patchText(anomalyFilterClearBtn, t('steps.anomalyFilterAll'));
-      patchAttr(stepSearchInput, 'placeholder', t('steps.searchPlaceholder'));
-      patchAttr(stepSearchInput, 'aria-label', t('steps.searchPlaceholder'));
-      patchAttr(stepSearchClearBtn, 'aria-label', t('steps.searchClearAria'));
-      stepsExportMenu.refs.setAriaLabel(t('steps.exportMenuAria'));
-      stepsExportMenu.refs.updateItemLabels({
-        xlsx: { label: t('steps.exportXlsx'), title: t('steps.exportXlsxTip') },
-        md: { label: t('steps.exportMd'), title: t('steps.exportMdTip') },
-      });
-      lastAnomalyStripSig = '';
-      lineMetricSwitch.setProps({
-        modelValue: selectedLineMetric,
-        options: getLineMetricSwitchOptions(),
-      });
-      fitMetricSwitch.setProps({
-        modelValue: selectedFitMetric,
-        options: getFitMetricSwitchOptions(),
-      });
-      const colKeys = normalizeClientStepColumns(latestSlice?.stepTableColumns);
-      syncTableHeaderColumns(colKeys);
-      if (!latestSlice) {
-        subTabSwitch.setProps({
-          modelValue: uiStore.getState().stepsSubTab,
-          options: [
-            { value: 'steps', label: t('steps.tabSteps', { count: 0 }) },
-            { value: 'models', label: t('steps.tabModels') },
-          ],
-        });
-      }
-    }
-
-    function renderStepsData(slice, { allowNewRowFade = false } = {}) {
-      if (!slice) return;
-      const uiSt = uiStore.getState();
-      const locale = getEffectiveLocale();
-
-      const currentCid = String(slice.cascadeId || slice.activeConversation?.cascadeId || '');
-      if (currentCid !== fitLockedCascadeId) {
-        if (fitLockedCascadeId !== null) {
-          selectedAgentScopes = [uiSt.selectedAgentScope || 'all'];
-          lastSyncedUiScope = uiSt.selectedAgentScope || 'all';
-          selectedTableModels = ['__all__'];
-          selectedLineModels = ['__all__'];
-          onlyAnomalies = false;
-          anomalyKindFilter = '';
-          stepSearchQuery = '';
-          stepSearchInput.value = '';
-          patchAttr(stepSearchClearBtn, 'hidden', true);
-          stepQuickChip = '';
-          sortKey = '';
-          sortDir = '';
-        }
-        fitLockedCascadeId = currentCid;
-        fitUserPicked = false;
-        fitPinnedWhileVisible = false;
-        fitLockedModelKeys = [];
-      }
-
-      const baseScope = resolveScopedConversation(
-        { activeConversation: slice.activeConversation },
-        'all',
-        uiSt.ctxInspectorAgentId,
-        true
-      );
-      const { hasSubagents, agents, subagents, mainAgent, aggregated } = baseScope;
-
-      let effectiveScopes = ['main'];
-      let isMergedMultiAgents = false;
-      let steps = [];
-      let models = [];
-      let activeModelSource = baseScope.scopedConv;
-
-      patchAttr(inlineScopeSelect.el, 'hidden', !hasSubagents);
-      if (hasSubagents) {
-        const validAgentIds = ['main', ...subagents.map((s) => s.agentId)];
-        const validSet = new Set(validAgentIds);
-        if (selectedAgentScopes.length === 0 || selectedAgentScopes.includes('all')) {
-          effectiveScopes = ['all'];
-        } else {
-          const filtered = selectedAgentScopes.filter((id) => validSet.has(id));
-          effectiveScopes =
-            filtered.length === 0 || filtered.length >= validAgentIds.length
-              ? ['all']
-              : filtered;
-        }
-        selectedAgentScopes = effectiveScopes;
-
-        const scopeOpts = [
-          {
-            value: 'all',
-            label: t('steps.allAgents'),
-            meta: t('header.convMetaSteps', { count: aggregated?.stepCount ?? 0 }),
-          },
-          {
-            value: 'main',
-            label: t('fmt.mainAgent'),
-            meta: t('header.convMetaSteps', { count: mainAgent?.stepCount ?? 0 }),
-          },
-          ...subagents.map((s) => ({
-            value: s.agentId,
-            label: formatAgentLabel(s),
-            meta: t('header.convMetaSteps', { count: s.stepCount || 0 }),
-          })),
-        ];
-        inlineScopeSelect.setProps({
-          modelValue: effectiveScopes,
-          options: scopeOpts,
-          placeholder: t('steps.allAgents'),
-          multiUnit: t('steps.unitAgent'),
-        });
-
-        if (effectiveScopes[0] === 'all') {
-          steps = aggregated?.recentSteps || [];
-          models = aggregated?.modelBreakdown || [];
-          isMergedMultiAgents = true;
-          activeModelSource = aggregated;
-        } else if (effectiveScopes.length === 1) {
-          const targetId = effectiveScopes[0];
-          const unit =
-            targetId === 'main'
-              ? mainAgent
-              : agents.find((a) => a.agentId === targetId) || mainAgent;
-          steps = unit?.recentSteps || [];
-          models = unit?.modelBreakdown || [];
-          isMergedMultiAgents = false;
-          activeModelSource = unit;
-        } else {
-          const scopeSet = new Set(effectiveScopes);
-          const selectedUnits = agents.filter((a) =>
-            scopeSet.has(a.isMain ? 'main' : a.agentId)
-          );
-          const merged = mergeSelectedAgentUnits(selectedUnits);
-          steps = merged.steps;
-          models = merged.models;
-          isMergedMultiAgents = true;
-          activeModelSource =
-            selectedUnits.find((a) => a.isRunning) || selectedUnits[0] || aggregated;
-        }
-      } else {
-        inlineScopeSelect.close();
-        steps = slice.recentSteps || [];
-        models = slice.sessionModelBreakdown || [];
-      }
-
-      const displaySettings = {
-        modelDisplayMode: normalizeModelDisplayMode(
-          slice.modelDisplayMode,
-          slice.showUpstreamModel
-        ),
-        showUpstreamModel: Boolean(slice.showUpstreamModel),
-        orchestratorIdMode: slice.orchestratorIdMode,
-      };
-
-      const showAgentPrefix = isMergedMultiAgents;
-      const showModels = uiSt.stepsSubTab === 'models';
-
-      const availableModelKeys = new Set();
-      const modelColorByGroup = new Map();
-      const perModelOptions = [];
-      let breakdownCalls = 0;
-      for (const m of models) {
-        if (!m || typeof m !== 'object') continue;
-        breakdownCalls += Math.max(0, Number(m.calls || 0));
-        const gk = getStepModelGroupKey(m);
-        if (availableModelKeys.has(gk)) continue;
-        availableModelKeys.add(gk);
-        modelColorByGroup.set(
-          gk,
-          MODEL_COLOR_VARS[(availableModelKeys.size - 1) % MODEL_COLOR_VARS.length]
-        );
-        const disp = resolveModelDisplayInfo(m, displaySettings, {
-          preferLabelInShort: false,
-          fallback: gk,
-        });
-        perModelOptions.push({
-          value: gk,
-          label: disp.baseText || disp.text || gk,
-          meta: t('header.convMetaSteps', { count: Number(m.calls || 0) }),
-        });
-      }
-
-      const needStepModelFallback =
-        steps.length > 0 && (models.length === 0 || breakdownCalls < steps.length);
-      if (needStepModelFallback) {
-        const stepModelOptionMap = new Map();
-        for (const st of steps) {
-          const gk = getStepModelGroupKey(st);
-          if (!stepModelOptionMap.has(gk)) {
-            const disp = resolveModelDisplayInfo(st, displaySettings, { fallback: gk });
-            stepModelOptionMap.set(gk, {
-              label: disp.baseText || disp.text || gk,
-              calls: 0,
-            });
-          }
-          stepModelOptionMap.get(gk).calls += 1;
-        }
-        for (const [gk, info] of stepModelOptionMap.entries()) {
-          if (!availableModelKeys.has(gk)) {
-            availableModelKeys.add(gk);
-            modelColorByGroup.set(
-              gk,
-              MODEL_COLOR_VARS[(availableModelKeys.size - 1) % MODEL_COLOR_VARS.length]
-            );
-            perModelOptions.push({
-              value: gk,
-              label: info.label,
-              meta: t('header.convMetaSteps', { count: info.calls }),
-            });
-          }
-        }
-      }
-
-      const hasMultipleModels = availableModelKeys.size > 1;
-      const modelSelectOptions = [
-        {
-          value: '__all__',
-          label: t('steps.allModels'),
-          meta: t('header.convMetaSteps', { count: steps.length }),
-        },
-        ...perModelOptions,
-      ];
-
-      // 1. “按步查看”动态列头同步与表格行级增量对账
-      selectedTableModels = normalizeMultiModelSelection(
-        selectedTableModels,
-        availableModelKeys
-      );
-      const showStepsModelFilter = uiSt.stepsSubTab === 'steps' && hasMultipleModels;
-      patchAttr(stepsModelSelect.el, 'hidden', !showStepsModelFilter);
-      patchAttr(headerFiltersEl, 'hidden', !hasSubagents && !showStepsModelFilter);
-      if (hasMultipleModels) {
-        stepsModelSelect.setProps({
-          modelValue: selectedTableModels,
-          options: modelSelectOptions,
-          placeholder: t('steps.allModels'),
-          multiUnit: t('steps.unitModel'),
-        });
-        if (!showStepsModelFilter) stepsModelSelect.close();
-      } else {
-        stepsModelSelect.close();
-      }
-
-      const tableModelFilterSet = selectedTableModels.includes('__all__')
-        ? null
-        : new Set(selectedTableModels);
-      const modelFilteredSteps = tableModelFilterSet
-        ? steps.filter((st) => tableModelFilterSet.has(getStepModelGroupKey(st)))
-        : steps;
-
-      const filterToolbarEnabled = slice.showStepFilterToolbar === true;
-      if (!filterToolbarEnabled) {
-        if (stepSearchQuery) {
-          stepSearchQuery = '';
-          stepSearchInput.value = '';
-          patchAttr(stepSearchClearBtn, 'hidden', true);
-        }
-        if (stepQuickChip && stepQuickChip !== 'anomaly') {
-          stepQuickChip = '';
-        }
-      }
-      const chipCounts = computeStepQuickChipCounts(modelFilteredSteps);
-      const effectiveQuickChip = onlyAnomalies
-        ? 'anomaly'
-        : filterToolbarEnabled
-          ? stepQuickChip
-          : '';
-      const showFilterToolbar = filterToolbarEnabled && !showModels && steps.length > 0;
-      patchAttr(stepsFilterToolbarEl, 'hidden', !showFilterToolbar);
-      stepsExportMenu.refs.setHidden(showModels || steps.length === 0);
-      if (showFilterToolbar) {
-        let visibleChipsCount = 0;
-        for (const { def, btn } of quickChipBtns) {
-          const cnt = chipCounts[def.key] || 0;
-          const isActive = effectiveQuickChip === def.key;
-          const showChip = cnt > 0 || isActive;
-          patchAttr(btn, 'hidden', !showChip);
-          if (showChip) {
-            visibleChipsCount += 1;
-            patchText(btn, t(def.i18nKey, { count: cnt }));
-            if (def.tipKey) patchAttr(btn, 'title', t(def.tipKey));
-            patchClasses(btn, { 'is-active': isActive });
-            patchAttr(btn, 'aria-pressed', isActive ? 'true' : 'false');
-          }
-        }
-        patchAttr(stepQuickChipsEl, 'hidden', visibleChipsCount === 0);
-      }
-
-      const filteredTableSteps = filterStepsBySearchAndChip(modelFilteredSteps, {
-        query: filterToolbarEnabled ? stepSearchQuery : '',
-        quickChip: effectiveQuickChip,
-        anomalyKindFilter: onlyAnomalies ? anomalyKindFilter : '',
-        displaySettings,
-      });
-
-      const normTokenFmt = normalizeClientStepTokenComboFormat(slice.stepTokenComboFormat);
-      const sortSig = `${sortKey}:${sortDir}:${normTokenFmt}:${displaySettings.modelDisplayMode}:${displaySettings.showUpstreamModel ? 1 : 0}:${displaySettings.orchestratorIdMode}`;
-      let tableSteps = filteredTableSteps;
-      if (sortKey && sortDir) {
-        if (cachedSortSrc === filteredTableSteps && cachedSortSig === sortSig) {
-          tableSteps = cachedSortedOut;
-        } else {
-          tableSteps = sortStepsByColumn(filteredTableSteps, sortKey, sortDir, {
-            stepTokenComboFormat: normTokenFmt,
-            displaySettings,
-          });
-          cachedSortSrc = filteredTableSteps;
-          cachedSortSig = sortSig;
-          cachedSortedOut = tableSteps;
-        }
-      } else {
-        cachedSortSrc = null;
-        cachedSortSig = '';
-        cachedSortedOut = [];
-      }
-
-      const showAnomalyFilterBar = !showModels && onlyAnomalies;
-      patchAttr(anomalyFilterBarEl, 'hidden', !showAnomalyFilterBar);
-      if (showAnomalyFilterBar) {
-        const baseLabel = t('steps.anomalyFilterLabel', { count: tableSteps.length });
-        const kindSuffix = anomalyKindFilter
-          ? ` · ${formatAnomalyKindLabel(anomalyKindFilter)}`
-          : '';
-        patchText(anomalyFilterLabelEl, `${baseLabel}${kindSuffix}`);
-      }
-
-      const stepsTabLabel =
-        tableSteps.length !== steps.length
-          ? t('steps.tabStepsFiltered', {
-              filtered: tableSteps.length,
-              total: steps.length,
-            })
-          : t('steps.tabSteps', { count: steps.length });
-
-      subTabSwitch.setProps({
-        options: [
-          { value: 'steps', label: stepsTabLabel },
-          { value: 'models', label: t('steps.tabModels') },
-        ],
-      });
-
-      const allConversationSteps = hasSubagents
-        ? aggregated?.recentSteps || []
-        : slice.recentSteps || [];
-      currentTableSteps = tableSteps;
-      currentAllConvSteps = allConversationSteps;
-      currentDisplaySettings = displaySettings;
-      const shouldAnimateNewRows = Boolean(
-        allowNewRowFade && slice.experimentalModernUi && !showModels
-      );
-      if (!showModels) {
-        const colKeys = normalizeClientStepColumns(slice.stepTableColumns);
-        renderStepTable(tableSteps, slice.cascadeId, colKeys, locale, {
-          effectiveScopes,
-          hasSubagents,
-          isMergedMultiAgents,
-          showStepTurnRail: slice.showStepTurnRail === true,
-          showStepAgentBadge: slice.showStepAgentBadge !== false,
-          showStepSpeedColor: slice.showStepSpeedColor === true,
-          stepTokenComboFormat: slice.stepTokenComboFormat,
-          displaySettings,
-          allConversationSteps,
-          allowNewRowFade: shouldAnimateNewRows,
-          sortKey,
-          sortDir,
-        });
-        stepsScroll.refresh();
-        fitPinnedWhileVisible = false;
-        return;
-      }
-
-      const chronoSteps = getMemoizedChronoSteps(steps, isMergedMultiAgents);
-      const stepTtftFallbackMap = new Map();
-      const needTtftFallback = models.some((m) => m && m.avgTtftSec == null);
-      if (needTtftFallback) {
-        for (const st of chronoSteps) {
-          if (!st.isCompactionStep && Number.isFinite(st.ttftSec) && st.ttftSec >= 0) {
-            const gk = getStepModelGroupKey(st);
-            const prev = stepTtftFallbackMap.get(gk) || { sum: 0, count: 0 };
-            prev.sum += Number(st.ttftSec);
-            prev.count += 1;
-            stepTtftFallbackMap.set(gk, prev);
-          }
-        }
-      }
-
-      // 2. 顶部“会话走势”更新
-      selectedLineModels = normalizeMultiModelSelection(
-        selectedLineModels,
-        availableModelKeys
-      );
-
-      // 3. 顶部“趋势拟合”模型锁定随当前会话与代理范围更新。
-      const defaultActiveModelKey = resolveDefaultActiveModelKey(
-        activeModelSource,
-        chronoSteps,
-        models,
-        availableModelKeys
-      );
-      const sanitizedLocked = fitLockedModelKeys.includes('__all__')
-        ? ['__all__']
-        : Array.from(new Set(fitLockedModelKeys.filter((k) => availableModelKeys.has(k))));
-
-      if ((!fitPinnedWhileVisible && !fitUserPicked) || sanitizedLocked.length === 0) {
-        fitLockedModelKeys = [defaultActiveModelKey];
-      } else {
-        fitLockedModelKeys = sanitizedLocked;
-      }
-      if (availableModelKeys.size > 0) fitPinnedWhileVisible = true;
-
-      patchAttr(lineModelSelect.el, 'hidden', !hasMultipleModels);
-      if (hasMultipleModels) {
-        lineModelSelect.setProps({
-          modelValue: selectedLineModels,
-          options: modelSelectOptions,
-          placeholder: t('steps.allModels'),
-          multiUnit: t('steps.unitModel'),
-        });
-      } else {
-        lineModelSelect.close();
-      }
-
-      const lineRes = sessionLineChart.update({
-        steps: chronoSteps,
-        modelGroupKey: selectedLineModels[0] || '__all__',
-        modelGroupKeys: selectedLineModels,
-        modelColorByGroup,
-        metric: selectedLineMetric,
-        showAgentPrefix,
-        displaySettings,
-      });
-      patchText(lineSummaryBadge, lineRes.summaryBadge);
-
-      const effectiveFitModelKeys =
-        availableModelKeys.size === 0
-          ? ['__all__']
-          : !hasMultipleModels
-            ? [Array.from(availableModelKeys)[0]]
-            : fitLockedModelKeys.length > 0
-              ? fitLockedModelKeys
-              : [defaultActiveModelKey];
-
-      patchAttr(fitModelSelect.el, 'hidden', !hasMultipleModels);
-      if (hasMultipleModels) {
-        fitModelSelect.setProps({
-          modelValue: effectiveFitModelKeys,
-          options: modelSelectOptions,
-          placeholder: t('steps.selectModel'),
-          multiUnit: t('steps.unitModel'),
-        });
-      } else {
-        fitModelSelect.close();
-      }
-
-      const fitRes = modelFitChart.update({
-        steps: chronoSteps,
-        modelGroupKey: effectiveFitModelKeys[0] || '__all__',
-        modelGroupKeys: effectiveFitModelKeys,
-        modelColorByGroup,
-        metric: selectedFitMetric,
-        showAgentPrefix,
-        displaySettings,
-      });
-      patchText(fitSummaryBadge, fitRes.summaryBadge);
-
-      // 4. 极简模型总览列表增量对账
-      const displayModels = mergeModelsByDisplayName(models, displaySettings, { fallback: '—' });
-      const needStepAnomalyFallback = displayModels.every((m) => !(Number(m?.anomalyCount) > 0));
-      let stepAnomalyByGroup = null;
-      if (needStepAnomalyFallback) {
-        for (const st of chronoSteps) {
-          const a = st?.anomaly;
-          if (!a || !(Number(a.count) > 0)) continue;
-          if (!stepAnomalyByGroup) stepAnomalyByGroup = new Map();
-          const gk = getStepModelGroupKey(st);
-          let acc = stepAnomalyByGroup.get(gk);
-          if (!acc) {
-            acc = {
-              anomalySteps: 0,
-              anomalyCount: 0,
-              anomalyDangerCount: 0,
-              anomalyTotalDelaySec: 0,
-              anomalyByKind: {},
-            };
-            stepAnomalyByGroup.set(gk, acc);
-          }
-          acc.anomalySteps += 1;
-          acc.anomalyCount += Number(a.count) || 0;
-          if (a.severity === 'danger') acc.anomalyDangerCount += 1;
-          acc.anomalyTotalDelaySec += Number(a.totalDelaySec) || 0;
-          if (a.kinds && typeof a.kinds === 'object') {
-            for (const [k, cnt] of Object.entries(a.kinds)) {
-              const n = Math.max(0, Number(cnt || 0));
-              if (n > 0) acc.anomalyByKind[k] = (acc.anomalyByKind[k] || 0) + n;
-            }
-          }
-        }
-      }
-      const resolveEffectiveAnomalyModel = (m) => {
-        if (Number(m?.anomalyCount) > 0 || !stepAnomalyByGroup) return m;
-        const gk = getStepModelGroupKey(m);
-        const groupKeys =
-          Array.isArray(m.sourceLabels) && m.sourceLabels.length > 0
-            ? Array.from(new Set(m.sourceLabels.map((lbl) => getStepModelGroupKey({ label: lbl }))))
-            : [gk];
-        let anomalySteps = 0;
-        let anomalyCount = 0;
-        let anomalyDangerCount = 0;
-        let anomalyTotalDelaySec = 0;
-        const anomalyByKind = {};
-        for (const key of groupKeys) {
-          const hit = stepAnomalyByGroup.get(key);
-          if (!hit) continue;
-          anomalySteps += hit.anomalySteps;
-          anomalyCount += hit.anomalyCount;
-          anomalyDangerCount += hit.anomalyDangerCount;
-          anomalyTotalDelaySec += hit.anomalyTotalDelaySec;
-          for (const [k, cnt] of Object.entries(hit.anomalyByKind)) {
-            anomalyByKind[k] = (anomalyByKind[k] || 0) + cnt;
-          }
-        }
-        if (anomalyCount <= 0) return m;
-        return {
-          ...m,
-          anomalySteps,
-          anomalyCount,
-          anomalyDangerCount,
-          anomalyTotalDelaySec: +anomalyTotalDelaySec.toFixed(1),
-          anomalyByKind,
-        };
-      };
-
-      let sumCalls = 0;
-      let sumTokens = 0;
-      let sumCost = 0;
-      let sumUnpriced = 0;
-      let sumAnomalyCount = 0;
-      let sumAnomalySteps = 0;
-      const sumAnomalyByKind = {};
-      const effectiveAnomalyModels = new Map();
-      for (const m of displayModels) {
-        sumCalls += Math.max(0, Number(m.calls || 0));
-        sumTokens += Math.max(0, Number(m.totalTokens || 0));
-        sumUnpriced += Math.max(0, Number(m.unpricedCalls || 0));
-        if (Number.isFinite(Number(m.costUsd))) {
-          sumCost += Math.max(0, Number(m.costUsd));
-        }
-        const effM = resolveEffectiveAnomalyModel(m);
-        effectiveAnomalyModels.set(m, effM);
-        const anomSum = resolveModelAnomalySummary(effM);
-        if (anomSum) {
-          sumAnomalyCount += anomSum.count;
-          sumAnomalySteps += anomSum.steps;
-          for (const [k, v] of anomSum.entries) {
-            sumAnomalyByKind[k] = (sumAnomalyByKind[k] || 0) + v;
-          }
-        }
-      }
-
-      if (sumAnomalyCount > 0) {
-        patchAttr(modelsAnomalyStripEl, 'hidden', false);
-        const sortedKinds = Object.entries(sumAnomalyByKind)
-          .filter(([, v]) => v > 0)
-          .sort((a, b) => b[1] - a[1]);
-        const hasDangerKind = sortedKinds.some(
-          ([kind]) => kind === 'rate_limit' || kind === 'auth_or_model'
-        );
-        patchClasses(modelsAnomalyStripEl, { 'has-danger': hasDangerKind });
-        const stripSig = `${locale}:${sumAnomalyCount}:${sumAnomalySteps}:${sortedKinds.map(([k, v]) => `${k}=${v}`).join(',')}`;
-        if (stripSig !== lastAnomalyStripSig) {
-          lastAnomalyStripSig = stripSig;
-          patchText(
-            modelsAnomalyMetaEl,
-            t('steps.anomalySummaryMeta', { count: sumAnomalyCount, steps: sumAnomalySteps })
-          );
-          while (modelsAnomalyTagsEl.firstChild) {
-            modelsAnomalyTagsEl.removeChild(modelsAnomalyTagsEl.firstChild);
-          }
-          for (const [kind, cnt] of sortedKinds) {
-            const isDanger = kind === 'rate_limit' || kind === 'auth_or_model';
-            const btn = h('button', {
-              type: 'button',
-              className: `step-anomaly-tag smodel-anomaly-tag text-mono${isDanger ? ' is-danger' : ''}`,
-              text: formatAnomalyTagText(kind, cnt),
-              title: `${formatAnomalyKindLabel(kind)} · ${t('steps.anomalyModelClickHint')}`,
-              onclick: () => {
-                hideAnomalyTip();
-                selectedTableModels = ['__all__'];
-                onlyAnomalies = true;
-                anomalyKindFilter = kind;
-                uiStore.setState({ stepsSubTab: 'steps' });
-              },
-            });
-            modelsAnomalyTagsEl.appendChild(btn);
-          }
-        }
-      } else {
-        lastAnomalyStripSig = '';
-        patchAttr(modelsAnomalyStripEl, 'hidden', true);
-      }
-
-      if (displayModels.length === 0) {
-        patchText(modelsSummaryMeta, t('cons.callsCount', { calls: 0 }));
-      } else {
-        const modelCountPart =
-          displayModels.length > 1
-            ? t('steps.modelsSummaryPrefix', { count: displayModels.length })
-            : '';
-        const isAllUnpricedSum = sumCalls > 0 && sumUnpriced >= sumCalls && !(sumCost > 0);
-        patchText(
-          modelsSummaryMeta,
-          `${modelCountPart}${t('cons.callsCount', { calls: sumCalls })} · ${formatTokens(sumTokens)} · ${formatUsd(
-            isAllUnpricedSum ? null : sumCost,
-            {
-              precise: sumCost > 0 && sumCost < 0.1,
-            }
-          )}`
-        );
-      }
-      patchAttr(modelsEmptyEl, 'hidden', displayModels.length > 0);
-      patchAttr(modelsListEl, 'hidden', displayModels.length === 0);
-
-      const isFitPooledAll = effectiveFitModelKeys.includes('__all__');
-      const fitActiveKeySet = new Set(isFitPooledAll ? [] : effectiveFitModelKeys);
-
-      patchKeyedList(modelsListEl, displayModels, {
-        keyFn: (m) => m.displayText || m.label || m.shortName,
-        sigFn: (m) => {
-          const gk = getStepModelGroupKey(m);
-          const fbTtft = stepTtftFallbackMap.get(gk);
-          const avgTtft =
-            m.avgTtftSec != null
-              ? m.avgTtftSec
-              : fbTtft && fbTtft.count > 0
-                ? +(fbTtft.sum / fbTtft.count).toFixed(1)
-                : null;
-          const cardGroupKeys =
-            Array.isArray(m.sourceLabels) && m.sourceLabels.length > 0
-              ? m.sourceLabels.map((lbl) => getStepModelGroupKey({ label: lbl }))
-              : [gk];
-          const isActiveFit =
-            hasMultipleModels && cardGroupKeys.some((k) => fitActiveKeySet.has(k));
-          const effM = effectiveAnomalyModels.get(m) || m;
-          const anomSum = resolveModelAnomalySummary(effM);
-          const anomSig = anomSum
-            ? `${anomSum.count}:${anomSum.steps}:${anomSum.primaryKind}:${anomSum.severity}:${anomSum.totalDelaySec}`
-            : '';
-          return `${locale}:${m.displayText}:${m.displayTitle}:${m.calls}:${sumCalls}:${sumTokens}:${displayModels.length}:${m.avgTokPerSec}:${avgTtft}:${m.cacheHitPct}:${m.inputTokens}:${m.cacheReadTokens}:${m.thinkingTokens}:${m.responseTokens}:${m.totalTokens}:${m.costUsd}:${m.unpricedCalls}:${isActiveFit}:${hasMultipleModels}:${anomSig}`;
-        },
-        createRow: () => {
-          const nameEl = h('strong', { className: 'cons-row-title-text smodel-name' });
-          const anomalyTagEl = h('span', {
-            className: 'step-anomaly-tag smodel-anomaly-tag text-mono',
-            title: '',
-            hidden: true,
-          });
-          const titleWrapEl = h('strong', { className: 'cons-row-title smodel-ident' }, [
-            nameEl,
-            anomalyTagEl,
-          ]);
-          const pctBadgeEl = h('span', { className: 'cons-share-pill text-mono', text: '0%' });
-          const tokEl = h('span', { className: 'cons-row-tok smodel-tok text-mono' });
-          const costEl = h('strong', { className: 'cons-row-cost smodel-cost text-mono' });
-          const segBar = createFourSegmentBar();
-          segBar.el.classList.add('smodel-seg-bar');
-
-          const inLbl = h('span', { text: t('cons.footInput') });
-          const cacheLbl = h('span', { text: t('cons.footCache') });
-          const thinkLbl = h('span', { text: t('cons.footThinking') });
-          const outLbl = h('span', { text: t('cons.footOutput') });
-          const callsLbl = h('span', { text: t('cons.footCalls') });
-          const inVal = h('strong', { className: 'text-mono' });
-          const cacheVal = h('strong', { className: 'text-mono' });
-          const thinkVal = h('strong', { className: 'text-mono' });
-          const outVal = h('strong', { className: 'text-mono' });
-          const callsVal = h('strong', { className: 'text-mono' });
-          const footEl = h('div', { className: 'cons-item-foot smodel-foot' }, [
-            h('span', { className: 'legend-left' }, [
-              h('span', { className: 'dot-swatch seg-input' }),
-              inLbl,
-              inVal,
-            ]),
-            h('span', { className: 'legend-left' }, [
-              h('span', { className: 'dot-swatch seg-cached' }),
-              cacheLbl,
-              cacheVal,
-            ]),
-            h('span', { className: 'legend-left' }, [
-              h('span', { className: 'dot-swatch seg-thinking' }),
-              thinkLbl,
-              thinkVal,
-            ]),
-            h('span', { className: 'legend-left' }, [
-              h('span', { className: 'dot-swatch seg-output' }),
-              outLbl,
-              outVal,
-            ]),
-            h('span', { className: 'legend-left' }, [callsLbl, callsVal]),
-          ]);
-          const perfEl = h('span', { className: 'cons-model-perf-main smodel-perf text-mono' });
-          const unitCostEl = h('span', {
-            className: 'cons-model-unit-cost smodel-unit-cost text-mono',
-            hidden: true,
-          });
-          const perfFootEl = h('div', { className: 'cons-model-perf-foot smodel-perf-foot' }, [
-            perfEl,
-            unitCostEl,
-          ]);
-
-          const cardEl = h('div', { className: 'cons-item-row smodel-card' }, [
-            h('div', { className: 'panel-header smodel-head' }, [
-              titleWrapEl,
-              h('span', { className: 'cons-row-metrics smodel-totals' }, [
-                pctBadgeEl,
-                tokEl,
-                costEl,
-              ]),
-            ]),
-            segBar.el,
-            footEl,
-            perfFootEl,
-          ]);
-
-          return {
-            el: cardEl,
-            refs: {
-              nameEl,
-              pctBadgeEl,
-              anomalyTagEl,
-              tokEl,
-              costEl,
-              segBar,
-              perfEl,
-              unitCostEl,
-              inLbl,
-              cacheLbl,
-              thinkLbl,
-              outLbl,
-              callsLbl,
-              inVal,
-              cacheVal,
-              thinkVal,
-              outVal,
-              callsVal,
-              cardTitle: '',
-              isHoveringAnomaly: false,
-            },
-          };
-        },
-        updateRow: (refs, m, _idx, cardEl) => {
-          const gk = getStepModelGroupKey(m);
-          const cardGroupKeys =
-            Array.isArray(m.sourceLabels) && m.sourceLabels.length > 0
-              ? Array.from(
-                  new Set(m.sourceLabels.map((lbl) => getStepModelGroupKey({ label: lbl })))
-                )
-              : [gk];
-          const dispText = m.displayText || '—';
-          const dispTitle = m.displayTitle || dispText;
-          patchText(refs.nameEl, dispText);
-          patchAttr(refs.nameEl, 'title', dispTitle);
-
-          const calls = Math.max(0, Number(m.calls || 0));
-
-          const effM = effectiveAnomalyModels.get(m) || m;
-          const anomSum = resolveModelAnomalySummary(effM);
-          patchAttr(refs.anomalyTagEl, 'hidden', !anomSum);
-          if (anomSum) {
-            patchText(refs.anomalyTagEl, anomSum.tagText);
-            patchClasses(refs.anomalyTagEl, { 'is-danger': anomSum.severity === 'danger' });
-            patchAttr(refs.anomalyTagEl, 'title', '');
-            refs.anomalyTagEl.onmouseenter = () => {
-              refs.isHoveringAnomaly = true;
-              patchAttr(cardEl, 'title', null);
-              showAnomalyTip(refs.anomalyTagEl, buildModelAnomalyDiagnostic(effM));
-            };
-            refs.anomalyTagEl.onmouseleave = () => {
-              refs.isHoveringAnomaly = false;
-              patchAttr(cardEl, 'title', refs.cardTitle || null);
-              hideAnomalyTip();
-            };
-            refs.anomalyTagEl.onclick = (e) => {
-              e?.stopPropagation?.();
-              refs.isHoveringAnomaly = false;
-              patchAttr(cardEl, 'title', refs.cardTitle || null);
-              hideAnomalyTip();
-              selectedTableModels = hasMultipleModels ? [...cardGroupKeys] : ['__all__'];
-              onlyAnomalies = true;
-              anomalyKindFilter = '';
-              uiStore.setState({ stepsSubTab: 'steps' });
-            };
-          } else {
-            refs.isHoveringAnomaly = false;
-            refs.anomalyTagEl.onmouseenter = null;
-            refs.anomalyTagEl.onmouseleave = null;
-            refs.anomalyTagEl.onclick = null;
-          }
-
-          const inTok = Math.max(0, Number(m.inputTokens || 0));
-          const cacheTok = Math.max(0, Number(m.cacheReadTokens || 0));
-          const outTok = Math.max(0, Number(m.outputTokens || 0));
-          const thinkTok = Math.max(0, Number(m.thinkingTokens || 0));
-          const respTok =
-            m.responseTokens != null
-              ? Math.max(0, Number(m.responseTokens))
-              : Math.max(0, outTok - thinkTok);
-
-          const modelTok = Math.max(0, Number(m.totalTokens || 0));
-          const tokSharePct =
-            sumTokens > 0 ? (modelTok / sumTokens) * 100 : sumCalls > 0 ? (calls / sumCalls) * 100 : 0;
-          patchText(refs.pctBadgeEl, formatPctNumber(tokSharePct, { withSymbol: true }));
-          patchText(refs.tokEl, formatTokensPrecise(modelTok));
-          const costNum = Number(m.costUsd || 0);
-          const isAllUnpriced =
-            calls > 0 && Number(m.unpricedCalls || 0) >= calls && !(costNum > 0);
-          patchText(
-            refs.costEl,
-            formatUsd(isAllUnpriced ? null : costNum, { precise: costNum > 0 && costNum < 0.1 })
-          );
-
-          const scaleRatio =
-            displayModels.length > 1 && sumTokens > 0 && modelTok > 0
-              ? Math.min(1, Math.max(0.008, modelTok / sumTokens))
-              : 1;
-          refs.segBar.update({
-            inputTokens: inTok,
-            cacheReadTokens: cacheTok,
-            responseTokens: respTok,
-            thinkingTokens: thinkTok,
-            scaleRatio,
-          });
-
-          const fbTtft = stepTtftFallbackMap.get(gk);
-          const resolvedAvgTtft =
-            m.avgTtftSec != null
-              ? Number(m.avgTtftSec)
-              : fbTtft && fbTtft.count > 0
-                ? fbTtft.sum / fbTtft.count
-                : null;
-          const promptTok = inTok + cacheTok;
-          const resolvedCachePct =
-            m.cacheHitPct != null
-              ? Number(m.cacheHitPct)
-              : promptTok > 0
-                ? +((cacheTok / promptTok) * 100).toFixed(1)
-                : 0;
-
-          patchText(refs.inLbl, t('cons.footInput'));
-          patchText(refs.cacheLbl, t('cons.footCache'));
-          patchText(refs.thinkLbl, t('cons.footThinking'));
-          patchText(refs.outLbl, t('cons.footOutput'));
-          patchText(refs.callsLbl, t('cons.footCalls'));
-          patchText(refs.inVal, formatTokensPrecise(inTok));
-          patchText(refs.cacheVal, formatTokensPrecise(cacheTok));
-          patchText(refs.thinkVal, formatTokensPrecise(thinkTok));
-          patchText(refs.outVal, formatTokensPrecise(respTok));
-          patchText(refs.callsVal, String(calls));
-
-          patchText(
-            refs.perfEl,
-            t('steps.modelPerfFoot', {
-              tps: formatSpeedMetric(m.avgTokPerSec, ' tok/s'),
-              ttft: formatMetric(resolvedAvgTtft, 's'),
-              cache: resolvedCachePct,
-            })
-          );
-          const effCostPer1M =
-            !isAllUnpriced && costNum > 0 && modelTok >= 1000
-              ? costNum / (modelTok / 1_000_000)
-              : null;
-          patchAttr(refs.unitCostEl, 'hidden', effCostPer1M === null);
-          patchText(
-            refs.unitCostEl,
-            effCostPer1M !== null
-              ? t('cons.modelUnitCost', {
-                  cost: formatUsd(effCostPer1M, { precise: effCostPer1M < 0.1 }),
-                })
-              : ''
-          );
-
-          const isActiveFit =
-            hasMultipleModels && cardGroupKeys.some((k) => fitActiveKeySet.has(k));
-          patchClasses(cardEl, { 'is-fit-active': isActiveFit });
-          refs.cardTitle = !hasMultipleModels
-            ? dispTitle
-            : isActiveFit
-              ? t('steps.fitActiveCardTitle', { title: dispTitle })
-              : t('steps.fitInactiveCardTitle', { text: dispText });
-          patchAttr(cardEl, 'title', refs.isHoveringAnomaly ? null : refs.cardTitle);
-          cardEl.onclick = (e) => {
-            if (!hasMultipleModels) return;
-            if (e && (e.ctrlKey || e.metaKey || e.shiftKey) && !isFitPooledAll) {
-              const cardSet = new Set(cardGroupKeys);
-              const next = isActiveFit
-                ? effectiveFitModelKeys.filter((k) => !cardSet.has(k))
-                : Array.from(new Set([...effectiveFitModelKeys, ...cardGroupKeys]));
-              fitLockedModelKeys = next.length > 0 ? next : [...cardGroupKeys];
-              fitUserPicked = true;
-              fitPinnedWhileVisible = true;
-              if (latestSlice) renderStepsData(latestSlice);
-              return;
-            }
-            const isAlreadySole =
-              !isFitPooledAll &&
-              effectiveFitModelKeys.length === cardGroupKeys.length &&
-              cardGroupKeys.every((k) => fitActiveKeySet.has(k));
-            if (!isAlreadySole || !fitUserPicked) {
-              fitLockedModelKeys = [...cardGroupKeys];
-              fitUserPicked = true;
-              fitPinnedWhileVisible = true;
-              if (latestSlice) renderStepsData(latestSlice);
-            }
-          };
-        },
-      });
-
-      modelsScroll.refresh();
-    }
-
-    const unsubUi = uiStore.subscribe(
-      (st) => st.stepsSubTab,
-      (tab) => {
-        hideTurnTip();
-        hideAnomalyTip();
-        subTabSwitch.setValue(tab);
-        patchAttr(anomalyFilterBarEl, 'hidden', tab !== 'steps' || !onlyAnomalies);
-        const toolbarAllowed = latestSlice?.showStepFilterToolbar === true;
-        patchAttr(
-          stepsFilterToolbarEl,
-          'hidden',
-          tab !== 'steps' || !toolbarAllowed || (currentTableSteps.length === 0 && !stepSearchQuery && !stepQuickChip)
-        );
-        stepsExportMenu.refs.setHidden(tab !== 'steps' || currentAllConvSteps.length === 0);
-        patchAttr(stepsScroll.el, 'hidden', tab !== 'steps');
-        patchAttr(modelsScroll.el, 'hidden', tab !== 'models');
-        if (getVisibleMonitorView() === 'steps' && latestSlice) {
-          renderStepsData(latestSlice);
-        } else if (tab === 'steps') {
-          refreshStepTableViewport();
-          stepsScroll.refresh();
-        } else {
-          modelsScroll.refresh();
-        }
-      }
-    );
-
-    const unsubTelemetry = telemetryStore.subscribe(
-      (st) => ({
-        activeConversation: st.telemetry?.activeConversation,
-        cascadeId: st.telemetry?.activeConversation?.cascadeId,
-        recentSteps: st.telemetry?.activeConversation?.recentSteps,
-        sessionModelBreakdown: st.telemetry?.activeConversation?.modelBreakdown,
-        modelDisplayMode: normalizeModelDisplayMode(
-          st.telemetry?.settings?.modelDisplayMode,
-          st.telemetry?.settings?.showUpstreamModel
-        ),
-        showUpstreamModel: Boolean(st.telemetry?.settings?.showUpstreamModel),
-        orchestratorIdMode: normalizeOrchestratorIdDisplayMode(
-          st.telemetry?.settings?.orchestratorIdMode
-        ),
-        showStepTurnRail: st.telemetry?.settings?.showStepTurnRail === true,
-        showStepAgentBadge: st.telemetry?.settings?.showStepAgentBadge !== false,
-        showStepSpeedColor: st.telemetry?.settings?.showStepSpeedColor === true,
-        showStepFilterToolbar: st.telemetry?.settings?.showStepFilterToolbar === true,
-        stepTokenComboFormat: normalizeClientStepTokenComboFormat(
-          st.telemetry?.settings?.stepTokenComboFormat
-        ),
-        stepTableColumns: st.telemetry?.settings?.stepTableColumns,
-        experimentalModernUi: resolveSettingsModernUi(st.telemetry?.settings),
-      }),
-      (slice) => {
-        latestSlice = slice;
-        if (getVisibleMonitorView() !== 'steps') {
-          if (!fitUserPicked) {
-            fitPinnedWhileVisible = false;
-          }
-          isDirty = true;
-          return;
-        }
-        isDirty = false;
-        renderStepsData(slice, {
-          allowNewRowFade: uiStore.getState().stepsSubTab === 'steps',
-        });
-      }
-    );
-
-    let prevScope = uiStore.getState().selectedAgentScope;
-    let prevActiveView = getVisibleMonitorView();
-
-    const unsubView = uiStore.subscribe(
-      (st) => ({
-        activeView: getVisibleMonitorView(st),
-        selectedAgentScope: st.selectedAgentScope,
-      }),
-      (uiSlice) => {
-        const scopeChanged = uiSlice.selectedAgentScope !== prevScope;
-        if (uiSlice.selectedAgentScope !== lastSyncedUiScope) {
-          lastSyncedUiScope = uiSlice.selectedAgentScope;
-          selectedAgentScopes = [uiSlice.selectedAgentScope || 'all'];
-        }
-        const viewEntered = uiSlice.activeView === 'steps' && prevActiveView !== 'steps';
-        prevScope = uiSlice.selectedAgentScope;
-        prevActiveView = uiSlice.activeView;
-        if (uiSlice.activeView !== 'steps') {
-          hideTurnTip();
-          hideAnomalyTip();
-          fitPinnedWhileVisible = false;
-          if (scopeChanged) isDirty = true;
-          return;
-        }
-        if ((isDirty || scopeChanged || viewEntered) && latestSlice) {
-          isDirty = false;
-          renderStepsData(latestSlice);
-        }
-      }
-    );
-
-    const unsubI18n = i18nStore.subscribe(
-      (st) => st.locale,
-      () => {
-        refreshStaticLocaleLabels();
-        if (getVisibleMonitorView() === 'steps' && latestSlice) {
-          renderStepsData(latestSlice);
-        } else {
-          isDirty = true;
-        }
-      }
-    );
-
-    onCleanup(() => {
-      stepsExportMenu.destroy();
-      modelsAnalyticsPane.removeEventListener('scroll', onModelsPaneScroll);
-      unsubUi();
-      unsubTelemetry();
-      unsubView();
-      unsubI18n();
-      stepTableWidget.destroy();
-      sessionLineChart.destroy?.();
-      modelFitChart.destroy?.();
-      inlineScopeSelect.destroy();
-      stepsModelSelect.destroy();
-      subTabSwitch.destroy();
-      lineModelSelect.destroy();
-      lineMetricSwitch.destroy();
-      fitModelSelect.destroy();
-      fitMetricSwitch.destroy();
-      stepsScroll.destroy();
-      modelsScroll.destroy();
-    });
-
-    return {
-      el: rootEl,
-      refs: {
-        stepsTableEl,
-        stepsTheadRow,
-        stepsTbody,
-        turnTipEl,
-        anomalyTipEl,
-        anomalyFilterBarEl,
-        stepsFilterToolbarEl,
-        stepSearchInput,
-        stepQuickChipsEl,
-        stepsExportMenu,
-        modelsAnomalyStripEl,
-        modelsListEl,
-        inlineScopeSelect,
-        stepsModelSelect,
-        subTabSwitch,
-        lineModelSelect,
-        lineMetricSwitch,
-        fitModelSelect,
-        fitMetricSwitch,
-        stepsScroll,
-        modelsScroll,
-        refreshStepTableViewport,
-      },
-    };
-  },
-});
-return { mergeSelectedAgentUnits, StepsDetailView };
-})();
-
 // --- src/views/SettingsView.js ---
 const { SHOW_ACCOUNT_TAB, SettingsView } = (() => {
 /**
- * @fileoverview View 4: Modular preferences ("常规" / "结构" / "账号" / "其他").
- * Orchestrates the four preference tabs
- * with top sub-navigation and a shared `CustomScrollbar` viewport.
+ * @fileoverview View 3: Streamlined Preferences (single-page layout).
+ * Consolidates essential appearance, display, mount, and maintenance controls
+ * without account/quota management clutter.
  */
 
 
-const SHOW_ACCOUNT_TAB = true;
+const SHOW_ACCOUNT_TAB = false;
 
-function getSettingsSubTabOptions() {
+function getLanguageOptions() {
   return [
-    { value: 'general', label: t('settings.subTab.general') },
-    { value: 'structure', label: t('settings.subTab.structure') },
-    ...(SHOW_ACCOUNT_TAB ? [{ value: 'account', label: t('settings.subTab.account') }] : []),
-    { value: 'other', label: t('settings.subTab.other') },
+    { value: 'auto', label: t('settings.gen.langAuto') },
+    { value: 'zh-CN', label: t('settings.gen.langZh') },
+    { value: 'en-US', label: t('settings.gen.langEn') },
+  ];
+}
+
+function getFontScaleOptions() {
+  return [
+    { value: 'sm', label: t('settings.gen.fontSm') },
+    { value: 'md', label: t('settings.gen.fontMd') },
+    { value: 'lg', label: t('settings.gen.fontLg') },
+    { value: 'xl', label: t('settings.gen.fontXl') },
+  ];
+}
+
+function getStepModelDisplayOptions() {
+  return [
+    { value: 'short', label: t('settings.oth.modelShort') },
+    { value: 'upstream', label: t('settings.oth.modelUpstream') },
+    { value: 'upstream_compact', label: t('settings.oth.modelUpstreamCompact') },
+  ];
+}
+
+function getMountModeOptions() {
+  return [
+    { value: 'dual', label: t('settings.str.mountDual') },
+    { value: 'composer', label: t('settings.str.mountComposer') },
+    { value: 'sidebar', label: t('settings.str.mountSidebar') },
   ];
 }
 
 const SettingsView = defineComponent({
   name: 'SettingsView',
   setup({ onCleanup }) {
-    const initialSubTab = uiStore.getState().settingsSubTab || 'general';
-
-    const subNavSwitch = SegmentedControl({
-      ariaLabel: t('settings.subTab.aria'),
-      modelValue: initialSubTab,
-      options: getSettingsSubTabOptions(),
-      onUpdateModelValue: (nextSubTab) => {
-        uiStore.setState({ settingsSubTab: nextSubTab }, { sync: true });
-      },
-    });
-
-    const subNavBar = h('div', { className: 'settings-subnav-bar' }, [subNavSwitch.el]);
-
     let viewScrollbar = null;
     const refreshScroll = () => {
       if (viewScrollbar) {
@@ -40488,170 +25381,530 @@ const SettingsView = defineComponent({
       }
     };
 
-    const generalTab = SettingsGeneralTab({ onLayoutChange: refreshScroll });
-    const structureTab = SettingsStructureTab({ onLayoutChange: refreshScroll });
-    const accountTab = SettingsAccountTab({ onLayoutChange: refreshScroll });
-    const otherTab = SettingsOtherTab({ onLayoutChange: refreshScroll });
+    // --- 常规精简页状态与回调 ---
+    let draftLanguage = 'auto';
+    let draftThemeAccent = 'host';
+    let draftFontScale = 'md';
+    let draftModelDisplayMode = 'short';
+    let draftWindowMountMode = 'dual';
+    let latestSettings = null;
+    let latestCloudStatus = null;
+    let displayTimer = null;
+    let displaySaveSeq = 0;
+    let maintTimer = null;
+    let resetConfirmTimer = null;
+    let resetConfirmArmed = false;
+    let isRebuilding = false;
+    let isResetting = false;
 
-    let showingAccount = false;
-    let preloadedAccountOnce = false;
-    function applyActiveSubTab(subTab, activeView) {
-      const target =
-        subTab === 'structure' ||
-        subTab === 'other' ||
-        (accountTab && subTab === 'account')
-          ? subTab
-          : 'general';
-      subNavSwitch.setValue(target);
-      patchAttr(generalTab.el, 'hidden', target !== 'general');
-      patchAttr(structureTab.el, 'hidden', target !== 'structure');
-      patchAttr(structureTab.refs.thirdNavBar, 'hidden', target !== 'structure');
-      patchAttr(otherTab.el, 'hidden', target !== 'other');
-      if (accountTab) {
-        patchAttr(accountTab.el, 'hidden', target !== 'account');
-        if (activeView === 'settings' && !preloadedAccountOnce) {
-          preloadedAccountOnce = true;
-          void accountTab.refs.preload?.();
-        }
-        const nextShowingAccount = target === 'account' && activeView === 'settings';
-        if (nextShowingAccount && !showingAccount) void accountTab.refs.load();
-        showingAccount = nextShowingAccount;
+    const displayStatusText = h('span', {
+      className: 'text-muted',
+      style: 'font-size: var(--fs-md);',
+      text: '',
+    });
+    const maintStatusText = h('span', {
+      className: 'text-muted settings-panel-status',
+      text: '',
+    });
+
+    function showDisplayFeedback(text, autoClearMs = 1500) {
+      if (displayTimer) {
+        clearTimeout(displayTimer);
+        displayTimer = null;
       }
-      refreshScroll();
+      patchText(displayStatusText, text);
+      if (text && autoClearMs > 0) {
+        displayTimer = setTimeout(() => {
+          displayTimer = null;
+          patchText(displayStatusText, '');
+        }, autoClearMs);
+      }
     }
 
-    const contentContainer = h(
-      'div',
-      {},
-      accountTab
-        ? [generalTab.el, structureTab.el, accountTab.el, otherTab.el]
-        : [generalTab.el, structureTab.el, otherTab.el]
+    function showMaintFeedback(text, autoClearMs = 2500) {
+      if (maintTimer) {
+        clearTimeout(maintTimer);
+        maintTimer = null;
+      }
+      patchText(maintStatusText, text);
+      patchAttr(maintStatusText, 'title', text || null);
+      if (text && autoClearMs > 0) {
+        maintTimer = setTimeout(() => {
+          maintTimer = null;
+          patchText(maintStatusText, '');
+          patchAttr(maintStatusText, 'title', null);
+        }, autoClearMs);
+      }
+    }
+
+    async function persistQuickPatch(patchObj) {
+      const token = ++displaySaveSeq;
+      showDisplayFeedback(t('settings.saving'), 0);
+      try {
+        await saveSettingsPatch(patchObj);
+        if (token === displaySaveSeq) {
+          showDisplayFeedback(t('settings.saved'), 1500);
+        }
+      } catch {
+        if (latestSettings) renderGeneralSettings(latestSettings);
+        if (token === displaySaveSeq) {
+          showDisplayFeedback(t('settings.saveFailed'), 2500);
+        }
+      }
+    }
+
+    // Card 1: 外观与显示 (语言、主题色、字号、模型名显示、挂载位置)
+    const appearanceTitleEl = h('span', { text: t('settings.simple.appearanceTitle') });
+    const langLabelEl = h('span', { className: 'form-label', text: t('settings.gen.language') });
+    const accentLabelEl = h('span', { className: 'form-label', text: t('settings.gen.themeAccent') });
+    const fontLabelEl = h('span', { className: 'form-label', text: t('settings.gen.fontScale') });
+    const modelFormatLabelEl = h('span', { className: 'form-label', text: t('settings.oth.modelFormat') });
+    const mountModeLabelEl = h('span', { className: 'form-label', text: t('settings.str.mountMode') });
+
+    const languageSwitch = SegmentedControl({
+      ariaLabel: t('settings.gen.language'),
+      modelValue: draftLanguage,
+      options: getLanguageOptions(),
+      onUpdateModelValue: (val) => {
+        const nextLang = normalizeI18nLanguage(val);
+        draftLanguage = nextLang;
+        setI18nLanguage(nextLang);
+        languageSwitch.setValue(nextLang);
+        void persistQuickPatch({ language: nextLang });
+      },
+    });
+
+    const themeColorPicker = ThemeColorPicker({
+      modelValue: draftThemeAccent,
+      onUpdateModelValue: (val) => {
+        const nextAccent = normalizeClientThemeAccent(val);
+        draftThemeAccent = nextAccent;
+        themeColorPicker.refs.setValue(nextAccent);
+        void persistQuickPatch({ themeAccent: nextAccent });
+      },
+    });
+
+    const fontScaleSwitch = SegmentedControl({
+      ariaLabel: t('settings.gen.fontScale'),
+      modelValue: draftFontScale,
+      options: getFontScaleOptions(),
+      onUpdateModelValue: (val) => {
+        const nextScale = normalizeClientFontScale(val);
+        draftFontScale = nextScale;
+        fontScaleSwitch.setValue(nextScale);
+        refreshScroll();
+        void persistQuickPatch({ fontScale: nextScale });
+      },
+    });
+
+    const stepModelSelect = CustomSelect({
+      modelValue: draftModelDisplayMode,
+      icon: 'table',
+      options: getStepModelDisplayOptions(),
+      onUpdateModelValue: (val) => {
+        const nextMode = normalizeClientModelDisplayMode(val);
+        draftModelDisplayMode = nextMode;
+        stepModelSelect.setValue(nextMode);
+        void persistQuickPatch({
+          modelDisplayMode: nextMode,
+          showUpstreamModel: nextMode !== 'short',
+        });
+      },
+    });
+
+    const windowMountSelect = CustomSelect({
+      modelValue: draftWindowMountMode,
+      icon: 'dock',
+      options: getMountModeOptions(),
+      onUpdateModelValue: (val) => {
+        const nextMode = normalizeClientWindowMountMode(val);
+        draftWindowMountMode = nextMode;
+        windowMountSelect.setValue(nextMode);
+        refreshScroll();
+        void persistQuickPatch({
+          windowMountMode: nextMode,
+          enableWindowOverlay: nextMode !== 'sidebar',
+        });
+      },
+    });
+
+    const appearancePanel = h('section', { className: 'panel' }, [
+      h('div', { className: 'panel-header' }, [
+        h('span', { className: 'panel-title' }, [
+          createSvgIcon('sliders', { size: 13 }),
+          appearanceTitleEl,
+        ]),
+        displayStatusText,
+      ]),
+      h('div', { className: 'form-row' }, [langLabelEl, languageSwitch.el]),
+      h('div', { className: 'form-row' }, [accentLabelEl, themeColorPicker.el]),
+      h('div', { className: 'form-row' }, [fontLabelEl, fontScaleSwitch.el]),
+      h('div', { className: 'form-row' }, [modelFormatLabelEl, stepModelSelect.el]),
+      h('div', { className: 'form-row' }, [mountModeLabelEl, windowMountSelect.el]),
+    ]);
+
+    // Card 2: 数据与维护 (版本与价格同步 + 重建缓存 / 恢复默认)
+    const maintTitleEl = h('span', { text: t('settings.simple.maintTitle') });
+    const versionRowLabelEl = h('span', {
+      className: 'form-label',
+      text: t('settings.simple.versionRow'),
+    });
+    const versionTagEl = h('span', { className: 'text-mono text-secondary', text: 'v1.4.4' });
+
+    const syncPricingBtnText = h('span', { text: t('settings.gen.syncBtn') });
+    const syncPricingBtn = h(
+      'button',
+      {
+        type: 'button',
+        className: 'btn-secondary',
+        onClick: async () => {
+          patchAttr(syncPricingBtn, 'disabled', true);
+          patchText(syncPricingBtnText, t('settings.gen.syncingBtn'));
+          showMaintFeedback(t('settings.gen.syncingMsg'), 0);
+          try {
+            const res = await triggerCloudSync();
+            const cs = res?.cloudStatus;
+            if (res?.ok && cs) {
+              showMaintFeedback(t('settings.gen.syncedMsg', { count: cs.modelCount }), 3200);
+            } else {
+              showMaintFeedback(cs?.lastSyncError || t('settings.gen.syncFallbackMsg'), 4000);
+            }
+          } catch (err) {
+            showMaintFeedback(err?.message || t('settings.gen.syncFallbackMsg'), 4000);
+          } finally {
+            patchAttr(syncPricingBtn, 'disabled', false);
+            patchText(syncPricingBtnText, t('settings.gen.syncBtn'));
+          }
+        },
+      },
+      [createSvgIcon('refresh', { size: 12 }), syncPricingBtnText]
     );
+
+    const updatePluginBtnText = h('span', { text: t('settings.gen.checkUpdateBtn') });
+    const updatePluginBtn = h(
+      'button',
+      {
+        type: 'button',
+        className: 'btn-secondary',
+        onClick: async () => {
+          patchAttr(updatePluginBtn, 'disabled', true);
+          try {
+            if (!latestCloudStatus?.updateAvailable) {
+              patchText(updatePluginBtnText, t('settings.gen.checkingBtn'));
+              showMaintFeedback(t('settings.gen.checkingMsg'), 0);
+              const syncRes = await triggerCloudSync();
+              const cs = syncRes?.cloudStatus || latestCloudStatus;
+              if (cs) {
+                latestCloudStatus = cs;
+                renderCloudStatus(cs);
+              }
+              if (!syncRes?.ok && cs?.lastSyncError) {
+                showMaintFeedback(t('settings.gen.checkFailedMsg', { err: cs.lastSyncError }), 4500);
+                return;
+              }
+              if (!cs?.updateAvailable) {
+                const curVer = cs?.currentPluginVersion || '1.4.4';
+                showMaintFeedback(t('settings.gen.upToDateMsg', { ver: curVer }), 4000);
+                return;
+              }
+            }
+            patchText(updatePluginBtnText, t('capsule.updating'));
+            showMaintFeedback(t('settings.gen.downloadingMsg'), 0);
+            const res = await triggerPluginUpdate();
+            if (res?.cloudStatus) {
+              latestCloudStatus = res.cloudStatus;
+            }
+            if (res?.ok) {
+              showMaintFeedback(res.message || t('settings.gen.updatedRestartMsg'), 4500);
+            } else {
+              showMaintFeedback(res?.message || t('settings.gen.updateSkippedMsg'), 4500);
+            }
+          } catch (err) {
+            showMaintFeedback(err?.message || t('settings.gen.updateFailedMsg'), 4500);
+          } finally {
+            patchAttr(updatePluginBtn, 'disabled', false);
+            renderCloudStatus(latestCloudStatus);
+          }
+        },
+      },
+      [createSvgIcon('arrow-down', { size: 12 }), updatePluginBtnText]
+    );
+
+    const cacheLabelEl = h('span', {
+      className: 'form-label',
+      text: t('settings.oth.cacheLabel'),
+    });
+    const rebuildBtnText = h('span', { text: t('settings.oth.rebuildBtn') });
+    const rebuildCacheBtn = h(
+      'button',
+      {
+        type: 'button',
+        className: 'btn-secondary',
+        onClick: async () => {
+          if (isRebuilding) return;
+          isRebuilding = true;
+          patchAttr(rebuildCacheBtn, 'disabled', true);
+          patchText(rebuildBtnText, t('settings.oth.rebuildingBtn'));
+          showMaintFeedback(t('settings.oth.rebuildingBtn'), 0);
+          try {
+            const res = await rebuildTrajectoryCache();
+            showMaintFeedback(
+              res?.ok !== false ? t('settings.oth.rebuildDone') : t('settings.oth.rebuildFailed'),
+              2800
+            );
+          } catch {
+            showMaintFeedback(t('settings.oth.rebuildFailed'), 3000);
+          } finally {
+            isRebuilding = false;
+            patchAttr(rebuildCacheBtn, 'disabled', false);
+            patchText(rebuildBtnText, t('settings.oth.rebuildBtn'));
+          }
+        },
+      },
+      [createSvgIcon('refresh', { size: 12 }), rebuildBtnText]
+    );
+
+    const resetBtnText = h('span', { text: t('settings.oth.resetAllBtn') });
+    function disarmResetConfirm() {
+      resetConfirmArmed = false;
+      if (resetConfirmTimer) {
+        clearTimeout(resetConfirmTimer);
+        resetConfirmTimer = null;
+      }
+      patchClasses(resetAllBtn, { 'btn-danger-confirm': false });
+      if (!isResetting) {
+        patchText(resetBtnText, t('settings.oth.resetAllBtn'));
+      }
+    }
+
+    const resetAllBtn = h(
+      'button',
+      {
+        type: 'button',
+        className: 'btn-secondary',
+        onClick: async () => {
+          if (isResetting) return;
+          if (!resetConfirmArmed) {
+            resetConfirmArmed = true;
+            patchClasses(resetAllBtn, { 'btn-danger-confirm': true });
+            patchText(resetBtnText, t('settings.oth.resetConfirmBtn'));
+            if (resetConfirmTimer) clearTimeout(resetConfirmTimer);
+            resetConfirmTimer = setTimeout(() => {
+              disarmResetConfirm();
+            }, 3000);
+            return;
+          }
+          disarmResetConfirm();
+          isResetting = true;
+          patchAttr(resetAllBtn, 'disabled', true);
+          patchText(resetBtnText, t('settings.oth.resettingBtn'));
+          showMaintFeedback(t('settings.oth.resettingBtn'), 0);
+          try {
+            const res = await resetAllSettings();
+            setI18nLanguage(res?.settings?.language || 'auto');
+            showMaintFeedback(t('settings.oth.resetAllDone'), 2800);
+          } catch {
+            showMaintFeedback(t('settings.saveFailed'), 2800);
+          } finally {
+            isResetting = false;
+            patchAttr(resetAllBtn, 'disabled', false);
+            patchText(resetBtnText, t('settings.oth.resetAllBtn'));
+          }
+        },
+      },
+      [resetBtnText]
+    );
+
+    const maintPanel = h('section', { className: 'panel' }, [
+      h('div', { className: 'panel-header settings-panel-header' }, [
+        h('span', { className: 'panel-title' }, [
+          createSvgIcon('bolt', { size: 13 }),
+          maintTitleEl,
+        ]),
+        maintStatusText,
+      ]),
+      h('div', { className: 'form-row' }, [
+        versionRowLabelEl,
+        h('div', { className: 'settings-compact-actions' }, [
+          versionTagEl,
+          syncPricingBtn,
+          updatePluginBtn,
+        ]),
+      ]),
+      h('div', { className: 'form-row' }, [
+        cacheLabelEl,
+        h('div', { className: 'settings-compact-actions' }, [
+          rebuildCacheBtn,
+          resetAllBtn,
+        ]),
+      ]),
+    ]);
+
+    const generalPane = h('div', { className: 'settings-tab-stack' }, [
+      appearancePanel,
+      maintPanel,
+    ]);
+
+    function renderGeneralSettings(settings) {
+      if (!settings) return;
+      latestSettings = settings;
+      draftLanguage = normalizeI18nLanguage(settings.language);
+      draftThemeAccent = normalizeClientThemeAccent(settings.themeAccent);
+      draftFontScale = normalizeClientFontScale(settings.fontScale);
+      draftModelDisplayMode = normalizeClientModelDisplayMode(
+        settings.modelDisplayMode,
+        settings.showUpstreamModel
+      );
+      draftWindowMountMode = normalizeClientWindowMountMode(
+        settings.windowMountMode,
+        settings.enableWindowOverlay
+      );
+
+      languageSwitch.setProps({
+        modelValue: draftLanguage,
+        options: getLanguageOptions(),
+      });
+      themeColorPicker.refs.setValue(draftThemeAccent);
+      fontScaleSwitch.setProps({
+        modelValue: draftFontScale,
+        options: getFontScaleOptions(),
+      });
+      stepModelSelect.setProps({
+        modelValue: draftModelDisplayMode,
+        options: getStepModelDisplayOptions(),
+      });
+      windowMountSelect.setProps({
+        modelValue: draftWindowMountMode,
+        options: getMountModeOptions(),
+      });
+    }
+
+    function renderCloudStatus(cs) {
+      if (!cs) return;
+      latestCloudStatus = cs;
+      const curVer = cs.currentPluginVersion || '1.4.4';
+      const latVer = cs.latestPluginVersion || curVer;
+      patchText(versionTagEl, `v${curVer}`);
+      if (cs.updateAvailable) {
+        patchText(updatePluginBtnText, t('settings.gen.upgradeToBtn', { ver: latVer }));
+        patchClasses(updatePluginBtn, { 'btn-primary': true, 'btn-secondary': false });
+      } else {
+        patchText(updatePluginBtnText, t('settings.gen.checkUpdateBtn'));
+        patchClasses(updatePluginBtn, { 'btn-primary': false, 'btn-secondary': true });
+      }
+    }
+
+    function refreshGeneralLabels() {
+      patchText(appearanceTitleEl, t('settings.simple.appearanceTitle'));
+      patchText(langLabelEl, t('settings.gen.language'));
+      patchText(accentLabelEl, t('settings.gen.themeAccent'));
+      patchText(fontLabelEl, t('settings.gen.fontScale'));
+      patchText(modelFormatLabelEl, t('settings.oth.modelFormat'));
+      patchText(mountModeLabelEl, t('settings.str.mountMode'));
+      patchText(maintTitleEl, t('settings.simple.maintTitle'));
+      patchText(versionRowLabelEl, t('settings.simple.versionRow'));
+      patchText(cacheLabelEl, t('settings.oth.cacheLabel'));
+      if (!syncPricingBtn.hasAttribute('disabled')) {
+        patchText(syncPricingBtnText, t('settings.gen.syncBtn'));
+      }
+      if (!isRebuilding) {
+        patchText(rebuildBtnText, t('settings.oth.rebuildBtn'));
+      }
+      if (!isResetting) {
+        patchText(
+          resetBtnText,
+          resetConfirmArmed ? t('settings.oth.resetConfirmBtn') : t('settings.oth.resetAllBtn')
+        );
+      }
+      languageSwitch.setProps({
+        modelValue: draftLanguage,
+        options: getLanguageOptions(),
+      });
+      themeColorPicker.refs.refreshLabels();
+      fontScaleSwitch.setProps({
+        modelValue: draftFontScale,
+        options: getFontScaleOptions(),
+      });
+      stepModelSelect.setProps({
+        modelValue: draftModelDisplayMode,
+        options: getStepModelDisplayOptions(),
+      });
+      windowMountSelect.setProps({
+        modelValue: draftWindowMountMode,
+        options: getMountModeOptions(),
+      });
+      if (latestCloudStatus) {
+        renderCloudStatus(latestCloudStatus);
+      }
+    }
+
     viewScrollbar = CustomScrollbar({
-      contentEl: contentContainer,
+      contentEl: generalPane,
       className: 'view-pane',
     });
 
-    applyActiveSubTab(initialSubTab, uiStore.getState().activeView);
-
-    const rootEl = h('div', { className: 'settings-view-root' }, [
-      subNavBar,
-      structureTab.refs.thirdNavBar,
-      viewScrollbar.el,
-    ]);
+    const rootEl = h('div', { className: 'settings-view-root' }, [viewScrollbar.el]);
 
     function syncActiveTab() {
       const ui = uiStore.getState();
-      const { settingsSubTab } = ui;
       if (getVisibleMonitorView(ui) !== 'settings') return;
       const telemetry = telemetryStore.getState().telemetry;
-      const settings = telemetry?.settings;
-      if (accountTab) {
-        accountTab.refs.renderAccount(telemetry?.account, telemetry?.quotas, settings);
-      }
-      if (settingsSubTab === 'structure') {
-        if (settings) {
-          structureTab.refs.renderSettings(
-            settings,
-            telemetry?.windowBridge,
-            telemetry?.hostPlatform,
-            telemetry?.cliStatusLine,
-            telemetry?.quotas
-          );
-        }
-      } else if (settingsSubTab === 'other') {
-        if (settings) {
-          otherTab.refs.renderSettings(
-            settings,
-            telemetry.contextWindowModels || [],
-            telemetry?.windowBridge,
-            telemetry?.hostPlatform,
-            telemetry?.cloudCodeProxy
-          );
-        }
-      } else if (settingsSubTab !== 'account') {
-        if (settings) {
-          generalTab.refs.renderSettings(
-            settings,
-            telemetry?.windowBridge,
-            telemetry?.hostPlatform
-          );
-        }
-        void generalTab.refs.loadHostI18n?.(false);
-        if (telemetry?.cloudStatus) generalTab.refs.renderCloudStatus(telemetry.cloudStatus);
-      }
+      if (telemetry?.settings) renderGeneralSettings(telemetry.settings);
+      if (telemetry?.cloudStatus) renderCloudStatus(telemetry.cloudStatus);
       refreshScroll();
     }
+
+    syncActiveTab();
 
     const unsubTelemetry = telemetryStore.subscribe(
       (st) => ({
         settings: st.telemetry?.settings,
-        windowBridge: st.telemetry?.windowBridge,
-        cloudCodeProxy: st.telemetry?.cloudCodeProxy,
-        cliStatusLine: st.telemetry?.cliStatusLine,
-        hostPlatform: st.telemetry?.hostPlatform,
         cloudStatus: st.telemetry?.cloudStatus,
-        contextWindowModels: st.telemetry?.contextWindowModels,
-        account: st.telemetry?.account,
-        quotas: st.telemetry?.quotas,
       }),
       syncActiveTab
     );
 
     const unsubUi = uiStore.subscribe(
-      (st) => ({
-        activeView: getVisibleMonitorView(st),
-        settingsSubTab: st.settingsSubTab,
-      }),
-      (slice) => {
-        applyActiveSubTab(slice.settingsSubTab, slice.activeView);
-        syncActiveTab();
-      }
+      (st) => getVisibleMonitorView(st),
+      syncActiveTab
     );
 
     const unsubI18n = i18nStore.subscribe(
       (st) => st.locale,
       () => {
-        subNavSwitch.setProps({
-          modelValue: uiStore.getState().settingsSubTab || 'general',
-          options: getSettingsSubTabOptions(),
-        });
-        generalTab.refs.refreshLabels();
-        structureTab.refs.refreshLabels();
-        accountTab?.refs.refreshLabels();
-        otherTab.refs.refreshLabels();
+        refreshGeneralLabels();
         refreshScroll();
       }
     );
 
     onCleanup(() => {
+      if (displayTimer) clearTimeout(displayTimer);
+      if (maintTimer) clearTimeout(maintTimer);
+      if (resetConfirmTimer) clearTimeout(resetConfirmTimer);
       unsubTelemetry();
       unsubUi();
       unsubI18n();
-      subNavSwitch.destroy();
-      generalTab.destroy();
-      structureTab.destroy();
-      accountTab?.destroy();
-      otherTab.destroy();
+      languageSwitch.destroy();
+      themeColorPicker.destroy();
+      fontScaleSwitch.destroy();
+      stepModelSelect.destroy();
+      windowMountSelect.destroy();
       viewScrollbar.destroy();
     });
 
     return {
       el: rootEl,
       refs: {
-        subNavSwitch,
-        generalTab,
-        structureTab,
-        accountTab,
-        otherTab,
         viewScrollbar,
-        // Convenience aliases for external callers / tests
-        windowMountSelect: structureTab.refs.windowMountSelect,
-        multiSessionToggle: structureTab.refs.multiSessionToggle,
-        topbarSlotsList: structureTab.refs.topbarSlotsList,
-        stepModelSelect: otherTab.refs.stepModelSelect,
-        orchestratorIdSelect: otherTab.refs.orchestratorIdSelect,
-        autoUpdateSelect: generalTab.refs.autoUpdateSelect,
+        languageSwitch,
+        themeColorPicker,
+        fontScaleSwitch,
+        stepModelSelect,
+        windowMountSelect,
+        syncPricingBtn,
+        updatePluginBtn,
+        rebuildCacheBtn,
+        resetAllBtn,
       },
     };
   },
@@ -40671,8 +25924,7 @@ const { App } = (() => {
 const APP_VIEW_SHORTCUT_MAP = Object.freeze({
   1: 'overview',
   2: 'consumption',
-  3: 'steps',
-  4: 'settings',
+  3: 'settings',
 });
 
 function isEditableKeyTarget(e) {
@@ -40693,8 +25945,9 @@ const App = defineComponent({
   name: 'App',
   setup({ onCleanup }) {
     const sessionHeader = TopSessionHeader();
+    const initialActiveView = uiStore.getState().activeView;
     const topPillNav = TopLongPillNav({
-      modelValue: uiStore.getState().activeView,
+      modelValue: initialActiveView === 'steps' ? 'overview' : initialActiveView,
       items: getViewTabs(),
       onUpdateModelValue: (nextView) => {
         uiStore.setState({ activeView: nextView });
@@ -40703,7 +25956,7 @@ const App = defineComponent({
 
     const overviewView = LiveOverviewView();
     const consumptionView = ConsumptionView();
-    const stepsView = StepsDetailView();
+    const stepsView = overviewView.refs.stepsView;
     const settingsView = SettingsView();
 
     const globalBridgeNotice = BridgeStatusNotice({
@@ -40739,14 +25992,12 @@ const App = defineComponent({
     const viewMap = {
       overview: overviewView.el,
       consumption: consumptionView.el,
-      steps: stepsView.el,
       settings: settingsView.el,
     };
 
     const stageEl = h('div', { className: 'viewport-stage' }, [
       overviewView.el,
       consumptionView.el,
-      stepsView.el,
       settingsView.el,
     ]);
 
@@ -40896,43 +26147,29 @@ const App = defineComponent({
       ]
     );
 
-    function syncStepsBadge() {
-      const uiSt = uiStore.getState();
-      const scopeForBadge = uiSt.activeView === 'steps' ? uiSt.selectedAgentScope : 'all';
-      const { scopedConv } = resolveScopedConversation(
-        telemetryStore.getState().telemetry,
-        scopeForBadge,
-        uiSt.ctxInspectorAgentId
-      );
-      const stepCount = scopedConv?.stepCount ?? 0;
+    function syncNavTabs() {
       topPillNav.setProps({
-        items: getViewTabs().map((tabItem) =>
-          tabItem.value === 'steps'
-            ? { ...tabItem, badge: stepCount > 0 ? stepCount : '' }
-            : tabItem
-        ),
+        items: getViewTabs(),
       });
     }
 
     const unsubUi = uiStore.subscribe(
       (st) => st.activeView,
       (activeView) => {
-        topPillNav.setValue(activeView);
+        const targetView = activeView === 'steps' ? 'overview' : activeView;
+        topPillNav.setValue(targetView);
         for (const [key, paneEl] of Object.entries(viewMap)) {
-          patchAttr(paneEl, 'hidden', key !== activeView);
+          patchAttr(paneEl, 'hidden', key !== targetView);
         }
-        if (activeView === 'overview') {
+        if (targetView === 'overview') {
           overviewView.refs?.viewScrollbar?.refresh();
-        } else if (activeView === 'consumption') {
+          stepsView?.refs?.refreshStepTableViewport?.();
+          stepsView?.refs?.stepsScroll?.refresh();
+        } else if (targetView === 'consumption') {
           consumptionView.refs?.viewScrollbar?.refresh();
-        } else if (activeView === 'steps') {
-          stepsView.refs?.refreshStepTableViewport?.();
-          stepsView.refs?.stepsScroll?.refresh();
-          stepsView.refs?.modelsScroll?.refresh();
-        } else if (activeView === 'settings') {
+        } else if (targetView === 'settings') {
           settingsView.refs?.viewScrollbar?.refresh();
         }
-        syncStepsBadge();
         syncGlobalBridgeBanner();
       }
     );
@@ -40957,9 +26194,6 @@ const App = defineComponent({
 
     const unsubStepCount = telemetryStore.subscribe(
       (st) => ({
-        stepCount: st.telemetry?.activeConversation?.stepCount ?? 0,
-        totalStepsAllAgents: st.telemetry?.activeConversation?.totalStepsAllAgents ?? 0,
-        subagentCount: st.telemetry?.activeConversation?.subagentCount ?? 0,
         windowMountMode: st.telemetry?.settings?.windowMountMode,
         enableWindowOverlay: st.telemetry?.settings?.enableWindowOverlay,
         contextAgentMode: st.telemetry?.settings?.contextAgentMode,
@@ -40969,14 +26203,8 @@ const App = defineComponent({
       }),
       () => {
         syncContextAgentModeFromSettings(telemetryStore.getState().telemetry?.settings);
-        syncStepsBadge();
         syncGlobalBridgeBanner();
       }
-    );
-
-    const unsubScopeBadge = uiStore.subscribe(
-      (st) => st.selectedAgentScope,
-      () => syncStepsBadge()
     );
 
     const unsubToast = uiStore.subscribe(
@@ -40988,7 +26216,7 @@ const App = defineComponent({
     const unsubI18n = i18nStore.subscribe(
       (st) => st.locale,
       () => {
-        syncStepsBadge();
+        syncNavTabs();
         globalBridgeNotice.refs.refreshLabels();
         patchAttr(bannerSlotEl, 'hidden', globalBridgeNotice.el.hasAttribute('hidden'));
         patchAttr(toastCloseBtn, 'aria-label', t('export.closeToast'));
@@ -41000,7 +26228,6 @@ const App = defineComponent({
       clearToastTimer();
       unsubUi();
       unsubStepCount();
-      unsubScopeBadge();
       unsubToast();
       unsubI18n();
       globalBridgeNotice.destroy();
@@ -41008,7 +26235,6 @@ const App = defineComponent({
       topPillNav.destroy();
       overviewView.destroy();
       consumptionView.destroy();
-      stepsView.destroy();
       settingsView.destroy();
     });
 
@@ -41968,6 +27194,19 @@ const FLOATING_CARD_WIDTH = 522;
 const POPOVER_BASE_WIDTH = 540;
 const POPOVER_MAX_AUTO_WIDTH = 960;
 const MULTI_PANEL_WIDTH = 464;
+const LEGACY_TOPBAR_SLOTS_SIG = 'tps,ttft,context';
+const REALTIME_TOPBAR_SLOTS = Object.freeze(['tps', 'ttft', 'cache_hit', 'context']);
+
+function resolveEffectiveTopbarSlots(rawSlots) {
+  const normalized = normalizeClientTopbarSlots(rawSlots);
+  return normalized.join(',') === LEGACY_TOPBAR_SLOTS_SIG
+    ? [...REALTIME_TOPBAR_SLOTS]
+    : normalized;
+}
+
+function resolveEffectiveHoverModules(rawModules) {
+  return normalizeClientHoverModules(rawModules).filter((key) => key !== 'quotas');
+}
 
 
 function mountWindowOverlay() {
@@ -42411,7 +27650,7 @@ function mountWindowOverlay() {
     containerEl: hoverWidgetsContainer,
     mode: 'hover',
     isVisibleFn: () => Boolean(tooltipOpen && !disposed),
-    initialModuleKeys: DEFAULT_CLIENT_HOVER_MODULES,
+    initialModuleKeys: resolveEffectiveHoverModules(DEFAULT_CLIENT_HOVER_MODULES),
     getCtxAgentId: () =>
       resolveOverlayCtxInspectorAgentId(
         telemetryStore.getState().telemetry,
@@ -43152,7 +28391,7 @@ function mountWindowOverlay() {
       curTel?.settings?.autoUpdatePlugin
     );
     const hasUpdate = Boolean(curTel?.cloudStatus?.updateAvailable) && curUpdateMode !== 'off';
-    const slotCount = normalizeClientTopbarSlots(curTel?.settings?.topbarCapsuleSlots).length;
+    const slotCount = resolveEffectiveTopbarSlots(curTel?.settings?.topbarCapsuleSlots).length;
     const nextMode = computeCapsuleLayoutMode(avail, layoutMode, {
       showMulti,
       hasUpdate,
@@ -43311,16 +28550,15 @@ function mountWindowOverlay() {
   function refreshActiveViewScrollbars() {
     if (!appInstance) return;
     const activeView = uiStore.getState().activeView;
+    const targetView = activeView === 'steps' ? 'overview' : activeView;
     const refs = appInstance.refs;
-    if (activeView === 'overview') {
+    if (targetView === 'overview') {
       refs?.overviewView?.refs?.viewScrollbar?.refresh();
-    } else if (activeView === 'consumption') {
-      refs?.consumptionView?.refs?.viewScrollbar?.refresh();
-    } else if (activeView === 'steps') {
       refs?.stepsView?.refs?.refreshStepTableViewport?.();
       refs?.stepsView?.refs?.stepsScroll?.refresh();
-      refs?.stepsView?.refs?.modelsScroll?.refresh();
-    } else if (activeView === 'settings') {
+    } else if (targetView === 'consumption') {
+      refs?.consumptionView?.refs?.viewScrollbar?.refresh();
+    } else if (targetView === 'settings') {
       refs?.settingsView?.refs?.viewScrollbar?.refresh();
     }
   }
@@ -43361,7 +28599,7 @@ function mountWindowOverlay() {
 
   function canOpenHoverTooltip() {
     const curTel = telemetryStore.getState().telemetry;
-    const hoverMods = normalizeClientHoverModules(curTel?.settings?.hoverModules);
+    const hoverMods = resolveEffectiveHoverModules(curTel?.settings?.hoverModules);
     const curUpdateMode = normalizeClientUpdateMode(
       curTel?.settings?.pluginUpdateMode,
       curTel?.settings?.autoUpdatePlugin
@@ -43465,7 +28703,7 @@ function mountWindowOverlay() {
   function renderHoverWidgets() {
     const { telemetry, minuteTick } = telemetryStore.getState();
     hoverWidgetHost.update({
-      moduleKeys: normalizeClientHoverModules(telemetry?.settings?.hoverModules),
+      moduleKeys: resolveEffectiveHoverModules(telemetry?.settings?.hoverModules),
       data: telemetry,
       minuteTick: Number(minuteTick || Math.floor(Date.now() / 30000)),
     });
@@ -43489,7 +28727,7 @@ function mountWindowOverlay() {
       setMultiOpen(false);
     }
 
-    const slotKeys = normalizeClientTopbarSlots(telemetry?.settings?.topbarCapsuleSlots);
+    const slotKeys = resolveEffectiveTopbarSlots(telemetry?.settings?.topbarCapsuleSlots);
     const layoutInputsChanged =
       showMulti !== lastShowMulti || slotKeys.length !== lastSlotCount;
     if (layoutInputsChanged) {
@@ -43596,7 +28834,7 @@ function mountWindowOverlay() {
     }
 
     // --- 同步动态悬停组件宿主（0 项且无更新提示时自动关闭悬停窗，点击完整浮窗不受影响） ---
-    const hoverModuleKeys = normalizeClientHoverModules(telemetry.settings?.hoverModules);
+    const hoverModuleKeys = resolveEffectiveHoverModules(telemetry.settings?.hoverModules);
     patchAttr(hoverWidgetsContainer, 'hidden', hoverModuleKeys.length === 0);
     if (hoverModuleKeys.length === 0 && !showUpdatePrompt && tooltipOpen) {
       setTooltipOpen(false);

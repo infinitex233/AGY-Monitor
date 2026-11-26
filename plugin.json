@@ -1,9 +1,8 @@
 {
   "name": "usage-monitor",
-  "displayName": "Usage & Speed Monitor",
-  "version": "1.5.5",
-  "description": "实时查看生成速度、首字延迟、上下文占用、可用额度及历史用量。",
-  "logo": "assets/logo.svg",
+  "displayName": "AGY Monitor",
+  "version": "1.0.0",
+  "description": "实时查看生成速度、首字延迟、实时缓存命中、上下文占用及历史用量统计。",
   "suggestedPrompts": [
     "打开用量监控面板",
     "查看当前会话的 Token 消耗",

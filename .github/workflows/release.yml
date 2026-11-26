@@ -1,0 +1,35 @@
+name: Release AGY Monitor
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build, test, and pack release archive
+        working-directory: sidecars/panel
+        run: |
+          npm run build
+          npm test
+          npm run pack:release
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/usage-monitor.zip
+          generate_release_notes: true

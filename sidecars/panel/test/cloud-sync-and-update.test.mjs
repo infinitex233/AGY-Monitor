@@ -68,7 +68,7 @@ test('sanitizeCatalogPayload filters malformed/null/zero entries, untrusted URLs
   assert.ok(sanitized);
   assert.equal(sanitized.catalogVersion, '2026.11.03.9');
   assert.equal(sanitized.latestPluginVersion, '1.5.0');
-  assert.ok(sanitized.downloadUrl.startsWith('https://github.com/yuhuan-dev/'));
+  assert.ok(sanitized.downloadUrl.startsWith('https://github.com/infinitex233/'));
   assert.deepEqual(Object.keys(sanitized.pricing), ['gemini-4.5-ultra']);
   assert.equal(sanitized.pricing['gemini-4.5-ultra'].phases.length, 2);
   assert.equal(sanitized.pricing['gemini-4.5-ultra'].phases[0].input, 1.75);
@@ -266,7 +266,7 @@ test('cloud catalog sync fetches from GitHub raw URL and dynamically prices newl
 
   // Sync cloud catalog from GitHub
   const syncStatus = await h.syncCloudCatalog({ force: true });
-  assert.ok(fetchedUrl.startsWith('https://raw.githubusercontent.com/yuhuan-dev/antigravity-usage-monitor/main/pricing-catalog.json'));
+  assert.ok(fetchedUrl.startsWith('https://raw.githubusercontent.com/infinitex233/antigravity-usage-monitor/main/pricing-catalog.json'));
   assert.equal(syncStatus.source, 'remote');
   assert.equal(syncStatus.catalogVersion, '2026.11.03.2');
   assert.equal(syncStatus.latestPluginVersion, '1.5.0');
@@ -448,19 +448,19 @@ test('performPluginUpdate pulls fast-forward when git worktree is clean, on main
   assert.equal(gitCalls.length, 7); // status, rev-parse, remote get-url, fetch, show, merge-base, pull
 });
 
-test('repository migration: scrubs legacy yuhuan2498281558 cache URLs/TTL and migrates git origin remote to yuhuan-dev', async () => {
+test('repository decoupling: ignores foreign upstream catalog latestPluginVersion/TTL and syncs from infinitex233', async () => {
   let fetchedNewRepoUrl = '';
   const cacheH = backendHarness({
-    pluginManifest: { name: 'usage-monitor', version: '1.4.4' },
+    pluginManifest: { name: 'usage-monitor', version: '1.0.0' },
     remoteCatalog: {
       schemaVersion: 1,
-      catalogVersion: '2026.11.11.4',
-      updatedAt: '2026-11-11T23:20:00+09:00',
-      latestPluginVersion: '1.4.4',
-      releaseUrl: 'https://github.com/yuhuan2498281558/antigravity-usage-monitor/releases/latest',
-      downloadUrl: 'https://github.com/yuhuan2498281558/antigravity-usage-monitor/releases/latest/download/usage-monitor.zip',
-      archiveFallbackUrl: 'https://codeload.github.com/yuhuan2498281558/antigravity-usage-monitor/zip/refs/heads/main',
-      sourceUrl: 'https://raw.githubusercontent.com/yuhuan2498281558/antigravity-usage-monitor/main/pricing-catalog.json',
+      catalogVersion: '2026.11.25.1',
+      updatedAt: '2026-11-25T14:23:00+09:00',
+      latestPluginVersion: '1.5.5',
+      releaseUrl: 'https://github.com/yuhuan-dev/antigravity-usage-monitor/releases/latest',
+      downloadUrl: 'https://github.com/yuhuan-dev/antigravity-usage-monitor/releases/latest/download/usage-monitor.zip',
+      archiveFallbackUrl: 'https://codeload.github.com/yuhuan-dev/antigravity-usage-monitor/zip/refs/heads/main',
+      sourceUrl: 'https://raw.githubusercontent.com/yuhuan-dev/antigravity-usage-monitor/main/pricing-catalog.json',
       fetchedAtMs: Date.now() - 60_000,
       pricing: {
         'gemini-4-carbon-high': { input: 2.0, cache: 0.1, output: 10.0, short: 'carbon-4-high', family: 'Gemini' },
@@ -472,9 +472,9 @@ test('repository migration: scrubs legacy yuhuan2498281558 cache URLs/TTL and mi
         ok: true,
         json: async () => ({
           schemaVersion: 1,
-          catalogVersion: '2026.11.12.1',
-          updatedAt: '2026-11-12T10:00:00+09:00',
-          latestPluginVersion: '1.4.5',
+          catalogVersion: '2026.11.26.1',
+          updatedAt: '2026-11-26T10:00:00+09:00',
+          latestPluginVersion: '1.0.1',
           pricing: {
             'gemini-4-carbon-high': { input: 2.0, cache: 0.1, output: 10.0, short: 'carbon-4-high', family: 'Gemini' },
           },
@@ -484,25 +484,23 @@ test('repository migration: scrubs legacy yuhuan2498281558 cache URLs/TTL and mi
   });
 
   const initialStatus = cacheH.getCloudStatus();
-  assert.equal(initialStatus.releaseUrl, 'https://github.com/yuhuan-dev/antigravity-usage-monitor/releases/latest');
-  assert.equal(initialStatus.downloadUrl, 'https://github.com/yuhuan-dev/antigravity-usage-monitor/releases/latest/download/usage-monitor.zip');
-  assert.equal(initialStatus.lastSyncedAtMs, 0, 'legacy repo cache TTL must be invalidated so new repo syncs immediately');
+  assert.equal(initialStatus.currentPluginVersion, '1.0.0');
+  assert.equal(initialStatus.latestPluginVersion, '1.0.0');
+  assert.equal(initialStatus.updateAvailable, false);
+  assert.equal(initialStatus.lastSyncedAtMs, 0);
+  assert.equal(initialStatus.releaseUrl, 'https://github.com/infinitex233/antigravity-usage-monitor/releases/latest');
+  assert.equal(initialStatus.downloadUrl, 'https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/usage-monitor.zip');
 
   const synced = await cacheH.syncCloudCatalog({ force: false });
-  assert.equal(
-    fetchedNewRepoUrl,
-    'https://raw.githubusercontent.com/yuhuan-dev/antigravity-usage-monitor/main/pricing-catalog.json'
+  assert.ok(
+    fetchedNewRepoUrl.startsWith('https://raw.githubusercontent.com/infinitex233/antigravity-usage-monitor/main/pricing-catalog.json')
   );
-  assert.equal(synced.catalogVersion, '2026.11.12.1');
-  assert.equal(synced.latestPluginVersion, '1.4.5');
+  assert.equal(synced.catalogVersion, '2026.11.26.1');
+  assert.equal(synced.latestPluginVersion, '1.0.1');
 
   assert.equal(
-    cacheH.resolveMigratedGitRemoteUrl('https://github.com/yuhuan2498281558/antigravity-usage-monitor.git'),
-    'https://github.com/yuhuan-dev/antigravity-usage-monitor.git'
-  );
-  assert.equal(
-    cacheH.resolveMigratedGitRemoteUrl('git@github.com:yuhuan2498281558/antigravity-usage-monitor.git'),
-    'git@github.com:yuhuan-dev/antigravity-usage-monitor.git'
+    cacheH.resolveMigratedGitRemoteUrl('https://github.com/infinitex233/antigravity-usage-monitor.git'),
+    ''
   );
   assert.equal(
     cacheH.resolveMigratedGitRemoteUrl('https://github.com/custom-fork/antigravity-usage-monitor.git'),
@@ -510,10 +508,10 @@ test('repository migration: scrubs legacy yuhuan2498281558 cache URLs/TTL and mi
   );
 
   const gitCalls = [];
-  const migrateH = backendHarness({
+  const updateH = backendHarness({
     hasGitDir: true,
     pluginRootPath: '/Users/test/.gemini/config/plugins/usage-monitor',
-    pluginManifest: { name: 'usage-monitor', version: '1.4.3' },
+    pluginManifest: { name: 'usage-monitor', version: '1.0.0' },
     execFileImpl: (_cmd, args, opts, cb) => {
       const fn = typeof opts === 'function' ? opts : cb;
       gitCalls.push(args);
@@ -522,26 +520,24 @@ test('repository migration: scrubs legacy yuhuan2498281558 cache URLs/TTL and mi
         return;
       }
       if (args.includes('remote') && args.includes('get-url')) {
-        fn(null, 'https://github.com/yuhuan2498281558/antigravity-usage-monitor.git\n', '');
+        fn(null, 'https://github.com/infinitex233/antigravity-usage-monitor.git\n', '');
         return;
       }
       if (args.includes('show')) {
-        fn(null, JSON.stringify({ name: 'usage-monitor', version: '1.4.4' }), '');
+        fn(null, JSON.stringify({ name: 'usage-monitor', version: '1.0.1' }), '');
         return;
       }
       if (args.includes('pull')) {
-        migrateH.state.pluginManifest = { name: 'usage-monitor', version: '1.4.4' };
+        updateH.state.pluginManifest = { name: 'usage-monitor', version: '1.0.1' };
       }
       fn(null, '', '');
     },
   });
 
-  const updRes = await migrateH.performPluginUpdate({ isAuto: false });
+  const updRes = await updateH.performPluginUpdate({ isAuto: false });
   assert.equal(updRes.ok, true);
-  assert.equal(updRes.currentVersion, '1.4.4');
-  const setUrlCall = gitCalls.find((args) => args.includes('remote') && args.includes('set-url'));
-  assert.ok(setUrlCall, 'must run git remote set-url origin before fetching');
-  assert.equal(setUrlCall[setUrlCall.length - 1], 'https://github.com/yuhuan-dev/antigravity-usage-monitor.git');
+  assert.equal(updRes.currentVersion, '1.0.1');
+  assert.equal(gitCalls.some((args) => args.includes('set-url')), false);
 });
 
 test('pluginUpdateMode supports manual (default), auto, and off with legacy autoUpdatePlugin compatibility', async () => {

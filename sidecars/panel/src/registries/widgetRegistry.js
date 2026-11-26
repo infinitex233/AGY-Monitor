@@ -9,7 +9,6 @@ import { OVERVIEW_MODULE_KEYS } from '../../shared/settings-normalization.mjs';
 import { ContextWindowWidget } from '../components/widgets/ContextWindowWidget.js';
 import { LiveActivityWidget } from '../components/widgets/LiveActivityWidget.js';
 import { MetricMatrixWidget } from '../components/widgets/MetricMatrixWidget.js';
-import { QuotaPoolsWidget } from '../components/widgets/QuotaPoolsWidget.js';
 import { t } from '../i18n/index.js';
 
 export const OVERVIEW_WIDGET_KEYS = OVERVIEW_MODULE_KEYS;
@@ -31,14 +30,6 @@ export const OVERVIEW_WIDGET_REGISTRY = Object.freeze({
         preview,
         getCtxAgentId,
         setCtxAgentId,
-      }),
-  },
-  quotas: {
-    key: 'quotas',
-    labelKey: 'module.quotas',
-    create: ({ mode }) =>
-      QuotaPoolsWidget({
-        compactHover: mode === 'hover',
       }),
   },
   live_tasks: {

@@ -1598,9 +1598,7 @@ export function createTrendAreaChart({ onSelectSlot = null } = {}) {
 
         if (shouldAutoScrollRight && typeof requestAnimationFrame === 'function') {
           requestAnimationFrame(() => {
-            if (hmScrollEl.scrollWidth > hmScrollEl.clientWidth) {
-              hmScrollEl.scrollLeft = hmScrollEl.scrollWidth;
-            }
+            hmScrollEl.scrollLeft = 0;
           });
         }
       } else if (currentHmMode === 'day') {

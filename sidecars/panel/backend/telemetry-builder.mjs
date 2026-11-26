@@ -45,8 +45,6 @@ import {
 } from './model-pricing.mjs';
 import { getCloudStatus, getPricingPhaseEpoch, pricingCatalogRevision } from './pricing-catalog.mjs';
 import { buildOfficialQuotaPools } from './quota-pools.mjs';
-import { recordAccountQuotaSnapshot } from './account-quota-history.mjs';
-import { updatePoolQuotaReservationEstimates } from './quota-reservation.mjs';
 import { getDefaultCloudCodeProxyStatus } from './cloudcode-proxy.mjs';
 import { getDefaultWindowBridgeStatus } from './window-bridge.mjs';
 import {
@@ -1902,61 +1900,6 @@ export async function buildTelemetryPayloadInternal(
     poolObj.cycleWeekly = pStats?.cycleWeekly || createEmptyCycleSummary();
   }
 
-  const runningPoolKeys = new Set();
-  let hasUnknownRunningPool = false;
-  for (const rootConv of conversations) {
-    const isMainRunning = rootConv?.status === 'CASCADE_RUN_STATUS_RUNNING';
-    const rawSubs = Array.isArray(rootConv?.subagents) ? rootConv.subagents : [];
-    const runningSubs = rawSubs.filter((s) => s?.status === 'CASCADE_RUN_STATUS_RUNNING');
-    if (!isMainRunning && runningSubs.length === 0) continue;
-
-    const recordRunningPool = (cid) => {
-      const entry = findTrajectoryCacheEntry(cid, cacheStore);
-      const steps = Array.isArray(entry?.steps) ? entry.steps : [];
-      const lastStep = steps.length > 0 ? steps[steps.length - 1] : null;
-      if (!lastStep) {
-        if (activePoolKey && activePoolKey !== 'Unknown') {
-          runningPoolKeys.add(activePoolKey);
-        } else {
-          hasUnknownRunningPool = true;
-        }
-        return;
-      }
-      const mInfo = resolveStepModel(lastStep);
-      const { activePoolKey: pKey } = resolveActivePoolKeyFromStep(
-        {
-          modelKey: lastStep.modelKey || mInfo.modelId || 'unknown',
-          family: mInfo.family,
-          modelLabel: mInfo.label,
-          modelShort: mInfo.shortName,
-          modelUpstream: mInfo.modelId,
-        },
-        quotaPoolsMap
-      );
-      if (pKey && pKey !== 'Unknown') {
-        runningPoolKeys.add(pKey);
-      } else {
-        hasUnknownRunningPool = true;
-      }
-    };
-
-    if (isMainRunning) recordRunningPool(rootConv.cascadeId);
-    for (const sub of runningSubs) {
-      recordRunningPool(sub.cascadeId);
-    }
-  }
-
-  updatePoolQuotaReservationEstimates({
-    endpointId,
-    accountScope: accountScope || '',
-    quotaPoolsMap,
-    poolCycleStats,
-    runningPoolKeys,
-    hasUnknownRunningPool,
-    quotaFetchedAtMs: officialQuotaInfo?.fetchedAtMs || 0,
-    nowMs: Date.now(),
-  });
-
   // 6. 组装当前活跃配额池与每周限额视图数据
   const { activePoolQuota, weeklyQuota } = buildActivePoolAndWeeklyQuotas({
     activePoolKey,
@@ -2321,20 +2264,6 @@ export async function buildTelemetryPayloadInternal(
     const order = { Gemini: 0, Argon: 1, Carbon: 2, 'Claude & GPT': 3 };
     return (order[a.family] ?? 99) - (order[b.family] ?? 99);
   });
-  if (
-    !isRemote &&
-    accountStatus === 'signedIn' &&
-    userStatus?.email &&
-    officialQuotaInfo?.data &&
-    !officialQuotaInfo.isStale
-  ) {
-    recordAccountQuotaSnapshot(
-      userStatus.email,
-      sortedQuotaPools,
-      officialQuotaInfo.fetchedAtMs || Date.now(),
-      { isActiveHost: true }
-    );
-  }
   const weeklyCapacityEstimate = buildWeeklyCapacityEstimate({
     sortedPools: sortedQuotaPools,
     isCustomWeeklyMode,

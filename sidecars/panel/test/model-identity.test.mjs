@@ -419,20 +419,28 @@ test('future uncatalogued Orchestrator variants never fall back to Carbon identi
   assert.equal(resolveModelDisplayInfo(s2, { orchestratorIdMode: 'compact' }).text, 'orchestrator-helium');
   assert.equal(resolveModelDisplayInfo(s2, { orchestratorIdMode: 'full' }).text, 'gemini-pro-orchestrator (helium)');
 
-  // Direct non-Orchestrator Carbon/Argon/Neon models remain unaffected
+  // Direct non-Orchestrator Carbon/Argon/Neon models format with version-first Gemini short aliases
   assert.equal(
     resolveModelDisplayInfo(
       { modelKey: 'MODEL_PLACEHOLDER_M429', modelShort: 'carbon-4-high', modelLabel: 'Gemini 4 Carbon (High)', modelUpstream: 'gemini-4-carbon-high' },
       { showUpstreamModel: false, orchestratorIdMode: 'compact' }
     ).text,
-    'carbon-4-high'
+    '4-carbon-high'
   );
   assert.equal(
     resolveModelDisplayInfo(
       { modelKey: 'MODEL_PLACEHOLDER_M535', modelShort: 'neon-4-xhigh', modelLabel: 'Gemini 4 Neon (XHigh)', modelUpstream: 'gemini-4-neon-xhigh' },
       { showUpstreamModel: false, orchestratorIdMode: 'compact' }
     ).text,
-    'neon-4-xhigh'
+    '4-neon-xhigh'
+  );
+  assert.equal(
+    resolveModelDisplayInfo({ modelShort: 'neon-4-high' }, { showUpstreamModel: false }).text,
+    '4-neon-high'
+  );
+  assert.equal(
+    resolveModelDisplayInfo({ modelShort: 'sonnet-4.6' }, { showUpstreamModel: false }).text,
+    'sonnet-4.6'
   );
 });
 
@@ -886,10 +894,10 @@ test('orchestratorIdMode defaults to compact, persists via settings action, and 
     );
   }
 
-  // Non-Orchestrator direct Hydrogen still follows showUpstreamModel regardless of orchestratorIdMode
+  // Non-Orchestrator direct Hydrogen formats version-first in short mode and follows showUpstreamModel regardless of orchestratorIdMode
   assert.equal(
     resolveModelDisplayInfo(directHydrogen, { showUpstreamModel: false, orchestratorIdMode: 'compact' }).text,
-    'hydrogen-4-xhigh'
+    '4-hydrogen-xhigh'
   );
   assert.equal(
     resolveModelDisplayInfo(directHydrogen, { showUpstreamModel: true, orchestratorIdMode: 'compact' }).text,
