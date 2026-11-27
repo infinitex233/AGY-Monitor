@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/banner.png" alt="AGY Monitor — Apple Liquid Glass 实时监控插件" width="100%" />
+<img src="assets/agy-monitor-icon.png" alt="AGY Monitor 图标" width="128" height="128" />
 
 # AGY Monitor
 
@@ -19,6 +19,10 @@
 简体中文 · [English](README.md)
 
 [设计理念](#设计理念) · [界面预览](#界面预览) · [核心能力](#核心能力) · [安装与启用](#安装与启用) · [本地开发](#本地开发) · [致谢与许可](#致谢与许可)
+
+<br />
+
+<img src="assets/screenshots/popover-live.png" alt="AGY Monitor 实时监控浮窗" width="100%" />
 
 <br />
 

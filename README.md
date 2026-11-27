@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/banner.png" alt="AGY Monitor — Apple Liquid Glass Local Telemetry Plugin" width="100%" />
+<img src="assets/agy-monitor-icon.png" alt="AGY Monitor icon" width="128" height="128" />
 
 # AGY Monitor
 
@@ -19,6 +19,10 @@ Switchable Liquid Glass & Classic UI · 2×2 four-metric live trends · Pure Dec
 [简体中文](README.zh-CN.md) · English
 
 [Why AGY Monitor](#why-agy-monitor) · [Screenshots](#screenshots) · [Features](#features) · [Installation](#installation) · [Local Development](#local-development) · [License](#acknowledgments--license)
+
+<br />
+
+<img src="assets/screenshots/popover-live.png" alt="AGY Monitor Live Popover Preview" width="100%" />
 
 <br />
 
