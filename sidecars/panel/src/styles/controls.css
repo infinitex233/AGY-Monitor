@@ -4,11 +4,10 @@
  * 1. 顶部会话控制栏 (.session-header, .status-tag, .icon-btn, .update-badge-btn)
  * 2. 顶部唯一长药丸导航栏 (.long-pill-nav, .pill-glider, .pill-tab)
  * 3. 定制下拉选择器 (.custom-select)
- * 4. 定制步进数字输入框 (.number-input)
- * 5. 定制日期时间选择器 (.datetime-picker)
- * 6. 微边框分段控制器 (.segmented)
- * 7. 独立轨道槽自定义滚动条 (.custom-scroll-host)
- * 8. 设置表单行与主次操作按钮 (.form-row, .btn-primary, .btn-secondary, .cloud-actions-row)
+ * 4. 定制日期时间选择器 (.datetime-picker)
+ * 5. 微边框分段控制器 (.segmented)
+ * 6. 独立轨道槽自定义滚动条 (.custom-scroll-host)
+ * 7. 设置表单行与主次操作按钮 (.form-row, .btn-primary, .btn-secondary, .cloud-actions-row)
  */
 
 /* --- 1. 顶部会话控制栏与二级代理切换条 (Top Session Control Header & Agent Scope Bar) --- */
@@ -625,57 +624,7 @@
   stroke-width: 2.4;
 }
 
-/* --- 4. 定制步进数字框 (Bespoke Custom Number Input，零原生 <input type="number">) --- */
-.number-input {
-  display: inline-flex;
-  align-items: stretch;
-  min-height: calc(28px * var(--ui-font-scale, 1));
-  background: var(--surface-panel);
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--radius-xs);
-  overflow: hidden;
-}
-
-.number-input:focus-within {
-  border-color: var(--accent-primary);
-}
-
-.num-step-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  border: none;
-  background: var(--surface-panel);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background-color var(--dur-instant) var(--ease-fast), color var(--dur-instant) var(--ease-fast);
-}
-
-.num-step-btn:hover {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.num-step-btn:active {
-  background: var(--surface-active);
-}
-
-.num-field {
-  flex: 1;
-  min-width: 90px;
-  padding: 0 var(--space-3);
-  border: none;
-  border-left: 1px solid var(--border-hairline);
-  border-right: 1px solid var(--border-hairline);
-  background: transparent;
-  color: var(--text-primary);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  outline: none;
-}
-
-/* --- 5. 定制日期时间选择器 (Bespoke Custom DateTime Picker) --- */
+/* --- 4. 定制日期时间选择器 (Bespoke Custom DateTime Picker) --- */
 .datetime-picker {
   position: relative;
   display: inline-flex;
@@ -804,7 +753,7 @@
   color: var(--text-primary);
 }
 
-/* --- 6. 微边框分段控制器 (Micro-Bezel Sliding Segmented Control) --- */
+/* --- 5. 微边框分段控制器 (Micro-Bezel Sliding Segmented Control) --- */
 .segmented {
   position: relative;
   display: inline-flex;
@@ -907,7 +856,7 @@
   transform: translate3d(calc(var(--seg-active-idx, 0) * (100% + 2px)), 0, 0);
 }
 
-/* --- 7. 独立槽位自定义滚动条 (Bespoke Custom Scrollbar) --- */
+/* --- 6. 独立槽位自定义滚动条 (Bespoke Custom Scrollbar) --- */
 .custom-scroll-host {
   position: relative;
   display: flex;
@@ -979,7 +928,7 @@
   background: color-mix(in srgb, var(--accent-primary) 72%, transparent);
 }
 
-/* --- 8. 设置表单与按钮控件 (Settings Form & Buttons) --- */
+/* --- 7. 设置表单与按钮控件 (Settings Form & Buttons) --- */
 .form-row {
   display: flex;
   flex-direction: column;
@@ -1082,15 +1031,7 @@
   transform: scale(0.96);
 }
 
-/* --- 9. 顶部栏定制面板专属表单与排序槽位控件 (Topbar Customization Controls) --- */
-.settings-inline-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 26px;
-}
-
+/* --- 8. 紧凑辅助按钮 --- */
 .btn-ghost-sm {
   display: inline-flex;
   align-items: center;
@@ -1119,60 +1060,6 @@
 
 .btn-ghost-sm:disabled {
   opacity: 0.42;
-  cursor: default;
-}
-
-.slot-index-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: calc(16px * var(--ui-font-scale, 1));
-  min-height: calc(16px * var(--ui-font-scale, 1));
-  padding: 0 3px;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
-  border-radius: var(--radius-xs);
-  flex-shrink: 0;
-}
-
-.slot-order-btns {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.slot-move-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition:
-    background-color var(--dur-instant) var(--ease-fast),
-    color var(--dur-instant) var(--ease-fast);
-}
-
-.slot-move-btn:hover:not(:disabled) {
-  background: var(--surface-hover);
-  color: var(--text-primary);
-}
-
-.slot-move-btn:active:not(:disabled) {
-  transform: scale(0.94);
-}
-
-.slot-move-btn:disabled {
-  opacity: 0.28;
   cursor: default;
 }
 

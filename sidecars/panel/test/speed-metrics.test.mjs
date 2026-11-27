@@ -91,6 +91,36 @@ test('held bursts are excluded while longer windows and brief waits are accepted
     assert.ok(Math.abs(speedMetric(step).value - expected) < 1e-9);
   }
 });
+test('long-wait buffered bursts above 1 s are excluded when exceeding 3x same-model session median', () => {
+  const mk = (idx, opts) => {
+    const { s, gm } = sample(opts);
+    s.metadata.sourceTrajectoryStepInfo = { stepIndex: idx };
+    s.metadata.modelUsage.model = 'MODEL_NEON';
+    gm.stepIndices = [idx];
+    return { s, gm };
+  };
+  const cases = [
+    mk(0, { total: 10.367, ttft: '7.687s', output: 426 }),  // ~159 tok/s (normal)
+    mk(1, { total: 13.393, ttft: '10.754s', output: 480 }), // ~182 tok/s (normal)
+    mk(2, { total: 24.815, ttft: '22.323s', output: 557 }), // ~224 tok/s, ttft>4*dec, <=3x med -> keep!
+    mk(3, { total: 15.183, ttft: '14.117s', output: 1556 }), // ~1460 tok/s, dec=1.066s, ttft>4*dec, >3x med -> held_burst!
+    mk(4, { total: 7.0, ttft: '2.0s', output: 3000 }),       // 600 tok/s, >3x med, but ttft<=4*dec -> keep!
+  ];
+  const steps = extractModelSteps(
+    cases.map((c) => c.s),
+    cases.map((c) => c.gm)
+  );
+  assert.equal(steps[0].speedSampleEligible, true);
+  assert.equal(steps[1].speedSampleEligible, true);
+  assert.equal(steps[2].speedSampleEligible, true);
+  assert.equal(steps[3].totalTokPerSec, null);
+  assert.equal(steps[3].decodeDurationSec, null);
+  assert.equal(steps[3].speedSampleEligible, false);
+  assert.equal(steps[3].speedReason, 'held_burst');
+  assert.equal(speedMetric(steps[3]).reason, 'held_burst');
+  assert.equal(steps[4].speedSampleEligible, true);
+  assert.equal(steps[4].totalTokPerSec, 600);
+});
 test('rates above 10,000 tok/s are excluded', () => {
   const atLimit = parse({ total: 0.7, ttft: '0.5s', output: 2000 });
   const outlier = parse({ total: 0.7, ttft: '0.5s', output: 2001 });
@@ -172,7 +202,7 @@ test('no rate-dependent cap or formula switch at the former 260 TPS boundary',()
   assert.equal(a.speedBasis,b.speedBasis);
 });
 test('legacy cache retains billing but cannot masquerade as current measurements',()=>{
-  for(const measurementVersion of [undefined,1,2,3,4,5]){
+  for(const measurementVersion of [undefined,1,2,3,4,5,6]){
     const old={measurementVersion,inputTokens:500,cacheReadTokens:2000,outputTokens:1100,ttftSec:0.4,totalTokPerSec:55};
     const migrated=normalizeCachedStep(old);
     assert.equal(migrated.outputTokens,1100);assert.equal(migrated.inputTokens,500);

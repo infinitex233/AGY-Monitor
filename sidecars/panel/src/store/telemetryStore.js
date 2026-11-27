@@ -151,7 +151,6 @@ export const telemetryStore = createReactiveStore({
   customStartMs: Date.now() - 24 * 3600 * 1000,
   customEndMs: Date.now(),
   syncState: 'idle', // 'idle' | 'syncing' | 'synced' | 'error'
-  minuteTick: 0,
   telemetry: null,
 });
 
@@ -917,7 +916,7 @@ export function isEquivalentTelemetry(prev, next) {
   if (pAcct?.avgTokPerSec !== nAcct?.avgTokPerSec) return false;
   if (pAcct?.unpricedCalls !== nAcct?.unpricedCalls) return false;
 
-  // 6. 比对历史趋势时间分桶序列与年度分月序列
+  // 6. 比对历史趋势时间分桶序列
   const areModelSlicesEqual = (pList, nList) => {
     const a = pList || [];
     const b = nList || [];
@@ -948,6 +947,8 @@ export function isEquivalentTelemetry(prev, next) {
     return true;
   };
 
+  if (prev.consumption?.revision !== next.consumption?.revision) return false;
+
   const pTrend = prev.consumption?.trendSeries || [];
   const nTrend = next.consumption?.trendSeries || [];
   if (pTrend.length !== nTrend.length) return false;
@@ -968,21 +969,6 @@ export function isEquivalentTelemetry(prev, next) {
       return false;
     }
   }
-  if (prev.consumption?.monthlyYear !== next.consumption?.monthlyYear) return false;
-
-  const pMonthly = prev.consumption?.monthlySeries || [];
-  const nMonthly = next.consumption?.monthlySeries || [];
-  if (pMonthly.length !== nMonthly.length) return false;
-  for (let i = 0; i < pMonthly.length; i++) {
-    if (
-      pMonthly[i]?.totalTokens !== nMonthly[i]?.totalTokens ||
-      pMonthly[i]?.costUsd !== nMonthly[i]?.costUsd ||
-      pMonthly[i]?.calls !== nMonthly[i]?.calls ||
-      !areModelSlicesEqual(pMonthly[i]?.models, nMonthly[i]?.models)
-    ) {
-      return false;
-    }
-  }
 
   // 7. 比对按模型汇总明细与数据来源汇总明细
   if (!areModelSlicesEqual(pAct?.modelBreakdown, nAct?.modelBreakdown)) {
@@ -998,17 +984,25 @@ export function isEquivalentTelemetry(prev, next) {
     return false;
   }
 
+  const sameUsageRowTotals = (a, b) =>
+    a?.calls === b?.calls &&
+    a?.inputTokens === b?.inputTokens &&
+    a?.cacheReadTokens === b?.cacheReadTokens &&
+    a?.outputTokens === b?.outputTokens &&
+    a?.thinkingTokens === b?.thinkingTokens &&
+    a?.responseTokens === b?.responseTokens &&
+    a?.totalTokens === b?.totalTokens &&
+    a?.costUsd === b?.costUsd &&
+    a?.unpricedCalls === b?.unpricedCalls &&
+    a?.cacheHitPct === b?.cacheHitPct;
+
   const pSources = prev.consumption?.sourcesBreakdown || [];
   const nSources = next.consumption?.sourcesBreakdown || [];
   if (pSources.length !== nSources.length) return false;
   for (let i = 0; i < pSources.length; i++) {
     if (
       pSources[i]?.name !== nSources[i]?.name ||
-      pSources[i]?.costUsd !== nSources[i]?.costUsd ||
-      pSources[i]?.unpricedCalls !== nSources[i]?.unpricedCalls ||
-      pSources[i]?.totalTokens !== nSources[i]?.totalTokens ||
-      pSources[i]?.calls !== nSources[i]?.calls ||
-      !areModelSlicesEqual(pSources[i]?.models, nSources[i]?.models)
+      !sameUsageRowTotals(pSources[i], nSources[i])
     ) {
       return false;
     }
@@ -1021,10 +1015,9 @@ export function isEquivalentTelemetry(prev, next) {
     if (
       pTopConvs[i]?.cascadeId !== nTopConvs[i]?.cascadeId ||
       pTopConvs[i]?.title !== nTopConvs[i]?.title ||
-      pTopConvs[i]?.totalTokens !== nTopConvs[i]?.totalTokens ||
-      pTopConvs[i]?.costUsd !== nTopConvs[i]?.costUsd ||
-      pTopConvs[i]?.calls !== nTopConvs[i]?.calls ||
-      !areModelSlicesEqual(pTopConvs[i]?.models, nTopConvs[i]?.models)
+      pTopConvs[i]?.sourceName !== nTopConvs[i]?.sourceName ||
+      pTopConvs[i]?.appSource !== nTopConvs[i]?.appSource ||
+      !sameUsageRowTotals(pTopConvs[i], nTopConvs[i])
     ) {
       return false;
     }
@@ -1037,11 +1030,9 @@ export function isEquivalentTelemetry(prev, next) {
     if (
       pTopWs[i]?.workspaceKey !== nTopWs[i]?.workspaceKey ||
       pTopWs[i]?.label !== nTopWs[i]?.label ||
+      pTopWs[i]?.workspacePath !== nTopWs[i]?.workspacePath ||
       pTopWs[i]?.sessionCount !== nTopWs[i]?.sessionCount ||
-      pTopWs[i]?.totalTokens !== nTopWs[i]?.totalTokens ||
-      pTopWs[i]?.costUsd !== nTopWs[i]?.costUsd ||
-      pTopWs[i]?.calls !== nTopWs[i]?.calls ||
-      !areModelSlicesEqual(pTopWs[i]?.models, nTopWs[i]?.models)
+      !sameUsageRowTotals(pTopWs[i], nTopWs[i])
     ) {
       return false;
     }
@@ -1322,7 +1313,6 @@ async function requestTelemetry(params, force) {
       if (feedbackTimer) clearTimeout(feedbackTimer);
       telemetryStore.setState({
         telemetry: finalForcePayload,
-        minuteTick: Math.floor(Date.now() / 30000),
         syncState: 'synced',
       });
       feedbackTimer = setTimeout(() => {
@@ -1335,7 +1325,6 @@ async function requestTelemetry(params, force) {
       const nextTelemetry = isSame ? latestSt.telemetry : resolvedPayload;
       telemetryStore.setState({
         telemetry: nextTelemetry,
-        minuteTick: Math.floor(Date.now() / 30000),
         syncState: latestSt.syncState === 'synced' ? 'synced' : 'idle',
       });
       if (needsSilentRangeRevalidate) {
@@ -1561,7 +1550,6 @@ export async function selectConversation(
         if (!isEquivalentTelemetry(baseTelemetry, mergedTelemetry)) {
           telemetryStore.setState({
             telemetry: mergedTelemetry,
-            minuteTick: Math.floor(Date.now() / 30000),
           });
         }
       } else {
@@ -1592,7 +1580,6 @@ export async function selectConversation(
     if (!isEquivalentTelemetry(latestSt.telemetry, resolvedPayload)) {
       telemetryStore.setState({
         telemetry: resolvedPayload,
-        minuteTick: Math.floor(Date.now() / 30000),
         syncState: latestSt.syncState === 'synced' ? 'synced' : 'idle',
       });
     }

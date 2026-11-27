@@ -57,44 +57,16 @@ export const LiveOverviewView = defineComponent({
 
     let latestData = null;
     let isDirty = false;
-    let countdownTickTimer = null;
-
-    function stopCountdownTicker() {
-      if (countdownTickTimer) {
-        clearInterval(countdownTickTimer);
-        countdownTickTimer = null;
-      }
-    }
-
-    function ensureCountdownTicker() {
-      if (getVisibleMonitorView() !== 'overview') {
-        stopCountdownTicker();
-        return;
-      }
-      if (!countdownTickTimer) {
-        countdownTickTimer = setInterval(() => {
-          if (getVisibleMonitorView() === 'overview' && latestData) {
-            renderData(latestData);
-          }
-        }, 30_000);
-      }
-    }
 
     function renderData(data) {
       if (!data) return;
       const moduleKeys = resolveOverviewModules(data.settings?.overviewModules);
-      const minuteTick = Math.floor(Date.now() / 30000);
-      widgetHost.update({
-        moduleKeys,
-        data,
-        minuteTick,
-      });
-      ensureCountdownTicker();
+      widgetHost.update({ moduleKeys, data });
       viewScrollbar.refresh();
     }
 
     const unsubTelemetry = telemetryStore.subscribe(
-      (st) => ({ telemetry: st.telemetry, minuteTick: st.minuteTick }),
+      (st) => ({ telemetry: st.telemetry }),
       ({ telemetry: data }) => {
         latestData = data;
         if (getVisibleMonitorView() !== 'overview') {
@@ -128,11 +100,9 @@ export const LiveOverviewView = defineComponent({
 
         if (slice.activeView !== 'overview') {
           widgetHost.pauseTickers();
-          stopCountdownTicker();
           if (scopeChanged) isDirty = true;
           return;
         }
-        ensureCountdownTicker();
         if ((isDirty || scopeChanged) && latestData) {
           isDirty = false;
           renderData(latestData);
@@ -168,7 +138,6 @@ export const LiveOverviewView = defineComponent({
     );
 
     onCleanup(() => {
-      stopCountdownTicker();
       unsubTelemetry();
       unsubView();
       unsubI18n();

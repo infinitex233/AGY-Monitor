@@ -2,6 +2,30 @@
 
 All notable changes to **AGY Monitor** are documented in this file.
 
+## [1.2.2] - 2026-11
+
+### 更新内容
+- **自适应相对缓冲突发过滤（Measurement v7）**：
+  - 将 `MEASUREMENT_VERSION` 升至 `7` 并新增 `filterRelativeHeldBursts`，补筛解码窗口 `>= 1.0s` 但等待远大于解码（`ttft > 4 * decode`）且速率超过同会话同模型中位数 `3×`（至少 3 个基线样本）的漏网缓冲突发（如长等待纯工具调用），统一标记为 `held_burst` 排除，避免 1000+ `tok/s` 假高值污染均速。
+- **用量趋势与首字耗时悬浮提示精简**：
+  - 精简「用量趋势」（折线面积图与 >90 天热力图）悬浮卡片：移除冗余的每模型 4 段进度条与底部 4 通道网格，仅保留「时间区间 + 调用次数」「总 Token + 预估费用」及轻量单行「前 3 模型名 + 占比」明细；修复热力图 `周 / 月 / 全部` 聚合模式签名遗漏长尾模型变化的问题。
+  - 移除明细表首字耗时拆解浮层中冗余的 `原生思考计时可能重叠首字或流式阶段，不可直接相加` 提示文案。
+- **遗留冗余代码清理与轮询性能优化**：
+  - 清理上游残留的 320 个死 CSS 类、321 对孤儿 i18n 词条（中英保持 514/514 对齐）、废弃的 30s 配额倒计时与 `minuteTick` 轮询重绘、旧版图表动画控制器、胶囊预览组件及未用 SVG 图标；修正偏好设置中残留的 `v1.4.4` 硬编码占位版本。编译产物 `styles.css` 缩小 27%（`282 KB → 206 KB`），`app.js` 缩小约 `60 KB`。
+  - 移除后端年度 12 月桶聚合（`monthlySeries` / `monthlyYear`）、裁剪 `sourcesBreakdown` / `topConversations` / `topWorkspaces` 的未用嵌套 `models` 子数组（保留行级汇总供 XLSX / Markdown 导出）、停止预计算多余的 `5h` / `week` 预设并移除无效 `pool` 去重与空 `accountName` memo 传递。
+  - 为常规轮询中的 CLI 状态探测与模型目录刷新增加缓存复用（含瞬时失败保留上一份有效模型目录、2s 短重试冷却、时钟回拨保护），并补齐 `consumption.revision` 比对以防历史回填后预取缓存陈旧。
+
+### English
+- **Adaptive Relative Held-Burst Filtering (Measurement v7)**:
+  - Upgraded `MEASUREMENT_VERSION` to `7` with `filterRelativeHeldBursts` to catch long-wait buffered bursts whose decode window exceeds `1.0s` when `ttft > 4 * decode` and step TPS exceeds `3×` the same-model session median (with `>= 3` baseline samples), classifying them as `held_burst` so 1000+ `tok/s` tool-call spikes do not skew session speeds.
+- **Streamlined Usage Trend & TTFT Tooltips**:
+  - Simplified the Usage Trend hover tooltip (shared by curve and >90d heatmap views) by removing per-model 4-segment bars and the 4-channel micro-grid while retaining time + calls, hero tokens + cost, and concise single-line top-3 model share rows; fixed aggregate heatmap (`week`/`month`/`all`) render signatures to track full tail-model changes.
+  - Removed the redundant `timingOverlapHint` disclaimer from the step TTFT timing breakdown popover.
+- **Legacy Cleanup & Polling Hot-Path Optimization**:
+  - Removed 320 obsolete CSS classes, 321 orphan i18n keys per locale (514/514 parity), the unused 30s quota countdown timer & `minuteTick` plumbing, dead chart controllers, capsule preview, 7 unused SVG icons, and hardcoded upstream `v1.4.4` version fallbacks in Preferences — shrinking `styles.css` by 27% (`282 KB → 206 KB`) and `app.js` by ~`60 KB`.
+  - Removed the unused annual `monthlySeries` / `monthlyYear` accumulator, trimmed unused nested `models` arrays from `sourcesBreakdown` / `topConversations` / `topWorkspaces` (preserving row totals for XLSX / Markdown exports), stopped eagerly computing extra `5h` / `week` presets, and removed dead `pool` dedupe and empty `accountName` memo inputs.
+  - Added 30s cached CLI status probing (with backward-clock expiration) and stale-while-revalidate model catalog caching (preserving the last good catalog across transient RPC failures with a 2s strict-caller retry cooldown), plus `consumption.revision` comparison in `isEquivalentTelemetry` so historical backfills invalidate prefetched ranges cleanly.
+
 ## [1.2.1] - 2026-11
 
 ### 更新内容

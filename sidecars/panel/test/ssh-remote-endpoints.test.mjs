@@ -1025,7 +1025,7 @@ test('WindowOverlayShell updateBridge rejects stale CDP rpcQueue on endpoint swi
           runningConversations: [],
           activeConversation: { cascadeId: `conv-${seq}`, title: `Title-${epHeader}`, steps: [], agents: [] },
           quotas: { pools: [], meta: {} },
-          consumption: { selectedRange: { key: 'today' }, session: {}, account: {}, presets: {}, trendSeries: [], sourcesBreakdown: [], monthlySeries: [] },
+          consumption: { selectedRange: { key: 'today' }, session: {}, account: {}, presets: {}, trendSeries: [], sourcesBreakdown: [] },
           settings: { language: 'zh-CN', windowMountMode: 'dual', enableWindowOverlay: true },
         }),
       };

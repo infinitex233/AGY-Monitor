@@ -920,25 +920,20 @@ async function readTelemetrySources(
   const localSummaries = isRemote
     ? { available: false, summariesObj: {}, sideQuestionParents: {} }
     : readLocalSummarySnapshot(undefined, { forceRefresh });
-  const [allTrajRes, contextModelCatalog] = await Promise.all([
-    localSummaries.available
-      ? Promise.resolve(null)
-      : callLsRpc('GetAllCascadeTrajectories', {}, 5000, endpoint).catch(() => ({})),
-    getContextModelCatalog(endpoint),
-  ]);
+  const allTrajRes = localSummaries.available
+    ? null
+    : await callLsRpc('GetAllCascadeTrajectories', {}, 5000, endpoint).catch(() => ({}));
 
-  const sessions = await enumerateAndSyncConversations({
+  return enumerateAndSyncConversations({
     summariesObj: localSummaries.available
       ? localSummaries.summariesObj
       : allTrajRes?.trajectorySummaries || {},
     summariesFromLocalDb: localSummaries.available,
     sideQuestionParents: localSummaries.available ? localSummaries.sideQuestionParents : {},
-    currentAccountName: '',
     requestedConvId,
     forceRefresh,
     endpoint,
   });
-  return { contextModelCatalog, sessions };
 }
 
 function getTelemetrySources(
@@ -1065,7 +1060,6 @@ function buildActiveConversationAssembly({
   resolveStepModel,
   knownUpstreamByModelKey,
   modelInputs,
-  accountScope,
   endpointId = LOCAL_ENDPOINT_ID,
   cacheStore = null,
 }) {
@@ -1141,7 +1135,6 @@ function buildActiveConversationAssembly({
     return cachedAssembly.result;
   }
 
-  const agentReuseInputs = { ...modelInputs, endpointId: epKey, activeCascadeId, accountScope };
   const mainUnit = buildAgentUnitTelemetry({
     agentId: 'main',
     cascadeId: activeCascadeId,
@@ -1160,7 +1153,7 @@ function buildActiveConversationAssembly({
     resolveStepModel,
     knownUpstreamByModelKey,
     includeRecentSteps: false,
-    reuseInputs: agentReuseInputs,
+    reuseInputs: modelInputs,
   });
 
   const enrichedActiveSteps = mainUnit.taggedSteps;
@@ -1242,7 +1235,7 @@ function buildActiveConversationAssembly({
       resolveStepModel,
       knownUpstreamByModelKey,
       includeRecentSteps: false,
-      reuseInputs: agentReuseInputs,
+      reuseInputs: modelInputs,
     });
 
     const clonedSubSteps = subUnit.taggedSteps.map((st) => ({ ...st }));
@@ -1599,15 +1592,15 @@ export async function buildTelemetryPayloadInternal(
         .catch(() => null);
     }
   }
-  const { contextModelCatalog, sessions } = await getTelemetrySources(
-    requestedConvId,
-    forceRefresh,
-    endpoint
-  );
-  const { conversations, activeConvSummary, activeCascadeId } = sessions;
-
   // 仅读取静态模型配置列表用于占位符名称映射（绝不提取用户身份或订阅配额信息）
   const clientConfigs = userStatus?.cascadeModelConfigData?.clientModelConfigs || [];
+  const [sessions, contextModelCatalog] = await Promise.all([
+    getTelemetrySources(requestedConvId, forceRefresh, endpoint),
+    Array.isArray(clientConfigs) && clientConfigs.length
+      ? getContextModelCatalog(endpoint, { allowStale: !forceRefresh, forceRefresh })
+      : null,
+  ]);
+  const { conversations, activeConvSummary, activeCascadeId } = sessions;
   const dynamicModelMap = buildDynamicModelMap(clientConfigs);
 
   const resolveStepModel = createStepModelResolver(dynamicModelMap);
@@ -1631,12 +1624,11 @@ export async function buildTelemetryPayloadInternal(
     resolveStepModel,
     knownUpstreamByModelKey,
     modelInputs,
-    accountScope: '',
     endpointId,
     cacheStore,
   });
 
-  // 4. 多时间窗口聚合（预设窗口 + 当前选定窗口 + 趋势 + 月序列 + 来源与模型拆解）
+  // 4. 多时间窗口聚合（预设窗口 + 当前选定窗口 + 趋势 + 来源与模型拆解）
   const {
     usageRevision,
     selectedWindow,
@@ -1647,8 +1639,6 @@ export async function buildTelemetryPayloadInternal(
     finalizedPresets,
     trendSeries,
     sourcesBreakdown,
-    currentYear,
-    monthlySeries,
     modelBreakdown,
     topConversations,
     topWorkspaces,
@@ -1981,7 +1971,7 @@ export async function buildTelemetryPayloadInternal(
     uiBundleVersion,
     windowBridge: getDefaultWindowBridgeStatus(),
     cloudCodeProxy: getDefaultCloudCodeProxyStatus(),
-    cliStatusLine: getCliStatusLineRuntimeStatus(),
+    cliStatusLine: getCliStatusLineRuntimeStatus({ maxAgeMs: forceRefresh ? 0 : 30_000 }),
     settings,
     contextWindowModels: getContextWindowGroups(
       getContextWindowModels(clientConfigs, contextModelCatalog)
@@ -2056,8 +2046,6 @@ export async function buildTelemetryPayloadInternal(
       sourcesBreakdown,
       topConversations: enrichTopConversationTitles(topConversations, conversations),
       topWorkspaces: enrichTopWorkspaces(topWorkspaces, conversations),
-      monthlyYear: currentYear,
-      monthlySeries,
     },
     modelBreakdown,
   };
@@ -2187,7 +2175,6 @@ function tryBuildFastConversationPayload(requestedConvId, filterOpts = {}) {
     resolveStepModel: snap.aggContext.resolveStepModel,
     knownUpstreamByModelKey: snap.knownUpstreamByModelKey,
     modelInputs: snap.aggContext.modelInputs,
-    accountScope: '',
     endpointId,
     cacheStore,
   });
@@ -2287,9 +2274,6 @@ function tryBuildFastConsumptionPayload(filterOpts = {}) {
       revision: agg.usageRevision,
       selectedRange: {
         key: agg.selectedWindow.key,
-        ...(agg.selectedWindow.pool ? { pool: agg.selectedWindow.pool } : {}),
-        ...(agg.selectedWindow.poolLabel ? { poolLabel: agg.selectedWindow.poolLabel } : {}),
-        ...(agg.selectedWindow.isFallbackWeek ? { isFallbackWeek: true } : {}),
         label: agg.selectedWindow.label,
         startMs: agg.trendStartMs,
         endMs: agg.trendEndMs,
@@ -2411,19 +2395,19 @@ export function buildCliStatusSnapshot(finalPayload, updatedAtMs = Date.now()) {
  * 带并发请求合并（In-Flight Deduplication）的遥测载荷构建入口。
  *
  * @param {string} requestedConvId
- * @param {boolean} [forceQuotaRefresh=false]
+ * @param {boolean} [forceRefresh=false]
  * @param {{ range?: string, startMs?: number, endMs?: number, scope?: string }} [filterOpts={}]
  * @returns {Promise<object>}
  */
 export function buildTelemetryPayload(
   requestedConvId,
-  forceQuotaRefresh = false,
+  forceRefresh = false,
   filterOpts = {}
 ) {
   const endpointKey = filterOpts?.endpoint?.isRemote
     ? String(filterOpts.endpoint.id || 'remote')
     : LOCAL_ENDPOINT_ID;
-  if (!forceQuotaRefresh) {
+  if (!forceRefresh) {
     if (filterOpts?.scope === 'conversation') {
       const convPayload = tryBuildFastConversationPayload(requestedConvId, filterOpts);
       if (convPayload) {
@@ -2457,12 +2441,12 @@ export function buildTelemetryPayload(
       }
     }
   }
-  const rangeSig = `${filterOpts.range || 'all'}:${filterOpts.pool || 'all'}:${filterOpts.startMs || 0}:${filterOpts.endMs || 0}`;
-  const key = `${endpointKey}::${requestedConvId || '__auto__'}::${forceQuotaRefresh ? 'force' : 'normal'}::${rangeSig}`;
+  const rangeSig = `${filterOpts.range || 'all'}:${filterOpts.startMs || 0}:${filterOpts.endMs || 0}`;
+  const key = `${endpointKey}::${requestedConvId || '__auto__'}::${forceRefresh ? 'force' : 'normal'}::${rangeSig}`;
   if (inFlightRequests.has(key)) {
     return inFlightRequests.get(key);
   }
-  const p = buildTelemetryPayloadInternal(requestedConvId, forceQuotaRefresh, filterOpts).finally(
+  const p = buildTelemetryPayloadInternal(requestedConvId, forceRefresh, filterOpts).finally(
     () => {
       inFlightRequests.delete(key);
     }

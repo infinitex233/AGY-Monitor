@@ -95,13 +95,6 @@ export function formatTokensPrecise(num) {
   return String(Math.round(n));
 }
 
-export function formatCnyApprox(usdAmount, rate = 7.2) {
-  const rmb = Number(usdAmount || 0) * rate;
-  if (rmb <= 0) return '≈ ¥0';
-  if (rmb >= 10) return `≈ ¥${Math.round(rmb)}`;
-  return `≈ ¥${rmb.toFixed(1)}`;
-}
-
 export function formatDateSpanBadge(startMs, endMs) {
   const s = startMs && Number.isFinite(startMs) ? new Date(startMs) : new Date();
   const e = endMs && Number.isFinite(endMs) ? new Date(endMs) : new Date();
@@ -282,15 +275,6 @@ export function resolveModelAnomalySummary(m) {
   };
 }
 
-export function formatStepAnomalyInlineSummary(anomaly) {
-  if (!anomaly || !(Number(anomaly.count) > 0)) return '';
-  const tag = formatAnomalyTagText(anomaly.primaryKind, anomaly.count);
-  const label = formatAnomalyKindLabel(anomaly.primaryKind);
-  const delaySec = Number(anomaly.totalDelaySec || 0);
-  const delayPart = delaySec > 0 ? ` · ${t('steps.anomalyDelayPart', { sec: delaySec })}` : '';
-  return `${tag} · ${label}${delayPart}`;
-}
-
 export function buildStepAnomalyDiagnostic(st) {
   const a = st?.anomaly;
   if (!a || !(Number(a.count) > 0)) return null;
@@ -440,15 +424,6 @@ export function buildStepTimingDiagnostic(st) {
   }
 
   const hints = [];
-  const hasOverlap =
-    think !== null &&
-    total !== null &&
-    ((ttft !== null && ttft + think > total + 0.05) ||
-      (nativeStream !== null && ttft !== null && ttft + nativeStream + think > total + 0.05) ||
-      think > total + 0.05);
-  if (hasOverlap) {
-    hints.push(t('steps.timingOverlapHint'));
-  }
   const streamForToolCheck = nativeStream ?? afterTtft;
   if (
     st.hasToolCalls &&
@@ -555,7 +530,7 @@ export { normalizeModelDisplayMode };
  * @param {string} rawText
  * @returns {string}
  */
-export function stripVendorModelPrefix(rawText) {
+function stripVendorModelPrefix(rawText) {
   return String(rawText || '')
     .trim()
     .replace(/^(?:gemini|claude|gpt)-(?=.+)/i, '');
@@ -668,7 +643,7 @@ const GEMINI_SHORT_ALIAS_RE =
  * @param {string} name
  * @returns {string}
  */
-export function formatGeminiShortAlias(name) {
+function formatGeminiShortAlias(name) {
   const raw = String(name ?? '').trim();
   if (!raw) return raw;
   const match = raw.match(GEMINI_SHORT_ALIAS_RE);

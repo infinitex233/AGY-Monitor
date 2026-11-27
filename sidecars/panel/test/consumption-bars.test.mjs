@@ -126,7 +126,7 @@ test('FourSegmentBar supports percentage scaling while keeping 100% default for 
   }
 });
 
-test('Backend aggregates per-model breakdown on both sourcesBreakdown and monthlySeries', async () => {
+test('Backend keeps source totals and per-model details on the usage trend', async () => {
   const nowMs = Date.parse('2026-11-18T12:00:00Z');
   const nowIso = '2026-11-18T12:00:00Z';
   const appCid = 'aaaaaaaa-1111-4111-8111-111111111111';
@@ -208,21 +208,29 @@ test('Backend aggregates per-model breakdown on both sourcesBreakdown and monthl
     },
   });
 
-  const payload = await harness.buildTelemetryPayloadInternal({ range: 'all' });
+  const payload = await harness.buildTelemetryPayloadInternal(appCid, false, { range: 'all' });
   const sources = payload.consumption?.sourcesBreakdown || [];
   assert.equal(sources.length, 2);
   assert.equal(sources[0].name, 'Antigravity App');
   assert.equal(sources[0].totalTokens, 15_000);
-  assert.equal(sources[0].models.length, 2);
+  assert.equal(sources[0].calls, 2);
+  assert.equal(sources[0].models, undefined);
   assert.equal(sources[1].name, 'Antigravity CLI');
   assert.equal(sources[1].totalTokens, 5_000);
-  assert.equal(sources[1].models.length, 1);
+  assert.equal(sources[1].calls, 1);
+  assert.equal(sources[1].models, undefined);
+  assert.equal(payload.consumption.monthlyYear, undefined);
+  assert.equal(payload.consumption.monthlySeries, undefined);
 
-  // November (index 10) in monthlySeries also carries aggregated per-model breakdown, and range='all' trendSeries spans ~6 months
-  const novBucket = payload.consumption?.monthlySeries?.[10];
-  assert.ok(novBucket);
-  assert.equal(novBucket.totalTokens, 20_000);
-  assert.equal(novBucket.models.length, 2);
+  const scoped = JSON.parse((await harness.executeTelemetryAction({
+    conversationId: appCid,
+    scope: 'consumption',
+    range: 'custom',
+    startMs: nowMs - 60_000,
+    endMs: nowMs + 120_000,
+  })).body);
+  assert.equal(scoped.scope, 'consumption');
+  assert.deepEqual(scoped.consumption.sourcesBreakdown, JSON.parse(JSON.stringify(sources)));
 
   // Active trendSeries bucket carries 4-channel totals & per-model 4-channel breakdown while zero-token buckets omit models
   const trendSlots = payload.consumption?.trendSeries || [];
@@ -246,7 +254,7 @@ test('Backend aggregates per-model breakdown on both sourcesBreakdown and monthl
   }
 });
 
-test('ConsumptionView: Top Models color dot + % bar, clutter-free Client Sources + Monthly model bars with long-tail folding & hover popover', async (t) => {
+test('ConsumptionView renders the overview, model table, and compact usage trend tooltip', async (t) => {
   const prevLocale = i18nStore.getState().locale;
   const prevDoc = globalThis.document;
   const prevWin = globalThis.window;
@@ -301,23 +309,6 @@ test('ConsumptionView: Top Models color dot + % bar, clutter-free Client Sources
   const mTail2 = mkModel('3.1-flash-lite', 700, 1, 0.01);
   const mTail3 = mkModel('2.5-flash-lite', 500, 1, 0.01);
 
-  const emptyMonths = Array.from({ length: 12 }, (_, idx) => ({
-    month: idx + 1,
-    label: `${idx + 1}月`,
-    calls: 0,
-    totalTokens: 0,
-    costUsd: 0,
-    models: [],
-  }));
-  emptyMonths[10] = {
-    month: 11,
-    label: '11月',
-    calls: 23,
-    totalTokens: 100_000,
-    costUsd: 0.96,
-    models: [mArgon, mCarbon, mFlash, mTail1, mTail2, mTail3],
-  };
-
   const baseTelemetry = {
     settings: {
       language: 'zh-CN',
@@ -366,35 +357,24 @@ test('ConsumptionView: Top Models color dot + % bar, clutter-free Client Sources
           models: [mArgon, mCarbon, mFlash, mTail1, mTail2, mTail3],
         },
       ],
-      monthlyYear: 2026,
-      monthlySeries: emptyMonths,
       sourcesBreakdown: [
         {
           name: 'Antigravity App',
           calls: 20,
+          inputTokens: 15_000,
+          cacheReadTokens: 50_000,
           totalTokens: 80_000,
           costUsd: 0.8,
           unpricedCalls: 0,
-          models: [
-            mkModel('4-argon', 40_000, 8, 0.4),
-            mkModel('4-carbon', 25_000, 5, 0.25),
-            mkModel('3.8-flash-n', 13_000, 4, 0.1),
-            mTail1,
-            mTail2,
-            mTail3,
-          ],
         },
         {
           name: 'Antigravity CLI',
           calls: 3,
+          inputTokens: 5_000,
+          cacheReadTokens: 10_000,
           totalTokens: 20_000,
           costUsd: 0.16,
           unpricedCalls: 0,
-          models: [
-            mkModel('4-argon', 10_000, 2, 0.1),
-            mkModel('4-carbon', 5_000, 1, 0.05),
-            mkModel('3.8-flash-n', 5_000, 0, 0.01),
-          ],
         },
       ],
     },
@@ -405,14 +385,21 @@ test('ConsumptionView: Top Models color dot + % bar, clutter-free Client Sources
       ...baseTelemetry,
       consumption: {
         ...baseTelemetry.consumption,
-        monthlySeries: emptyMonths.map((m, idx) =>
-          idx === 10 ? { ...m, models: [mArgon] } : m
+        trendSeries: baseTelemetry.consumption.trendSeries.map((slot, index) =>
+          index === 1 ? { ...slot, models: [mArgon] } : slot
         ),
       },
     }),
     false,
-    'isEquivalentTelemetry must detect model breakdown changes inside monthlySeries'
+    'isEquivalentTelemetry must detect model breakdown changes inside trendSeries'
   );
+
+  const rebalancedSources = structuredClone(baseTelemetry);
+  rebalancedSources.consumption.sourcesBreakdown[0].inputTokens += 1_000;
+  rebalancedSources.consumption.sourcesBreakdown[0].cacheReadTokens -= 1_000;
+  rebalancedSources.consumption.sourcesBreakdown[1].inputTokens -= 1_000;
+  rebalancedSources.consumption.sourcesBreakdown[1].cacheReadTokens += 1_000;
+  assert.equal(isEquivalentTelemetry(baseTelemetry, rebalancedSources), false);
 
   telemetryStore.setState(
     { selectedTimeRange: 'all', telemetry: baseTelemetry },
@@ -444,20 +431,11 @@ test('ConsumptionView: Top Models color dot + % bar, clutter-free Client Sources
   // 2. Client Sources panel removed cleanly from ConsumptionView
   assert.equal((view.el.textContent || '').includes('客户端来源'), false);
 
-  // Verify single-line non-wrapping CSS rules and zero-gap hover layout rules
-  const { readFileSync } = await import('node:fs');
-  const consCss = readFileSync(new URL('../src/styles/views-consumption.css', import.meta.url), 'utf8');
-  assert.match(consCss, /\.cons-source-hover-zone\s*\{[\s\S]*flex-direction:\s*column/);
-  assert.match(consCss, /\.cons-source-foot\s*\{[\s\S]*flex-wrap:\s*nowrap/);
-  assert.match(consCss, /\.cons-source-top-models\s*\{[\s\S]*flex-wrap:\s*nowrap/);
-  assert.match(consCss, /@container\s*\(max-width:\s*340px\)\s*\{\s*\.cons-source-top-item:nth-child\(n\s*\+\s*3\)/);
-  assert.match(consCss, /\.monthly-grid\s*\{[\s\S]*gap:\s*0/);
-
   // 3. No duplicate bottom heatmap or monthly panel
   assert.equal(view.el.querySelector('.cons-heatmap-panel'), null);
   assert.equal(view.el.querySelectorAll('.monthly-grid').length, 0);
 
-  // 4. Usage Trend: taller 184px viewBox & hovering x-axis tick opens redesigned tooltip (hero TOKEN, 4-seg model bars, no subtitle/dot clutter, bottom 4 channels)
+  // 4. Usage Trend: taller 184px viewBox & hovering x-axis tick opens compact tooltip (time + calls, hero TOKEN + cost, concise model + share lines without progress bars or 4-channel micro-grid)
   const trendSvg = view.el.querySelector('.trend-svg');
   assert.match(trendSvg?.getAttribute('viewBox') || '', /\s184$/);
   const trendTicks = view.el.querySelectorAll('.trend-x-tick');
@@ -465,27 +443,22 @@ test('ConsumptionView: Top Models color dot + % bar, clutter-free Client Sources
   trendTicks[1].onclick();
   const trendTip = view.el.querySelector('.trend-tooltip');
   assert.equal(trendTip?.hasAttribute('hidden'), false);
+  assert.equal(trendTip.querySelector('.trend-tip-time')?.textContent, '11月18日 (周三)');
+  assert.equal(trendTip.querySelector('.trend-tip-calls')?.textContent, '23 次');
   assert.match(trendTip.querySelector('.trend-tip-tokens')?.textContent || '', /100\.0k TOKEN/);
-  assert.equal((trendTip.textContent || '').includes('模型细分'), false);
+  assert.equal(trendTip.querySelector('.trend-tip-cost')?.textContent, '$0.96');
   const trendTipModelRows = trendTip.querySelectorAll('.cons-pop-model-row');
   assert.equal(trendTipModelRows.length, 4);
-  assert.equal(trendTipModelRows[0].querySelector('.cons-pop-model-name')?.textContent, '4-argon');
-  assert.equal(trendTipModelRows[0].querySelector('.cons-model-dot')?.hasAttribute('hidden'), true);
-  const trendArgonSegs = trendTipModelRows[0].querySelectorAll('.progress-seg');
   assert.deepEqual(
-    trendArgonSegs.map((el) => el.className.split(/\s+/).find((c) => c.startsWith('seg-'))),
-    ['seg-input', 'seg-cached', 'seg-thinking', 'seg-output']
+    trendTipModelRows.map((row) => row.querySelector('.cons-pop-model-name')?.textContent),
+    ['4-argon', '4-carbon', '3.8-flash-n', '其他 (3)']
   );
-  const trendArgonSum = trendArgonSegs.reduce((s, el) => s + parsePctVar(el, '--seg-w'), 0);
-  assert.ok(Math.abs(trendArgonSum - 50) < 0.1, `Expected 50% 4-seg width in trend tooltip, got ${trendArgonSum}`);
-  assert.equal(trendTipModelRows[3].querySelector('.cons-pop-model-name')?.textContent, '其他 (3)');
-  const trendChannelsEl = trendTip.querySelector('.cons-pop-channels');
-  assert.equal(trendChannelsEl?.hasAttribute('hidden'), false);
-  assert.equal(trendTip.children[trendTip.children.length - 1], trendChannelsEl);
   assert.deepEqual(
-    trendChannelsEl.querySelectorAll('.cons-pop-chan-val').map((el) => el.textContent),
-    ['20.0k', '60.0k', '5.0k', '15.0k']
+    trendTipModelRows.map((row) => row.querySelector('.cons-pop-model-pct')?.textContent),
+    ['50.0%', '30.0%', '18.0%', '2.0%']
   );
+  assert.equal(trendTip.querySelectorAll('.progress-seg').length, 0);
+  assert.equal(trendTip.querySelector('.cons-pop-channels'), null);
 
   const histogramTelemetry = structuredClone(baseTelemetry);
   delete histogramTelemetry.consumption.account.avgTokPerSec;
@@ -515,7 +488,7 @@ test('selectConsumptionTimeRange serves prefetched presets with 0 network calls,
     session: { totalTokens },
     account: { totalTokens, calls: 2, inputTokens: totalTokens, cacheReadTokens: 0, outputTokens: 0, costUsd: 0.1, savedCostUsd: 0, cacheHitPct: 0 },
     trendSeries: [{ index: 0, label: '11/19', fullLabel: '11月19日', tokens: totalTokens, calls: 2, costUsd: 0.1 }],
-    sourcesBreakdown: [{ name: 'Antigravity App', calls: 2, totalTokens, costUsd: 0.1, models: [] }],
+    sourcesBreakdown: [{ name: 'Antigravity App', calls: 2, totalTokens, costUsd: 0.1 }],
     modelBreakdown: [{ label: 'Claude 4.5 Sonnet', shortName: 'Sonnet 4.5', calls: 2, totalTokens, costUsd: 0.1 }],
   });
 
@@ -527,8 +500,6 @@ test('selectConsumptionTimeRange serves prefetched presets with 0 network calls,
     consumption: {
       ...mkSlice('today', '今日', 1000, 7),
       presets: { today: { label: '今日', account: { totalTokens: 1000 } } },
-      monthlyYear: 2026,
-      monthlySeries: [],
     },
     modelBreakdown: mkSlice('today', '今日', 1000, 7).modelBreakdown,
   };
@@ -546,7 +517,6 @@ test('selectConsumptionTimeRange serves prefetched presets with 0 network calls,
           scope: 'consumption-presets',
           usageRevision: 7,
           ranges: {
-            cycle: mkSlice('cycle', '当前周期', 4000, 7),
             today: mkSlice('today', '今日', 1000, 7),
             '24h': mkSlice('24h', '近 24 小时', 1500, 7),
             '7d': mkSlice('7d', '近 7 天', 7000, 7),
@@ -586,7 +556,7 @@ test('selectConsumptionTimeRange serves prefetched presets with 0 network calls,
     };
   });
 
-  // 1. Entering ConsumptionView prefetches all 7 presets once
+  // 1. Entering ConsumptionView prefetches all 6 presets once
   assert.equal(await prefetchConsumptionPresets(), true);
   assert.equal(requestedUrls.length, 1);
   assert.match(requestedUrls[0], /scope=consumption-presets/);
@@ -772,8 +742,6 @@ test('ConsumptionView >90d heatmap replaces static hint with Day/Week/Month/Tota
         cacheHitPct: 66.7,
       },
       trendSeries: slots,
-      monthlyYear: 2026,
-      monthlySeries: [],
       sourcesBreakdown: [],
     },
   });
@@ -835,12 +803,18 @@ test('ConsumptionView >90d heatmap replaces static hint with Day/Week/Month/Tota
   assert.deepEqual(litRowsInCol(1), [5, 6]);
   assert.deepEqual(litRowsInCol(2), [0, 1, 2, 3, 4, 5, 6]);
 
-  // Hovering top unlit cell (row 0) of Week 1 still highlights Week 1's lit bar [row 5, row 6] and shows aggregated weekly tooltip
+  // Hovering top unlit cell (row 0) of Week 1 still highlights Week 1's lit bar [row 5, row 6] and shows compact aggregated weekly tooltip
   hmGridEl.dispatchEvent({ type: 'mouseover', target: colCells(1)[0], clientX: 40, clientY: 20 });
   assert.equal(trendTip.hasAttribute('hidden'), false);
   assert.equal(trendTip.querySelector('.trend-tip-time')?.textContent, '8月10日 ~ 16日');
+  assert.equal(trendTip.querySelector('.trend-tip-calls')?.textContent, '28 次');
   assert.match(trendTip.querySelector('.trend-tip-tokens')?.textContent || '', /140\.0k TOKEN/);
+  assert.equal(trendTip.querySelector('.trend-tip-cost')?.textContent, '$1.40');
   assert.equal(trendTip.querySelectorAll('.cons-pop-model-row').length, 1);
+  assert.equal(trendTip.querySelector('.cons-pop-model-name')?.textContent, 'Claude Opus 4.6');
+  assert.equal(trendTip.querySelector('.cons-pop-model-pct')?.textContent, '100%');
+  assert.equal(trendTip.querySelectorAll('.progress-seg').length, 0);
+  assert.equal(trendTip.querySelector('.cons-pop-channels'), null);
   assert.equal(colCells(1)[5].classList.contains('is-bar-hovered'), true);
   assert.equal(colCells(1)[6].classList.contains('is-bar-hovered'), true);
   assert.equal(colCells(1)[0].classList.contains('is-bar-hovered'), false);
@@ -856,6 +830,9 @@ test('ConsumptionView >90d heatmap replaces static hint with Day/Week/Month/Tota
   );
   hmGridEl.dispatchEvent({ type: 'mouseover', target: colCells(0)[6], clientX: 20, clientY: 60 });
   assert.equal(trendTip.querySelector('.trend-tip-time')?.textContent, '2026年 8月');
+  assert.equal(trendTip.querySelector('.trend-tip-calls')?.textContent, '88 次');
+  assert.match(trendTip.querySelector('.trend-tip-tokens')?.textContent || '', /1\.16M TOKEN/i);
+  assert.equal(trendTip.querySelector('.cons-pop-model-pct')?.textContent, '100%');
 
   // 5. Switch to 'all' (cumulative) mode: monotonic bottom-up growth ramp reaching 7 rows on last column
   modeBtns[3].dispatchEvent({ type: 'click', stopPropagation() {} });
@@ -884,7 +861,61 @@ test('ConsumptionView >90d heatmap replaces static hint with Day/Week/Month/Tota
   // 7. Clicking a week bar in 'week' mode drills down into custom time range for that week
   setI18nLanguage('zh-CN');
   await Promise.resolve();
+  hmSwitchEl.dispatchEvent({ type: 'noop' });
   hmSwitchEl.querySelectorAll('.seg-btn')[1].dispatchEvent({ type: 'click', stopPropagation() {} });
+
+  // 7a. Cross-review regression: moving tokens among daily tail models in week mode refreshes aggregate weekly leader
+  const mkDayWithHiddenTail = (dayIdx, tailXTok, tailYTok) => [
+    { label: `Day${dayIdx}-A`, shortName: `Day${dayIdx}-A`, calls: 1, totalTokens: 30_000 },
+    { label: `Day${dayIdx}-B`, shortName: `Day${dayIdx}-B`, calls: 1, totalTokens: 25_000 },
+    { label: `Day${dayIdx}-C`, shortName: `Day${dayIdx}-C`, calls: 1, totalTokens: 20_000 },
+    { label: 'Tail X', shortName: 'Tail X', calls: 1, totalTokens: tailXTok },
+    { label: 'Tail Y', shortName: 'Tail Y', calls: 1, totalTokens: tailYTok },
+  ];
+  const weekTailPayload1 = makePayload(
+    'all',
+    trendSlots.map((slot, idx) =>
+      idx >= 14 && idx <= 20
+        ? { ...slot, tokens: 85_000, models: mkDayWithHiddenTail(idx, 9_000, 1_000) }
+        : slot
+    )
+  );
+  weekTailPayload1.consumption.revision = 10;
+  telemetryStore.setState({ selectedTimeRange: 'all', telemetry: weekTailPayload1 }, { sync: true });
+  await Promise.resolve();
+  hmGridEl.dispatchEvent({ type: 'mouseover', target: colCells(2)[3], clientX: 60, clientY: 40 });
+  assert.equal(
+    trendTip.querySelector('.cons-pop-model-name')?.textContent,
+    'Tail X',
+    'Weekly aggregation promotes cumulative Tail X to #1 even when hidden in daily Others'
+  );
+
+  const weekTailPayload2 = makePayload(
+    'all',
+    trendSlots.map((slot, idx) =>
+      idx >= 14 && idx <= 20
+        ? { ...slot, tokens: 85_000, models: mkDayWithHiddenTail(idx, 1_000, 9_000) }
+        : slot
+    )
+  );
+  weekTailPayload2.consumption.revision = 11;
+  assert.equal(
+    isEquivalentTelemetry(weekTailPayload1, {
+      ...weekTailPayload1,
+      consumption: { ...weekTailPayload1.consumption, revision: 11 },
+    }),
+    false,
+    'isEquivalentTelemetry must detect consumption.revision bumps even when visible window totals match'
+  );
+  telemetryStore.setState({ selectedTimeRange: 'all', telemetry: weekTailPayload2 }, { sync: true });
+  await Promise.resolve();
+  hmGridEl.dispatchEvent({ type: 'mouseover', target: colCells(2)[3], clientX: 60, clientY: 40 });
+  assert.equal(
+    trendTip.querySelector('.cons-pop-model-name')?.textContent,
+    'Tail Y',
+    'Shifting tokens between daily tail models must invalidate weekly heatmap signature and update leader'
+  );
+
   hmGridEl.dispatchEvent({ type: 'click', target: colCells(2)[3], clientX: 60, clientY: 40 });
   assert.equal(telemetryStore.getState().selectedTimeRange, 'custom');
   assert.equal(telemetryStore.getState().customStartMs, firstMondayMs + 14 * dayMs);

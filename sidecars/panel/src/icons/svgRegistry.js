@@ -22,11 +22,6 @@ export const SVG_ICON_DEFS = Object.freeze({
     { tag: 'path', attrs: { d: 'M8 6.2v3.4' } },
     { tag: 'circle', attrs: { cx: '8', cy: '11.5', r: '0.6', fill: 'currentColor', stroke: 'none' } },
   ],
-  'help-circle': [
-    { tag: 'circle', attrs: { cx: '8', cy: '8', r: '6' } },
-    { tag: 'path', attrs: { d: 'M6.2 6.3a1.9 1.9 0 0 1 3.6.7c0 1.15-1.8 1.35-1.8 2.5' } },
-    { tag: 'circle', attrs: { cx: '8', cy: '11.8', r: '0.65', fill: 'currentColor', stroke: 'none' } },
-  ],
   'chevron-down': [
     { tag: 'path', attrs: { d: 'M4 6.2l4 4 4-4' } },
   ],
@@ -71,9 +66,6 @@ export const SVG_ICON_DEFS = Object.freeze({
     { tag: 'circle', attrs: { cx: '8', cy: '8', r: '5.8' } },
     { tag: 'path', attrs: { d: 'M8 4.8v3.5l2.4 1.5' } },
   ],
-  plus: [
-    { tag: 'path', attrs: { d: 'M8 3.5v9M3.5 8h9' } },
-  ],
   minus: [
     { tag: 'path', attrs: { d: 'M3.5 8h9' } },
   ],
@@ -106,10 +98,6 @@ export const SVG_ICON_DEFS = Object.freeze({
     { tag: 'path', attrs: { d: 'M8 2.4v7.6M5 7.2L8 10.2l3-3' } },
     { tag: 'path', attrs: { d: 'M2.6 11.4v1.4a1 1 0 0 0 1 1h8.8a1 1 0 0 0 1-1v-1.4' } },
   ],
-  upload: [
-    { tag: 'path', attrs: { d: 'M8 10.2V2.6M5 5.4L8 2.4l3 3' } },
-    { tag: 'path', attrs: { d: 'M2.6 11.4v1.4a1 1 0 0 0 1 1h8.8a1 1 0 0 0 1-1v-1.4' } },
-  ],
   'more-vertical': [
     { tag: 'circle', attrs: { cx: '8', cy: '3.6', r: '1.15', fill: 'currentColor', stroke: 'none' } },
     { tag: 'circle', attrs: { cx: '8', cy: '8', r: '1.15', fill: 'currentColor', stroke: 'none' } },
@@ -123,14 +111,6 @@ export const SVG_ICON_DEFS = Object.freeze({
       },
     },
   ],
-  grip: [
-    { tag: 'circle', attrs: { cx: '6', cy: '4', r: '1.05', fill: 'currentColor', stroke: 'none' } },
-    { tag: 'circle', attrs: { cx: '10', cy: '4', r: '1.05', fill: 'currentColor', stroke: 'none' } },
-    { tag: 'circle', attrs: { cx: '6', cy: '8', r: '1.05', fill: 'currentColor', stroke: 'none' } },
-    { tag: 'circle', attrs: { cx: '10', cy: '8', r: '1.05', fill: 'currentColor', stroke: 'none' } },
-    { tag: 'circle', attrs: { cx: '6', cy: '12', r: '1.05', fill: 'currentColor', stroke: 'none' } },
-    { tag: 'circle', attrs: { cx: '10', cy: '12', r: '1.05', fill: 'currentColor', stroke: 'none' } },
-  ],
   lock: [
     { tag: 'rect', attrs: { x: '3', y: '7', width: '10', height: '7', rx: '1.5' } },
     { tag: 'path', attrs: { d: 'M5.2 7V5.1a2.8 2.8 0 0 1 5.6 0V7' } },
@@ -139,11 +119,6 @@ export const SVG_ICON_DEFS = Object.freeze({
   unlock: [
     { tag: 'rect', attrs: { x: '3', y: '7', width: '10', height: '7', rx: '1.5' } },
     { tag: 'path', attrs: { d: 'M5.2 7V5.1a2.8 2.8 0 0 1 5.3-1.2' } },
-  ],
-  globe: [
-    { tag: 'circle', attrs: { cx: '8', cy: '8', r: '6' } },
-    { tag: 'ellipse', attrs: { cx: '8', cy: '8', rx: '2.7', ry: '6' } },
-    { tag: 'path', attrs: { d: 'M2.3 6h11.4M2.3 10h11.4' } },
   ],
   dollar: [
     { tag: 'path', attrs: { d: 'M8 2v12' } },

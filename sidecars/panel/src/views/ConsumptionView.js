@@ -18,7 +18,6 @@ import {
   patchText,
 } from '../core/domPatch.js';
 import {
-  buildDeterministicModelColorMap,
   formatDateSpanBadge,
   formatPctNumber,
   formatTokensPrecise,
@@ -625,20 +624,6 @@ export const ConsumptionView = defineComponent({
       const modelsTotalTok = models.reduce((s, m) => s + Number(m.totalTokens || 0), 0);
 
       const rawTrendSeries = cons.trendSeries || [];
-      const allTrendMergedModels = [];
-      const trendMergedByIdx = rawTrendSeries.map((slot) => {
-        if (!Array.isArray(slot?.models) || slot.models.length === 0) return null;
-        const merged = mergeAndSortBucketModels(slot.models);
-        for (const m of merged) {
-          allTrendMergedModels.push(m);
-        }
-        return merged;
-      });
-
-      const modelColorMap = buildDeterministicModelColorMap([
-        ...models,
-        ...allTrendMergedModels,
-      ]);
 
       // 2. 同步历史趋势交互式 SVG 面积图 / 近一年热力图
       const firstTrendSlot = rawTrendSeries[0] || null;
@@ -654,13 +639,14 @@ export const ConsumptionView = defineComponent({
         heatmapModeSwitch.setValue(heatmapViewMode);
       }
       const buildTrendModelSegments = (mergedSlotModels) =>
-        partitionModelSegments(mergedSlotModels, modelColorMap, {
-          maxMain: 5,
+        partitionModelSegments(mergedSlotModels, null, {
+          maxMain: 3,
           minSharePct: 1.5,
         });
-      const enrichedTrendSeries = rawTrendSeries.map((slot, idx) => {
-        const mergedSlotModels = trendMergedByIdx[idx];
-        if (!mergedSlotModels || mergedSlotModels.length === 0) return slot;
+      const enrichedTrendSeries = rawTrendSeries.map((slot) => {
+        if (!Array.isArray(slot?.models) || slot.models.length === 0) return slot;
+        const mergedSlotModels = mergeAndSortBucketModels(slot.models);
+        if (mergedSlotModels.length === 0) return slot;
         return {
           ...slot,
           mergedModels: mergedSlotModels,

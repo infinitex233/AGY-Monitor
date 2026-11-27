@@ -1,14 +1,13 @@
 /*
  * 全景消耗统计视图样式表 (views-consumption.css).
  * 包含：
- * 1. 消费概览顶栏与 3+3 统一指标矩阵 (.cons-overview-head, .cons-unified-matrix, .cons-split-3, .cons-col)
+ * 1. 消费概览顶栏与指标矩阵 (.cons-overview-head, .cons-unified-matrix, .cons-col)
  * 2. 4 段比例条与圆点色块 (.dot-swatch, .cons-seg-bar)
- * 3. 热门模型与数据来源列表项样式 (.cons-row-*, .cons-share-pill, .cons-item-*)
- * 4. 历史趋势纯 SVG 平滑曲线图与峰值胶囊 (.trend-*)
- * 5. 12 个月垂直堆叠柱状图与月度图例 (.monthly-*, .month-*)
+ * 3. 历史趋势曲线、热力图与悬浮详情 (.trend-*)
+ * 4. 模型用量明细表 (.cons-models-table)
  */
 
-/* --- 1. 消费概览顶栏与 3+3 组合指标矩阵 (Consumption Overview Matrix) --- */
+/* --- 1. 消费概览顶栏与指标矩阵 (Consumption Overview Matrix) --- */
 .cons-overview-head {
   flex-wrap: wrap;
   gap: 6px;
@@ -19,46 +18,6 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-}
-
-.cons-cycle-pool-select {
-  flex: 0 1 auto;
-  width: auto;
-  min-width: 0;
-  max-width: 112px;
-}
-
-.cons-cycle-pool-select .select-trigger {
-  width: auto;
-  min-height: calc(20px * var(--ui-font-scale, 1));
-  height: auto;
-  padding: 1px 7px;
-  gap: 4px;
-  font-size: var(--fs-sm);
-  line-height: 1.25;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--text-primary) 7.5%, var(--surface-panel));
-}
-
-.cons-cycle-pool-select .select-trigger:hover {
-  background: color-mix(in srgb, var(--text-primary) 11.5%, var(--surface-panel));
-}
-
-.cons-cycle-pool-select.is-open .select-trigger {
-  background: color-mix(in srgb, var(--text-primary) 14%, var(--surface-panel));
-}
-
-.cons-cycle-pool-select .select-trigger .svg-icon {
-  width: 11px;
-  height: 11px;
-}
-
-.cons-cycle-pool-select .select-menu {
-  right: auto;
-  min-width: 224px;
-  width: max-content;
-  max-width: 280px;
 }
 
 .cons-overview-controls {
@@ -117,11 +76,6 @@
   overflow: hidden;
 }
 
-.cons-split-3 {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .cons-split-4 {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) repeat(3, minmax(0, 1fr));
@@ -169,28 +123,6 @@
     border-left: none;
   }
   .cons-split-4 .cons-col:nth-child(n + 3) {
-    border-top: 1px solid var(--border-hairline);
-  }
-}
-
-.cons-matrix-bottom {
-  border-top: 1px solid var(--border-hairline);
-}
-
-.cons-matrix-bottom .cons-col {
-  gap: 4px;
-}
-
-@media (max-width: 350px) {
-  .cons-matrix-bottom.cons-split-3 {
-    grid-template-columns: 1fr;
-  }
-  .cons-matrix-bottom .cons-col {
-    padding-left: 0;
-    padding-right: 0;
-  }
-  .cons-matrix-bottom .cons-col.is-bordered-col {
-    border-left: none;
     border-top: 1px solid var(--border-hairline);
   }
 }
@@ -243,36 +175,6 @@
   letter-spacing: -0.02em;
 }
 
-.cons-sub-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  min-width: 0;
-}
-
-.cons-sub-head > span {
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.cons-sub-label {
-  font-size: var(--fs-base-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.cons-mid-num {
-  font-size: var(--fs-lg);
-  font-weight: 700;
-  line-height: 1.25;
-  color: var(--text-primary);
-  letter-spacing: -0.015em;
-  white-space: nowrap;
-}
-
 /* --- 2. 4 段比例条与圆点色块 (Four-Segment Bar & Dot Swatches) --- */
 .dot-swatch {
   width: 6px;
@@ -291,119 +193,17 @@
 .dot-swatch.seg-cached { background: var(--ctx-cached); }
 .dot-swatch.seg-output { background: var(--ctx-output); }
 .dot-swatch.seg-thinking { background: var(--ctx-thinking); }
-.dot-swatch.cons-model-dot { background: var(--dot-color, var(--accent-primary)); }
-
-.progress-seg.cons-model-seg,
-.month-seg.cons-model-seg {
-  background-color: var(--seg-color, var(--accent-primary));
-}
-
-/* --- 3. 热门模型与数据来源行头部对齐 (Popular Models & Sources Row Header) --- */
-.cons-row-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  min-height: calc(20px * var(--ui-font-scale, 1));
-  line-height: 1.3;
-  font-size: var(--fs-base);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.cons-row-title-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cons-row-metrics {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: calc(20px * var(--ui-font-scale, 1));
-}
-
-.cons-share-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(20px * var(--ui-font-scale, 1));
-  line-height: 1.2;
-  padding: 1px 7px;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--metric-ok);
-  background: color-mix(in srgb, var(--metric-ok) 11%, transparent);
-  border: none;
-  border-radius: var(--radius-pill);
-  box-sizing: border-box;
-}
-
-.cons-row-tok {
-  display: inline-flex;
-  align-items: center;
-  min-height: calc(20px * var(--ui-font-scale, 1));
-  line-height: 1.25;
-  font-size: var(--fs-base);
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.cons-row-cost {
-  display: inline-flex;
-  align-items: center;
-  min-height: calc(20px * var(--ui-font-scale, 1));
-  line-height: 1.25;
-  font-size: var(--fs-base);
-  font-weight: 700;
-  color: var(--text-primary);
-}
 
 .cons-seg-bar {
   height: 6px;
   border-radius: var(--radius-pill);
 }
 
-.cons-seg-bar[hidden],
-.cons-item-foot[hidden],
-.cons-share-pill[hidden] {
+.cons-seg-bar[hidden] {
   display: none !important;
 }
 
-.cons-metric-fill.tone-cost {
-  background-color: var(--accent-primary);
-}
-
-.cons-metric-fill.tone-speed {
-  background-color: var(--metric-ok);
-}
-
-.cons-metric-fill.tone-calls {
-  background-color: var(--ctx-cached);
-}
-
-.cons-model-focus-foot {
-  justify-content: space-between;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-}
-
-.cons-model-focus-left {
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cons-model-focus-right {
-  color: var(--text-secondary);
-  white-space: nowrap;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
-/* --- 4. 历史趋势交互式 SVG 平滑曲线图 (Interactive Historical Trend SVG Chart) --- */
+/* --- 3. 历史趋势交互式 SVG 平滑曲线图 (Interactive Historical Trend SVG Chart) --- */
 .cons-trend-head {
   flex-wrap: wrap;
   gap: 6px;
@@ -415,7 +215,6 @@
   margin-left: auto;
 }
 
-.cons-trend-hint[hidden],
 .cons-hm-mode-switch[hidden] {
   display: none !important;
 }
@@ -468,18 +267,6 @@
   stroke-linecap: round;
 }
 
-.trend-node-dot {
-  fill: var(--surface-panel);
-  stroke: var(--ctx-cached);
-  stroke-width: 1.4;
-}
-
-.trend-peak-dot {
-  fill: var(--ctx-cached);
-  stroke: var(--surface-panel);
-  stroke-width: 1.5;
-}
-
 .trend-hover-line {
   stroke: var(--accent-primary);
   stroke-width: 1;
@@ -512,22 +299,15 @@
   z-index: 2;
 }
 
-.cons-view-stage .progress-seg,
-.models-analytics-pane .progress-seg {
+.cons-view-stage .progress-seg {
   flex: 0 0 auto;
   transition:
     background-color 80ms ease,
     width 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.cons-view-stage .progress-fill {
-  transition: width 240ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
 @starting-style {
-  .cons-view-stage.is-ready .progress-seg,
-  .cons-view-stage.is-ready .progress-fill,
-  .models-analytics-pane .progress-seg {
+  .cons-view-stage.is-ready .progress-seg {
     width: 0%;
   }
 }
@@ -536,34 +316,13 @@
   transition: left 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes anim-cons-bar-grow {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-
-.cons-item-list.is-bars-revealing .progress-track {
-  transform-origin: left center;
-  animation: anim-cons-bar-grow 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .cons-view-stage .progress-seg,
-  .cons-view-stage .progress-fill,
-  .models-analytics-pane .progress-seg,
   .trend-peak-pill.is-ready,
   .trend-hm-cell,
   .trend-tooltip.is-tracking,
-  .trend-hover-dot.is-tracking,
-  .sstep-hover-raw-dot.is-tracking,
-  .sstep-anomaly-dot {
+  .trend-hover-dot.is-tracking {
     transition: none !important;
-  }
-  .cons-item-list.is-bars-revealing .progress-track {
-    animation: none !important;
   }
 }
 
@@ -648,55 +407,6 @@
   display: none;
 }
 
-.trend-tip-sub {
-  padding: 2px 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  font-size: var(--fs-xs);
-  line-height: 1.3;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.trend-tip-sub[hidden] {
-  display: none !important;
-}
-
-.trend-tip-sub.is-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding: 2px 0;
-  white-space: normal;
-  overflow: visible;
-}
-
-.trend-tip-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.trend-tip-stat-label {
-  font-size: var(--fs-2xs);
-  font-weight: 500;
-  line-height: 1.2;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.trend-tip-stat-val {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  line-height: 1.25;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
 .trend-tooltip.is-line-low {
   top: auto;
   bottom: 20px;
@@ -746,7 +456,7 @@
   font-weight: 600;
 }
 
-/* --- 4b. 类 GitHub 每日小格子热力图 (> 90 天自动启用，一格一天) --- */
+/* --- 历史用量热力图 --- */
 .trend-heatmap-stage {
   display: flex;
   flex-direction: column;
@@ -934,156 +644,6 @@
   box-sizing: border-box;
 }
 
-/* --- 5. 模型与数据来源明细行容器 (Popular Models & Sources Item Rows) --- */
-.cons-ranking-head {
-  flex-wrap: wrap;
-  row-gap: 6px;
-}
-
-.cons-ranking-sort-wrap {
-  display: inline-flex;
-  align-items: center;
-  margin-left: auto;
-}
-
-.cons-ranking-sort-wrap .segmented[hidden],
-.cons-item-list[hidden],
-.cons-ranking-empty[hidden] {
-  display: none !important;
-}
-
-.cons-ranking-empty {
-  padding: var(--space-4) 0;
-  text-align: center;
-  font-size: var(--fs-md);
-}
-
-.cons-item-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.cons-item-row {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 5px 7px;
-  margin: -5px -7px;
-  border-radius: var(--radius-xs);
-  transition: background-color var(--dur-instant) var(--ease-fast);
-}
-
-.cons-item-row:hover {
-  background: var(--surface-hover);
-}
-
-.cons-top-conv-row {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 5px 7px;
-  margin: -5px -7px;
-  width: calc(100% + 14px);
-  container-type: inline-size;
-  background: transparent;
-  border-radius: var(--radius-xs);
-  transition:
-    background-color var(--dur-instant) var(--ease-fast),
-    opacity var(--dur-instant) var(--ease-fast);
-}
-
-.cons-top-conv-row:hover {
-  background: var(--surface-hover);
-}
-
-.cons-top-conv-row.is-jumpable {
-  cursor: pointer;
-}
-
-.cons-top-conv-row.is-jumpable:hover .cons-top-conv-title {
-  color: var(--accent-primary);
-}
-
-.cons-top-conv-meta {
-  font-size: var(--fs-md);
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cons-top-conv-meta[hidden] {
-  display: none !important;
-}
-
-.cons-ws-sessions-tag {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 6px;
-  padding: 0 5px;
-  height: 16px;
-  border-radius: var(--radius-xs);
-  background: var(--surface-subtle);
-  border: 1px solid var(--border-hairline);
-  color: var(--text-muted);
-  font-size: var(--fs-2xs);
-  font-weight: 500;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.cons-ws-sessions-tag[hidden] {
-  display: none !important;
-}
-
-[data-modern-ui="true"] .cons-ws-sessions-tag {
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--modern-surface-subtle);
-  padding: 0 7px;
-}
-
-.cons-item-foot {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  font-size: var(--fs-md);
-  color: var(--text-secondary);
-}
-
-.cons-item-foot > .legend-left:last-child {
-  margin-left: auto;
-}
-
-.cons-model-perf-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: var(--fs-sm);
-  line-height: 1.3;
-  color: var(--text-muted);
-  margin-top: -1px;
-}
-
-.cons-model-perf-foot[hidden],
-.cons-model-unit-cost[hidden] {
-  display: none !important;
-}
-
-.cons-model-perf-main {
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.cons-model-unit-cost {
-  color: var(--text-secondary);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
 .cons-view-stage {
   flex: 1;
   min-height: 0;
@@ -1092,170 +652,7 @@
   position: relative;
 }
 
-.cons-item-foot strong {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.cons-source-row {
-  gap: 5px;
-  width: 100%;
-  container-type: inline-size;
-}
-
-.cons-source-hover-zone {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 4px 0 2px;
-  margin: -4px 0 -2px;
-  min-width: 0;
-}
-
-.cons-source-hover-zone.is-interactive {
-  cursor: pointer;
-}
-
-.cons-source-bar-hit {
-  padding: 0;
-  margin: 0;
-  cursor: inherit;
-}
-
-.cons-source-hover-zone.is-interactive:hover .cons-source-model-bar,
-.cons-source-hover-zone.is-hovered .cons-source-model-bar,
-.cons-source-bar-hit:hover .cons-source-model-bar,
-.cons-source-bar-hit.is-hovered .cons-source-model-bar {
-  box-shadow: 0 0 0 1px var(--border-strong);
-}
-
-.cons-source-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: nowrap;
-  gap: 8px;
-  min-width: 0;
-  min-height: 16px;
-  overflow: hidden;
-}
-
-.cons-source-top-models {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 8px;
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  cursor: pointer;
-}
-
-.cons-source-top-models[hidden] {
-  display: none;
-}
-
-.cons-source-top-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  line-height: 1.25;
-}
-
-.cons-source-top-item:first-child {
-  flex-shrink: 0.5;
-}
-
-.cons-source-top-dot {
-  width: 6px;
-  height: 6px;
-  flex-shrink: 0;
-}
-
-.cons-source-top-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-  color: var(--text-secondary);
-  transition: color 120ms ease;
-}
-
-.cons-source-hover-zone.is-interactive:hover .cons-source-top-name,
-.cons-source-hover-zone.is-hovered .cons-source-top-name,
-.cons-source-top-models:hover .cons-source-top-name,
-.cons-source-top-models.is-hovered .cons-source-top-name {
-  color: var(--text-primary);
-}
-
-.cons-source-top-pct {
-  flex-shrink: 0;
-  white-space: nowrap;
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.cons-source-foot > .cons-calls-stat {
-  flex: 0 0 auto;
-  white-space: nowrap;
-  margin-left: auto;
-}
-
-@container (max-width: 340px) {
-  .cons-source-top-item:nth-child(n + 3) {
-    display: none;
-  }
-}
-
-@container (max-width: 210px) {
-  .cons-source-top-item:nth-child(n + 2) {
-    display: none;
-  }
-}
-
-.month-col.is-interactive {
-  cursor: pointer;
-}
-
-.month-col.is-interactive:hover .month-stack,
-.month-col.is-hovered .month-stack {
-  box-shadow: 0 0 0 1px var(--text-primary);
-}
-
-.month-col.is-interactive:hover .month-label,
-.month-col.is-hovered .month-label {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-/* --- 共享模型构成悬浮详情卡 (Trend Heatmap / Client Sources / Sessions / Monthly Popover) --- */
-.cons-breakdown-popover {
-  position: absolute;
-  left: 0;
-  top: 0;
-  transform: translate3d(var(--pop-x, 8px), var(--pop-y, 8px), 0);
-  will-change: transform;
-  contain: layout style;
-  width: max-content;
-  min-width: 224px;
-  max-width: min(316px, calc(100% - 16px));
-  padding: 9px 11px;
-  background: var(--surface-panel);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-popover);
-  pointer-events: none;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
+/* --- 趋势图和热力图的悬浮详情 --- */
 .trend-tooltip.is-rich-breakdown {
   top: 0;
   bottom: auto;
@@ -1281,25 +678,23 @@
   transition: transform 150ms var(--ease-modern, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
-.trend-hover-dot.is-tracking,
-.sstep-hover-raw-dot.is-tracking {
+.trend-hover-dot.is-tracking {
   transition:
     cx 150ms var(--ease-modern, cubic-bezier(0.16, 1, 0.3, 1)),
     cy 150ms var(--ease-modern, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
-.trend-tooltip.is-rich-breakdown,
-.cons-breakdown-popover.is-rich-breakdown {
-  min-width: 212px;
-  max-width: min(276px, calc(100% - 10px));
-  padding: 7px 9px;
-  gap: 5px;
+.trend-tooltip.is-rich-breakdown {
+  min-width: 172px;
+  max-width: min(244px, calc(100% - 10px));
+  padding: 8px 11px;
+  gap: 4px;
 }
 
 .is-rich-breakdown .cons-tip-head {
   padding-bottom: 0;
   border-bottom: none;
-  gap: 8px;
+  gap: 12px;
 }
 
 .is-rich-breakdown .trend-tip-time {
@@ -1320,8 +715,9 @@
 
 .is-rich-breakdown .cons-tip-main {
   align-items: baseline;
-  margin-top: -2px;
+  margin-top: 0;
   padding: 0;
+  gap: 14px;
 }
 
 .is-rich-breakdown .cons-tip-hero {
@@ -1355,10 +751,10 @@
 .cons-pop-models {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  border-top: none;
-  padding-top: 2px;
-  margin-top: 0;
+  gap: 3px;
+  border-top: 1px solid color-mix(in srgb, var(--border-hairline) 75%, transparent);
+  padding-top: 5px;
+  margin-top: 1px;
 }
 
 .cons-pop-models[hidden] {
@@ -1367,219 +763,45 @@
 
 .cons-pop-model-row {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: var(--fs-xs);
-  line-height: 1.2;
-}
-
-.cons-pop-model-head {
-  display: flex;
+  flex-direction: row;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+  font-size: var(--fs-xs);
+  line-height: 1.3;
   min-width: 0;
-}
-
-.cons-pop-model-left {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  color: var(--text-primary);
-}
-
-.cons-pop-model-left .cons-model-dot {
-  width: 5px;
-  height: 5px;
-}
-
-.cons-pop-model-left .cons-model-dot[hidden] {
-  display: none !important;
 }
 
 .cons-pop-model-name {
-  max-width: 128px;
+  min-width: 0;
+  flex: 1 1 auto;
   font-size: var(--fs-xs);
   font-weight: 500;
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .cons-pop-model-row.is-other .cons-pop-model-name {
-  color: var(--text-secondary);
-}
-
-.cons-pop-model-right {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.cons-pop-model-tok {
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text-muted);
 }
 
 .cons-pop-model-pct {
-  min-width: 34px;
+  flex-shrink: 0;
   text-align: right;
-  font-size: var(--fs-2xs);
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
-.cons-pop-model-row .cons-seg-bar {
-  height: 3px;
-  border-radius: var(--radius-pill);
-}
-
-.cons-pop-channels {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  border-top: 1px solid color-mix(in srgb, var(--border-hairline) 65%, transparent);
-  padding-top: 5px;
-}
-
-.cons-pop-channels[hidden] {
-  display: none !important;
-}
-
-.cons-pop-chan {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.cons-pop-chan-head {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  min-width: 0;
-}
-
-.cons-pop-chan-head .dot-swatch {
-  width: 4px;
-  height: 4px;
-}
-
-.cons-pop-chan-label {
-  font-size: var(--fs-2xs);
-  font-weight: 500;
-  line-height: 1.15;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.cons-pop-chan-val {
   font-size: var(--fs-xs);
   font-weight: 600;
-  line-height: 1.2;
   color: var(--text-primary);
   white-space: nowrap;
 }
 
-/* --- 6. 12 个月垂直堆叠柱状图 (12-Month Stacked Bar Chart) --- */
-.monthly-grid {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 0;
-  align-items: stretch;
-  margin: var(--space-2) -1.5px 0;
-}
-
-.month-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 3px;
-  padding: 0 1.5px;
-  box-sizing: border-box;
-  min-width: 0;
-}
-
-.month-cost {
-  font-size: var(--fs-2xs);
+.cons-pop-model-row.is-other .cons-pop-model-pct {
   color: var(--text-secondary);
-  min-height: 14px;
-  white-space: nowrap;
+  font-weight: 500;
 }
 
-.month-bar-well {
-  width: 100%;
-  height: 82px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-.month-stack {
-  width: 72%;
-  max-width: 20px;
-  height: var(--bar-h, 0%);
-  display: flex;
-  flex-direction: column;
-  border-radius: 2px 2px 0 0;
-  overflow: hidden;
-  transition: height var(--dur-normal) var(--ease-fast);
-}
-
-.month-seg {
-  width: 100%;
-  height: var(--seg-h, 0%);
-}
-
-.month-seg.seg-input { background: var(--ctx-input); }
-.month-seg.seg-cached { background: var(--ctx-cached); }
-.month-seg.seg-output { background: var(--ctx-output); }
-.month-seg.seg-thinking { background: var(--ctx-thinking); }
-
-.month-zero-dot {
-  width: 3px;
-  height: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--border-strong);
-  margin-bottom: 4px;
-}
-
-.month-label {
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
-  padding: 1px 3px;
-  border-radius: var(--radius-xs);
-  white-space: nowrap;
-}
-
-.month-label.is-current {
-  color: var(--ctx-cached);
-  background: color-mix(in srgb, var(--ctx-cached) 14%, transparent);
-  font-weight: 600;
-}
-
-.month-tok {
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-  min-height: 12px;
-  white-space: nowrap;
-}
-
-.monthly-legend {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-4);
-  padding-top: var(--space-2);
-  font-size: var(--fs-md);
-  color: var(--text-secondary);
-}
-
-/* --- 7. Magpie 风格模型用量明细表 (.cons-models-table) --- */
+/* --- 4. 模型用量明细表 (.cons-models-table) --- */
 .cons-models-table-wrap {
   width: 100%;
   overflow-x: auto;

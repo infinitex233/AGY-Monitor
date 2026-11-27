@@ -1200,7 +1200,6 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
               session: { totalTokens: 128000, costUsd: 0.42, unpricedCalls: 12 },
               account: { totalTokens: 500000, costUsd: 1.5, unpricedCalls: 3993 },
               trendSeries,
-              monthlySeries: [],
             };
           })(),
           quotas: {
@@ -1677,11 +1676,6 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
       'Consumption trend curve spans flush edge-to-edge (1.0..179.0) across measured 180px viewBox'
     );
     assert.match(stylesCss, /\.app-shell\s*\{[^}]*max-width:\s*none;/, 'Sidecar .app-shell removes 560px width cap');
-    assert.match(
-      stylesCss,
-      /\.models-analytics-pane\s*\{[^}]*padding-left:\s*0;/,
-      'Models analytics pane eliminates nested left double-padding while preserving right scrollbar clearance'
-    );
     assert.doesNotMatch(
       stylesCss,
       /hsl\(145\s+78%\s+60%\)/,
@@ -2011,7 +2005,7 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
             context: { totalTokens: 64000, compactionLimitTokens: 256000, limitTokens: 256000 },
             recentSteps: [],
           },
-          consumption: { selectedRange: { key: 'today', label: '今天', startMs: 1, endMs: 2 }, session: {}, account: {}, trendSeries: [], monthlySeries: [] },
+          consumption: { selectedRange: { key: 'today', label: '今天', startMs: 1, endMs: 2 }, session: {}, account: {}, trendSeries: [] },
           quotas: null,
           modelBreakdown: [],
         },
@@ -2468,7 +2462,7 @@ test('Compiled app.js in Antigravity IDE workbench.html docks into .part.titleba
             context: { totalTokens: 64000, compactionLimitTokens: 256000, limitTokens: 256000 },
             recentSteps: [],
           },
-          consumption: { selectedRange: { key: 'today', label: '今天', startMs: 1, endMs: 2 }, session: {}, account: {}, trendSeries: [], monthlySeries: [] },
+          consumption: { selectedRange: { key: 'today', label: '今天', startMs: 1, endMs: 2 }, session: {}, account: {}, trendSeries: [] },
           quotas: null,
           modelBreakdown: [],
         }),
@@ -2893,7 +2887,7 @@ test('Composer mount mode (输入框挂载) docks capsule immediately left of Au
           recentSteps: [],
           modelBreakdown: [],
         },
-        consumption: { session: {}, account: {}, trendSeries: [], monthlySeries: [] },
+        consumption: { session: {}, account: {}, trendSeries: [] },
         quotas: { pools: [], weekly: {} },
         modelBreakdown: [],
       },
@@ -2927,7 +2921,7 @@ test('Composer mount mode (输入框挂载) docks capsule immediately left of Au
             recentSteps: [],
             modelBreakdown: [],
           },
-          consumption: { session: {}, account: {}, trendSeries: [], monthlySeries: [] },
+          consumption: { session: {}, account: {}, trendSeries: [] },
           quotas: { pools: [], weekly: {} },
           modelBreakdown: [],
         }),
@@ -3129,7 +3123,7 @@ test('Antigravity IDE composer mount mode (输入框挂载) docks inside extensi
       recentSteps: [],
       modelBreakdown: [],
     },
-    consumption: { session: {}, account: {}, trendSeries: [], monthlySeries: [] },
+    consumption: { session: {}, account: {}, trendSeries: [] },
     quotas: { pools: [], weekly: {} },
     modelBreakdown: [],
   });
@@ -4031,7 +4025,6 @@ test('v1.5 feedback E2E: sticky bridge port/token across hot-reloads, CDP->HTTP 
       session: {},
       account: {},
       trendSeries: [],
-      monthlySeries: [],
     },
     modelBreakdown: [],
   });

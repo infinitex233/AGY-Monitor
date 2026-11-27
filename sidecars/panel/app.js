@@ -844,11 +844,6 @@ const SVG_ICON_DEFS = Object.freeze({
     { tag: 'path', attrs: { d: 'M8 6.2v3.4' } },
     { tag: 'circle', attrs: { cx: '8', cy: '11.5', r: '0.6', fill: 'currentColor', stroke: 'none' } },
   ],
-  'help-circle': [
-    { tag: 'circle', attrs: { cx: '8', cy: '8', r: '6' } },
-    { tag: 'path', attrs: { d: 'M6.2 6.3a1.9 1.9 0 0 1 3.6.7c0 1.15-1.8 1.35-1.8 2.5' } },
-    { tag: 'circle', attrs: { cx: '8', cy: '11.8', r: '0.65', fill: 'currentColor', stroke: 'none' } },
-  ],
   'chevron-down': [
     { tag: 'path', attrs: { d: 'M4 6.2l4 4 4-4' } },
   ],
@@ -893,9 +888,6 @@ const SVG_ICON_DEFS = Object.freeze({
     { tag: 'circle', attrs: { cx: '8', cy: '8', r: '5.8' } },
     { tag: 'path', attrs: { d: 'M8 4.8v3.5l2.4 1.5' } },
   ],
-  plus: [
-    { tag: 'path', attrs: { d: 'M8 3.5v9M3.5 8h9' } },
-  ],
   minus: [
     { tag: 'path', attrs: { d: 'M3.5 8h9' } },
   ],
@@ -928,10 +920,6 @@ const SVG_ICON_DEFS = Object.freeze({
     { tag: 'path', attrs: { d: 'M8 2.4v7.6M5 7.2L8 10.2l3-3' } },
     { tag: 'path', attrs: { d: 'M2.6 11.4v1.4a1 1 0 0 0 1 1h8.8a1 1 0 0 0 1-1v-1.4' } },
   ],
-  upload: [
-    { tag: 'path', attrs: { d: 'M8 10.2V2.6M5 5.4L8 2.4l3 3' } },
-    { tag: 'path', attrs: { d: 'M2.6 11.4v1.4a1 1 0 0 0 1 1h8.8a1 1 0 0 0 1-1v-1.4' } },
-  ],
   'more-vertical': [
     { tag: 'circle', attrs: { cx: '8', cy: '3.6', r: '1.15', fill: 'currentColor', stroke: 'none' } },
     { tag: 'circle', attrs: { cx: '8', cy: '8', r: '1.15', fill: 'currentColor', stroke: 'none' } },
@@ -945,14 +933,6 @@ const SVG_ICON_DEFS = Object.freeze({
       },
     },
   ],
-  grip: [
-    { tag: 'circle', attrs: { cx: '6', cy: '4', r: '1.05', fill: 'currentColor', stroke: 'none' } },
-    { tag: 'circle', attrs: { cx: '10', cy: '4', r: '1.05', fill: 'currentColor', stroke: 'none' } },
-    { tag: 'circle', attrs: { cx: '6', cy: '8', r: '1.05', fill: 'currentColor', stroke: 'none' } },
-    { tag: 'circle', attrs: { cx: '10', cy: '8', r: '1.05', fill: 'currentColor', stroke: 'none' } },
-    { tag: 'circle', attrs: { cx: '6', cy: '12', r: '1.05', fill: 'currentColor', stroke: 'none' } },
-    { tag: 'circle', attrs: { cx: '10', cy: '12', r: '1.05', fill: 'currentColor', stroke: 'none' } },
-  ],
   lock: [
     { tag: 'rect', attrs: { x: '3', y: '7', width: '10', height: '7', rx: '1.5' } },
     { tag: 'path', attrs: { d: 'M5.2 7V5.1a2.8 2.8 0 0 1 5.6 0V7' } },
@@ -961,11 +941,6 @@ const SVG_ICON_DEFS = Object.freeze({
   unlock: [
     { tag: 'rect', attrs: { x: '3', y: '7', width: '10', height: '7', rx: '1.5' } },
     { tag: 'path', attrs: { d: 'M5.2 7V5.1a2.8 2.8 0 0 1 5.3-1.2' } },
-  ],
-  globe: [
-    { tag: 'circle', attrs: { cx: '8', cy: '8', r: '6' } },
-    { tag: 'ellipse', attrs: { cx: '8', cy: '8', rx: '2.7', ry: '6' } },
-    { tag: 'path', attrs: { d: 'M2.3 6h11.4M2.3 10h11.4' } },
   ],
   dollar: [
     { tag: 'path', attrs: { d: 'M8 2v12' } },
@@ -1265,7 +1240,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   // Top Navigation
   'nav.overview': '实时监控',
   'nav.consumption': '用量统计',
-  'nav.steps': '调用明细',
   'nav.settings': '偏好设置',
 
   // Top Session Header
@@ -1478,31 +1452,17 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'cons.rangeAria': '消耗统计时间范围',
   'cons.applyFilter': '筛选',
   'cons.rangeTo': '至',
-  'cons.overviewTitle': '用量总览',
   'cons.totalTokens': '总 Token',
-  'cons.tokenSplitSub': '输入 {input} · 缓存 {cache} · 输出 {output}',
   'cons.estCost': '预估费用',
   'cons.cacheHitRate': '缓存命中率',
   'cons.avgOutputSpeed': '输出速度',
   'cons.callsCount': '{calls} 次',
-  'cons.cacheHitTokens': '命中 {tokens}',
-  'cons.newInput': '新输入',
-  'cons.uncachedInput': '未命中缓存输入',
-  'cons.cacheRead': '缓存读取',
-  'cons.savedCost': '节省 {cost}',
-  'cons.outputUsage': '输出用量',
-  'cons.replyAndThink': '思考 {think} · 回复 {resp}',
   'cons.trendTitle': '用量趋势',
-  'cons.allTime': '全部时间',
   'cons.hmModeAria': '热力图查看维度',
   'cons.hmModeDay': '日',
   'cons.hmModeWeek': '周',
   'cons.hmModeMonth': '月',
   'cons.hmModeAll': '全部',
-  'cons.trendPointsHintMinute': '按 {minutes} 分钟 ({points}点) · 悬停查看',
-  'cons.trendPointsHintHourly': '按小时 ({points}点) · 悬停查看',
-  'cons.trendPointsHintDaily': '按日 ({points}点) · 悬停查看',
-  'cons.topModels': '模型排行',
   'cons.modelsTableTitle': '模型用量',
   'cons.modelsTableEmpty': '当前时间范围暂无模型用量',
   'cons.colModel': '模型',
@@ -1513,79 +1473,31 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'cons.colSpeed': '速度',
   'cons.colTtft': '首字',
   'cons.colCalls': '调用',
-  'cons.clientSources': '客户端来源',
-  'cons.monthlyTitle': '月度统计',
   'cons.monthLabel': '{m}月',
   'cons.monthFullLabel': '{year}年 {m}月',
-  'cons.hoverModelsHint': '悬停查看模型',
   'cons.otherModelsCount': '其他 ({count})',
-  'cons.legInput': '输入',
-  'cons.legCache': '缓存',
-  'cons.legOutput': '输出',
-  'cons.legThinking': '思考',
   'cons.footInput': '输入 ',
   'cons.footCache': '缓存 ',
   'cons.footOutput': '输出 ',
-  'cons.footThinking': '思考 ',
-  'cons.footCalls': '调用 ',
-  'cons.rankTabAria': '排行视图切换',
-  'cons.rankTabModelsCount': '模型排行 ({count})',
-  'cons.rankTabSessions': '会话排行',
-  'cons.rankTabSessionsCount': '会话排行 ({count})',
-  'cons.rankTabWorkspaces': '项目排行',
-  'cons.rankTabWorkspacesCount': '项目排行 ({count})',
-  'cons.workspaceUnbound': '未绑定工作区',
-  'cons.workspaceSessions': '{count} 会话',
   'cons.exportMenuAria': '导出及报告选项',
   'cons.exportXlsx': '导出 Excel (.xlsx)',
   'cons.exportXlsxTip': '导出多工作表排版精美的 Excel 报表（自动列宽、千分位及对齐）',
-  'cons.exportCsv': '导出 CSV',
-  'cons.exportCsvTip': '导出当前统计区间用量明细为 CSV',
-  'cons.exportCsvDone': '已导出',
   'cons.exportMd': '复制 Markdown 报告',
   'cons.exportMdTip': '复制当前统计区间 Markdown 汇总报告',
   'cons.exportMdDone': '已复制用量 Markdown 报告',
-  'cons.topConvsEmpty': '当前时间范围暂无会话消耗记录',
-  'cons.topConvsSortAria': '会话排行排序方式',
-  'cons.topConvsSortCost': '费用',
-  'cons.topConvsSortTokens': 'Token',
-  'cons.topConvCacheMeta': '缓存 {pct}%',
-  'cons.topConvJumpTip': '点击跳转到该会话调用记录',
-  'cons.modelsSortAria': '模型排行排序方式',
-  'cons.modelsSortTokens': 'Token',
-  'cons.modelsSortCost': '费用',
-  'cons.modelsSortSpeed': '均速',
-  'cons.modelsSortCalls': '调用',
-  'cons.modelUnitCost': '均价 {cost}/1M',
-  'cons.speedRelTip': '相对本时段最快模型的均速比例',
-  'cons.focusTtft': '首字 {ttft}',
-  'cons.focusSpeedMeta': '首字 {ttft} · 缓存 {cache}% · 输出 {out}',
-  'cons.focusCallsMeta': '单次均耗 {avgTok} · 费用 {cost}',
 
   // Steps Detail View & Step Column Registry
-  'steps.title': '调用记录',
   'steps.detailTitle': '明细',
   'steps.modeDots': '点阵',
   'steps.modeCurve': '曲线',
   'steps.modeTable': '列表',
   'steps.modeSwitchAria': '切换明细展示视图',
   'steps.trendEmpty': '当前范围暂无步骤趋势数据',
-  'steps.tabSteps': '明细',
-  'steps.tabStepsFiltered': '明细 ({filtered}/{total})',
-  'steps.tabModels': '汇总',
   'steps.allAgents': '全部汇总',
   'steps.allModels': '全部模型',
-  'steps.selectModel': '选择模型',
   'steps.unitAgent': '代理',
   'steps.unitModel': '模型',
-  'steps.lineTitle': '会话走势',
-  'steps.fitTitle': '趋势拟合',
-  'steps.modelsTitle': '模型总览',
-  'steps.modelsEmpty': '当前范围暂无模型调用记录',
-  'steps.metricTotalTokens': '总Token',
-  'steps.metricContext': '上下文',
   'steps.metricSpeed': '速度',
-  'steps.metricTps': 'TPS',
   'steps.metricTtft': '首字',
   'steps.metricCache': '缓存',
   'steps.metricCost': '费用',
@@ -1607,13 +1519,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'steps.tokSeg.reply.tip': '正文',
   'steps.tokSeg.total.th': '总计',
   'steps.tokSeg.total.tip': '总计',
-  'steps.modelCallsShare': '{calls}次 · {pct}%',
-  'steps.modelCallsOnly': '{calls}次',
-  'steps.modelsSummaryPrefix': '{count} 模型 · ',
-  'steps.modelPerfFoot': '均速 {tps} · 首字 {ttft} · 缓存 {cache}%',
-  'steps.modelSplitFoot': '输入 {inTok} · 缓存 {cacheTok} · 思考 {thinkTok} · 输出 {respTok}',
-  'steps.fitActiveCardTitle': '{title}（已纳入上方趋势拟合，按住 Ctrl/Shift 点击可多选对比）',
-  'steps.fitInactiveCardTitle': '点击在上方拟合图查看 {text}（按住 Ctrl/Shift 点击可多选同图对比）',
   'steps.turnMediaOnly': '[图片/附件提问]',
   'steps.turnMediaSuffix': '[附图]',
   'steps.anomalyTag.timeout': '超时{n}',
@@ -1651,7 +1556,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'steps.timingAfterTtftLabel': '首字后耗时',
   'steps.timingThinkLabel': '原生思考计时',
   'steps.timingTotalLabel': '端到端总耗时',
-  'steps.timingOverlapHint': '原生思考计时可能重叠首字或流式阶段，不可直接相加',
   'steps.timingToolBufferedHint': '含工具调用，缓冲返回时流式耗时较短',
   'steps.timingAnomalyHint': '含 {count} 次异常',
   'steps.timingAnomalyDelayHint': '含 {count} 次异常 · 退避 {sec}s',
@@ -1660,7 +1564,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'steps.anomalyModelSub': '涉及 {steps} 步',
   'steps.anomalyModelKindRow': '{kind}：{count} 次',
   'steps.anomalyModelClickHint': '点击前往「按步查看」筛选异常步',
-  'steps.anomalySummaryMeta': '异常 {count} 次（{steps} 步）',
   'steps.anomalyFilterLabel': '仅看异常 ({count})',
   'steps.anomalyFilterAll': '返回全部步骤',
   'steps.sortClickTip': '点击按「{col}」排序',
@@ -1675,9 +1578,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'steps.exportMenuAria': '导出及报告选项',
   'steps.exportXlsx': '导出 Excel (.xlsx)',
   'steps.exportXlsxTip': '导出排版精美的步骤明细及模型汇总 Excel 报表',
-  'steps.exportCsv': '导出 CSV',
-  'steps.exportCsvTip': '导出当前步骤明细为 CSV 文件',
-  'steps.exportCsvDone': '已导出',
   'steps.exportMd': '复制 Markdown 报告',
   'steps.exportMdTip': '复制当前步骤 Markdown 诊断报告',
   'steps.exportMdDone': '已复制步骤 Markdown 报告',
@@ -1723,22 +1623,15 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'stepCol.cost.th': '费用',
   'stepCol.cost.opt': '单步费用 ($)',
 
-  // Preferences (3-Tab Modular Settings)
-  'settings.subTab.general': '常规',
-  'settings.subTab.structure': '结构',
-  'settings.subTab.other': '其他',
-  'settings.subTab.aria': '偏好设置分类切换',
+  // Preferences
   'settings.simple.appearanceTitle': '外观与显示',
   'settings.simple.maintTitle': '数据与维护',
   'settings.simple.versionRow': '版本与价格',
   'settings.saving': '保存中…',
   'settings.saved': '已保存',
   'settings.saveFailed': '保存失败',
-  'settings.resetDone': '已恢复默认',
-  'settings.resetBtn': '恢复默认',
 
-  // Preferences -> General Tab
-  'settings.gen.appearanceTitle': '界面与外观',
+  // Appearance and updates
   'settings.gen.language': '界面语言',
   'settings.gen.langZh': '简体中文',
   'settings.gen.langEn': 'English',
@@ -1759,25 +1652,8 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'settings.gen.fontMd': '标准',
   'settings.gen.fontLg': '大',
   'settings.gen.fontXl': '特大',
-  'settings.gen.fontHint': '等比缩放侧边栏与展开面板字号，顶栏及输入框内嵌胶囊保持紧凑定高',
-  'settings.gen.modernUi': '现代化 UI',
   'settings.gen.modernUiOff': '关闭',
   'settings.gen.modernUiOn': '开启',
-  'settings.gen.modernUiHint': '去除大部分线框，采用柔和分层底色及更流畅的现代过渡动画',
-  'settings.gen.updateTitle': '版本更新',
-  'settings.gen.updateMode': '更新方式',
-  'settings.gen.updateManual': '仅提示新版本，手动更新',
-  'settings.gen.updateAuto': '自动更新',
-  'settings.gen.updateOff': '关闭更新',
-  'settings.gen.pricingLabel': '价格表',
-  'settings.gen.versionLabel': '当前版本',
-  'settings.gen.modelCount': '{count} 个模型',
-  'settings.gen.srcRemote': '云端同步',
-  'settings.gen.srcLocal': '本地文件',
-  'settings.gen.srcDefault': '内置默认',
-  'settings.gen.syncAt': '更新于 {time}',
-  'settings.gen.pubAt': '发布于 {date}',
-  'settings.gen.defaultPricing': '默认价格',
   'settings.gen.syncBtn': '更新价格表',
   'settings.gen.syncingBtn': '更新中…',
   'settings.gen.syncingMsg': '正在同步价格表…',
@@ -1787,66 +1663,15 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'settings.gen.checkingBtn': '检查中…',
   'settings.gen.checkingMsg': '正在检查新版本…',
   'settings.gen.checkFailedMsg': '检查失败：{err}',
-  'settings.gen.upToDateMsg': '当前已是最新版本 (v{ver})',
+  'settings.gen.upToDateMsg': '当前已是最新版本',
+  'settings.gen.upToDateVersionMsg': '当前已是最新版本 (v{ver})',
   'settings.gen.downloadingMsg': '正在下载更新…',
   'settings.gen.updatedRestartMsg': '更新完成，正在重启面板…',
   'settings.gen.updateSkippedMsg': '未执行更新',
   'settings.gen.updateFailedMsg': '更新失败',
-  'settings.gen.canUpgradeSub': '可升级至 v{ver} ({mode})',
   'settings.gen.upgradeToBtn': '升级至 v{ver}',
-  'settings.gen.manualUpgradeBtn': '手动升级 v{ver}',
-  'settings.gen.updateOffSub': '已关闭更新提醒 ({mode})',
-  'settings.gen.latestSub': '已是最新 ({mode})',
 
-  // Preferences -> General Tab -> Antigravity Host UI Language (decoupled Host I18n)
-  'settings.hostI18n.title': 'Antigravity 界面语言',
-  'settings.hostI18n.langLabel': '目标语言',
-  'settings.hostI18n.langOff': '原始语言（不翻译）',
-  'settings.hostI18n.langHint': '从仓库按需独立下载语言包并在渲染层无损应用，不修改宿主安装包，不影响聊天内容与代码',
-  'settings.hostI18n.optInstalled': '已下载 v{ver}',
-  'settings.hostI18n.optRemote': '仓库拉取 · {size}',
-  'settings.hostI18n.refreshManifestTip': '刷新仓库语言包清单',
-  'settings.hostI18n.refreshingManifestMsg': '正在拉取语言清单…',
-  'settings.hostI18n.manifestSyncedMsg': '已更新清单（{count} 个语言包）',
-  'settings.hostI18n.manifestFailedMsg': '拉取语言清单失败，请检查网络或代理',
-  'settings.hostI18n.depthLabel': '翻译深度',
-  'settings.hostI18n.depthLight': '浅度',
-  'settings.hostI18n.depthDeep': '深度',
-  'settings.hostI18n.depthLightHint': '浅度模式：保留 MCP、Skill、Workspace、Subagent、Swarm、Diff、Terminal 等高频英文术语及模型名称，仅翻译常规界面',
-  'settings.hostI18n.depthDeepHint': '深度模式：将常见工程术语一并译为目标语言（如工作区、子代理、蜂群、终端、沙箱），仅保留模型名与命令',
-  'settings.hostI18n.downloadingMsg': '正在下载 {locale} 语言包…',
-  'settings.hostI18n.downloadedAndAppliedMsg': '语言包已下载校验并生效',
-  'settings.hostI18n.appliedMsg': '已切换并即时生效',
-  'settings.hostI18n.disabledMsg': '已关闭翻译并还原原始界面',
-  'settings.hostI18n.depthSwitchedMsg': '已热切换翻译深度',
-  'settings.hostI18n.packUpdatedMsg': '语言包已更新并重新应用',
-  'settings.hostI18n.cacheRemovedMsg': '已删除本地语言包缓存',
-  'settings.hostI18n.actionFailed': '语言包操作失败，请重试',
-  'settings.hostI18n.entriesCount': '{count} 条词条',
-  'settings.hostI18n.appliedWindows': '已应用 {count} 窗口',
-  'settings.hostI18n.updatePackBtn': '更新至 v{ver}',
-  'settings.hostI18n.redownloadBtn': '检查更新',
-  'settings.hostI18n.removeCacheBtn': '删除缓存',
-  'settings.hostI18n.devToolsTitle': '词条采集与多语言扩展',
-  'settings.hostI18n.devToolsHint': '仅扫描当前打开的 Antigravity 界面控件中未命中的英文短语（自动排除聊天正文与代码），便于补全漏翻词条或制作新语言包',
-  'settings.hostI18n.collectBtn': '采集未翻译 UI 文案',
-  'settings.hostI18n.collectingBtn': '采集中…',
-  'settings.hostI18n.collectedResult': '共采集到 {count} 条待翻译 UI 文案（扫描 {targets} 个窗口）',
-  'settings.hostI18n.collectedEmpty': '当前页面未检测到待翻译的英文 UI 短语',
-  'settings.hostI18n.collectFailed': '采集失败，请确认已开启调试端口并打开主窗口',
-  'settings.hostI18n.copyJsonBtn': '复制 JSON',
-  'settings.hostI18n.exportJsonBtn': '导出 JSON',
-
-  // Preferences -> Structure Tab
-  'settings.str.thirdTabAria': '结构子菜单切换',
-  'settings.str.tabMount': '挂载胶囊',
-  'settings.str.tabHover': '鼠标悬浮窗',
-  'settings.str.tabOverview': '实时监控布局',
-  'settings.str.tabSteps': '调用明细字段',
-  'settings.str.previewMountSidebarHint': '当前为仅侧边栏模式，主窗口不挂载胶囊；切回顶部栏或输入框挂载后将按上方样式呈现',
-  'settings.str.previewMountFloatingHint': '监控面板显示为可移动的悬浮窗，收起为浮标后仍可查看实时指标。',
-  'settings.str.mountSection': '挂载胶囊',
-  'settings.str.mountBadge': '{count}/5 项',
+  // Mount modes and control labels
   'settings.str.mountMode': '面板挂载方式',
   'settings.str.mountDual': '双栖挂载 (顶部栏 + 侧边栏)',
   'settings.str.mountComposer': '输入框挂载 (输入框 + 侧边栏)',
@@ -1873,154 +1698,25 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'settings.bridge.dismissAria': '暂时关闭提示',
   'settings.bridge.copyFlagBtn': '复制 {cmd}',
   'settings.bridge.copiedBtn': '已复制启动参数',
-  'settings.str.popoverWidthLabel': '悬浮面板宽度',
-  'settings.str.popoverWidthAuto': '自适应',
-  'settings.str.popoverWidthCustom': '指定宽度',
-  'settings.str.popoverWidthHint': '自适应模式下在调用明细等宽表格视图自动撑宽免水平滚动；指定宽度范围 440~1080 px',
-  'settings.str.multiToggle': '实时运行会话入口',
-  'settings.str.contextAgentModeLabel': '胶囊及悬浮上下文',
-  'settings.str.contextAgentMain': '锁定主代理',
-  'settings.str.contextAgentAuto': '跟随活跃',
-  'settings.str.cliCapsuleToggle': 'CLI 底部状态胶囊',
-  'settings.str.cliSlotsLabel': 'CLI 槽位顺序 (左 → 右，1~6 项，可拖拽)',
-  'settings.str.addCliSlot': '添加 CLI 槽位 ({count}/{max})',
-  'settings.str.cliCustomCmdHint': '检测到自定义 statusLine 命令，为避免误覆盖默认不会自动改写',
-  'settings.str.cliPausedHint': 'CLI 端当前已暂停或未写入 statusLine 配置',
-  'settings.str.cliFlagsOverrideHint': '检测到 CLI 启动参数包含显式槽位覆盖，命令行参数将优先于此处配置',
-  'settings.str.cliRestoreBtn': '一键接管并恢复',
-  'settings.str.cliEnableBtn': '重新写入并启用',
-  'settings.str.cliClearFlagsBtn': '清除命令行覆盖',
-  'settings.str.cliRestoringBtn': '正在写入...',
-  'settings.str.cliPreviewRunning': '{count} 运行中',
   'settings.str.show': '显示',
   'settings.str.hide': '隐藏',
   'settings.str.on': '开启',
   'settings.str.off': '关闭',
-  'settings.str.capsuleSlotsLabel': '胶囊数值与顺序 (左 → 右，1~5 项，可拖拽)',
-  'settings.str.addCapsuleSlot': '添加槽位 ({count}/{max})',
-  'settings.str.hoverSection': '鼠标悬浮窗',
-  'settings.str.hoverBadgeOff': '已关闭',
-  'settings.str.hoverBadgeCount': '{count} 模块',
-  'settings.str.hoverModulesLabel': '悬浮窗展示模块 (上 → 下，0~4 项，可拖拽)',
-  'settings.str.hoverEmptyHint': '已关闭悬浮速览窗（点击胶囊仍可展开完整面板）',
-  'settings.str.addHoverModule': '添加模块 ({count}/{max})',
-  'settings.str.overviewSection': '实时监控布局',
-  'settings.str.overviewBadge': '{modCount} 模块 · {metCount} 指标',
-  'settings.str.overviewModulesLabel': '监控模块与顺序 (上 → 下，至少 1 项，可拖拽)',
-  'settings.str.addOverviewModule': '添加模块 ({count}/{max})',
-  'settings.str.overviewMetricsLabel': '第一行实时指标 (左 → 右，1~4 项，可拖拽)',
-  'settings.str.overviewMetricsInactiveHint': '当前已移出「实时指标」模块，此配置将在悬浮窗启用或重新添加模块时生效',
-  'settings.str.addOverviewMetric': '添加指标 ({count}/{max})',
-  'settings.str.stepsSection': '调用明细字段',
-  'settings.str.stepsBadge': '{count} 列',
-  'settings.str.stepTurnRailToggle': '对话轮次导轨',
-  'settings.str.stepAgentBadgeToggle': '主/子代理标识',
-  'settings.str.stepSpeedColorToggle': '输出速度多色分级',
-  'settings.str.stepFilterToolbarToggle': '搜索及诊断筛选栏',
-  'settings.str.stepTokenComboLabel': '自定义 Token 组合格式',
-  'settings.str.stepTokenComboPlaceholder': '例如 context:new:cache 或 in:out:cache',
-  'settings.str.stepTokenComboHint': '可用字段：context(上下文)、in/new(新输入)、out(输出)、cache(缓存)、think(思考)、reply(正文)、total(总计)，以 : 或 / 分隔（1~4 项）',
-  'settings.str.stepsColsLabel': '「按步查看」显示列 (左 → 右，至少 2 列，可拖拽)',
-  'settings.str.addStepCol': '添加字段 ({count}/{max})',
-  'settings.slot.dragHint': '按住上下拖动调整顺序',
-  'settings.slot.moveUp': '前移',
-  'settings.slot.moveDown': '后移',
-  'settings.slot.remove': '移除此项',
-  'settings.slot.minReached': '至少保留 {min} 项',
-  'settings.slot.alreadyAdded': '已添加',
-  'settings.mock.sessionTitle': '重构鉴权中间件与会话缓存',
-  'settings.mock.subRole': '接口审计',
-  'settings.mock.turnPromptLatest': '排查并发刷新令牌时的竞态问题，补齐单元测试',
-  'settings.mock.turnPromptPrev': '梳理路由守卫与过期会话清理逻辑',
 
-  // Preferences -> Other Tab
-  'settings.oth.modelTitle': '模型标识显示',
+  // Model display and maintenance
   'settings.oth.modelFormat': '模型名称格式',
   'settings.oth.modelShort': '精简代号 (如 4-neon-high)',
   'settings.oth.modelUpstream': '原始模型 ID (如 gemini-3.8-flash-n)',
   'settings.oth.modelUpstreamCompact': '去前缀原始 ID (如 3.8-flash-n / sonnet-4-6 / 5.4-mini)',
-  'settings.oth.orchFormat': 'Orchestrator 系列 ID',
-  'settings.oth.orchCompact': '精简代号 (如 orchestrator-argon)',
-  'settings.oth.orchFull': '原始完整 ID (如 gemini-pro-orchestrator)',
-  'settings.oth.baselineTitle': '模型上下文设置',
-  'settings.oth.ctxRiskTitle': '非官方能力风险提示',
-  'settings.oth.ctxRiskBody': 'Google 官方并未授权在 Antigravity App / IDE 中修改模型上下文上限。擅自修改可能导致 Antigravity 或 GCP 服务被禁用，甚至触发账号封禁；启用该功能即默认由你自行承担全部风险。你最好清楚自己在做什么！',
-  'settings.oth.ctxRiskAcceptBtn': '我已知晓风险，继续使用',
-  'settings.oth.ctxModel': '模型',
-  'settings.oth.ctxMainLabel': '主代理',
-  'settings.oth.ctxSwarmLabel': '子代理与蜂群',
-  'settings.oth.ctxSwarmError': '本地同步异常：{error}',
-  'settings.oth.ctxBaselineLabel': '上下文窗口上限',
-  'settings.oth.ctxChooseModel': '选择模型',
-  'settings.oth.ctxDefault': '跟随宿主设置',
-  'settings.oth.ctxExpensive': '{name}（消耗更多配额）',
-  'settings.oth.ctxTokens': '{count} token',
-  'settings.oth.ctxUnavailable': '{name}（当前不可用）',
-  'settings.oth.ctxConfigured': '{name} · 已设置',
-  'settings.oth.ctxConfiguredReported': '{name} · 已设置 / 最近 {reported}',
-  'settings.oth.ctxPendingBridge': '{name} · 待重启生效',
-  'settings.oth.ctxDefaultReported': '默认 · 最近 {name}',
-  'settings.oth.ctxReported': '最近一次请求由宿主报告为 {name}。',
-  'settings.oth.ctxMixed': '各推理档设置不同',
-  'settings.oth.ctxMixedHint': '该模型的推理档保留了不同的旧设置。选择一个上限即可统一。',
-  'settings.oth.ctxBaselineHint': '同一模型的推理档共享上限。插件会在启动后重新应用已保存的设置，用于之后发送的消息。',
-  'settings.oth.ctxNoModels': '宿主暂未返回可用模型。',
-  'settings.oth.ctxNoOptions': '宿主未提供此模型的上下文档位或容量，当前只能跟随宿主设置。',
-  'settings.oth.maintTitle': '缓存与重置',
   'settings.oth.cacheLabel': '本地轨迹缓存',
-  'settings.oth.cacheDesc': '清空内存与磁盘步骤解析缓存并立即重扫全部会话',
   'settings.oth.rebuildBtn': '重建本地轨迹缓存',
   'settings.oth.rebuildingBtn': '重建中…',
   'settings.oth.rebuildDone': '本地轨迹缓存已重建',
   'settings.oth.rebuildFailed': '缓存重建失败',
-  'settings.oth.resetLabel': '恢复出厂偏好',
-  'settings.oth.resetDesc': '将常规、结构与其他分页中的所有偏好设置还原为初始默认状态',
   'settings.oth.resetAllBtn': '恢复全部默认设置',
   'settings.oth.resetConfirmBtn': '再次点击确认重置',
   'settings.oth.resettingBtn': '重置中…',
   'settings.oth.resetAllDone': '已恢复全部默认设置',
-  'settings.oth.backupLabel': '配置备份及恢复',
-  'settings.oth.backupDesc': '导出或导入外观、胶囊、列配置等便携偏好 JSON',
-  'settings.oth.exportJsonBtn': '导出 JSON',
-  'settings.oth.importJsonBtn': '导入 JSON',
-  'settings.oth.exportDone': '配置 JSON 已导出',
-  'settings.oth.importDone': '已恢复 {count} 项偏好设置',
-  'settings.oth.importInvalid': '导入失败：JSON 无效或未包含可识别的偏好项',
-  'settings.oth.migTitle': '跨端会话迁移',
-  'settings.oth.migDesc': '按需把选定会话迁往另一端，迁移前自动备份摘要库和源库',
-  'settings.oth.migRefreshBtn': '刷新列表',
-  'settings.oth.migSourceLabel': '来源端',
-  'settings.oth.migTargetLabel': '目标端',
-  'settings.oth.migModeLabel': '迁移方式',
-  'settings.oth.migModeMove': '完整迁移（推荐）',
-  'settings.oth.migModeClone': '克隆副本',
-  'settings.oth.migModeMoveHint': '分配目标端独立会话 ID 并完整保留全部历史步序明细，备份后移出源端',
-  'settings.oth.migModeCloneHint': '保留源会话并生成新 ID，新副本仅统计迁入后的新步骤',
-  'settings.oth.migProjectLabel': '绑定目标项目',
-  'settings.oth.migProjectOutside': '独立会话（无所属项目）',
-  'settings.oth.migClientDesktop': '桌面端 App / 新版 IDE',
-  'settings.oth.migClientCli': 'Antigravity CLI',
-  'settings.oth.migClientIdeLegacy': '旧版 IDE (.db)',
-  'settings.oth.migSearchPlaceholder': '按标题或工作区筛选会话…',
-  'settings.oth.migSelectAll': '全选',
-  'settings.oth.migClearSel': '清空',
-  'settings.oth.migSelectedCount': '已选 {selected} / {total}',
-  'settings.oth.migRunningTag': '运行中',
-  'settings.oth.migStepsUnit': '{count} 步',
-  'settings.oth.migEmpty': '当前来源端暂无可迁移会话',
-  'settings.oth.migNoMatch': '没有匹配的会话',
-  'settings.oth.migActionBtn': '迁移选定会话 ({count})',
-  'settings.oth.migRunningBtn': '迁移中…',
-  'settings.oth.migDoneDesktop': '已成功迁移 {count} 条会话到「{project}」，在桌面端按 Ctrl+R 即可在左侧看到',
-  'settings.oth.migDoneCli': '已成功迁移 {count} 条会话到 CLI，可使用下方命令恢复对话',
-  'settings.oth.migPartialWarn': '（另有 {failed} 条跳过或失败）',
-  'settings.oth.migReloadBtn': '刷新窗口',
-  'settings.oth.migCopyCmd': '复制命令',
-  'settings.oth.migCopied': '已复制',
-  'settings.oth.migErrLocked': '源会话文件正被原端占用，请先关闭对应终端/窗口后重试，或切换为「克隆副本」',
-  'settings.oth.migErrExists': '目标端已存在同 ID 会话，无需重复移动（可切换为「克隆副本」）',
-  'settings.oth.migErrRunning': '该会话正在运行中，请待空闲后再迁移',
-  'settings.oth.migFailed': '迁移失败：{reason}',
 
   // Structured Live Activity Actions
   'live.act.run_command': '执行命令',
@@ -2062,49 +1758,7 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'live.act.awaitingApproval': '等待确认 · {label}',
   'live.act.compactionResuming': '已完成压缩，正在恢复推理',
 
-  // SVG Charts (SessionStepCharts & TrendAreaChart)
-  'chart.step.empty': '当前范围暂无可绘制的调用步骤',
-  'chart.step.excluded': '未纳入',
-  'chart.step.zeroSteps': '0 步',
-  'chart.step.stepAdd': '本步 +{tokens}',
-  'chart.step.ioSplit': '入 {inTok} · 缓 {cacheTok} · 出 {outTok}',
-  'chart.step.cacheShort': '缓存 {pct}%',
-  'chart.step.compactionCheckpoint': '上下文自动压缩检查点',
-  'chart.step.cacheHitOut': '缓存命中 {pct}% · 输出 +{outTok}',
-  'chart.step.ttftShort': '首字 {sec}s',
-  'chart.step.outAndCtx': '输出 {outTok} · 上下文 {ctxTok}',
-  'chart.step.compactionStep': '上下文压缩步',
-  'chart.step.noSpeedSample': '无测速样本',
-  'chart.step.ctxAndCache': '上下文 {ctxTok} · 缓存 {pct}%',
-  'chart.step.noTtftSample': '无首字计时样本',
-  'chart.step.cumCost': '累计 {cost}',
-  'chart.step.cacheAndStepTok': '缓存 {pct}% · 本步 {tokens}',
-  'chart.step.noSamples': '无样本',
-  'chart.step.peakShort': '峰 {val}',
-  'chart.step.peakPill': '峰值 {tag} · {val}',
-  'chart.step.stepsCount': '{count}步',
-  'chart.step.multiPrefix': '{count} 模型 · ',
-  'chart.step.sumTokens': '{prefix}累计 {tokens}',
-  'chart.step.peakTokens': '{prefix}峰值 {tokens}',
-  'chart.step.currentCtx': '当前 {tokens}',
-  'chart.step.meanTps': '{prefix}均值 {val} tok/s',
-  'chart.step.meanSec': '{prefix}均值 {val}s',
-  'chart.step.noValidSamples': '暂无有效样本',
-  'chart.step.sumCost': '{prefix}累计 {cost}',
-  'chart.fit.empty': '该模型暂无有效拟合样本',
-  'chart.fit.loess': 'LOESS 拟合',
-  'chart.fit.olsLinear': 'OLS 线性',
-  'chart.fit.olsReg': 'OLS 回归',
-  'chart.fit.observed': '观测值',
-  'chart.fit.tipFit': '拟合 {val}',
-  'chart.fit.tipObs': '观测 {val}',
-  'chart.fit.zeroSamples': '0 样本',
-  'chart.fit.peerMean': '{label} 均 {val}',
-  'chart.fit.peerCompare': '同图对比：{peers}',
-  'chart.fit.curvesCount': '{count} 条拟合线',
-  'chart.fit.multiBadge': '{steps}步 · {models} 模型对比',
-  'chart.fit.singleBadge': '{steps}步 · 均 {mean}',
-  'chart.fit.olsTitle': 'OLS: y = {slope}x + {intercept} · 样本标准差 SD = ±{sd}',
+  // Usage trend and heatmap
   'chart.trend.hmMonthYear': '{yy}年{month}月',
   'chart.trend.hmMonthOnly': '{month}月',
   'chart.trend.wdayMon': '一',
@@ -2124,7 +1778,7 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'chart.trend.hmCumThrough': '截至 {date} 累计',
   'chart.trend.peakPill': '峰值 {label} · {tokens}',
 
-  // Base UI Controls (CustomDateTimePicker, CustomNumberInput, SegmentedControl)
+  // Base UI Controls (CustomDateTimePicker, SegmentedControl)
   'ui.dt.wdayMon': '一',
   'ui.dt.wdayTue': '二',
   'ui.dt.wdayWed': '三',
@@ -2135,8 +1789,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'ui.dt.prevMonth': '上个月',
   'ui.dt.nextMonth': '下个月',
   'ui.dt.hourMinute': '时 / 分',
-  'ui.num.decrease': '减少数值',
-  'ui.num.increase': '增加数值',
   'ui.seg.defaultAria': '分段切换器',
 });
 return { I18N_MESSAGES_ZH_CN };
@@ -2153,7 +1805,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   // Top Navigation
   'nav.overview': 'Live',
   'nav.consumption': 'Usage',
-  'nav.steps': 'Steps',
   'nav.settings': 'Settings',
 
   // Top Session Header
@@ -2366,31 +2017,17 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'cons.rangeAria': 'Usage statistics time range',
   'cons.applyFilter': 'Apply',
   'cons.rangeTo': 'to',
-  'cons.overviewTitle': 'Usage Overview',
   'cons.totalTokens': 'Total Tokens',
-  'cons.tokenSplitSub': 'In {input} · Cache {cache} · Out {output}',
   'cons.estCost': 'Est. Cost',
   'cons.cacheHitRate': 'Cache Hit Rate',
   'cons.avgOutputSpeed': 'Output Speed',
   'cons.callsCount': '{calls} calls',
-  'cons.cacheHitTokens': 'Hit {tokens}',
-  'cons.newInput': 'New Input',
-  'cons.uncachedInput': 'Uncached input',
-  'cons.cacheRead': 'Cache Read',
-  'cons.savedCost': 'Saved {cost}',
-  'cons.outputUsage': 'Output',
-  'cons.replyAndThink': 'Think {think} · Reply {resp}',
   'cons.trendTitle': 'Usage Trend',
-  'cons.allTime': 'All Time',
   'cons.hmModeAria': 'Heatmap view mode',
   'cons.hmModeDay': 'Day',
   'cons.hmModeWeek': 'Week',
   'cons.hmModeMonth': 'Month',
   'cons.hmModeAll': 'Total',
-  'cons.trendPointsHintMinute': '{minutes}m ({points} pts) · Hover for details',
-  'cons.trendPointsHintHourly': 'Hourly ({points} pts) · Hover for details',
-  'cons.trendPointsHintDaily': 'Daily ({points} pts) · Hover for details',
-  'cons.topModels': 'Top Models',
   'cons.modelsTableTitle': 'Models',
   'cons.modelsTableEmpty': 'No model usage in this range',
   'cons.colModel': 'Model',
@@ -2401,79 +2038,31 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'cons.colSpeed': 'Speed',
   'cons.colTtft': 'TTFT',
   'cons.colCalls': 'Calls',
-  'cons.clientSources': 'Client Sources',
-  'cons.monthlyTitle': 'Monthly Breakdown',
   'cons.monthLabel': 'M{m}',
   'cons.monthFullLabel': 'M{m}, {year}',
-  'cons.hoverModelsHint': 'Hover for models',
   'cons.otherModelsCount': 'Others ({count})',
-  'cons.legInput': 'Input',
-  'cons.legCache': 'Cache',
-  'cons.legOutput': 'Output',
-  'cons.legThinking': 'Think',
   'cons.footInput': 'In ',
   'cons.footCache': 'Cache ',
   'cons.footOutput': 'Out ',
-  'cons.footThinking': 'Think ',
-  'cons.footCalls': 'Calls ',
-  'cons.rankTabAria': 'Switch ranking view',
-  'cons.rankTabModelsCount': 'Models ({count})',
-  'cons.rankTabSessions': 'Sessions',
-  'cons.rankTabSessionsCount': 'Sessions ({count})',
-  'cons.rankTabWorkspaces': 'Projects',
-  'cons.rankTabWorkspacesCount': 'Projects ({count})',
-  'cons.workspaceUnbound': 'Unbound Workspace',
-  'cons.workspaceSessions': '{count} sessions',
   'cons.exportMenuAria': 'Export and report actions',
   'cons.exportXlsx': 'Export Excel (.xlsx)',
   'cons.exportXlsxTip': 'Export styled multi-sheet Excel workbook with auto column width and alignment',
-  'cons.exportCsv': 'Export CSV',
-  'cons.exportCsvTip': 'Export current usage range as CSV',
-  'cons.exportCsvDone': 'Exported',
   'cons.exportMd': 'Copy Markdown Report',
   'cons.exportMdTip': 'Copy Markdown summary report for current range',
   'cons.exportMdDone': 'Usage Markdown report copied',
-  'cons.topConvsEmpty': 'No session usage in this range',
-  'cons.topConvsSortAria': 'Sort sessions ranking',
-  'cons.topConvsSortCost': 'Cost',
-  'cons.topConvsSortTokens': 'Tokens',
-  'cons.topConvCacheMeta': 'Cache {pct}%',
-  'cons.topConvJumpTip': 'Click to inspect this session in Steps',
-  'cons.modelsSortAria': 'Sort models ranking',
-  'cons.modelsSortTokens': 'Tokens',
-  'cons.modelsSortCost': 'Cost',
-  'cons.modelsSortSpeed': 'Speed',
-  'cons.modelsSortCalls': 'Calls',
-  'cons.modelUnitCost': 'Eff. {cost}/1M',
-  'cons.speedRelTip': 'Speed relative to fastest model in this range',
-  'cons.focusTtft': 'TTFT {ttft}',
-  'cons.focusSpeedMeta': 'TTFT {ttft} · Cache {cache}% · Out {out}',
-  'cons.focusCallsMeta': 'Avg {avgTok}/call · Cost {cost}',
 
   // Steps Detail View & Step Column Registry
-  'steps.title': 'Step Records',
   'steps.detailTitle': 'Details',
   'steps.modeDots': 'Dots',
   'steps.modeCurve': 'Curve',
   'steps.modeTable': 'List',
   'steps.modeSwitchAria': 'Switch step display view',
   'steps.trendEmpty': 'No step telemetry yet',
-  'steps.tabSteps': 'Steps',
-  'steps.tabStepsFiltered': 'Steps ({filtered}/{total})',
-  'steps.tabModels': 'Analytics',
   'steps.allAgents': 'All Agents',
   'steps.allModels': 'All Models',
-  'steps.selectModel': 'Select Model',
   'steps.unitAgent': 'agents',
   'steps.unitModel': 'models',
-  'steps.lineTitle': 'Session Timeline',
-  'steps.fitTitle': 'Trend Fit',
-  'steps.modelsTitle': 'Model Summary',
-  'steps.modelsEmpty': 'No model calls in current scope',
-  'steps.metricTotalTokens': 'Tokens',
-  'steps.metricContext': 'Context',
   'steps.metricSpeed': 'Speed',
-  'steps.metricTps': 'TPS',
   'steps.metricTtft': 'TTFT',
   'steps.metricCache': 'Cache',
   'steps.metricCost': 'Cost',
@@ -2495,13 +2084,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'steps.tokSeg.reply.tip': 'Reply',
   'steps.tokSeg.total.th': 'Total',
   'steps.tokSeg.total.tip': 'Total',
-  'steps.modelCallsShare': '{calls} calls · {pct}%',
-  'steps.modelCallsOnly': '{calls} calls',
-  'steps.modelsSummaryPrefix': '{count} models · ',
-  'steps.modelPerfFoot': 'Avg {tps} · TTFT {ttft} · Cache {cache}%',
-  'steps.modelSplitFoot': 'In {inTok} · Cache {cacheTok} · Think {thinkTok} · Out {respTok}',
-  'steps.fitActiveCardTitle': '{title} (Active in Trend Fit; Ctrl/Shift-click to compare)',
-  'steps.fitInactiveCardTitle': 'Click to inspect {text} in Trend Fit (Ctrl/Shift-click to compare)',
   'steps.turnMediaOnly': '[Media Attachment]',
   'steps.turnMediaSuffix': '[Media]',
   'steps.anomalyTag.timeout': 'TO{n}',
@@ -2539,7 +2121,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'steps.timingAfterTtftLabel': 'After First Token',
   'steps.timingThinkLabel': 'Native Thinking',
   'steps.timingTotalLabel': 'Total Duration',
-  'steps.timingOverlapHint': 'Native thinking timing may overlap TTFT/streaming; not additive',
   'steps.timingToolBufferedHint': 'Tool call step (buffered return yields short stream)',
   'steps.timingAnomalyHint': '{count} retries/errors',
   'steps.timingAnomalyDelayHint': '{count} retries/errors · backoff {sec}s',
@@ -2548,7 +2129,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'steps.anomalyModelSub': '{steps} steps affected',
   'steps.anomalyModelKindRow': '{kind}: {count}',
   'steps.anomalyModelClickHint': 'Click to filter anomalous steps',
-  'steps.anomalySummaryMeta': '{count} retries/errors ({steps} steps)',
   'steps.anomalyFilterLabel': 'Anomalies Only ({count})',
   'steps.anomalyFilterAll': 'Show All Steps',
   'steps.sortClickTip': 'Click to sort by {col}',
@@ -2563,9 +2143,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'steps.exportMenuAria': 'Export and report actions',
   'steps.exportXlsx': 'Export Excel (.xlsx)',
   'steps.exportXlsxTip': 'Export styled multi-sheet Excel workbook for steps and model summary',
-  'steps.exportCsv': 'Export CSV',
-  'steps.exportCsvTip': 'Export current steps table as CSV',
-  'steps.exportCsvDone': 'Exported',
   'steps.exportMd': 'Copy Markdown Report',
   'steps.exportMdTip': 'Copy Markdown diagnostic report for current steps',
   'steps.exportMdDone': 'Steps Markdown report copied',
@@ -2611,22 +2188,15 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'stepCol.cost.th': 'Cost',
   'stepCol.cost.opt': 'Step Cost ($)',
 
-  // Preferences (3-Tab Modular Settings)
-  'settings.subTab.general': 'General',
-  'settings.subTab.structure': 'Structure',
-  'settings.subTab.other': 'Other',
-  'settings.subTab.aria': 'Preferences category tabs',
+  // Preferences
   'settings.simple.appearanceTitle': 'Appearance & Display',
   'settings.simple.maintTitle': 'Data & Maintenance',
   'settings.simple.versionRow': 'Version & Pricing',
   'settings.saving': 'Saving…',
   'settings.saved': 'Saved',
   'settings.saveFailed': 'Save failed',
-  'settings.resetDone': 'Reset to default',
-  'settings.resetBtn': 'Reset',
 
-  // Preferences -> General Tab
-  'settings.gen.appearanceTitle': 'Interface & Appearance',
+  // Appearance and updates
   'settings.gen.language': 'Language',
   'settings.gen.langZh': '简体中文',
   'settings.gen.langEn': 'English',
@@ -2647,25 +2217,8 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'settings.gen.fontMd': 'Default',
   'settings.gen.fontLg': 'Large',
   'settings.gen.fontXl': 'XL',
-  'settings.gen.fontHint': 'Scales sidebar and popover typography while keeping the inline capsule compact',
-  'settings.gen.modernUi': 'Modern UI',
   'settings.gen.modernUiOff': 'Off',
   'settings.gen.modernUiOn': 'On',
-  'settings.gen.modernUiHint': 'Removes most borders in favor of soft tonal surfaces and smoother animations',
-  'settings.gen.updateTitle': 'Updates & Pricing',
-  'settings.gen.updateMode': 'Update Policy',
-  'settings.gen.updateManual': 'Notify only, update manually',
-  'settings.gen.updateAuto': 'Auto update',
-  'settings.gen.updateOff': 'Disable updates',
-  'settings.gen.pricingLabel': 'Pricing Catalog',
-  'settings.gen.versionLabel': 'Current Version',
-  'settings.gen.modelCount': '{count} models',
-  'settings.gen.srcRemote': 'Cloud synced',
-  'settings.gen.srcLocal': 'Local file',
-  'settings.gen.srcDefault': 'Built-in',
-  'settings.gen.syncAt': 'Synced {time}',
-  'settings.gen.pubAt': 'Published {date}',
-  'settings.gen.defaultPricing': 'Default catalog',
   'settings.gen.syncBtn': 'Sync Pricing',
   'settings.gen.syncingBtn': 'Syncing…',
   'settings.gen.syncingMsg': 'Syncing pricing catalog…',
@@ -2675,66 +2228,15 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'settings.gen.checkingBtn': 'Checking…',
   'settings.gen.checkingMsg': 'Checking for updates…',
   'settings.gen.checkFailedMsg': 'Check failed: {err}',
-  'settings.gen.upToDateMsg': 'Already up to date (v{ver})',
+  'settings.gen.upToDateMsg': 'Already up to date',
+  'settings.gen.upToDateVersionMsg': 'Already up to date (v{ver})',
   'settings.gen.downloadingMsg': 'Downloading update…',
   'settings.gen.updatedRestartMsg': 'Update complete, restarting panel…',
   'settings.gen.updateSkippedMsg': 'Update not applied',
   'settings.gen.updateFailedMsg': 'Update failed',
-  'settings.gen.canUpgradeSub': 'v{ver} available ({mode})',
   'settings.gen.upgradeToBtn': 'Upgrade to v{ver}',
-  'settings.gen.manualUpgradeBtn': 'Upgrade v{ver}',
-  'settings.gen.updateOffSub': 'Notifications off ({mode})',
-  'settings.gen.latestSub': 'Up to date ({mode})',
 
-  // Preferences -> General Tab -> Antigravity Host UI Language (decoupled Host I18n)
-  'settings.hostI18n.title': 'Antigravity UI Language',
-  'settings.hostI18n.langLabel': 'Host Language',
-  'settings.hostI18n.langOff': 'Original (Off)',
-  'settings.hostI18n.langHint': 'Downloads built language packs on demand from the repository and applies lossless runtime UI translation without patching app files or chat content',
-  'settings.hostI18n.optInstalled': 'Installed v{ver}',
-  'settings.hostI18n.optRemote': 'Download · {size}',
-  'settings.hostI18n.refreshManifestTip': 'Refresh repository language pack manifest',
-  'settings.hostI18n.refreshingManifestMsg': 'Refreshing language manifest…',
-  'settings.hostI18n.manifestSyncedMsg': 'Manifest updated ({count} packs)',
-  'settings.hostI18n.manifestFailedMsg': 'Failed to fetch language manifest',
-  'settings.hostI18n.depthLabel': 'Translation Depth',
-  'settings.hostI18n.depthLight': 'Light',
-  'settings.hostI18n.depthDeep': 'Deep',
-  'settings.hostI18n.depthLightHint': 'Light mode keeps common English engineering terms (MCP, Skill, Workspace, Subagent, Swarm, Diff, Terminal) and model names untranslated',
-  'settings.hostI18n.depthDeepHint': 'Deep mode localizes engineering terms alongside general UI copy while preserving model names and slash commands',
-  'settings.hostI18n.downloadingMsg': 'Downloading {locale} pack…',
-  'settings.hostI18n.downloadedAndAppliedMsg': 'Pack verified and applied',
-  'settings.hostI18n.appliedMsg': 'Language applied live',
-  'settings.hostI18n.disabledMsg': 'Translation disabled and UI restored',
-  'settings.hostI18n.depthSwitchedMsg': 'Translation depth switched',
-  'settings.hostI18n.packUpdatedMsg': 'Language pack updated and reapplied',
-  'settings.hostI18n.cacheRemovedMsg': 'Local pack cache removed',
-  'settings.hostI18n.actionFailed': 'Language pack operation failed',
-  'settings.hostI18n.entriesCount': '{count} entries',
-  'settings.hostI18n.appliedWindows': '{count} window(s) active',
-  'settings.hostI18n.updatePackBtn': 'Update to v{ver}',
-  'settings.hostI18n.redownloadBtn': 'Check Update',
-  'settings.hostI18n.removeCacheBtn': 'Remove Cache',
-  'settings.hostI18n.devToolsTitle': 'Missing UI String Collector',
-  'settings.hostI18n.devToolsHint': 'Scans visible Antigravity UI controls for untranslated English phrases (excluding chat content and code) to help complete packs or author new languages',
-  'settings.hostI18n.collectBtn': 'Collect Missing Strings',
-  'settings.hostI18n.collectingBtn': 'Collecting…',
-  'settings.hostI18n.collectedResult': 'Collected {count} untranslated UI strings across {targets} window(s)',
-  'settings.hostI18n.collectedEmpty': 'No untranslated English UI strings detected on active pages',
-  'settings.hostI18n.collectFailed': 'Collection failed — verify remote debugging bridge is active',
-  'settings.hostI18n.copyJsonBtn': 'Copy JSON',
-  'settings.hostI18n.exportJsonBtn': 'Export JSON',
-
-  // Preferences -> Structure Tab
-  'settings.str.thirdTabAria': 'Structure section tabs',
-  'settings.str.tabMount': 'Mount & Bar',
-  'settings.str.tabHover': 'Hover View',
-  'settings.str.tabOverview': 'Overview',
-  'settings.str.tabSteps': 'Step Table',
-  'settings.str.previewMountSidebarHint': 'Window capsule is disabled in Sidebar Only mode; switching back to Titlebar or Composer applies the capsule above',
-  'settings.str.previewMountFloatingHint': 'The monitor appears in a movable window. Minimize it to a floating badge to keep live metrics in view.',
-  'settings.str.mountSection': 'Mount & Capsule Bar',
-  'settings.str.mountBadge': '{count}/5 slots',
+  // Mount modes and control labels
   'settings.str.mountMode': 'Panel Mount Mode',
   'settings.str.mountDual': 'Dual Mount (Titlebar + Sidebar)',
   'settings.str.mountComposer': 'Composer Mount (Input Box + Sidebar)',
@@ -2761,154 +2263,25 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'settings.bridge.dismissAria': 'Dismiss notice for now',
   'settings.bridge.copyFlagBtn': 'Copy {cmd}',
   'settings.bridge.copiedBtn': 'Copied to Clipboard',
-  'settings.str.popoverWidthLabel': 'Popover Width',
-  'settings.str.popoverWidthAuto': 'Auto Fit',
-  'settings.str.popoverWidthCustom': 'Custom',
-  'settings.str.popoverWidthHint': 'Auto Fit widens wide tables like Step Records to avoid horizontal scroll; Custom accepts 440–1080 px',
-  'settings.str.multiToggle': 'Active Sessions Pill',
-  'settings.str.contextAgentModeLabel': 'Capsule & Hover Context',
-  'settings.str.contextAgentMain': 'Lock Main Agent',
-  'settings.str.contextAgentAuto': 'Follow Active',
-  'settings.str.cliCapsuleToggle': 'CLI Bottom Capsule',
-  'settings.str.cliSlotsLabel': 'CLI Slot Order (Left → Right, 1–6, draggable)',
-  'settings.str.addCliSlot': 'Add CLI Slot ({count}/{max})',
-  'settings.str.cliCustomCmdHint': 'Custom statusLine command detected; preserved automatically unless you take over',
-  'settings.str.cliPausedHint': 'CLI statusLine is currently paused or not yet configured',
-  'settings.str.cliFlagsOverrideHint': 'Explicit CLI launch flags (--slots / --preset) detected and take precedence over these slots',
-  'settings.str.cliRestoreBtn': 'Take Over & Restore',
-  'settings.str.cliEnableBtn': 'Re-enable in CLI',
-  'settings.str.cliClearFlagsBtn': 'Clear Flag Override',
-  'settings.str.cliRestoringBtn': 'Applying...',
-  'settings.str.cliPreviewRunning': '{count} active',
   'settings.str.show': 'Show',
   'settings.str.hide': 'Hide',
   'settings.str.on': 'On',
   'settings.str.off': 'Off',
-  'settings.str.capsuleSlotsLabel': 'Capsule Metrics & Order (Left → Right, 1–5, draggable)',
-  'settings.str.addCapsuleSlot': 'Add Slot ({count}/{max})',
-  'settings.str.hoverSection': 'Hover Quick-View',
-  'settings.str.hoverBadgeOff': 'Off',
-  'settings.str.hoverBadgeCount': '{count} modules',
-  'settings.str.hoverModulesLabel': 'Hover Popup Modules (Top → Bottom, 0–4, draggable)',
-  'settings.str.hoverEmptyHint': 'Hover quick-view disabled (click capsule to open full panel)',
-  'settings.str.addHoverModule': 'Add Module ({count}/{max})',
-  'settings.str.overviewSection': 'Live Overview Layout',
-  'settings.str.overviewBadge': '{modCount} mod · {metCount} cells',
-  'settings.str.overviewModulesLabel': 'Overview Modules & Order (Top → Bottom, min 1, draggable)',
-  'settings.str.addOverviewModule': 'Add Module ({count}/{max})',
-  'settings.str.overviewMetricsLabel': 'First-Row Metrics (Left → Right, 1–4, draggable)',
-  'settings.str.overviewMetricsInactiveHint': '"Live Metrics" is hidden here; these cells still apply to Hover Quick-View or when re-added',
-  'settings.str.addOverviewMetric': 'Add Metric ({count}/{max})',
-  'settings.str.stepsSection': 'Step Table Columns',
-  'settings.str.stepsBadge': '{count} cols',
-  'settings.str.stepTurnRailToggle': 'Turn Rail & Preview',
-  'settings.str.stepAgentBadgeToggle': 'Main/Sub Agent Badge',
-  'settings.str.stepSpeedColorToggle': 'Speed Multi-Color',
-  'settings.str.stepFilterToolbarToggle': 'Search & Filter Bar',
-  'settings.str.stepTokenComboLabel': 'Custom Token Combo Format',
-  'settings.str.stepTokenComboPlaceholder': 'e.g. context:new:cache or in:out:cache',
-  'settings.str.stepTokenComboHint': 'Tokens: context, in/new, out, cache, think, reply, total — separated by : or / (1–4 items)',
-  'settings.str.stepsColsLabel': '"Steps" Visible Columns (Left → Right, min 2, draggable)',
-  'settings.str.addStepCol': 'Add Column ({count}/{max})',
-  'settings.slot.dragHint': 'Drag up or down to reorder',
-  'settings.slot.moveUp': 'Move earlier',
-  'settings.slot.moveDown': 'Move later',
-  'settings.slot.remove': 'Remove item',
-  'settings.slot.minReached': 'Keep at least {min}',
-  'settings.slot.alreadyAdded': 'Added',
-  'settings.mock.sessionTitle': 'Refactor Auth Middleware & Session Cache',
-  'settings.mock.subRole': 'API Audit',
-  'settings.mock.turnPromptLatest': 'Fix token refresh race condition under concurrent requests and add tests',
-  'settings.mock.turnPromptPrev': 'Audit route guards and expired session cleanup logic',
 
-  // Preferences -> Other Tab
-  'settings.oth.modelTitle': 'Model Identity Display',
+  // Model display and maintenance
   'settings.oth.modelFormat': 'Model Name Format',
   'settings.oth.modelShort': 'Short Alias (e.g. 4-neon-high)',
   'settings.oth.modelUpstream': 'Raw Upstream ID (e.g. gemini-3.8-flash-n)',
   'settings.oth.modelUpstreamCompact': 'Trimmed Raw ID (hide gemini- / claude- / gpt-)',
-  'settings.oth.orchFormat': 'Orchestrator Series ID',
-  'settings.oth.orchCompact': 'Compact Alias (e.g. orchestrator-argon)',
-  'settings.oth.orchFull': 'Full Upstream ID (e.g. gemini-pro-orchestrator)',
-  'settings.oth.baselineTitle': 'Model Context Settings',
-  'settings.oth.ctxRiskTitle': 'Unofficial Override Risk Warning',
-  'settings.oth.ctxRiskBody': 'Google has not authorized modifying model context limits in Antigravity App / IDE. Altering context limits may get your Antigravity access, GCP services, or Google account disabled or banned; enabling this feature means you assume all associated risks. Make sure you know what you are doing!',
-  'settings.oth.ctxRiskAcceptBtn': 'I Understand the Risk, Unlock',
-  'settings.oth.ctxModel': 'Model',
-  'settings.oth.ctxMainLabel': 'Main Agent',
-  'settings.oth.ctxSwarmLabel': 'Subagents & Swarm',
-  'settings.oth.ctxSwarmError': 'Local sync failed: {error}',
-  'settings.oth.ctxBaselineLabel': 'Context Window Limit',
-  'settings.oth.ctxChooseModel': 'Choose a model',
-  'settings.oth.ctxDefault': 'Follow host settings',
-  'settings.oth.ctxExpensive': '{name} (uses more quota)',
-  'settings.oth.ctxTokens': '{count} tokens',
-  'settings.oth.ctxUnavailable': '{name} (currently unavailable)',
-  'settings.oth.ctxConfigured': '{name} · Set',
-  'settings.oth.ctxConfiguredReported': '{name} · Set / Last seen {reported}',
-  'settings.oth.ctxPendingBridge': '{name} · Pending Restart',
-  'settings.oth.ctxDefaultReported': 'Default · Last seen {name}',
-  'settings.oth.ctxReported': 'The host reported {name} on the latest request.',
-  'settings.oth.ctxMixed': 'Different limits by thinking level',
-  'settings.oth.ctxMixedHint': 'Thinking levels for this model have different saved limits. Choose a limit to apply it to all levels.',
-  'settings.oth.ctxBaselineHint': 'Thinking levels for the same model share a limit. Saved limits are reapplied at plugin startup and used for future messages.',
-  'settings.oth.ctxNoModels': 'The host has not returned any available models.',
-  'settings.oth.ctxNoOptions': 'The host has not provided context options or a capacity for this model. Follow host settings is the only available option.',
-  'settings.oth.maintTitle': 'Cache & Reset',
   'settings.oth.cacheLabel': 'Local Trajectory Cache',
-  'settings.oth.cacheDesc': 'Clear cached step records and rescan all conversation transcripts immediately',
   'settings.oth.rebuildBtn': 'Rebuild Trajectory Cache',
   'settings.oth.rebuildingBtn': 'Rebuilding…',
   'settings.oth.rebuildDone': 'Trajectory cache rebuilt',
   'settings.oth.rebuildFailed': 'Failed to rebuild cache',
-  'settings.oth.resetLabel': 'Factory Defaults',
-  'settings.oth.resetDesc': 'Restore all preferences across General, Structure, and Other tabs to default values',
   'settings.oth.resetAllBtn': 'Reset All Defaults',
   'settings.oth.resetConfirmBtn': 'Click Again to Confirm',
   'settings.oth.resettingBtn': 'Resetting…',
   'settings.oth.resetAllDone': 'All preferences restored to defaults',
-  'settings.oth.backupLabel': 'Preferences Backup & Restore',
-  'settings.oth.backupDesc': 'Export or import portable UI, capsule, and table preferences as JSON',
-  'settings.oth.exportJsonBtn': 'Export JSON',
-  'settings.oth.importJsonBtn': 'Import JSON',
-  'settings.oth.exportDone': 'Preferences JSON exported',
-  'settings.oth.importDone': 'Restored {count} preference settings',
-  'settings.oth.importInvalid': 'Import failed: invalid JSON or no recognized settings',
-  'settings.oth.migTitle': 'Cross-Client Session Migration',
-  'settings.oth.migDesc': 'Migrate selected sessions on demand with automatic source and summary backups',
-  'settings.oth.migRefreshBtn': 'Refresh',
-  'settings.oth.migSourceLabel': 'Source Client',
-  'settings.oth.migTargetLabel': 'Target Client',
-  'settings.oth.migModeLabel': 'Migration Mode',
-  'settings.oth.migModeMove': 'Full Move (Recommended)',
-  'settings.oth.migModeClone': 'Clone Copy',
-  'settings.oth.migModeMoveHint': 'Assigns an isolated target ID while preserving all historical steps/details; archives source backup before moving',
-  'settings.oth.migModeCloneHint': 'Keeps source intact with a fresh UUID; only counts new steps generated after cloning',
-  'settings.oth.migProjectLabel': 'Target Project',
-  'settings.oth.migProjectOutside': 'Standalone (No Project)',
-  'settings.oth.migClientDesktop': 'Desktop App / Modern IDE',
-  'settings.oth.migClientCli': 'Antigravity CLI',
-  'settings.oth.migClientIdeLegacy': 'Legacy IDE (.db)',
-  'settings.oth.migSearchPlaceholder': 'Filter sessions by title or workspace…',
-  'settings.oth.migSelectAll': 'Select all',
-  'settings.oth.migClearSel': 'Clear',
-  'settings.oth.migSelectedCount': '{selected} / {total} selected',
-  'settings.oth.migRunningTag': 'Running',
-  'settings.oth.migStepsUnit': '{count} steps',
-  'settings.oth.migEmpty': 'No migratable sessions in this source client',
-  'settings.oth.migNoMatch': 'No matching sessions',
-  'settings.oth.migActionBtn': 'Migrate Selected ({count})',
-  'settings.oth.migRunningBtn': 'Migrating…',
-  'settings.oth.migDoneDesktop': 'Migrated {count} session(s) to "{project}". Press Ctrl+R in Desktop App to refresh the sidebar',
-  'settings.oth.migDoneCli': 'Migrated {count} session(s) to CLI. Use the command below to resume',
-  'settings.oth.migPartialWarn': ' ({failed} skipped or failed)',
-  'settings.oth.migReloadBtn': 'Reload Window',
-  'settings.oth.migCopyCmd': 'Copy',
-  'settings.oth.migCopied': 'Copied',
-  'settings.oth.migErrLocked': 'Source database is locked by its open client. Close that terminal/window first, or switch to Clone Copy',
-  'settings.oth.migErrExists': 'A session with the same ID already exists in target (switch to Clone Copy if you want a duplicate)',
-  'settings.oth.migErrRunning': 'Session is currently running; wait until idle before migrating',
-  'settings.oth.migFailed': 'Migration failed: {reason}',
 
   // Structured Live Activity Actions
   'live.act.run_command': 'Run Command',
@@ -2950,49 +2323,7 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'live.act.awaitingApproval': 'Awaiting Approval · {label}',
   'live.act.compactionResuming': 'Compaction finished, resuming reasoning',
 
-  // SVG Charts (SessionStepCharts & TrendAreaChart)
-  'chart.step.empty': 'No plottable steps in current scope',
-  'chart.step.excluded': 'Excluded',
-  'chart.step.zeroSteps': '0 steps',
-  'chart.step.stepAdd': 'Step +{tokens}',
-  'chart.step.ioSplit': 'In {inTok} · Cache {cacheTok} · Out {outTok}',
-  'chart.step.cacheShort': 'Cache {pct}%',
-  'chart.step.compactionCheckpoint': 'Auto-compaction checkpoint',
-  'chart.step.cacheHitOut': 'Cache hit {pct}% · Out +{outTok}',
-  'chart.step.ttftShort': 'TTFT {sec}s',
-  'chart.step.outAndCtx': 'Out {outTok} · Context {ctxTok}',
-  'chart.step.compactionStep': 'Compaction step',
-  'chart.step.noSpeedSample': 'No speed sample',
-  'chart.step.ctxAndCache': 'Context {ctxTok} · Cache {pct}%',
-  'chart.step.noTtftSample': 'No TTFT sample',
-  'chart.step.cumCost': 'Total {cost}',
-  'chart.step.cacheAndStepTok': 'Cache {pct}% · Step {tokens}',
-  'chart.step.noSamples': 'No samples',
-  'chart.step.peakShort': 'Peak {val}',
-  'chart.step.peakPill': 'Peak {tag} · {val}',
-  'chart.step.stepsCount': '{count} steps',
-  'chart.step.multiPrefix': '{count} models · ',
-  'chart.step.sumTokens': '{prefix}Total {tokens}',
-  'chart.step.peakTokens': '{prefix}Peak {tokens}',
-  'chart.step.currentCtx': 'Current {tokens}',
-  'chart.step.meanTps': '{prefix}Avg {val} tok/s',
-  'chart.step.meanSec': '{prefix}Avg {val}s',
-  'chart.step.noValidSamples': 'No valid samples',
-  'chart.step.sumCost': '{prefix}Total {cost}',
-  'chart.fit.empty': 'No valid regression samples for this model',
-  'chart.fit.loess': 'LOESS Fit',
-  'chart.fit.olsLinear': 'OLS Linear',
-  'chart.fit.olsReg': 'OLS Reg',
-  'chart.fit.observed': 'Observed',
-  'chart.fit.tipFit': 'Fit {val}',
-  'chart.fit.tipObs': 'Obs {val}',
-  'chart.fit.zeroSamples': '0 samples',
-  'chart.fit.peerMean': '{label} Avg {val}',
-  'chart.fit.peerCompare': 'Compare: {peers}',
-  'chart.fit.curvesCount': '{count} fit curves',
-  'chart.fit.multiBadge': '{steps} steps · {models} models',
-  'chart.fit.singleBadge': '{steps} steps · Avg {mean}',
-  'chart.fit.olsTitle': 'OLS: y = {slope}x + {intercept} · Sample SD = ±{sd}',
+  // Usage trend and heatmap
   'chart.trend.hmMonthYear': "{month}/{yy}",
   'chart.trend.hmMonthOnly': 'M{month}',
   'chart.trend.wdayMon': 'M',
@@ -3012,7 +2343,7 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'chart.trend.hmCumThrough': 'Cumulative through {date}',
   'chart.trend.peakPill': 'Peak {label} · {tokens}',
 
-  // Base UI Controls (CustomDateTimePicker, CustomNumberInput, SegmentedControl)
+  // Base UI Controls (CustomDateTimePicker, SegmentedControl)
   'ui.dt.wdayMon': 'Mo',
   'ui.dt.wdayTue': 'Tu',
   'ui.dt.wdayWed': 'We',
@@ -3023,8 +2354,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'ui.dt.prevMonth': 'Previous month',
   'ui.dt.nextMonth': 'Next month',
   'ui.dt.hourMinute': 'Hr / Min',
-  'ui.num.decrease': 'Decrease value',
-  'ui.num.increase': 'Increase value',
   'ui.seg.defaultAria': 'Segmented switcher',
 });
 return { I18N_MESSAGES_EN_US };
@@ -4133,7 +3462,7 @@ return { defineComponent };
 })();
 
 // --- src/core/formatters.js ---
-const { formatMetric, formatSpeedMetric, formatCachePct, formatPctNumber, getSpeedToneClass, getCacheToneClass, getStepCostToneClass, getTtftToneClass, formatTokens, formatTokensPrecise, formatCnyApprox, formatDateSpanBadge, formatTrendSlotFullLabel, formatUsd, speedReasonText, formatAnomalyKindLabel, formatAnomalyTagText, resolveModelAnomalySummary, formatStepAnomalyInlineSummary, buildStepAnomalyDiagnostic, buildStepCompactionDiagnostic, formatTimingDetailSec, hasStepTimingData, buildStepTimingDiagnostic, buildModelAnomalyDiagnostic, sampleSummary, formatCountdown, formatCompactDateTime, formatElapsedSec, stripVendorModelPrefix, normalizeOrchestratorIdDisplayMode, formatGeminiShortAlias, resolveModelDisplayInfo, mergeModelsByDisplayName, getAgentBadgeClass, formatAgentBadgeText, formatAgentLabel, formatConversationMeta, formatLiveActivityLabel, formatLiveActivityDetail, getCanonicalModelColorSeed, resolveDeterministicModelColor, buildDeterministicModelColorMap } = (() => {
+const { formatMetric, formatSpeedMetric, formatCachePct, formatPctNumber, getSpeedToneClass, getCacheToneClass, getStepCostToneClass, getTtftToneClass, formatTokens, formatTokensPrecise, formatDateSpanBadge, formatTrendSlotFullLabel, formatUsd, speedReasonText, formatAnomalyKindLabel, formatAnomalyTagText, resolveModelAnomalySummary, buildStepAnomalyDiagnostic, buildStepCompactionDiagnostic, formatTimingDetailSec, hasStepTimingData, buildStepTimingDiagnostic, buildModelAnomalyDiagnostic, sampleSummary, formatCountdown, formatCompactDateTime, formatElapsedSec, normalizeOrchestratorIdDisplayMode, resolveModelDisplayInfo, mergeModelsByDisplayName, getAgentBadgeClass, formatAgentBadgeText, formatAgentLabel, formatConversationMeta, formatLiveActivityLabel, formatLiveActivityDetail, getCanonicalModelColorSeed, resolveDeterministicModelColor, buildDeterministicModelColorMap } = (() => {
 /**
  * @fileoverview Pure formatting utilities for speed metrics, token counts,
  * USD estimates, countdown timers, and custom datetime displays.
@@ -4216,13 +3545,6 @@ function formatTokensPrecise(num) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(Math.round(n));
-}
-
-function formatCnyApprox(usdAmount, rate = 7.2) {
-  const rmb = Number(usdAmount || 0) * rate;
-  if (rmb <= 0) return '≈ ¥0';
-  if (rmb >= 10) return `≈ ¥${Math.round(rmb)}`;
-  return `≈ ¥${rmb.toFixed(1)}`;
 }
 
 function formatDateSpanBadge(startMs, endMs) {
@@ -4405,15 +3727,6 @@ function resolveModelAnomalySummary(m) {
   };
 }
 
-function formatStepAnomalyInlineSummary(anomaly) {
-  if (!anomaly || !(Number(anomaly.count) > 0)) return '';
-  const tag = formatAnomalyTagText(anomaly.primaryKind, anomaly.count);
-  const label = formatAnomalyKindLabel(anomaly.primaryKind);
-  const delaySec = Number(anomaly.totalDelaySec || 0);
-  const delayPart = delaySec > 0 ? ` · ${t('steps.anomalyDelayPart', { sec: delaySec })}` : '';
-  return `${tag} · ${label}${delayPart}`;
-}
-
 function buildStepAnomalyDiagnostic(st) {
   const a = st?.anomaly;
   if (!a || !(Number(a.count) > 0)) return null;
@@ -4563,15 +3876,6 @@ function buildStepTimingDiagnostic(st) {
   }
 
   const hints = [];
-  const hasOverlap =
-    think !== null &&
-    total !== null &&
-    ((ttft !== null && ttft + think > total + 0.05) ||
-      (nativeStream !== null && ttft !== null && ttft + nativeStream + think > total + 0.05) ||
-      think > total + 0.05);
-  if (hasOverlap) {
-    hints.push(t('steps.timingOverlapHint'));
-  }
   const streamForToolCheck = nativeStream ?? afterTtft;
   if (
     st.hasToolCalls &&
@@ -5614,7 +4918,7 @@ function buildDeterministicModelColorMap(models = []) {
 
   return colorMap;
 }
-return { formatMetric, formatSpeedMetric, formatCachePct, formatPctNumber, getSpeedToneClass, getCacheToneClass, getStepCostToneClass, getTtftToneClass, formatTokens, formatTokensPrecise, formatCnyApprox, formatDateSpanBadge, formatTrendSlotFullLabel, formatUsd, speedReasonText, formatAnomalyKindLabel, formatAnomalyTagText, resolveModelAnomalySummary, formatStepAnomalyInlineSummary, buildStepAnomalyDiagnostic, buildStepCompactionDiagnostic, formatTimingDetailSec, hasStepTimingData, buildStepTimingDiagnostic, buildModelAnomalyDiagnostic, sampleSummary, formatCountdown, formatCompactDateTime, formatElapsedSec, stripVendorModelPrefix, normalizeOrchestratorIdDisplayMode, formatGeminiShortAlias, resolveModelDisplayInfo, mergeModelsByDisplayName, getAgentBadgeClass, formatAgentBadgeText, formatAgentLabel, formatConversationMeta, formatLiveActivityLabel, formatLiveActivityDetail, getCanonicalModelColorSeed, resolveDeterministicModelColor, buildDeterministicModelColorMap };
+return { formatMetric, formatSpeedMetric, formatCachePct, formatPctNumber, getSpeedToneClass, getCacheToneClass, getStepCostToneClass, getTtftToneClass, formatTokens, formatTokensPrecise, formatDateSpanBadge, formatTrendSlotFullLabel, formatUsd, speedReasonText, formatAnomalyKindLabel, formatAnomalyTagText, resolveModelAnomalySummary, buildStepAnomalyDiagnostic, buildStepCompactionDiagnostic, formatTimingDetailSec, hasStepTimingData, buildStepTimingDiagnostic, buildModelAnomalyDiagnostic, sampleSummary, formatCountdown, formatCompactDateTime, formatElapsedSec, normalizeOrchestratorIdDisplayMode, resolveModelDisplayInfo, mergeModelsByDisplayName, getAgentBadgeClass, formatAgentBadgeText, formatAgentLabel, formatConversationMeta, formatLiveActivityLabel, formatLiveActivityDetail, getCanonicalModelColorSeed, resolveDeterministicModelColor, buildDeterministicModelColorMap };
 })();
 
 // --- src/core/stepInspector.js ---
@@ -6780,18 +6084,8 @@ function formatExportDate(ms) {
 function resolveLocalizedRangeLabel(range, en) {
   const r = range || {};
   const key = String(r.key || '').trim().toLowerCase();
-  const poolSuffix =
-    key === 'cycle' && r.pool && r.pool !== 'all' ? ` · ${r.poolLabel || r.pool}` : '';
-  if (en) {
-    const baseEn =
-      key === 'cycle' && r.isFallbackWeek
-        ? 'This Week'
-        : RANGE_LABELS_EN[key] || r.label || key || 'All Time';
-    return `${baseEn}${poolSuffix}`;
-  }
-  if (r.label) return r.label;
-  const baseZh = RANGE_LABELS_ZH[key] || key || '全部时间';
-  return `${baseZh}${poolSuffix}`;
+  if (en) return RANGE_LABELS_EN[key] || r.label || key || 'All Time';
+  return r.label || RANGE_LABELS_ZH[key] || key || '全部时间';
 }
 
 function resolveRangeSpanNote(range) {
@@ -8573,10 +7867,7 @@ function setStepsViewMode(mode) {
 const uiStore = createReactiveStore({
   activeView: 'overview',
   monitorVisible: true,
-  stepsSubTab: 'steps', // 'steps' | 'models'
   stepsViewMode: loadInitialStepsViewMode(), // 'table' | 'dots' | 'curve'
-  settingsSubTab: 'general', // 'general' | 'structure' | 'account' | 'other'
-  settingsStructureTab: 'mount', // 'mount' | 'hover' | 'overview' | 'steps'
   selectedAgentScope: 'all', // 'all' | 'main' | <subagent cascadeId>
   ctxInspectorAgentId: 'main', // 'main' | 'auto' | <subagent cascadeId>
   toast: null, // { id, message, detail, actionLabel, onAction, tone, durationMs }
@@ -9004,7 +8295,6 @@ const telemetryStore = createReactiveStore({
   customStartMs: Date.now() - 24 * 3600 * 1000,
   customEndMs: Date.now(),
   syncState: 'idle', // 'idle' | 'syncing' | 'synced' | 'error'
-  minuteTick: 0,
   telemetry: null,
 });
 
@@ -9770,7 +9060,7 @@ function isEquivalentTelemetry(prev, next) {
   if (pAcct?.avgTokPerSec !== nAcct?.avgTokPerSec) return false;
   if (pAcct?.unpricedCalls !== nAcct?.unpricedCalls) return false;
 
-  // 6. 比对历史趋势时间分桶序列与年度分月序列
+  // 6. 比对历史趋势时间分桶序列
   const areModelSlicesEqual = (pList, nList) => {
     const a = pList || [];
     const b = nList || [];
@@ -9801,6 +9091,8 @@ function isEquivalentTelemetry(prev, next) {
     return true;
   };
 
+  if (prev.consumption?.revision !== next.consumption?.revision) return false;
+
   const pTrend = prev.consumption?.trendSeries || [];
   const nTrend = next.consumption?.trendSeries || [];
   if (pTrend.length !== nTrend.length) return false;
@@ -9821,21 +9113,6 @@ function isEquivalentTelemetry(prev, next) {
       return false;
     }
   }
-  if (prev.consumption?.monthlyYear !== next.consumption?.monthlyYear) return false;
-
-  const pMonthly = prev.consumption?.monthlySeries || [];
-  const nMonthly = next.consumption?.monthlySeries || [];
-  if (pMonthly.length !== nMonthly.length) return false;
-  for (let i = 0; i < pMonthly.length; i++) {
-    if (
-      pMonthly[i]?.totalTokens !== nMonthly[i]?.totalTokens ||
-      pMonthly[i]?.costUsd !== nMonthly[i]?.costUsd ||
-      pMonthly[i]?.calls !== nMonthly[i]?.calls ||
-      !areModelSlicesEqual(pMonthly[i]?.models, nMonthly[i]?.models)
-    ) {
-      return false;
-    }
-  }
 
   // 7. 比对按模型汇总明细与数据来源汇总明细
   if (!areModelSlicesEqual(pAct?.modelBreakdown, nAct?.modelBreakdown)) {
@@ -9851,17 +9128,25 @@ function isEquivalentTelemetry(prev, next) {
     return false;
   }
 
+  const sameUsageRowTotals = (a, b) =>
+    a?.calls === b?.calls &&
+    a?.inputTokens === b?.inputTokens &&
+    a?.cacheReadTokens === b?.cacheReadTokens &&
+    a?.outputTokens === b?.outputTokens &&
+    a?.thinkingTokens === b?.thinkingTokens &&
+    a?.responseTokens === b?.responseTokens &&
+    a?.totalTokens === b?.totalTokens &&
+    a?.costUsd === b?.costUsd &&
+    a?.unpricedCalls === b?.unpricedCalls &&
+    a?.cacheHitPct === b?.cacheHitPct;
+
   const pSources = prev.consumption?.sourcesBreakdown || [];
   const nSources = next.consumption?.sourcesBreakdown || [];
   if (pSources.length !== nSources.length) return false;
   for (let i = 0; i < pSources.length; i++) {
     if (
       pSources[i]?.name !== nSources[i]?.name ||
-      pSources[i]?.costUsd !== nSources[i]?.costUsd ||
-      pSources[i]?.unpricedCalls !== nSources[i]?.unpricedCalls ||
-      pSources[i]?.totalTokens !== nSources[i]?.totalTokens ||
-      pSources[i]?.calls !== nSources[i]?.calls ||
-      !areModelSlicesEqual(pSources[i]?.models, nSources[i]?.models)
+      !sameUsageRowTotals(pSources[i], nSources[i])
     ) {
       return false;
     }
@@ -9874,10 +9159,9 @@ function isEquivalentTelemetry(prev, next) {
     if (
       pTopConvs[i]?.cascadeId !== nTopConvs[i]?.cascadeId ||
       pTopConvs[i]?.title !== nTopConvs[i]?.title ||
-      pTopConvs[i]?.totalTokens !== nTopConvs[i]?.totalTokens ||
-      pTopConvs[i]?.costUsd !== nTopConvs[i]?.costUsd ||
-      pTopConvs[i]?.calls !== nTopConvs[i]?.calls ||
-      !areModelSlicesEqual(pTopConvs[i]?.models, nTopConvs[i]?.models)
+      pTopConvs[i]?.sourceName !== nTopConvs[i]?.sourceName ||
+      pTopConvs[i]?.appSource !== nTopConvs[i]?.appSource ||
+      !sameUsageRowTotals(pTopConvs[i], nTopConvs[i])
     ) {
       return false;
     }
@@ -9890,11 +9174,9 @@ function isEquivalentTelemetry(prev, next) {
     if (
       pTopWs[i]?.workspaceKey !== nTopWs[i]?.workspaceKey ||
       pTopWs[i]?.label !== nTopWs[i]?.label ||
+      pTopWs[i]?.workspacePath !== nTopWs[i]?.workspacePath ||
       pTopWs[i]?.sessionCount !== nTopWs[i]?.sessionCount ||
-      pTopWs[i]?.totalTokens !== nTopWs[i]?.totalTokens ||
-      pTopWs[i]?.costUsd !== nTopWs[i]?.costUsd ||
-      pTopWs[i]?.calls !== nTopWs[i]?.calls ||
-      !areModelSlicesEqual(pTopWs[i]?.models, nTopWs[i]?.models)
+      !sameUsageRowTotals(pTopWs[i], nTopWs[i])
     ) {
       return false;
     }
@@ -10175,7 +9457,6 @@ async function requestTelemetry(params, force) {
       if (feedbackTimer) clearTimeout(feedbackTimer);
       telemetryStore.setState({
         telemetry: finalForcePayload,
-        minuteTick: Math.floor(Date.now() / 30000),
         syncState: 'synced',
       });
       feedbackTimer = setTimeout(() => {
@@ -10188,7 +9469,6 @@ async function requestTelemetry(params, force) {
       const nextTelemetry = isSame ? latestSt.telemetry : resolvedPayload;
       telemetryStore.setState({
         telemetry: nextTelemetry,
-        minuteTick: Math.floor(Date.now() / 30000),
         syncState: latestSt.syncState === 'synced' ? 'synced' : 'idle',
       });
       if (needsSilentRangeRevalidate) {
@@ -10414,7 +9694,6 @@ async function selectConversation(
         if (!isEquivalentTelemetry(baseTelemetry, mergedTelemetry)) {
           telemetryStore.setState({
             telemetry: mergedTelemetry,
-            minuteTick: Math.floor(Date.now() / 30000),
           });
         }
       } else {
@@ -10445,7 +9724,6 @@ async function selectConversation(
     if (!isEquivalentTelemetry(latestSt.telemetry, resolvedPayload)) {
       telemetryStore.setState({
         telemetry: resolvedPayload,
-        minuteTick: Math.floor(Date.now() / 30000),
         syncState: latestSt.syncState === 'synced' ? 'synced' : 'idle',
       });
     }
@@ -13166,12 +12444,11 @@ return { createFourSegmentBar };
 // --- src/components/ui/ConsumptionTooltipContent.js ---
 const { createConsumptionBreakdownContent } = (() => {
 /**
- * @fileoverview 消耗统计统一悬浮详情内容组件 (ConsumptionTooltipContent).
- * 供历史趋势（折线/热力图）、客户端来源、会话排行及月度统计悬浮卡片复用：
- * 1. 顶部标题/日期行 + 右侧调用次数；
- * 2. 核心大字总量 (`TOKEN`) + 右侧预估费用；
- * 3. 分模型明细行（模型名/Token/占比 + 同「模型排行」Token 模式一致的四段构成进度条，不显示多余分组标题）；
- * 4. 底部四通道汇总（输入 / 缓存 / 思考 / 输出）。
+ * @fileoverview 消耗统计精简悬浮详情内容组件 (ConsumptionTooltipContent).
+ * 供历史趋势（折线/热力图）悬浮卡片复用，保留简洁直观的核心信息：
+ * 1. 顶部时间区间 + 右侧调用次数；
+ * 2. 核心总量 (`TOKEN`) + 右侧预估费用；
+ * 3. 轻量分模型占比列表（仅展示模型名与百分比，不含进度条与通道明细）。
  */
 
 
@@ -13180,21 +12457,10 @@ function safeNonNeg(val) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-function resolveSegmentChannels(seg) {
-  const inputTokens = safeNonNeg(seg?.inputTokens);
-  const cacheReadTokens = safeNonNeg(seg?.cacheReadTokens);
-  const thinkingTokens = safeNonNeg(seg?.thinkingTokens);
-  const responseTokens =
-    seg?.responseTokens != null
-      ? safeNonNeg(seg.responseTokens)
-      : Math.max(0, safeNonNeg(seg?.outputTokens) - thinkingTokens);
-  return { inputTokens, cacheReadTokens, thinkingTokens, responseTokens };
-}
-
 /**
- * 创建可增量更新的消耗统计悬浮详情内容结构。
+ * 创建可增量更新的精简消耗统计悬浮详情内容结构。
  *
- * @param {{ showModelDot?: boolean, monoTitle?: boolean }} [options]
+ * @param {{ monoTitle?: boolean }} [options]
  * @returns {{
  *   children: HTMLElement[],
  *   update: (payload: {
@@ -13202,17 +12468,11 @@ function resolveSegmentChannels(seg) {
  *     calls?: number,
  *     totalTokens?: number,
  *     costText?: string,
- *     inputTokens?: number,
- *     cacheReadTokens?: number,
- *     thinkingTokens?: number,
- *     responseTokens?: number,
- *     outputTokens?: number,
- *     segments?: Array<object>,
+ *     segments?: Array<{ key: string, label: string, pctText: string, isOther?: boolean }>,
  *   }) => void,
  * }}
  */
 function createConsumptionBreakdownContent({
-  showModelDot = false,
   monoTitle = false,
 } = {}) {
   const titleEl = h('span', {
@@ -13231,68 +12491,16 @@ function createConsumptionBreakdownContent({
   const mainEl = h('div', { className: 'trend-tip-main cons-tip-main' }, [tokensEl, costEl]);
 
   function createModelRow() {
-    const dotEl = h('span', {
-      className: 'dot-swatch cons-model-dot',
-      hidden: !showModelDot,
-    });
     const nameEl = h('span', { className: 'cons-pop-model-name' });
-    const tokEl = h('span', { className: 'cons-pop-model-tok' });
-    const pctEl = h('strong', { className: 'cons-pop-model-pct' });
-    const segBar = createFourSegmentBar();
-    const rowEl = h('div', { className: 'cons-pop-model-row' }, [
-      h('div', { className: 'cons-pop-model-head' }, [
-        h('span', { className: 'cons-pop-model-left' }, [dotEl, nameEl]),
-        h('span', { className: 'cons-pop-model-right text-mono' }, [tokEl, pctEl]),
-      ]),
-      segBar.el,
-    ]);
+    const pctEl = h('span', { className: 'cons-pop-model-pct text-mono' });
+    const rowEl = h('div', { className: 'cons-pop-model-row' }, [nameEl, pctEl]);
     return {
       el: rowEl,
-      refs: { rowEl, dotEl, nameEl, tokEl, pctEl, segBar },
+      refs: { rowEl, nameEl, pctEl },
     };
   }
 
   const modelsEl = h('div', { className: 'cons-pop-models', hidden: true });
-
-  const inLabelEl = h('span', { className: 'cons-pop-chan-label', text: t('cons.legInput') });
-  const inValEl = h('strong', { className: 'cons-pop-chan-val text-mono', text: '0' });
-  const cacheLabelEl = h('span', { className: 'cons-pop-chan-label', text: t('cons.legCache') });
-  const cacheValEl = h('strong', { className: 'cons-pop-chan-val text-mono', text: '0' });
-  const thinkLabelEl = h('span', { className: 'cons-pop-chan-label', text: t('cons.legThinking') });
-  const thinkValEl = h('strong', { className: 'cons-pop-chan-val text-mono', text: '0' });
-  const outLabelEl = h('span', { className: 'cons-pop-chan-label', text: t('cons.legOutput') });
-  const outValEl = h('strong', { className: 'cons-pop-chan-val text-mono', text: '0' });
-
-  const channelsEl = h('div', { className: 'cons-pop-channels', hidden: true }, [
-    h('div', { className: 'cons-pop-chan' }, [
-      h('span', { className: 'cons-pop-chan-head' }, [
-        h('span', { className: 'dot-swatch seg-input' }),
-        inLabelEl,
-      ]),
-      inValEl,
-    ]),
-    h('div', { className: 'cons-pop-chan' }, [
-      h('span', { className: 'cons-pop-chan-head' }, [
-        h('span', { className: 'dot-swatch seg-cached' }),
-        cacheLabelEl,
-      ]),
-      cacheValEl,
-    ]),
-    h('div', { className: 'cons-pop-chan' }, [
-      h('span', { className: 'cons-pop-chan-head' }, [
-        h('span', { className: 'dot-swatch seg-thinking' }),
-        thinkLabelEl,
-      ]),
-      thinkValEl,
-    ]),
-    h('div', { className: 'cons-pop-chan' }, [
-      h('span', { className: 'cons-pop-chan-head' }, [
-        h('span', { className: 'dot-swatch seg-output' }),
-        outLabelEl,
-      ]),
-      outValEl,
-    ]),
-  ]);
 
   function update(payload = {}) {
     patchText(titleEl, payload.title || '--');
@@ -13309,104 +12517,18 @@ function createConsumptionBreakdownContent({
     patchAttr(modelsEl, 'hidden', rows.length === 0);
     patchKeyedList(modelsEl, rows, {
       keyFn: (r) => r.key,
-      sigFn: (r) =>
-        `${showModelDot ? 1 : 0}:${r.key}:${r.label}:${r.color || ''}:${r.tokText}:${r.pctText}:${r.isOther ? 1 : 0}:${r.tok || 0}:${r.inputTokens || 0}:${r.cacheReadTokens || 0}:${r.thinkingTokens || 0}:${r.responseTokens ?? ''}:${r.outputTokens ?? ''}`,
+      sigFn: (r) => `${r.key}:${r.label}:${r.pctText}:${r.isOther ? 1 : 0}`,
       createRow: createModelRow,
       updateRow: (rRefs, r) => {
         patchClasses(rRefs.rowEl, { 'is-other': Boolean(r.isOther) });
-        patchAttr(rRefs.dotEl, 'hidden', !showModelDot);
-        if (showModelDot) {
-          patchStyleVar(rRefs.dotEl, '--dot-color', r.color);
-        }
         patchText(rRefs.nameEl, r.label);
-        patchText(rRefs.tokEl, r.tokText);
         patchText(rRefs.pctEl, r.pctText);
-
-        const segTok = safeNonNeg(r.tok);
-        const pct = Math.max(0, Math.min(100, Number(r.pct) || 0));
-        const scaleRatio = segTok > 0 ? Math.min(1, Math.max(0.008, pct / 100)) : 0;
-        const ch = resolveSegmentChannels(r);
-        const chSum = ch.inputTokens + ch.cacheReadTokens + ch.thinkingTokens + ch.responseTokens;
-        if (chSum > 0) {
-          rRefs.segBar.update({
-            inputTokens: ch.inputTokens,
-            cacheReadTokens: ch.cacheReadTokens,
-            thinkingTokens: ch.thinkingTokens,
-            responseTokens: ch.responseTokens,
-            scaleRatio,
-          });
-        } else if (segTok > 0) {
-          rRefs.segBar.update({
-            inputTokens: 0,
-            cacheReadTokens: segTok,
-            thinkingTokens: 0,
-            responseTokens: 0,
-            scaleRatio,
-          });
-        } else {
-          rRefs.segBar.update({
-            inputTokens: 0,
-            cacheReadTokens: 0,
-            thinkingTokens: 0,
-            responseTokens: 0,
-            scaleRatio: 0,
-          });
-        }
       },
     });
-
-    const hasExplicitChannels =
-      payload.inputTokens !== undefined ||
-      payload.cacheReadTokens !== undefined ||
-      payload.thinkingTokens !== undefined ||
-      payload.responseTokens !== undefined ||
-      payload.outputTokens !== undefined;
-    let inTok = safeNonNeg(payload.inputTokens);
-    let cacheTok = safeNonNeg(payload.cacheReadTokens);
-    let thinkTok = safeNonNeg(payload.thinkingTokens);
-    let respTok =
-      payload.responseTokens != null
-        ? safeNonNeg(payload.responseTokens)
-        : Math.max(0, safeNonNeg(payload.outputTokens) - thinkTok);
-    let hasChannels = hasExplicitChannels;
-
-    if (!hasChannels && rows.length > 0) {
-      let segIn = 0;
-      let segCache = 0;
-      let segThink = 0;
-      let segResp = 0;
-      for (const seg of rows) {
-        const ch = resolveSegmentChannels(seg);
-        segIn += ch.inputTokens;
-        segCache += ch.cacheReadTokens;
-        segThink += ch.thinkingTokens;
-        segResp += ch.responseTokens;
-      }
-      if (segIn + segCache + segThink + segResp > 0) {
-        inTok = segIn;
-        cacheTok = segCache;
-        thinkTok = segThink;
-        respTok = segResp;
-        hasChannels = true;
-      }
-    }
-
-    const showChannels = totalTokens > 0 && hasChannels;
-    patchAttr(channelsEl, 'hidden', !showChannels);
-    if (showChannels) {
-      patchText(inLabelEl, t('cons.legInput'));
-      patchText(cacheLabelEl, t('cons.legCache'));
-      patchText(thinkLabelEl, t('cons.legThinking'));
-      patchText(outLabelEl, t('cons.legOutput'));
-      patchText(inValEl, formatTokensPrecise(inTok));
-      patchText(cacheValEl, formatTokensPrecise(cacheTok));
-      patchText(thinkValEl, formatTokensPrecise(thinkTok));
-      patchText(outValEl, formatTokensPrecise(respTok));
-    }
   }
 
   return {
-    children: [headEl, mainEl, modelsEl, channelsEl],
+    children: [headEl, mainEl, modelsEl],
     update,
   };
 }
@@ -13414,23 +12536,10 @@ return { createConsumptionBreakdownContent };
 })();
 
 // --- src/components/charts/chartMotion.js ---
-const { CHART_CURVE_MORPH_MS, canAnimateChartInBrowser, evalCubicBezier, createReadyClassArmer, pointsToNormalizedCubicSegs, buildPathFromNormalizedSegs, createCubicCurveMorphController, createMultiSeriesCurveMorphController, createFitGridMorphController, createFloatingChartTooltipController } = (() => {
+const { CHART_CURVE_MORPH_MS, canAnimateChartInBrowser, evalCubicBezier, createReadyClassArmer, pointsToNormalizedCubicSegs, buildPathFromNormalizedSegs, createCubicCurveMorphController, createFloatingChartTooltipController } = (() => {
 /**
- * @fileoverview Shared interactive chart motion & 2D mouse-following tooltip primitives (`chartMotion.js`).
- *
- * Reused across:
- * 1. `TrendAreaChart.js` (ConsumptionView usage trend & heatmap);
- * 2. `SessionStepCharts.js` (StepsDetailView summary step line chart & LOESS model fit chart);
- * 3. `AccountQuotaTrendCard.js` (SettingsAccountTab per-account quota trajectory chart).
- *
- * Provides:
- * - GPU-composited 2D pointer-following floating tooltip (`translate3d`) with 4-way collision
- *   avoidance, viewport clipping, cached layout rects, and `150ms` `.is-tracking` arming
- *   synchronized with SVG focus dots (`.trend-hover-dot` / `.sstep-hover-raw-dot`);
- * - Exact CSS `cubic-bezier` solver (`evalCubicBezier`) and `240ms` normalized cubic-Bezier
- *   chain subdivision morphing for single-series and multi-series curves + area fills;
- * - Smooth `240ms` LOESS curve, `95% CI` confidence band, and OLS line morphing;
- * - Next-frame `.is-ready` transition arming for sliding peak badges (`.trend-peak-pill`).
+ * @fileoverview Pointer-following tooltips, curve morphing, and transition arming
+ * for the consumption trend chart and heatmap.
  */
 
 
@@ -13916,528 +13025,6 @@ function createCubicCurveMorphController({ durationMs = CHART_CURVE_MORPH_MS } =
 }
 
 /**
- * Coalesced multi-series cubic-Bezier curve, area fill, and endpoint dot morph controller
- * (used by `AccountQuotaTrendCard` and multi-model `SessionStepCharts`).
- */
-function createMultiSeriesCurveMorphController({ durationMs = CHART_CURVE_MORPH_MS } = {}) {
-  let morphRafId = 0;
-  let hasRenderedOnce = false;
-  const stateByKey = new Map();
-
-  function cancel() {
-    if (
-      morphRafId &&
-      typeof window !== 'undefined' &&
-      typeof window.cancelAnimationFrame === 'function'
-    ) {
-      window.cancelAnimationFrame(morphRafId);
-    }
-    morphRafId = 0;
-  }
-
-  function reset() {
-    cancel();
-    hasRenderedOnce = false;
-    stateByKey.clear();
-  }
-
-  function getSeriesSegs(key) {
-    const rec = stateByKey.get(key);
-    const src = rec ? rec.liveSegs || rec.committedSegs : null;
-    return src && src.length > 0 ? src.map((s) => ({ ...s })) : null;
-  }
-
-  function getFirstSegs() {
-    for (const rec of stateByKey.values()) {
-      const src = rec.liveSegs || rec.committedSegs;
-      if (src && src.length > 0) return src.map((s) => ({ ...s }));
-    }
-    return null;
-  }
-
-  function seedSeries(key, segs) {
-    if (!key || !Array.isArray(segs) || segs.length === 0) return;
-    stateByKey.set(key, {
-      committedSegs: segs.map((s) => ({ ...s })),
-      liveSegs: null,
-      endX: NaN,
-      endY: NaN,
-    });
-    hasRenderedOnce = true;
-  }
-
-  function morphSeries({
-    items,
-    leftX,
-    spanX,
-    bottomY,
-    skipMorph = false,
-    allowBaselineEntry = false,
-  }) {
-    cancel();
-    const canAnim = !skipMorph && canAnimateChartInBrowser();
-    const wasRenderedBefore = hasRenderedOnce;
-    hasRenderedOnce = items.length > 0;
-    const activeSet = new Set();
-    const jobs = [];
-
-    for (let idx = 0; idx < items.length; idx++) {
-      const it = items[idx];
-      activeSet.add(it.key);
-      const prevEntry = stateByKey.get(it.key);
-      let prevSegs = prevEntry ? prevEntry.liveSegs || prevEntry.committedSegs : null;
-      if (
-        (!prevSegs || prevSegs.length === 0) &&
-        canAnim &&
-        allowBaselineEntry &&
-        wasRenderedBefore &&
-        it.nextSegs.length > 0 &&
-        Number.isFinite(bottomY)
-      ) {
-        prevSegs = it.nextSegs.map((s) => ({
-          u0: s.u0,
-          y0: bottomY,
-          cu1: s.cu1,
-          cy1: bottomY,
-          cu2: s.cu2,
-          cy2: bottomY,
-          u3: s.u3,
-          y3: bottomY,
-        }));
-      }
-
-      if (!canAnim || !prevSegs || prevSegs.length === 0 || it.nextSegs.length === 0) {
-        stateByKey.set(it.key, {
-          committedSegs: it.nextSegs,
-          liveSegs: null,
-          endX: it.endX,
-          endY: it.endY,
-        });
-        patchAttr(it.lineEl, 'd', it.finalLineD);
-        if (it.areaEl) patchAttr(it.areaEl, 'd', it.finalAreaD || '');
-        if (it.endDotEl && Number.isFinite(it.endX) && Number.isFinite(it.endY)) {
-          patchAttr(it.endDotEl, 'cx', it.endX.toFixed(1));
-          patchAttr(it.endDotEl, 'cy', it.endY.toFixed(1));
-        }
-        continue;
-      }
-
-      const { alignedFrom, alignedTo } = alignCubicChainsForMorph(prevSegs, it.nextSegs);
-      const segCount = alignedTo.length;
-      let maxDelta = 0;
-      for (let i = 0; i < segCount; i++) {
-        const a = alignedFrom[i];
-        const b = alignedTo[i];
-        maxDelta = Math.max(
-          maxDelta,
-          Math.abs(b.y0 - a.y0),
-          Math.abs(b.cy1 - a.cy1),
-          Math.abs(b.cy2 - a.cy2),
-          Math.abs(b.y3 - a.y3),
-          Math.abs(b.u0 - a.u0) * spanX,
-          Math.abs(b.u3 - a.u3) * spanX
-        );
-      }
-
-      if (maxDelta < 0.25) {
-        stateByKey.set(it.key, {
-          committedSegs: it.nextSegs,
-          liveSegs: null,
-          endX: it.endX,
-          endY: it.endY,
-        });
-        patchAttr(it.lineEl, 'd', it.finalLineD);
-        if (it.areaEl) patchAttr(it.areaEl, 'd', it.finalAreaD || '');
-        if (it.endDotEl && Number.isFinite(it.endX) && Number.isFinite(it.endY)) {
-          patchAttr(it.endDotEl, 'cx', it.endX.toFixed(1));
-          patchAttr(it.endDotEl, 'cy', it.endY.toFixed(1));
-        }
-        continue;
-      }
-
-      const activeLive = alignedFrom.map((s) => ({ ...s }));
-      const fromEndX = Number.isFinite(prevEntry?.endX)
-        ? prevEntry.endX
-        : leftX + alignedFrom[segCount - 1].u3 * spanX;
-      const fromEndY = Number.isFinite(prevEntry?.endY)
-        ? prevEntry.endY
-        : alignedFrom[segCount - 1].y3;
-      const stateRec = {
-        committedSegs: it.nextSegs,
-        liveSegs: activeLive,
-        endX: fromEndX,
-        endY: fromEndY,
-      };
-      stateByKey.set(it.key, stateRec);
-      const initLineD = buildPathFromNormalizedSegs(activeLive, leftX, spanX);
-      patchAttr(it.lineEl, 'd', initLineD);
-      if (it.areaEl) {
-        if (it.finalAreaD) {
-          const firstX = (leftX + activeLive[0].u0 * spanX).toFixed(1);
-          const lastX = (leftX + activeLive[segCount - 1].u3 * spanX).toFixed(1);
-          patchAttr(it.areaEl, 'd', `${initLineD} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`);
-        } else {
-          patchAttr(it.areaEl, 'd', '');
-        }
-      }
-      jobs.push({
-        it,
-        alignedFrom,
-        alignedTo,
-        activeLive,
-        segCount,
-        fromEndX,
-        fromEndY,
-        stateRec,
-      });
-    }
-
-    for (const k of Array.from(stateByKey.keys())) {
-      if (!activeSet.has(k)) stateByKey.delete(k);
-    }
-
-    if (jobs.length === 0) return;
-
-    const startTs = performance.now();
-    const step = (nowTs) => {
-      const elapsed = Math.max(0, nowTs - startTs);
-      const rawT = Math.min(1, elapsed / durationMs);
-      if (rawT >= 1) {
-        morphRafId = 0;
-        for (let j = 0; j < jobs.length; j++) {
-          const jb = jobs[j];
-          jb.stateRec.liveSegs = null;
-          jb.stateRec.endX = jb.it.endX;
-          jb.stateRec.endY = jb.it.endY;
-          patchAttr(jb.it.lineEl, 'd', jb.it.finalLineD);
-          if (jb.it.areaEl) patchAttr(jb.it.areaEl, 'd', jb.it.finalAreaD || '');
-          if (jb.it.endDotEl && Number.isFinite(jb.it.endX) && Number.isFinite(jb.it.endY)) {
-            patchAttr(jb.it.endDotEl, 'cx', jb.it.endX.toFixed(1));
-            patchAttr(jb.it.endDotEl, 'cy', jb.it.endY.toFixed(1));
-          }
-        }
-        return;
-      }
-
-      const ease = evalCubicBezier(0.22, 1, 0.36, 1, rawT);
-      for (let j = 0; j < jobs.length; j++) {
-        const jb = jobs[j];
-        const { alignedFrom, alignedTo, activeLive, segCount, it } = jb;
-        for (let i = 0; i < segCount; i++) {
-          const a = alignedFrom[i];
-          const b = alignedTo[i];
-          const cur = activeLive[i];
-          cur.u0 = a.u0 + (b.u0 - a.u0) * ease;
-          cur.y0 = a.y0 + (b.y0 - a.y0) * ease;
-          cur.cu1 = a.cu1 + (b.cu1 - a.cu1) * ease;
-          cur.cy1 = a.cy1 + (b.cy1 - a.cy1) * ease;
-          cur.cu2 = a.cu2 + (b.cu2 - a.cu2) * ease;
-          cur.cy2 = a.cy2 + (b.cy2 - a.cy2) * ease;
-          cur.u3 = a.u3 + (b.u3 - a.u3) * ease;
-          cur.y3 = a.y3 + (b.y3 - a.y3) * ease;
-        }
-        const morphLineD = buildPathFromNormalizedSegs(activeLive, leftX, spanX);
-        patchAttr(it.lineEl, 'd', morphLineD);
-        if (it.areaEl && it.finalAreaD) {
-          const firstX = (leftX + activeLive[0].u0 * spanX).toFixed(1);
-          const lastX = (leftX + activeLive[segCount - 1].u3 * spanX).toFixed(1);
-          patchAttr(it.areaEl, 'd', `${morphLineD} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`);
-        }
-        if (it.endDotEl && Number.isFinite(it.endX) && Number.isFinite(it.endY)) {
-          const cx = jb.fromEndX + (it.endX - jb.fromEndX) * ease;
-          const cy = jb.fromEndY + (it.endY - jb.fromEndY) * ease;
-          jb.stateRec.endX = cx;
-          jb.stateRec.endY = cy;
-          patchAttr(it.endDotEl, 'cx', cx.toFixed(1));
-          patchAttr(it.endDotEl, 'cy', cy.toFixed(1));
-        }
-      }
-      morphRafId = window.requestAnimationFrame(step);
-    };
-
-    morphRafId = window.requestAnimationFrame(step);
-  }
-
-  return { morphSeries, cancel, reset, getSeriesSegs, getFirstSegs, seedSeries };
-}
-
-function buildGridFitPolylineD(grid) {
-  if (!grid.length) return '';
-  let d = `M ${grid[0].x.toFixed(1)} ${grid[0].fitY.toFixed(1)}`;
-  for (let i = 1; i < grid.length; i++) {
-    d += ` L ${grid[i].x.toFixed(1)} ${grid[i].fitY.toFixed(1)}`;
-  }
-  return d;
-}
-
-function buildGridCiBandD(grid) {
-  if (grid.length < 2) return '';
-  let d = `M ${grid[0].x.toFixed(1)} ${grid[0].highY.toFixed(1)}`;
-  for (let i = 1; i < grid.length; i++) {
-    d += ` L ${grid[i].x.toFixed(1)} ${grid[i].highY.toFixed(1)}`;
-  }
-  for (let i = grid.length - 1; i >= 0; i--) {
-    d += ` L ${grid[i].x.toFixed(1)} ${grid[i].lowY.toFixed(1)}`;
-  }
-  return `${d} Z`;
-}
-
-function resampleFitGridToTargetXs(sourceGrid, targetGrid) {
-  if (!Array.isArray(sourceGrid) || sourceGrid.length === 0) return null;
-  const sLen = sourceGrid.length;
-  const sFirst = sourceGrid[0];
-  const sLast = sourceGrid[sLen - 1];
-  let j = 0;
-  return targetGrid.map((tg) => {
-    const x = tg.x;
-    if (sLen === 1 || x <= sFirst.x) {
-      return { x, fitY: sFirst.fitY, lowY: sFirst.lowY, highY: sFirst.highY };
-    }
-    if (x >= sLast.x) {
-      return { x, fitY: sLast.fitY, lowY: sLast.lowY, highY: sLast.highY };
-    }
-    while (j < sLen - 2 && sourceGrid[j + 1].x < x) j += 1;
-    const a = sourceGrid[j];
-    const b = sourceGrid[j + 1];
-    const span = b.x - a.x;
-    const r = span > 1e-6 ? Math.max(0, Math.min(1, (x - a.x) / span)) : 0;
-    return {
-      x,
-      fitY: a.fitY + (b.fitY - a.fitY) * r,
-      lowY: a.lowY + (b.lowY - a.lowY) * r,
-      highY: a.highY + (b.highY - a.highY) * r,
-    };
-  });
-}
-
-/**
- * Smoothly morphs LOESS fit polylines, `95% CI` confidence bands, and optional OLS lines
- * across metric/model switches in `createModelFitChart`.
- */
-function createFitGridMorphController({ durationMs = CHART_CURVE_MORPH_MS } = {}) {
-  let morphRafId = 0;
-  let hasRenderedOnce = false;
-  const stateByKey = new Map();
-
-  function cancel() {
-    if (
-      morphRafId &&
-      typeof window !== 'undefined' &&
-      typeof window.cancelAnimationFrame === 'function'
-    ) {
-      window.cancelAnimationFrame(morphRafId);
-    }
-    morphRafId = 0;
-  }
-
-  function reset() {
-    cancel();
-    hasRenderedOnce = false;
-    stateByKey.clear();
-  }
-
-  function getGrid(key) {
-    const rec = stateByKey.get(key);
-    const src = rec ? rec.liveGrid || rec.committedGrid : null;
-    return src && src.length > 0 ? src.map((g) => ({ ...g })) : null;
-  }
-
-  function getFirstGrid() {
-    for (const rec of stateByKey.values()) {
-      const src = rec.liveGrid || rec.committedGrid;
-      if (src && src.length > 0) return src.map((g) => ({ ...g }));
-    }
-    return null;
-  }
-
-  function seedGrid(key, gridPts) {
-    if (!key || !Array.isArray(gridPts) || gridPts.length === 0) return;
-    stateByKey.set(key, {
-      committedGrid: gridPts.map((g) => ({ ...g })),
-      liveGrid: null,
-      ols: null,
-    });
-    hasRenderedOnce = true;
-  }
-
-  function morphFits({ items, skipMorph = false, allowBaselineEntry = false, bottomY = NaN }) {
-    cancel();
-    const canAnim = !skipMorph && canAnimateChartInBrowser();
-    const wasRenderedBefore = hasRenderedOnce;
-    hasRenderedOnce = items.length > 0;
-    const activeSet = new Set();
-    const jobs = [];
-
-    for (let idx = 0; idx < items.length; idx++) {
-      const it = items[idx];
-      activeSet.add(it.key);
-      const prevEntry = stateByKey.get(it.key);
-      const rawPrevGrid = prevEntry ? prevEntry.liveGrid || prevEntry.committedGrid : null;
-      let prevGrid =
-        rawPrevGrid && rawPrevGrid.length > 0 && it.gridPts.length >= 2
-          ? rawPrevGrid.length === it.gridPts.length &&
-            Math.abs(rawPrevGrid[0].x - it.gridPts[0].x) < 0.5 &&
-            Math.abs(
-              rawPrevGrid[rawPrevGrid.length - 1].x - it.gridPts[it.gridPts.length - 1].x
-            ) < 0.5
-            ? rawPrevGrid
-            : resampleFitGridToTargetXs(rawPrevGrid, it.gridPts)
-          : null;
-      if (
-        !prevGrid &&
-        canAnim &&
-        allowBaselineEntry &&
-        wasRenderedBefore &&
-        it.gridPts.length >= 2 &&
-        Number.isFinite(bottomY)
-      ) {
-        prevGrid = it.gridPts.map((g) => ({
-          x: g.x,
-          fitY: bottomY,
-          lowY: bottomY,
-          highY: bottomY,
-        }));
-      }
-
-      if (
-        !canAnim ||
-        !prevGrid ||
-        prevGrid.length !== it.gridPts.length ||
-        it.gridPts.length < 2
-      ) {
-        stateByKey.set(it.key, {
-          committedGrid: it.gridPts,
-          liveGrid: null,
-          ols: it.olsCoords || null,
-        });
-        patchAttr(it.curveEl, 'd', it.finalCurveD);
-        if (it.bandEl) patchAttr(it.bandEl, 'd', it.finalBandD || '');
-        if (it.olsEl && it.olsCoords) {
-          patchAttr(it.olsEl, 'x1', it.olsCoords.x1.toFixed(1));
-          patchAttr(it.olsEl, 'y1', it.olsCoords.y1.toFixed(1));
-          patchAttr(it.olsEl, 'x2', it.olsCoords.x2.toFixed(1));
-          patchAttr(it.olsEl, 'y2', it.olsCoords.y2.toFixed(1));
-        }
-        continue;
-      }
-
-      let maxDelta = 0;
-      for (let i = 0; i < it.gridPts.length; i++) {
-        const a = prevGrid[i];
-        const b = it.gridPts[i];
-        maxDelta = Math.max(
-          maxDelta,
-          Math.abs(b.fitY - a.fitY),
-          Math.abs(b.highY - a.highY),
-          Math.abs(b.lowY - a.lowY),
-          Math.abs(b.x - a.x)
-        );
-      }
-      if (maxDelta < 0.25) {
-        stateByKey.set(it.key, {
-          committedGrid: it.gridPts,
-          liveGrid: null,
-          ols: it.olsCoords || null,
-        });
-        patchAttr(it.curveEl, 'd', it.finalCurveD);
-        if (it.bandEl) patchAttr(it.bandEl, 'd', it.finalBandD || '');
-        if (it.olsEl && it.olsCoords) {
-          patchAttr(it.olsEl, 'x1', it.olsCoords.x1.toFixed(1));
-          patchAttr(it.olsEl, 'y1', it.olsCoords.y1.toFixed(1));
-          patchAttr(it.olsEl, 'x2', it.olsCoords.x2.toFixed(1));
-          patchAttr(it.olsEl, 'y2', it.olsCoords.y2.toFixed(1));
-        }
-        continue;
-      }
-
-      const activeLive = prevGrid.map((g) => ({ ...g }));
-      const fromOls = prevEntry?.ols || it.olsCoords || null;
-      const stateRec = {
-        committedGrid: it.gridPts,
-        liveGrid: activeLive,
-        ols: fromOls ? { ...fromOls } : null,
-      };
-      stateByKey.set(it.key, stateRec);
-      patchAttr(it.curveEl, 'd', buildGridFitPolylineD(activeLive));
-      if (it.bandEl) {
-        patchAttr(it.bandEl, 'd', it.finalBandD ? buildGridCiBandD(activeLive) : '');
-      }
-      if (it.olsEl && fromOls) {
-        patchAttr(it.olsEl, 'x1', fromOls.x1.toFixed(1));
-        patchAttr(it.olsEl, 'y1', fromOls.y1.toFixed(1));
-        patchAttr(it.olsEl, 'x2', fromOls.x2.toFixed(1));
-        patchAttr(it.olsEl, 'y2', fromOls.y2.toFixed(1));
-      }
-      jobs.push({ it, fromGrid: prevGrid, activeLive, fromOls, stateRec });
-    }
-
-    for (const k of Array.from(stateByKey.keys())) {
-      if (!activeSet.has(k)) stateByKey.delete(k);
-    }
-
-    if (jobs.length === 0) return;
-
-    const startTs = performance.now();
-    const step = (nowTs) => {
-      const elapsed = Math.max(0, nowTs - startTs);
-      const rawT = Math.min(1, elapsed / durationMs);
-      if (rawT >= 1) {
-        morphRafId = 0;
-        for (let j = 0; j < jobs.length; j++) {
-          const jb = jobs[j];
-          jb.stateRec.liveGrid = null;
-          jb.stateRec.ols = jb.it.olsCoords || null;
-          patchAttr(jb.it.curveEl, 'd', jb.it.finalCurveD);
-          if (jb.it.bandEl) patchAttr(jb.it.bandEl, 'd', jb.it.finalBandD || '');
-          if (jb.it.olsEl && jb.it.olsCoords) {
-            patchAttr(jb.it.olsEl, 'x1', jb.it.olsCoords.x1.toFixed(1));
-            patchAttr(jb.it.olsEl, 'y1', jb.it.olsCoords.y1.toFixed(1));
-            patchAttr(jb.it.olsEl, 'x2', jb.it.olsCoords.x2.toFixed(1));
-            patchAttr(jb.it.olsEl, 'y2', jb.it.olsCoords.y2.toFixed(1));
-          }
-        }
-        return;
-      }
-
-      const ease = evalCubicBezier(0.22, 1, 0.36, 1, rawT);
-      for (let j = 0; j < jobs.length; j++) {
-        const jb = jobs[j];
-        const { fromGrid, activeLive, it } = jb;
-        for (let i = 0; i < activeLive.length; i++) {
-          const a = fromGrid[i];
-          const b = it.gridPts[i];
-          const cur = activeLive[i];
-          cur.x = a.x + (b.x - a.x) * ease;
-          cur.fitY = a.fitY + (b.fitY - a.fitY) * ease;
-          cur.highY = a.highY + (b.highY - a.highY) * ease;
-          cur.lowY = a.lowY + (b.lowY - a.lowY) * ease;
-        }
-        patchAttr(it.curveEl, 'd', buildGridFitPolylineD(activeLive));
-        if (it.bandEl && it.finalBandD) {
-          patchAttr(it.bandEl, 'd', buildGridCiBandD(activeLive));
-        }
-        if (it.olsEl && it.olsCoords && jb.fromOls) {
-          const ox1 = jb.fromOls.x1 + (it.olsCoords.x1 - jb.fromOls.x1) * ease;
-          const oy1 = jb.fromOls.y1 + (it.olsCoords.y1 - jb.fromOls.y1) * ease;
-          const ox2 = jb.fromOls.x2 + (it.olsCoords.x2 - jb.fromOls.x2) * ease;
-          const oy2 = jb.fromOls.y2 + (it.olsCoords.y2 - jb.fromOls.y2) * ease;
-          jb.stateRec.ols = { x1: ox1, y1: oy1, x2: ox2, y2: oy2 };
-          patchAttr(it.olsEl, 'x1', ox1.toFixed(1));
-          patchAttr(it.olsEl, 'y1', oy1.toFixed(1));
-          patchAttr(it.olsEl, 'x2', ox2.toFixed(1));
-          patchAttr(it.olsEl, 'y2', oy2.toFixed(1));
-        }
-      }
-      morphRafId = window.requestAnimationFrame(step);
-    };
-
-    morphRafId = window.requestAnimationFrame(step);
-  }
-
-  return { morphFits, cancel, reset, getGrid, getFirstGrid, seedGrid };
-}
-
-/**
  * Shared 2D pointer-following floating tooltip & focus-dot tracking controller.
  * Positions `.trend-tooltip` smoothly around the pointer (`above -> right -> left -> below`),
  * clamps inside the nearest scrollable viewport container, and arms `.is-tracking` (`150ms`)
@@ -14450,7 +13037,7 @@ function createFloatingChartTooltipController({
   defaultTipHeight = 96,
   defaultViewWidth = 460,
   defaultViewHeight = 184,
-  clipSelector = '.view-pane, .cons-view-stage, .models-analytics-pane, .table-viewport',
+  clipSelector = '.view-pane, .cons-view-stage, .table-viewport',
   useFloatingClass = true,
 }) {
   if (useFloatingClass) {
@@ -14664,7 +13251,7 @@ function createFloatingChartTooltipController({
     destroy,
   };
 }
-return { CHART_CURVE_MORPH_MS, canAnimateChartInBrowser, evalCubicBezier, createReadyClassArmer, pointsToNormalizedCubicSegs, buildPathFromNormalizedSegs, createCubicCurveMorphController, createMultiSeriesCurveMorphController, createFitGridMorphController, createFloatingChartTooltipController };
+return { CHART_CURVE_MORPH_MS, canAnimateChartInBrowser, evalCubicBezier, createReadyClassArmer, pointsToNormalizedCubicSegs, buildPathFromNormalizedSegs, createCubicCurveMorphController, createFloatingChartTooltipController };
 })();
 
 // --- src/components/charts/TrendAreaChart.js ---
@@ -14876,11 +13463,6 @@ function normalizeHeatmapMode(mode) {
 function createHeatmapAggAcc(extra = {}) {
   return {
     tokens: 0,
-    inputTokens: 0,
-    cacheReadTokens: 0,
-    thinkingTokens: 0,
-    responseTokens: 0,
-    outputTokens: 0,
     costUsd: 0,
     calls: 0,
     minStartMs: Infinity,
@@ -14895,20 +13477,7 @@ function createHeatmapAggAcc(extra = {}) {
 function mergeSlotIntoHeatmapAcc(acc, slot) {
   if (!slot) return;
   const tok = safeSlotTokens(slot.tokens);
-  const inTok = safeSlotTokens(slot.inputTokens);
-  const cacheTok = safeSlotTokens(slot.cacheReadTokens);
-  const thinkTok = safeSlotTokens(slot.thinkingTokens);
-  const respTok = safeSlotTokens(slot.responseTokens);
-  const outTok =
-    slot.outputTokens !== undefined && slot.outputTokens !== null
-      ? safeSlotTokens(slot.outputTokens)
-      : thinkTok + respTok;
   acc.tokens += tok;
-  acc.inputTokens += inTok;
-  acc.cacheReadTokens += cacheTok;
-  acc.thinkingTokens += thinkTok;
-  acc.responseTokens += respTok;
-  acc.outputTokens += outTok;
   acc.costUsd += Math.max(0, Number(slot.costUsd || 0));
   acc.calls += Math.max(0, Number(slot.calls || 0));
 
@@ -14939,27 +13508,11 @@ function mergeSlotIntoHeatmapAcc(acc, slot) {
       if (!key) continue;
       let cur = acc.modelMap.get(key);
       if (!cur) {
-        cur = {
-          ...m,
-          calls: 0,
-          inputTokens: 0,
-          cacheReadTokens: 0,
-          thinkingTokens: 0,
-          responseTokens: 0,
-          outputTokens: 0,
-          totalTokens: 0,
-          costUsd: 0,
-        };
+        cur = { ...m, calls: 0, totalTokens: 0 };
         acc.modelMap.set(key, cur);
       }
       cur.calls += Math.max(0, Number(m.calls || 0));
-      cur.inputTokens += safeSlotTokens(m.inputTokens);
-      cur.cacheReadTokens += safeSlotTokens(m.cacheReadTokens);
-      cur.thinkingTokens += safeSlotTokens(m.thinkingTokens);
-      cur.responseTokens += safeSlotTokens(m.responseTokens);
-      cur.outputTokens += safeSlotTokens(m.outputTokens);
       cur.totalTokens += safeSlotTokens(m.totalTokens);
-      cur.costUsd += Math.max(0, Number(m.costUsd || 0));
     }
   }
 }
@@ -14985,11 +13538,6 @@ function finalizeHeatmapBucket(acc, customTitle, shortLabel, buildSegmentsFn) {
     fullLabel: customTitle,
     customTitle,
     tokens: acc.tokens,
-    inputTokens: acc.inputTokens,
-    cacheReadTokens: acc.cacheReadTokens,
-    thinkingTokens: acc.thinkingTokens,
-    responseTokens: acc.responseTokens,
-    outputTokens: acc.outputTokens,
     costUsd: +acc.costUsd.toFixed(4),
     calls: acc.calls,
     modelSegments,
@@ -15284,9 +13832,8 @@ function createTrendAreaChart({ onSelectSlot = null } = {}) {
 
   const peakPill = h('span', { className: 'trend-peak-pill text-mono', text: '0', hidden: true });
 
-  // 共享悬停详情浮层卡片（曲线图和热力格子图共用，含分模型四段进度条及底部四通道明细）
+  // 共享悬停精简浮层卡片（曲线图和热力格子图共用，仅展示时间区间、调用次数、总 Token 与预估费用）
   const tooltipContent = createConsumptionBreakdownContent({
-    showModelDot: false,
     monoTitle: true,
   });
 
@@ -15385,8 +13932,8 @@ function createTrendAreaChart({ onSelectSlot = null } = {}) {
   const tooltipCtrl = createFloatingChartTooltipController({
     containerEl: chartWrap,
     tooltipEl,
-    defaultTipWidth: 216,
-    defaultTipHeight: 104,
+    defaultTipWidth: 196,
+    defaultTipHeight: 78,
     defaultViewWidth: DEFAULT_VIEW_W,
     defaultViewHeight: VIEW_H,
     useFloatingClass: false,
@@ -15402,11 +13949,6 @@ function createTrendAreaChart({ onSelectSlot = null } = {}) {
       costText: formatUsd(slotCost, {
         precise: slotCost > 0 && slotCost < 0.1,
       }),
-      inputTokens: slot.inputTokens,
-      cacheReadTokens: slot.cacheReadTokens,
-      thinkingTokens: slot.thinkingTokens,
-      responseTokens: slot.responseTokens,
-      outputTokens: slot.outputTokens,
       segments: Array.isArray(slot.modelSegments) ? slot.modelSegments : [],
     });
   }
@@ -15982,20 +14524,31 @@ function createTrendAreaChart({ onSelectSlot = null } = {}) {
     patchText(hmLessEl, t('chart.trend.hmLess'));
     patchText(hmMoreEl, t('chart.trend.hmMore'));
 
+    const isAggregateBarMode = useHeatmap && currentHmMode !== 'day';
     const sig =
       `${locale}|${useHeatmap ? `hm:${currentHmMode}` : `line:${viewW}`}|` +
       slots
         .map((s) => {
-          const mSig = Array.isArray(s?.modelSegments)
-            ? s.modelSegments
+          let mSig = '';
+          if (isAggregateBarMode) {
+            const rawModels = Array.isArray(s?.mergedModels)
+              ? s.mergedModels
+              : Array.isArray(s?.models)
+                ? s.models
+                : null;
+            if (rawModels && rawModels.length > 0) {
+              mSig = rawModels
                 .map(
                   (m) =>
-                    `${m.key}:${m.color}:${m.pctText}:${m.inputTokens || 0}:${m.cacheReadTokens || 0}:${m.thinkingTokens || 0}:${m.responseTokens || 0}`
+                    `${m?.displayText || m?.label || m?.shortName || ''}:${safeSlotTokens(m?.totalTokens)}:${Number(m?.calls || 0)}`
                 )
-                .join(',')
-            : '';
+                .join(',');
+            }
+          } else if (Array.isArray(s?.modelSegments)) {
+            mSig = s.modelSegments.map((m) => `${m.key}:${m.pctText}`).join(',');
+          }
           const mergedCnt = Array.isArray(s?.mergedModels) ? s.mergedModels.length : 0;
-          return `${s?.startMs || ''}:${s?.label || ''}:${s?.fullLabel || ''}:${safeSlotTokens(s?.tokens)}:${safeSlotTokens(s?.inputTokens)}:${safeSlotTokens(s?.cacheReadTokens)}:${safeSlotTokens(s?.thinkingTokens)}:${safeSlotTokens(s?.responseTokens)}:${Number(s?.costUsd || 0)}:${Number(s?.calls || 0)}:${mergedCnt}:${mSig}`;
+          return `${s?.startMs || ''}:${s?.label || ''}:${s?.fullLabel || ''}:${safeSlotTokens(s?.tokens)}:${Number(s?.costUsd || 0)}:${Number(s?.calls || 0)}:${mergedCnt}:${mSig}`;
         })
         .join('|');
 
@@ -19710,12 +18263,12 @@ function createDynamicWidgetHost({
     return validKeys;
   }
 
-  function update({ moduleKeys = [], data = null, minuteTick = undefined } = {}) {
-    latestUpdatePayload = { data, minuteTick };
+  function update({ moduleKeys = [], data = null } = {}) {
+    latestUpdatePayload = { data };
     const validKeys = syncModules(moduleKeys);
     for (const key of validKeys) {
       const inst = instances.get(key);
-      inst?.refs?.update?.({ data, minuteTick });
+      inst?.refs?.update?.(latestUpdatePayload);
     }
   }
 
@@ -20356,11 +18909,9 @@ return { STEP_COLUMN_KEYS, DEFAULT_STEP_COLUMN_KEYS, resolveStepTokenParts, form
 })();
 
 // --- src/components/widgets/CapsuleBarWidget.js ---
-const { RING_RADIUS, RING_CIRCUMFERENCE, tokenizeCapsuleOdometerText, patchCapsuleOdometerText, buildCapsuleSlotContext, resolveMultiSessionCapsuleState, createCapsuleSlotNode, syncCapsuleSlotNodes, CapsuleBarWidget } = (() => {
+const { RING_RADIUS, RING_CIRCUMFERENCE, tokenizeCapsuleOdometerText, patchCapsuleOdometerText, buildCapsuleSlotContext, resolveMultiSessionCapsuleState, createCapsuleSlotNode, syncCapsuleSlotNodes } = (() => {
 /**
- * @fileoverview Shared Decoupled Capsule Bar Primitives & Widget (`CapsuleBarWidget.js`).
- * Powers both the live host window capsule (`WindowOverlayShell.js`) and the
- * real-UI structure preview (`SettingsStructureTab.js`), ensuring 100% DOM/CSS parity.
+ * @fileoverview Slot, ring, and odometer primitives for the host window capsule.
  */
 
 
@@ -20829,177 +19380,7 @@ function syncCapsuleSlotNodes(capsuleSlots, capsuleSeps, slotKeys, slotCtx) {
     patchAttr(sepEl, 'data-sep-for-rank', showSep ? String(nextRank) : '');
   }
 }
-
-/**
- * Standalone Capsule Bar Preview Widget mounting the real `.wm-multi-btn` and `.wm-capsule-btn`
- * inside a contextual host bar, with a mode-specific note for sidebar and floating modes.
- */
-const CapsuleBarWidget = defineComponent({
-  name: 'CapsuleBarWidget',
-  setup() {
-    const multiDot = h('span', { className: 'wm-multi-dot' });
-    const multiLabel = h('span', {
-      className: 'wm-multi-label',
-      text: t('capsule.multiZero'),
-    });
-    const multiBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'wm-multi-btn',
-        tabindex: '-1',
-        'aria-hidden': 'true',
-      },
-      [multiDot, multiLabel]
-    );
-
-    const capsuleSlots = [
-      createCapsuleSlotNode(0, 'tps'),
-      createCapsuleSlotNode(1, 'ttft'),
-      createCapsuleSlotNode(2, 'context'),
-      createCapsuleSlotNode(3, 'none'),
-      createCapsuleSlotNode(4, 'none'),
-    ];
-    const capsuleSeps = [
-      h('span', { className: 'wm-sep wm-sep-speed', 'data-sep-for-rank': '2' }),
-      h('span', { className: 'wm-sep wm-sep-quota', 'data-sep-for-rank': '3' }),
-      h('span', { className: 'wm-sep', 'data-sep-for-rank': '', hidden: true }),
-      h('span', { className: 'wm-sep', 'data-sep-for-rank': '', hidden: true }),
-    ];
-
-    const capsuleBtn = h(
-      'button',
-      {
-        type: 'button',
-        className: 'wm-capsule-btn',
-        tabindex: '-1',
-        'aria-hidden': 'true',
-      },
-      [
-        capsuleSlots[0].el,
-        capsuleSeps[0],
-        capsuleSlots[1].el,
-        capsuleSeps[1],
-        capsuleSlots[2].el,
-        capsuleSeps[2],
-        capsuleSlots[3].el,
-        capsuleSeps[3],
-        capsuleSlots[4].el,
-      ]
-    );
-
-    const capsuleCluster = h('div', { className: 'preview-capsule-cluster' }, [
-      multiBtn,
-      capsuleBtn,
-    ]);
-
-    // Contextual host chrome affordances for Titlebar vs Composer vs Sidebar-only
-    const titlebarLeftMock = h('div', { className: 'preview-host-left is-titlebar' }, [
-      h('span', { className: 'preview-win-title', text: 'Antigravity' }),
-    ]);
-    const composerLeftMock = h(
-      'div',
-      { className: 'preview-host-left is-composer', hidden: true },
-      [
-        h('span', { className: 'preview-composer-chip' }, [
-          h('span', { text: 'Carbon (High)' }),
-          createSvgIcon('chevron-down', { size: 10 }),
-        ]),
-      ]
-    );
-
-    const composerSendMock = h(
-      'span',
-      { className: 'preview-composer-send', 'aria-hidden': 'true', hidden: true },
-      [createSvgIcon('arrow-up', { size: 11 })]
-    );
-
-    const hostBarEl = h(
-      'div',
-      { className: 'preview-capsule-bar', 'data-mount-mode': 'dual' },
-      [titlebarLeftMock, composerLeftMock, capsuleCluster, composerSendMock]
-    );
-
-    const sidebarHintEl = h('div', {
-      className: 'preview-sidebar-note',
-      hidden: true,
-      text: t('settings.str.previewMountSidebarHint'),
-    });
-
-    const rootEl = h('div', { className: 'capsule-preview-widget' }, [hostBarEl, sidebarHintEl]);
-
-    function update({ data } = {}) {
-      const settings = data?.settings || {};
-      const mountMode = normalizeClientWindowMountMode(
-        settings.windowMountMode,
-        settings.enableWindowOverlay
-      );
-      const showMulti = settings.showTopbarMultiSession !== false;
-      const slotKeys = normalizeClientTopbarSlots(settings.topbarCapsuleSlots);
-
-      const isComposer = mountMode === 'composer';
-      const isSidebar = mountMode === 'sidebar';
-      const isFloating = mountMode === 'floating';
-      patchAttr(hostBarEl, 'data-mount-mode', mountMode);
-      patchAttr(hostBarEl, 'hidden', isFloating);
-      patchClasses(hostBarEl, {
-        'is-composer': isComposer,
-        'is-sidebar-only': isSidebar,
-      });
-
-      patchAttr(titlebarLeftMock, 'hidden', isComposer);
-      patchAttr(composerLeftMock, 'hidden', !isComposer);
-      patchAttr(composerSendMock, 'hidden', !isComposer);
-      patchAttr(sidebarHintEl, 'hidden', !isSidebar && !isFloating);
-      patchText(sidebarHintEl, isFloating
-        ? t('settings.str.previewMountFloatingHint')
-        : t('settings.str.previewMountSidebarHint'));
-
-      patchAttr(multiBtn, 'hidden', !showMulti);
-
-      if (!data) {
-        patchClasses(multiBtn, { 'is-running': false, 'is-waiting': false });
-        patchCapsuleOdometerText(multiLabel, t('capsule.multiZero'), { resetKey: 'multi' });
-        syncCapsuleSlotNodes(capsuleSlots, capsuleSeps, slotKeys, { hasTelemetry: false });
-        return;
-      }
-
-      const { agents, scopedConv, ctxAgent, aggregated } = resolveScopedConversation(
-        data,
-        'all',
-        resolveOverlayCtxInspectorAgentId(data, 'auto')
-      );
-      const slotCtx = buildCapsuleSlotContext(data, { scopedConv, ctxAgent, aggregated });
-      const { runningCount, hasWaiting, multiBtnText } = resolveMultiSessionCapsuleState(data, {
-        agents,
-        aggregated,
-        contextUsedPct: slotCtx.usedPct,
-      });
-
-      patchClasses(multiBtn, {
-        'is-running': runningCount > 0 && !hasWaiting,
-        'is-waiting': runningCount > 0 && hasWaiting,
-      });
-      patchCapsuleOdometerText(multiLabel, multiBtnText, { resetKey: 'multi' });
-
-      patchClasses(capsuleBtn, { 'is-running': slotCtx.isRunning });
-      syncCapsuleSlotNodes(capsuleSlots, capsuleSeps, slotKeys, slotCtx);
-    }
-
-    return {
-      el: rootEl,
-      refs: {
-        update,
-        multiBtn,
-        capsuleBtn,
-        capsuleSlots,
-        capsuleSeps,
-        hostBarEl,
-      },
-    };
-  },
-});
-return { RING_RADIUS, RING_CIRCUMFERENCE, tokenizeCapsuleOdometerText, patchCapsuleOdometerText, buildCapsuleSlotContext, resolveMultiSessionCapsuleState, createCapsuleSlotNode, syncCapsuleSlotNodes, CapsuleBarWidget };
+return { RING_RADIUS, RING_CIRCUMFERENCE, tokenizeCapsuleOdometerText, patchCapsuleOdometerText, buildCapsuleSlotContext, resolveMultiSessionCapsuleState, createCapsuleSlotNode, syncCapsuleSlotNodes };
 })();
 
 // --- src/components/widgets/StepTableWidget.js ---
@@ -23820,10 +22201,7 @@ return { TopSessionHeader };
 // --- src/views/StepsDetailView.js ---
 const { mergeSelectedAgentUnits, StepsDetailView } = (() => {
 /**
- * @fileoverview View 3: StepsDetailView (步骤明细与总汇总分析视图).
- * 提供“按步查看”与“总汇总”双子视图切换：
- * - 单步测速表通过 `stepColumnRegistry.js` 动态渲染用户自选的 2..12 个字段列，并支持行级增量对账；
- * - 总汇总视图提供会话线性走势图、多模型同图趋势拟合曲线与极简高密度模型总览卡片。
+ * @fileoverview Embedded step details with dot-matrix, curve, and table modes.
  */
 
 
@@ -24960,44 +23338,16 @@ const LiveOverviewView = defineComponent({
 
     let latestData = null;
     let isDirty = false;
-    let countdownTickTimer = null;
-
-    function stopCountdownTicker() {
-      if (countdownTickTimer) {
-        clearInterval(countdownTickTimer);
-        countdownTickTimer = null;
-      }
-    }
-
-    function ensureCountdownTicker() {
-      if (getVisibleMonitorView() !== 'overview') {
-        stopCountdownTicker();
-        return;
-      }
-      if (!countdownTickTimer) {
-        countdownTickTimer = setInterval(() => {
-          if (getVisibleMonitorView() === 'overview' && latestData) {
-            renderData(latestData);
-          }
-        }, 30_000);
-      }
-    }
 
     function renderData(data) {
       if (!data) return;
       const moduleKeys = resolveOverviewModules(data.settings?.overviewModules);
-      const minuteTick = Math.floor(Date.now() / 30000);
-      widgetHost.update({
-        moduleKeys,
-        data,
-        minuteTick,
-      });
-      ensureCountdownTicker();
+      widgetHost.update({ moduleKeys, data });
       viewScrollbar.refresh();
     }
 
     const unsubTelemetry = telemetryStore.subscribe(
-      (st) => ({ telemetry: st.telemetry, minuteTick: st.minuteTick }),
+      (st) => ({ telemetry: st.telemetry }),
       ({ telemetry: data }) => {
         latestData = data;
         if (getVisibleMonitorView() !== 'overview') {
@@ -25031,11 +23381,9 @@ const LiveOverviewView = defineComponent({
 
         if (slice.activeView !== 'overview') {
           widgetHost.pauseTickers();
-          stopCountdownTicker();
           if (scopeChanged) isDirty = true;
           return;
         }
-        ensureCountdownTicker();
         if ((isDirty || scopeChanged) && latestData) {
           isDirty = false;
           renderData(latestData);
@@ -25071,7 +23419,6 @@ const LiveOverviewView = defineComponent({
     );
 
     onCleanup(() => {
-      stopCountdownTicker();
       unsubTelemetry();
       unsubView();
       unsubI18n();
@@ -25670,20 +24017,6 @@ const ConsumptionView = defineComponent({
       const modelsTotalTok = models.reduce((s, m) => s + Number(m.totalTokens || 0), 0);
 
       const rawTrendSeries = cons.trendSeries || [];
-      const allTrendMergedModels = [];
-      const trendMergedByIdx = rawTrendSeries.map((slot) => {
-        if (!Array.isArray(slot?.models) || slot.models.length === 0) return null;
-        const merged = mergeAndSortBucketModels(slot.models);
-        for (const m of merged) {
-          allTrendMergedModels.push(m);
-        }
-        return merged;
-      });
-
-      const modelColorMap = buildDeterministicModelColorMap([
-        ...models,
-        ...allTrendMergedModels,
-      ]);
 
       // 2. 同步历史趋势交互式 SVG 面积图 / 近一年热力图
       const firstTrendSlot = rawTrendSeries[0] || null;
@@ -25699,13 +24032,14 @@ const ConsumptionView = defineComponent({
         heatmapModeSwitch.setValue(heatmapViewMode);
       }
       const buildTrendModelSegments = (mergedSlotModels) =>
-        partitionModelSegments(mergedSlotModels, modelColorMap, {
-          maxMain: 5,
+        partitionModelSegments(mergedSlotModels, null, {
+          maxMain: 3,
           minSharePct: 1.5,
         });
-      const enrichedTrendSeries = rawTrendSeries.map((slot, idx) => {
-        const mergedSlotModels = trendMergedByIdx[idx];
-        if (!mergedSlotModels || mergedSlotModels.length === 0) return slot;
+      const enrichedTrendSeries = rawTrendSeries.map((slot) => {
+        if (!Array.isArray(slot?.models) || slot.models.length === 0) return slot;
+        const mergedSlotModels = mergeAndSortBucketModels(slot.models);
+        if (mergedSlotModels.length === 0) return slot;
         return {
           ...slot,
           mergedModels: mergedSlotModels,
@@ -25885,15 +24219,13 @@ return { ConsumptionView };
 })();
 
 // --- src/views/SettingsView.js ---
-const { SHOW_ACCOUNT_TAB, SettingsView } = (() => {
+const { SettingsView } = (() => {
 /**
  * @fileoverview View 3: Streamlined Preferences (single-page layout).
  * Consolidates essential appearance, display, mount, and maintenance controls
  * without account/quota management clutter.
  */
 
-
-const SHOW_ACCOUNT_TAB = false;
 
 function getLanguageOptions() {
   return [
@@ -26130,7 +24462,7 @@ const SettingsView = defineComponent({
       className: 'form-label',
       text: t('settings.simple.versionRow'),
     });
-    const versionTagEl = h('span', { className: 'text-mono text-secondary', text: 'v1.4.4' });
+    const versionTagEl = h('span', { className: 'text-mono text-secondary', text: '—' });
 
     const syncPricingBtnText = h('span', { text: t('settings.gen.syncBtn') });
     const syncPricingBtn = h(
@@ -26184,8 +24516,11 @@ const SettingsView = defineComponent({
                 return;
               }
               if (!cs?.updateAvailable) {
-                const curVer = cs?.currentPluginVersion || '1.4.4';
-                showMaintFeedback(t('settings.gen.upToDateMsg', { ver: curVer }), 4000);
+                const ver = cs?.currentPluginVersion;
+                showMaintFeedback(
+                  ver ? t('settings.gen.upToDateVersionMsg', { ver }) : t('settings.gen.upToDateMsg'),
+                  4000
+                );
                 return;
               }
             }
@@ -26371,16 +24706,18 @@ const SettingsView = defineComponent({
     function renderCloudStatus(cs) {
       if (!cs) return;
       latestCloudStatus = cs;
-      const curVer = cs.currentPluginVersion || '1.4.4';
-      const latVer = cs.latestPluginVersion || curVer;
-      patchText(versionTagEl, `v${curVer}`);
-      if (cs.updateAvailable) {
-        patchText(updatePluginBtnText, t('settings.gen.upgradeToBtn', { ver: latVer }));
-        patchClasses(updatePluginBtn, { 'btn-primary': true, 'btn-secondary': false });
-      } else {
-        patchText(updatePluginBtnText, t('settings.gen.checkUpdateBtn'));
-        patchClasses(updatePluginBtn, { 'btn-primary': false, 'btn-secondary': true });
-      }
+      const { currentPluginVersion, latestPluginVersion, updateAvailable } = cs;
+      patchText(versionTagEl, currentPluginVersion ? `v${currentPluginVersion}` : '—');
+      patchText(
+        updatePluginBtnText,
+        updateAvailable && latestPluginVersion
+          ? t('settings.gen.upgradeToBtn', { ver: latestPluginVersion })
+          : t('settings.gen.checkUpdateBtn')
+      );
+      patchClasses(updatePluginBtn, {
+        'btn-primary': Boolean(updateAvailable),
+        'btn-secondary': !updateAvailable,
+      });
     }
 
     function refreshGeneralLabels() {
@@ -26505,7 +24842,7 @@ const SettingsView = defineComponent({
     };
   },
 });
-return { SHOW_ACCOUNT_TAB, SettingsView };
+return { SettingsView };
 })();
 
 // --- src/App.js ---
@@ -28120,7 +26457,6 @@ function mountWindowOverlay() {
     setI18nLanguage(seedTelemetry?.settings?.language);
     telemetryStore.setState({
       telemetry: seedTelemetry,
-      minuteTick: Math.floor(Date.now() / 30000),
       syncState: 'idle',
     });
   } else {
@@ -29751,11 +28087,10 @@ function mountWindowOverlay() {
   }
 
   function renderHoverWidgets() {
-    const { telemetry, minuteTick } = telemetryStore.getState();
+    const { telemetry } = telemetryStore.getState();
     hoverWidgetHost.update({
       moduleKeys: resolveEffectiveHoverModules(telemetry?.settings?.hoverModules),
       data: telemetry,
-      minuteTick: Number(minuteTick || Math.floor(Date.now() / 30000)),
     });
   }
 
@@ -29913,7 +28248,6 @@ function mountWindowOverlay() {
     (st) => ({
       syncState: st.syncState,
       telemetry: st.telemetry,
-      minuteTick: st.minuteTick,
       selectedConversationId: st.selectedConversationId,
     }),
     (slice) => {
@@ -29934,10 +28268,7 @@ function mountWindowOverlay() {
       selectedAgentScope: st.selectedAgentScope,
       ctxInspectorAgentId: st.ctxInspectorAgentId,
       activeView: st.activeView,
-      stepsSubTab: st.stepsSubTab,
       stepsViewMode: st.stepsViewMode,
-      settingsSubTab: st.settingsSubTab,
-      settingsStructureTab: st.settingsStructureTab,
     }),
     () => {
       renderCapsuleTelemetry();

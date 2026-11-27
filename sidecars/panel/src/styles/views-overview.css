@@ -3,9 +3,8 @@
  * 包含：
  * 1. 通用面板容器与标题头 (.panel, .panel-header, .panel-title, .panel-meta)
  * 2. 4 格实时测速指标矩阵 (.telemetry-matrix, .matrix-cell, .cell-*)
- * 3. 10 段上下文窗口进度条与配额填充条 (.progress-track, .progress-seg, .progress-fill)
+ * 3. 10 段上下文窗口进度条 (.progress-track, .progress-seg)
  * 4. 上下文双列图例网格与色块 (.ctx-legend-grid, .legend-*, .swatch)
- * 5. 双栏布局网格与窄屏响应式断点 (.dual-grid)
  */
 
 /* --- 1. 通用微边框面板卡片 (Architectural Precision Panels) --- */
@@ -25,7 +24,6 @@
 .panel:has(.action-menu-popover:not([hidden])),
 .panel:has(.dt-popover:not([hidden])),
 .panel:has(.trend-tooltip:not([hidden])),
-.panel:has(.cons-breakdown-popover:not([hidden])),
 .panel:has(.turn-prompt-tip:not([hidden])),
 .panel:has(.step-anomaly-tip:not([hidden])),
 .session-header:has(.is-open),
@@ -75,66 +73,6 @@
   color: var(--text-secondary);
   flex-shrink: 0;
   white-space: nowrap;
-}
-
-/* 配额池分组行及池间分隔线（暗黑模式保留原分割色，浅色模式使用柔和细线） */
-.quota-pool-row {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.quota-pool-row.has-divider {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-hairline);
-}
-
-:root[data-color-scheme="light"] .quota-pool-row.has-divider,
-:host([data-color-scheme="light"]) .quota-pool-row.has-divider,
-[data-color-scheme="light"] .quota-pool-row.has-divider {
-  border-top-color: color-mix(in srgb, var(--text-primary) 7%, transparent);
-}
-
-/* 配额池窗口行头：标题 + 周期用量内联（窄栏自适应截断，零额外纵向行高） */
-.quota-win-head {
-  gap: 8px;
-  min-width: 0;
-}
-
-.quota-win-left {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
-}
-
-.quota-win-title {
-  font-size: var(--fs-base-sm);
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.quota-win-usage {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--fs-sm);
-  font-weight: 400;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.quota-win-meta {
-  font-size: var(--fs-md);
-  color: var(--text-muted);
-  flex-shrink: 0;
 }
 
 /* --- 2. 多任务实时运行卡片列表与 4 格测速指标矩阵 (Live Running Tasks List & 4-Cell Telemetry Matrix) --- */
@@ -511,7 +449,7 @@
   text-overflow: ellipsis;
 }
 
-/* --- 3. 10 段上下文进度条与配额池填充条 (Context Segment Meter & Quota Progress Bars) --- */
+/* --- 3. 10 段上下文进度条 (Context Segment Meter) --- */
 .progress-track {
   width: 100%;
   height: 7px;
@@ -629,337 +567,6 @@
 }
 .progress-seg.seg-output {
   background-color: var(--ctx-output);
-}
-
-.progress-fill {
-  height: 100%;
-  width: var(--fill-w, 0%);
-  background: var(--accent-primary);
-  transition: width var(--dur-normal) var(--ease-fast);
-}
-
-.progress-fill.tone-warn {
-  background: var(--metric-warn);
-}
-
-.progress-fill.tone-danger {
-  background: var(--metric-danger);
-}
-
-.progress-fill-reserved {
-  height: 100%;
-  width: var(--reserved-w, 0%);
-  background: repeating-linear-gradient(
-    -45deg,
-    color-mix(in srgb, var(--quota-reserved) 72%, transparent) 0 2px,
-    color-mix(in srgb, var(--quota-reserved) 26%, transparent) 2px 5px
-  );
-  transition:
-    width var(--dur-normal) var(--ease-fast),
-    margin-left var(--dur-fast) var(--ease-fast);
-  flex-shrink: 0;
-}
-
-.progress-fill-reserved.is-active {
-  min-width: 5px;
-}
-
-.progress-fill-reserved.is-active.has-sep {
-  margin-left: 1px;
-}
-
-.quota-reserve-legend {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 2px;
-  padding-top: 2px;
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-}
-
-.quota-reserve-legend[hidden] {
-  display: none;
-}
-
-.quota-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-
-.quota-legend-line {
-  display: inline-block;
-  width: 14px;
-  height: 2px;
-  border-radius: 1px;
-  flex-shrink: 0;
-}
-
-.quota-legend-line.is-actual {
-  background: var(--accent-primary);
-}
-
-.quota-legend-line.is-reserved {
-  background: repeating-linear-gradient(
-    90deg,
-    var(--quota-reserved) 0 4px,
-    transparent 4px 6.5px
-  );
-}
-
-/* 可用额度标题旁圈问号触发器及实测倍率预估悬浮卡片 */
-.quota-panel {
-  position: relative;
-}
-
-.quota-rate-help-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  margin-left: -1px;
-  border: none;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: help;
-  flex-shrink: 0;
-  transition:
-    color var(--dur-instant) var(--ease-fast),
-    background-color var(--dur-instant) var(--ease-fast);
-}
-
-.quota-rate-help-btn:hover,
-.quota-rate-help-btn:focus-visible,
-.quota-rate-help-btn.is-open {
-  color: var(--accent-primary);
-  background: var(--accent-primary-soft);
-  outline: none;
-}
-
-.quota-rate-popover {
-  position: absolute;
-  top: 38px;
-  left: 12px;
-  width: min(352px, calc(100% - 24px));
-  z-index: 45;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  background: var(--surface-panel);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-popover);
-  color: var(--text-primary);
-}
-
-.quota-rate-popover[hidden] {
-  display: none;
-}
-
-.quota-rate-pop-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  min-width: 0;
-}
-
-.quota-rate-pop-title {
-  font-size: var(--fs-base-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.quota-rate-pop-account {
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.quota-rate-pop-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: min(300px, 58vh);
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.quota-rate-pool-group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.quota-rate-pool-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.quota-rate-pool-label {
-  font-size: var(--fs-2xs);
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.quota-rate-shared-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 6px;
-  border-radius: 999px;
-  font-size: var(--fs-2xs);
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--metric-warn);
-  background: color-mix(in srgb, var(--metric-warn) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--metric-warn) 28%, transparent);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.quota-rate-ext-banner {
-  margin-top: 2px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  font-size: var(--fs-2xs);
-  line-height: 1.45;
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--metric-warn) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--metric-warn) 22%, var(--border-hairline));
-}
-
-.quota-rate-ext-banner.is-active {
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--metric-warn) 12%, transparent);
-  border-color: color-mix(in srgb, var(--metric-warn) 34%, var(--border-hairline));
-}
-
-.quota-rate-model-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.quota-rate-model-row {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-
-.quota-rate-row-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-}
-
-.quota-rate-model-left {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.quota-rate-model-name {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.quota-rate-model-name.is-muted {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.quota-rate-mult-badge {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  color: var(--text-muted);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.quota-rate-mult-badge.is-high {
-  color: var(--metric-warn);
-}
-
-.quota-rate-meta {
-  font-size: var(--fs-2xs);
-  color: var(--text-muted);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.quota-rate-eq-grid {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  column-gap: 10px;
-  row-gap: 3px;
-}
-
-.quota-rate-eq-grid.is-single {
-  justify-content: flex-start;
-}
-
-.quota-rate-eq-cell {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  min-width: 0;
-}
-
-.quota-rate-eq-k {
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.quota-rate-eq-v {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.quota-rate-eq-tok {
-  font-size: var(--fs-xs);
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.quota-rate-pop-empty {
-  font-size: var(--fs-sm);
-  line-height: 1.5;
-  color: var(--text-secondary);
 }
 
 /* --- 4. 上下文双列图例网格与悬停读数胶囊 (Context 10-Channel Legend Grid & Hover Readout) --- */
@@ -1087,14 +694,7 @@
 .swatch.seg-system-prompt { background: var(--ctx-system-prompt); }
 .swatch.seg-user-rules { background: var(--ctx-user-rules); }
 
-/* --- 5. 双栏网格与窄视口响应式折叠 (Dual Grid & Responsive Breakpoints) --- */
-.dual-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-}
-
-/* --- 6. 上下文窗口内联代理切换器与代理徽章 (Scheme B Context Inspector & Agent Badges) --- */
+/* --- 5. 上下文窗口内联代理切换器与代理徽章 (Context Inspector & Agent Badges) --- */
 .ctx-inspector-bar {
   display: flex;
   align-items: flex-start;
@@ -1221,9 +821,6 @@
 @media (max-width: 390px) {
   .telemetry-matrix:not([data-cols="1"]):not([data-cols="2"]) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .dual-grid {
-    grid-template-columns: 1fr;
   }
 }
 

@@ -126,6 +126,52 @@ test('reports the latest observed threshold separately from the saved group pref
   assert.equal(reloaded.contextWindowModels[0].reportedLimitTokens, 256000);
 });
 
+test('routine telemetry reuses the model catalog while context-window actions wait for its refresh', { timeout: 5000 }, async () => {
+  let now = Date.now();
+  const h = backendHarness({ clock: () => now });
+  const empty = await h.buildTelemetryPayloadInternal('');
+  assert.equal(empty.contextWindowModels.length, 0);
+  assert.equal(h.state.calls.some(({ method }) => method === 'GetAvailableModels'), false);
+
+  const endpoint = h.registerRemoteEndpoint({ origin: 'https://127.0.0.1:26192' });
+  const refresh = Promise.withResolvers();
+  let catalogCalls = 0;
+  h.setRemoteWindowRpcInvoker(async (_endpoint, method) => {
+    if (method === 'GetUserStatus') {
+      return { userStatus: { cascadeModelConfigData: { clientModelConfigs: carbonModels } } };
+    }
+    if (method === 'GetAvailableModels') {
+      catalogCalls += 1;
+      return catalogCalls === 1 ? { response: { models: availableModels } } : refresh.promise;
+    }
+    return {};
+  });
+  const load = () => h.buildTelemetryPayloadInternal('', false, { endpoint });
+  const initial = await load();
+  assert.equal(initial.contextWindowModels[0].capacity, 636000);
+
+  now += 30_001;
+  let action;
+  try {
+    const stale = await load();
+    assert.equal(stale.contextWindowModels[0].capacity, 636000);
+    assert.equal(catalogCalls, 2);
+    action = h.executeModelContextWindowAction({
+      endpointId: endpoint.id,
+      modelId: carbonGroup,
+      option: '768000',
+    });
+  } finally {
+    refresh.resolve({ response: { models: {
+      ...availableModels,
+      'gemini-4-carbon-low': { ...availableModels['gemini-4-carbon-low'], maxTokens: 900000 },
+    } } });
+  }
+  assert.equal((await action).status, 200);
+  assert.equal((await load()).contextWindowModels[0].capacity, 786432);
+  assert.equal(catalogCalls, 2);
+});
+
 test('host requests apply a rule only to the exact model across App and IDE transports', async () => {
   const sendPath = '/exa.language_server_pb.LanguageServerService/SendUserCascadeMessage';
   const statusPath = sendPath.replace('SendUserCascadeMessage', 'GetUserStatus');
@@ -1088,4 +1134,82 @@ test('cloudcode-proxy handles socks5:// and authenticated HTTP/HTTPS proxies, en
       new Promise((r) => hungProxyServer.close(() => r())),
     ]);
   }
+});
+
+test('getContextModelCatalog preserves last good models on transient RPC failure and getCliStatusLineRuntimeStatus expires on backward clock jump', async (t) => {
+  const { lsRuntimeEndpoint } = await import('../backend/config.mjs');
+  const { getContextModelCatalog } = await import('../backend/ls-rpc.mjs');
+  const { getCliStatusLineRuntimeStatus } = await import('../backend/cli-statusline-config.mjs');
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+
+  const prevEp = { ...lsRuntimeEndpoint };
+  let fakeNow = 1_750_000_000_000;
+  const origDateNow = Date.now;
+  Date.now = () => fakeNow;
+
+  lsRuntimeEndpoint.addr = 'test.invalid';
+  lsRuntimeEndpoint.baseUrl = 'http://127.0.0.1:19999';
+  lsRuntimeEndpoint.csrfToken = 'tok-retry';
+
+  let rpcMode = 'ok';
+  let rpcCount = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    rpcCount += 1;
+    if (rpcMode === 'fail') throw new Error('transient timeout');
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ response: { models: availableModels } }),
+      text: async () => JSON.stringify({ response: { models: availableModels } }),
+    };
+  });
+
+  const tempHome = mkdtempSync(join(tmpdir(), 'agy-cli-clock-'));
+  t.after(() => {
+    Date.now = origDateNow;
+    Object.assign(lsRuntimeEndpoint, prevEp);
+    rmSync(tempHome, { recursive: true, force: true });
+  });
+
+  // 1. Warm catalog succeeds
+  const first = await getContextModelCatalog(null, { allowStale: false });
+  assert.deepEqual(first, availableModels);
+  assert.equal(rpcCount, 1);
+
+  // 2. After 31s TTL, background refresh fails -> preserves last good catalog instead of null
+  fakeNow += 31_000;
+  rpcMode = 'fail';
+  const staleDuringFail = await getContextModelCatalog(null, { allowStale: true });
+  assert.deepEqual(staleDuringFail, availableModels);
+  const settledOnFail = await getContextModelCatalog(null, { allowStale: false });
+  assert.deepEqual(settledOnFail, availableModels, 'transient failure must preserve last good models');
+  assert.equal(rpcCount, 2);
+
+  // 3. Strict caller retries after short 2s cooldown and recovers immediately once RPC is healthy
+  fakeNow += 2_100;
+  rpcMode = 'ok';
+  const recovered = await getContextModelCatalog(null, { allowStale: false });
+  assert.deepEqual(recovered, availableModels);
+  assert.equal(rpcCount, 3);
+
+  // 4. CLI statusline cache expires immediately if wall clock moves backward
+  const cliDir = join(tempHome, '.gemini', 'antigravity-cli');
+  mkdirSync(cliDir, { recursive: true });
+  const settingsPath = join(cliDir, 'settings.json');
+  writeFileSync(settingsPath, '{}', 'utf8');
+  const st1 = getCliStatusLineRuntimeStatus({ homeDir: tempHome, env: {}, maxAgeMs: 30_000 });
+  assert.equal(st1.installed, true);
+  assert.equal(st1.configured, false);
+
+  writeFileSync(
+    settingsPath,
+    JSON.stringify({ statusLine: { command: 'node /path/cli-statusline.mjs' } }),
+    'utf8'
+  );
+  // Move clock backward 1 hour -> cache must NOT stay stuck for 1h+
+  fakeNow -= 3_600_000;
+  const st2 = getCliStatusLineRuntimeStatus({ homeDir: tempHome, env: {}, maxAgeMs: 30_000 });
+  assert.equal(st2.configured, true, 'backward clock jump must expire CLI status cache');
 });

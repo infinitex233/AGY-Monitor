@@ -39,10 +39,7 @@ export function setStepsViewMode(mode) {
 export const uiStore = createReactiveStore({
   activeView: 'overview',
   monitorVisible: true,
-  stepsSubTab: 'steps', // 'steps' | 'models'
   stepsViewMode: loadInitialStepsViewMode(), // 'table' | 'dots' | 'curve'
-  settingsSubTab: 'general', // 'general' | 'structure' | 'account' | 'other'
-  settingsStructureTab: 'mount', // 'mount' | 'hover' | 'overview' | 'steps'
   selectedAgentScope: 'all', // 'all' | 'main' | <subagent cascadeId>
   ctxInspectorAgentId: 'main', // 'main' | 'auto' | <subagent cascadeId>
   toast: null, // { id, message, detail, actionLabel, onAction, tone, durationMs }

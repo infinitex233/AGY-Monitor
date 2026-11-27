@@ -227,11 +227,6 @@ function normalizeHeatmapMode(mode) {
 function createHeatmapAggAcc(extra = {}) {
   return {
     tokens: 0,
-    inputTokens: 0,
-    cacheReadTokens: 0,
-    thinkingTokens: 0,
-    responseTokens: 0,
-    outputTokens: 0,
     costUsd: 0,
     calls: 0,
     minStartMs: Infinity,
@@ -246,20 +241,7 @@ function createHeatmapAggAcc(extra = {}) {
 function mergeSlotIntoHeatmapAcc(acc, slot) {
   if (!slot) return;
   const tok = safeSlotTokens(slot.tokens);
-  const inTok = safeSlotTokens(slot.inputTokens);
-  const cacheTok = safeSlotTokens(slot.cacheReadTokens);
-  const thinkTok = safeSlotTokens(slot.thinkingTokens);
-  const respTok = safeSlotTokens(slot.responseTokens);
-  const outTok =
-    slot.outputTokens !== undefined && slot.outputTokens !== null
-      ? safeSlotTokens(slot.outputTokens)
-      : thinkTok + respTok;
   acc.tokens += tok;
-  acc.inputTokens += inTok;
-  acc.cacheReadTokens += cacheTok;
-  acc.thinkingTokens += thinkTok;
-  acc.responseTokens += respTok;
-  acc.outputTokens += outTok;
   acc.costUsd += Math.max(0, Number(slot.costUsd || 0));
   acc.calls += Math.max(0, Number(slot.calls || 0));
 
@@ -290,27 +272,11 @@ function mergeSlotIntoHeatmapAcc(acc, slot) {
       if (!key) continue;
       let cur = acc.modelMap.get(key);
       if (!cur) {
-        cur = {
-          ...m,
-          calls: 0,
-          inputTokens: 0,
-          cacheReadTokens: 0,
-          thinkingTokens: 0,
-          responseTokens: 0,
-          outputTokens: 0,
-          totalTokens: 0,
-          costUsd: 0,
-        };
+        cur = { ...m, calls: 0, totalTokens: 0 };
         acc.modelMap.set(key, cur);
       }
       cur.calls += Math.max(0, Number(m.calls || 0));
-      cur.inputTokens += safeSlotTokens(m.inputTokens);
-      cur.cacheReadTokens += safeSlotTokens(m.cacheReadTokens);
-      cur.thinkingTokens += safeSlotTokens(m.thinkingTokens);
-      cur.responseTokens += safeSlotTokens(m.responseTokens);
-      cur.outputTokens += safeSlotTokens(m.outputTokens);
       cur.totalTokens += safeSlotTokens(m.totalTokens);
-      cur.costUsd += Math.max(0, Number(m.costUsd || 0));
     }
   }
 }
@@ -336,11 +302,6 @@ function finalizeHeatmapBucket(acc, customTitle, shortLabel, buildSegmentsFn) {
     fullLabel: customTitle,
     customTitle,
     tokens: acc.tokens,
-    inputTokens: acc.inputTokens,
-    cacheReadTokens: acc.cacheReadTokens,
-    thinkingTokens: acc.thinkingTokens,
-    responseTokens: acc.responseTokens,
-    outputTokens: acc.outputTokens,
     costUsd: +acc.costUsd.toFixed(4),
     calls: acc.calls,
     modelSegments,
@@ -635,9 +596,8 @@ export function createTrendAreaChart({ onSelectSlot = null } = {}) {
 
   const peakPill = h('span', { className: 'trend-peak-pill text-mono', text: '0', hidden: true });
 
-  // 共享悬停详情浮层卡片（曲线图和热力格子图共用，含分模型四段进度条及底部四通道明细）
+  // 共享悬停精简浮层卡片（曲线图和热力格子图共用，仅展示时间区间、调用次数、总 Token 与预估费用）
   const tooltipContent = createConsumptionBreakdownContent({
-    showModelDot: false,
     monoTitle: true,
   });
 
@@ -736,8 +696,8 @@ export function createTrendAreaChart({ onSelectSlot = null } = {}) {
   const tooltipCtrl = createFloatingChartTooltipController({
     containerEl: chartWrap,
     tooltipEl,
-    defaultTipWidth: 216,
-    defaultTipHeight: 104,
+    defaultTipWidth: 196,
+    defaultTipHeight: 78,
     defaultViewWidth: DEFAULT_VIEW_W,
     defaultViewHeight: VIEW_H,
     useFloatingClass: false,
@@ -753,11 +713,6 @@ export function createTrendAreaChart({ onSelectSlot = null } = {}) {
       costText: formatUsd(slotCost, {
         precise: slotCost > 0 && slotCost < 0.1,
       }),
-      inputTokens: slot.inputTokens,
-      cacheReadTokens: slot.cacheReadTokens,
-      thinkingTokens: slot.thinkingTokens,
-      responseTokens: slot.responseTokens,
-      outputTokens: slot.outputTokens,
       segments: Array.isArray(slot.modelSegments) ? slot.modelSegments : [],
     });
   }
@@ -1333,20 +1288,31 @@ export function createTrendAreaChart({ onSelectSlot = null } = {}) {
     patchText(hmLessEl, t('chart.trend.hmLess'));
     patchText(hmMoreEl, t('chart.trend.hmMore'));
 
+    const isAggregateBarMode = useHeatmap && currentHmMode !== 'day';
     const sig =
       `${locale}|${useHeatmap ? `hm:${currentHmMode}` : `line:${viewW}`}|` +
       slots
         .map((s) => {
-          const mSig = Array.isArray(s?.modelSegments)
-            ? s.modelSegments
+          let mSig = '';
+          if (isAggregateBarMode) {
+            const rawModels = Array.isArray(s?.mergedModels)
+              ? s.mergedModels
+              : Array.isArray(s?.models)
+                ? s.models
+                : null;
+            if (rawModels && rawModels.length > 0) {
+              mSig = rawModels
                 .map(
                   (m) =>
-                    `${m.key}:${m.color}:${m.pctText}:${m.inputTokens || 0}:${m.cacheReadTokens || 0}:${m.thinkingTokens || 0}:${m.responseTokens || 0}`
+                    `${m?.displayText || m?.label || m?.shortName || ''}:${safeSlotTokens(m?.totalTokens)}:${Number(m?.calls || 0)}`
                 )
-                .join(',')
-            : '';
+                .join(',');
+            }
+          } else if (Array.isArray(s?.modelSegments)) {
+            mSig = s.modelSegments.map((m) => `${m.key}:${m.pctText}`).join(',');
+          }
           const mergedCnt = Array.isArray(s?.mergedModels) ? s.mergedModels.length : 0;
-          return `${s?.startMs || ''}:${s?.label || ''}:${s?.fullLabel || ''}:${safeSlotTokens(s?.tokens)}:${safeSlotTokens(s?.inputTokens)}:${safeSlotTokens(s?.cacheReadTokens)}:${safeSlotTokens(s?.thinkingTokens)}:${safeSlotTokens(s?.responseTokens)}:${Number(s?.costUsd || 0)}:${Number(s?.calls || 0)}:${mergedCnt}:${mSig}`;
+          return `${s?.startMs || ''}:${s?.label || ''}:${s?.fullLabel || ''}:${safeSlotTokens(s?.tokens)}:${Number(s?.costUsd || 0)}:${Number(s?.calls || 0)}:${mergedCnt}:${mSig}`;
         })
         .join('|');
 

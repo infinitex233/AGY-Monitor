@@ -158,12 +158,12 @@ export function createDynamicWidgetHost({
     return validKeys;
   }
 
-  function update({ moduleKeys = [], data = null, minuteTick = undefined } = {}) {
-    latestUpdatePayload = { data, minuteTick };
+  function update({ moduleKeys = [], data = null } = {}) {
+    latestUpdatePayload = { data };
     const validKeys = syncModules(moduleKeys);
     for (const key of validKeys) {
       const inst = instances.get(key);
-      inst?.refs?.update?.({ data, minuteTick });
+      inst?.refs?.update?.(latestUpdatePayload);
     }
   }
 

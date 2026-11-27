@@ -142,7 +142,6 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
 [data-ui-theme="liquid-glass"] .panel:has(.action-menu-popover:not([hidden])),
 [data-ui-theme="liquid-glass"] .panel:has(.dt-popover:not([hidden])),
 [data-ui-theme="liquid-glass"] .panel:has(.trend-tooltip:not([hidden])),
-[data-ui-theme="liquid-glass"] .panel:has(.cons-breakdown-popover:not([hidden])),
 [data-ui-theme="liquid-glass"] .panel:has(.turn-prompt-tip:not([hidden])),
 [data-ui-theme="liquid-glass"] .panel:has(.step-anomaly-tip:not([hidden])),
 [data-ui-theme="liquid-glass"] .session-header:has(.is-open),
@@ -536,22 +535,6 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
 [data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-muted {
   color: var(--lg-ink-3);
   font-weight: 500;
-}
-
-/* Keep flat dual-grid cells inside panels clean */
-[data-ui-theme="liquid-glass"] .dual-grid > .matrix-cell,
-[data-ui-theme="liquid-glass"] .dual-grid > .matrix-cell:hover {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  transform: none;
-  padding: 2px 0;
-}
-
-[data-ui-theme="liquid-glass"] .dual-grid > .matrix-cell::after {
-  display: none;
 }
 
 /* --- 6. Context Window Card (macOS Storage Bar + Hover Readout + Shimmer) --- */
@@ -953,7 +936,6 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   stroke-width: 2.2;
 }
 
-[data-ui-theme="liquid-glass"] .trend-peak-dot,
 [data-ui-theme="liquid-glass"] .trend-hover-dot {
   fill: var(--lg-accent);
   stroke: var(--lg-popover-bg);
@@ -1030,7 +1012,6 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
 }
 
 [data-ui-theme="liquid-glass"] .form-row > .custom-select > .select-trigger,
-[data-ui-theme="liquid-glass"] .cons-cycle-pool-select .select-trigger,
 [data-ui-theme="liquid-glass"] .steps-inline-scope-select .select-trigger,
 [data-ui-theme="liquid-glass"] .steps-inline-model-select .select-trigger {
   border-radius: var(--radius-pill);
@@ -1039,7 +1020,6 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
 }
 
 [data-ui-theme="liquid-glass"] .form-row > .custom-select > .select-trigger:hover,
-[data-ui-theme="liquid-glass"] .cons-cycle-pool-select .select-trigger:hover,
 [data-ui-theme="liquid-glass"] .steps-inline-scope-select .select-trigger:hover,
 [data-ui-theme="liquid-glass"] .steps-inline-model-select .select-trigger:hover {
   background: var(--lg-card-hover);
@@ -1050,10 +1030,8 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
 [data-ui-theme="liquid-glass"] .app-toast,
 [data-ui-theme="liquid-glass"] .dt-popover,
 [data-ui-theme="liquid-glass"] .trend-tooltip,
-[data-ui-theme="liquid-glass"] .sstep-tooltip,
 [data-ui-theme="liquid-glass"] .step-anomaly-tip,
-[data-ui-theme="liquid-glass"] .turn-prompt-tip,
-[data-ui-theme="liquid-glass"] .cons-breakdown-popover {
+[data-ui-theme="liquid-glass"] .turn-prompt-tip {
   border-radius: 16px;
   background: var(--lg-popover-bg);
   backdrop-filter: blur(18px) saturate(185%);
@@ -1061,6 +1039,10 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   border: 1px solid var(--lg-rim-edge);
   box-shadow: var(--lg-shadow-popover);
   z-index: 80;
+}
+
+[data-ui-theme="liquid-glass"] .trend-tooltip.is-rich-breakdown {
+  border-radius: 12px;
 }
 
 [data-ui-theme="liquid-glass"] .select-option {

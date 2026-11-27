@@ -2,7 +2,7 @@
  * 客户端观测请求级纯吐字吞吐率（Pure Decode TPS）、首字延迟（TTFT）、上下文构成拆解与模型身份归因计算模块。
  *
  * 文本生成速率为总输出 Token 除以扣除原生首字延迟（TTFT）后的解码耗时。
- * 依照 Magpie 的解码窗口规则排除缺失 TTFT、低于 100ms 的窗口、缓冲突发及超过 10,000 tok/s 的速率。
+ * 依照 Magpie 的解码窗口规则排除缺失 TTFT、低于 100ms 的窗口、缓冲突发（含同会话同模型中位数 3 倍以上的长等待突发）及超过 10,000 tok/s 的速率。
  * 聚合使用有效单步速率的中位数，并附带可合并的 2% 对数分桶。
  */
 
@@ -10,7 +10,7 @@ import { extractCleanUserRequestBody } from './shared/prompt-clean.mjs';
 import { medianSpeed, speedRateBin } from './shared/telemetry-display-rules.mjs';
 
 /** 速度测量口径版本号；当耗时或样本过滤算法变更时递增，用于触发旧版缓存测量字段失效重算 */
-export const MEASUREMENT_VERSION = 6;
+export const MEASUREMENT_VERSION = 7;
 
 /** 模型身份归因版本号；当模型识别优先级或占位符清洗策略变更时递增 */
 export const MODEL_IDENTITY_VERSION = 1;
@@ -22,6 +22,8 @@ export const MIN_DECODE_DURATION_SECONDS = 0.1;
 export const MAX_DECODE_SPEED_TPS = 10000;
 export const HELD_WINDOW_SECONDS = 1.0;
 export const HELD_SHARE = 4;
+export const HELD_BURST_PACE_MULTIPLIER = 3;
+export const HELD_BURST_MIN_BASELINE_SAMPLES = 3;
 
 const NS_PER_SECOND = 1e9;
 const MIN_DECODE_DURATION_NS = MIN_DECODE_DURATION_SECONDS * NS_PER_SECOND;
@@ -1708,7 +1710,60 @@ export function extractModelSteps(rawSteps = [], generatorMetadata = []) {
     }
   }
 
-  return inferCompactionStepModels(result);
+  return filterRelativeHeldBursts(inferCompactionStepModels(result));
+}
+
+/**
+ * 离线轨迹缺少逐包 SSE 时间戳，补筛解码窗口 >= 1s 但等待远大于解码且速率超过同会话同模型中位数 3 倍的漏网缓冲突发。
+ */
+function filterRelativeHeldBursts(steps) {
+  if (!Array.isArray(steps) || steps.length < HELD_BURST_MIN_BASELINE_SAMPLES) {
+    return steps;
+  }
+  const ratesByModel = new Map();
+  for (const step of steps) {
+    if (!step?.speedSampleEligible || !(step.totalTokPerSec > 0)) continue;
+    const key = step.modelKey || 'unknown';
+    let bucket = ratesByModel.get(key);
+    if (!bucket) {
+      bucket = [];
+      ratesByModel.set(key, bucket);
+    }
+    bucket.push(step.totalTokPerSec);
+  }
+  const medianByModel = new Map();
+  for (const [key, rates] of ratesByModel) {
+    if (rates.length >= HELD_BURST_MIN_BASELINE_SAMPLES) {
+      medianByModel.set(key, medianSpeed(rates));
+    }
+  }
+  if (medianByModel.size === 0) return steps;
+
+  for (const step of steps) {
+    if (
+      !step ||
+      step.isImageGenStep ||
+      !(step.totalTokPerSec > 0) ||
+      !(step.decodeDurationSec > 0) ||
+      !(step.nativeTtftSec > 0)
+    ) {
+      continue;
+    }
+    const baseline = medianByModel.get(step.modelKey || 'unknown');
+    if (!(baseline > 0) || step.totalTokPerSec <= HELD_BURST_PACE_MULTIPLIER * baseline) {
+      continue;
+    }
+    const decodeNs = Math.round(step.decodeDurationSec * NS_PER_SECOND);
+    const ttftNs = Math.round(step.nativeTtftSec * NS_PER_SECOND);
+    if (ttftNs > HELD_SHARE * decodeNs) {
+      step.decodeDurationSec = null;
+      step.totalTokPerSec = null;
+      step.speedBasis = 'unavailable';
+      step.speedSampleEligible = false;
+      step.speedReason = 'held_burst';
+    }
+  }
+  return steps;
 }
 
 /**

@@ -254,10 +254,8 @@ export async function executeTelemetryAction(data, opts = {}) {
     rawScope === 'conversation'
       ? rawScope
       : '';
-  const rawPool = typeof data?.pool === 'string' ? data.pool.trim().slice(0, 48) : '';
   const filterOpts = {
     range: data?.range || 'all',
-    ...(rawPool ? { pool: rawPool } : {}),
     startMs: sanitizePositiveFiniteMs(data?.startMs),
     endMs: sanitizePositiveFiniteMs(data?.endMs),
     ...(scope ? { scope } : {}),

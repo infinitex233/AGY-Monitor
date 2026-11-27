@@ -2732,6 +2732,10 @@ test('CLI statusLine v1.5.4 upgrades: /statusline inline flags, preserved manage
       JSON.stringify({ statusLine: { type: 'command', command: 'custom-bar' } }),
       'utf8'
     );
+    assert.deepEqual(
+      getCliStatusLineRuntimeStatus({ env, maxAgeMs: 30_000 }),
+      managedStatus
+    );
     const customStatus = getCliStatusLineRuntimeStatus({
       env: { ANTIGRAVITY_GEMINI_DIR: tempRoot },
     });
@@ -2750,7 +2754,7 @@ test('CLI statusLine v1.5.4 upgrades: /statusline inline flags, preserved manage
     });
     assert.equal(forceRestored.updated, true);
     assert.deepEqual(
-      getCliStatusLineRuntimeStatus({ env: { ANTIGRAVITY_GEMINI_DIR: tempRoot } }),
+      getCliStatusLineRuntimeStatus({ env, maxAgeMs: 30_000 }),
       {
         installed: true,
         configured: true,
@@ -2761,10 +2765,18 @@ test('CLI statusLine v1.5.4 upgrades: /statusline inline flags, preserved manage
 
     const noCliPayload = await backendHarness().buildTelemetryPayloadInternal('', false, { range: 'today' });
     assert.equal(noCliPayload.cliStatusLine?.installed, false);
-    const withCliPayload = await backendHarness({
+    let now = Date.now();
+    const withCli = backendHarness({
+      clock: () => now,
       diskDirs: { '/test-home/.gemini/antigravity-cli': [] },
-    }).buildTelemetryPayloadInternal('', false, { range: 'today' });
+    });
+    const load = () => withCli.buildTelemetryPayloadInternal('', false, { range: 'today' });
+    const withCliPayload = await load();
     assert.equal(withCliPayload.cliStatusLine?.installed, true);
+    withCli.state.settings.statusLine = { command: 'custom-bar' };
+    assert.equal((await load()).cliStatusLine.preservedCustom, false);
+    now += 30_001;
+    assert.equal((await load()).cliStatusLine.preservedCustom, true);
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -2915,7 +2927,7 @@ test('v1.5 feedback settings schema: custom token combo DSL, 3-way model display
 });
 
 test('scope=consumption and scope=consumption-presets bypass matchesConv, >30s idle, and visual settings, match full aggregation, and invalidate on weeklyLimitMode/cache rebuild', async (t) => {
-  let clockMs = Date.parse('2026-11-19T12:00:00.000Z');
+  let clockMs = new Date(2026, 10, 19, 12).getTime();
   const mkStep = (idx, offsetMs, tok) => ({
     type: 'CORTEX_STEP_TYPE_PLANNER_RESPONSE',
     status: 'CORTEX_STEP_STATUS_DONE',
@@ -2971,16 +2983,21 @@ test('scope=consumption and scope=consumption-presets bypass matchesConv, >30s i
     },
   });
 
-  const initBody = JSON.parse(
-    (
-      await h.executeTelemetryAction({
-        conversationId: 'conv-recent',
-        range: 'today',
-        stepDetails: 'display',
-        stepRevision: '',
-      })
-    ).body
-  );
+  const initOptions = {
+    conversationId: 'conv-recent',
+    range: 'today',
+    stepDetails: 'display',
+    stepRevision: '',
+  };
+  const [init, otherPool] = await Promise.all([
+    h.executeTelemetryAction({ ...initOptions, pool: 'Gemini' }),
+    h.executeTelemetryAction({ ...initOptions, pool: 'Claude' }),
+  ]);
+  assert.equal(init.body, otherPool.body);
+  assert.equal(h.state.calls.filter(({ method }) => method === 'GetUserStatus').length, 1);
+  const initBody = JSON.parse(init.body);
+  const presetKeys = ['today', '24h', '7d', '14d', '30d', 'all'];
+  assert.deepEqual(Object.keys(initBody.consumption.presets), presetKeys);
   assert.ok(Number(initBody.consumption?.revision || 0) > 0);
   const rpcCallsAfterInit = h.state.calls.length;
 
@@ -3000,6 +3017,7 @@ test('scope=consumption and scope=consumption-presets bypass matchesConv, >30s i
   assert.equal(presetsRes.scope, 'consumption-presets');
   assert.equal(presetsRes.activeConversation, undefined);
   assert.equal(presetsRes.quotas, undefined);
+  assert.deepEqual(Object.keys(presetsRes.ranges), presetKeys);
   assert.equal(presetsRes.ranges.today.account.totalTokens, 500);
   assert.equal(presetsRes.ranges['7d'].account.totalTokens, 3500);
   assert.equal(presetsRes.ranges['30d'].account.totalTokens, 4500);
@@ -3049,6 +3067,21 @@ test('scope=consumption and scope=consumption-presets bypass matchesConv, >30s i
     h.state.calls.length > rpcCallsAfterMountChange,
     'Cache rebuild must invalidate cached fast consumption snapshot'
   );
+
+  for (const range of ['5h', 'week', 'cycle']) {
+    const full = JSON.parse((await h.executeTelemetryAction({ ...initOptions, range })).body);
+    const scoped = JSON.parse((await h.executeTelemetryAction({
+      ...initOptions, range, scope: 'consumption',
+    })).body);
+    const key = range === '5h' ? '5h' : 'week';
+    assert.equal(full.consumption.selectedRange.key, key);
+    assert.equal(full.consumption.account.totalTokens, 500);
+    assert.equal(full.consumption.session.totalTokens, 500);
+    assert.deepEqual(Object.keys(full.consumption.presets), presetKeys);
+    assert.equal(scoped.scope, 'consumption');
+    assert.deepEqual(scoped.consumption.account, full.consumption.account);
+    assert.deepEqual(scoped.consumption.session, full.consumption.session);
+  }
 
   // Verify frontend selectConsumptionTimeRange sends scope=consumption without force=1
   const {
@@ -3191,8 +3224,15 @@ test('scope=conversation switches sessions with zero LS RPCs, preserves usageRev
   assert.equal(switchClaude.quotas, undefined);
   assert.equal(switchClaude.account, undefined);
   assert.equal(switchClaude.consumption.session.calls, 2);
+  assert.deepEqual(Object.keys(switchClaude.consumption.sessionPresets), ['today', '24h', '7d', '14d', '30d', 'all']);
   assert.equal(switchClaude.needsBackgroundSync, false);
   assert.ok(switchClaude.stepRevision);
+
+  const switchClaude5h = JSON.parse((await h.executeTelemetryAction({
+    conversationId: 'conv-claude', range: '5h', scope: 'conversation',
+  })).body);
+  assert.equal(switchClaude5h.scope, 'conversation');
+  assert.deepEqual(switchClaude5h.consumption.session, switchClaude.consumption.session);
 
   // 3. Fast switch back to conv-gemini with cached stepRevision -> stepsUnchanged=true & 0 RPCs
   const switchBackGemini = JSON.parse(

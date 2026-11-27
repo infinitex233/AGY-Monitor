@@ -163,7 +163,6 @@ export function mountWindowOverlay() {
     setI18nLanguage(seedTelemetry?.settings?.language);
     telemetryStore.setState({
       telemetry: seedTelemetry,
-      minuteTick: Math.floor(Date.now() / 30000),
       syncState: 'idle',
     });
   } else {
@@ -1794,11 +1793,10 @@ export function mountWindowOverlay() {
   }
 
   function renderHoverWidgets() {
-    const { telemetry, minuteTick } = telemetryStore.getState();
+    const { telemetry } = telemetryStore.getState();
     hoverWidgetHost.update({
       moduleKeys: resolveEffectiveHoverModules(telemetry?.settings?.hoverModules),
       data: telemetry,
-      minuteTick: Number(minuteTick || Math.floor(Date.now() / 30000)),
     });
   }
 
@@ -1956,7 +1954,6 @@ export function mountWindowOverlay() {
     (st) => ({
       syncState: st.syncState,
       telemetry: st.telemetry,
-      minuteTick: st.minuteTick,
       selectedConversationId: st.selectedConversationId,
     }),
     (slice) => {
@@ -1977,10 +1974,7 @@ export function mountWindowOverlay() {
       selectedAgentScope: st.selectedAgentScope,
       ctxInspectorAgentId: st.ctxInspectorAgentId,
       activeView: st.activeView,
-      stepsSubTab: st.stepsSubTab,
       stepsViewMode: st.stepsViewMode,
-      settingsSubTab: st.settingsSubTab,
-      settingsStructureTab: st.settingsStructureTab,
     }),
     () => {
       renderCapsuleTelemetry();

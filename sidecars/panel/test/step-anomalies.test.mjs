@@ -683,16 +683,10 @@ test('Compiled styles.css centers odometer capsule slot text and ships both clas
   assert.match(builtCss, /\.steps-inline-scope-select,\s*\.steps-inline-model-select\s*\{[\s\S]*?flex:\s*0\s+1\s+auto;/);
   assert.match(builtCss, /\.steps-inline-scope-select\s+\.select-trigger[\s\S]*?border-radius:\s*var\(--radius-pill\)/);
   assert.match(builtCss, /\[data-modern-ui="true"\]\s*\.form-row\s*>\s*\.custom-select\s*>\s*\.select-trigger,[\s\S]*?\.steps-inline-scope-select\s+\.select-trigger[\s\S]*?border-radius:\s*var\(--radius-pill\)[\s\S]*?var\(--modern-pill-select-bg\)/);
-  assert.match(builtCss, /\.step-anomaly-tag\s*\{/);
   assert.match(builtCss, /\.step-anomaly-tip\s*\{/);
-  assert.match(builtCss, /\.steps-anomaly-strip\s*\{/);
   assert.match(builtCss, /\.steps-anomaly-filterbar\s*\{/);
-  assert.match(builtCss, /\.sstep-anomaly-dot/);
   assert.match(builtCss, /\.panel\s*>\s*\.table-scroll-host\s*\{[\s\S]*?margin-right:\s*calc\(-1\s*\*\s*var\(--space-5\)\s*\+\s*2px\)/);
   assert.match(builtCss, /\.panel\s*>\s*\.table-scroll-host\s*>\s*\.custom-scroll-content\s*\{[\s\S]*?padding-right:\s*calc\(var\(--space-5\)\s*-\s*2px\)/);
-  assert.doesNotMatch(builtCss, /\.models-analytics-pane\s*\{[^}]*padding:\s*var\(--space-3\)\s+0\s+2px/);
-  assert.match(builtCss, /\.trend-tip-sub\.is-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
-  assert.match(builtCss, /\.trend-tip-anomaly/);
   assert.match(builtCss, /\[data-modern-ui="true"\]\s*\.step-anomaly-tip/);
   assert.match(builtCss, /\.progress-track\.ctx-segment-meter\s*\{[\s\S]*?height:\s*6px;/);
   assert.match(builtCss, /\.progress-track\.ctx-segment-meter\s+\.progress-seg\s*\{[\s\S]*?border-radius:\s*2px;/);
@@ -739,7 +733,7 @@ test('buildStepTimingDiagnostic and StepTableWidget TTFT/duration hover tooltips
     assert.equal(slowDiag.rows[0].toneClass, 'tone-danger');
     assert.equal(slowDiag.rows[1].value, '0.20s');
     assert.equal(slowDiag.rows[2].value, '119.3s');
-    assert.match(slowDiag.hint, /重叠/);
+    assert.doesNotMatch(slowDiag.hint, /重叠/);
     assert.match(slowDiag.hint, /工具调用/);
 
     // 2. Legacy step without nativeStreamSec derives after-TTFT cleanly; inconsistent timing avoids bogus share

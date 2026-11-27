@@ -7,11 +7,54 @@ import { App } from '../src/App.js';
 import { sortStepsByColumn } from '../src/registries/stepColumnRegistry.js';
 import { StepsDetailView } from '../src/views/StepsDetailView.js';
 import { ConsumptionView } from '../src/views/ConsumptionView.js';
+import { SettingsView } from '../src/views/SettingsView.js';
 import { createTrendAreaChart } from '../src/components/charts/TrendAreaChart.js';
 import { backendHarness } from './backend-harness.mjs';
 import { i18nStore, setI18nLanguage } from '../src/i18n/index.js';
-import { telemetryStore } from '../src/store/telemetryStore.js';
+import { stopAsyncTelemetryLoop, telemetryStore } from '../src/store/telemetryStore.js';
 import { uiStore } from '../src/store/uiStore.js';
+
+test('SettingsView shows the reported version and handles an update check without a version', async (t) => {
+  const previousDocument = globalThis.document;
+  const previousUi = uiStore.getState();
+  const previousTelemetry = telemetryStore.getState();
+  const previousLanguage = i18nStore.getState().language;
+  const { document } = createMockDom();
+  const settings = { language: 'en-US' };
+  let cloudStatus = {};
+
+  t.mock.method(globalThis, 'fetch', async (url) => ({
+    ok: true,
+    json: async () => url === '/api/cloud-sync' ? { ok: true, cloudStatus } : { settings, cloudStatus },
+  }));
+  globalThis.document = document;
+  uiStore.setState({ activeView: 'settings', monitorVisible: true }, { sync: true });
+  telemetryStore.setState({ telemetry: { settings } }, { sync: true });
+  setI18nLanguage('en-US');
+  const view = SettingsView({});
+  t.after(() => {
+    view.destroy();
+    stopAsyncTelemetryLoop();
+    telemetryStore.setState(previousTelemetry, { sync: true });
+    uiStore.setState(previousUi, { sync: true });
+    setI18nLanguage(previousLanguage);
+    globalThis.document = previousDocument;
+  });
+
+  const versionBadge = view.el.querySelector('.settings-version-badge');
+  const status = view.el.querySelector('.settings-panel-status');
+  const [checkForUpdates] = view.refs.updatePluginBtn._listeners.get('click');
+  assert.equal(versionBadge.textContent, '—');
+
+  await checkForUpdates();
+  assert.equal(versionBadge.textContent, '—');
+  assert.equal(status.textContent, 'Already up to date');
+
+  cloudStatus = { currentPluginVersion: '1.2.3' };
+  await checkForUpdates();
+  assert.equal(versionBadge.textContent, 'v1.2.3');
+  assert.equal(status.textContent, 'Already up to date (v1.2.3)');
+});
 
 test('Feature 1: CustomSelect searchable mode filters by multi-term query, respects threshold, and handles keyboard flow', (t) => {
   const prevDoc = globalThis.document;
@@ -284,7 +327,7 @@ test('Feature 3: Step table supports multi-column sorting (with nulls last), ano
   assert.deepEqual(byTpsAsc.map((s) => s.stepIndex), [3, 1, 2]);
 
   // Full StepsDetailView integration: click header sort cycles desc -> asc -> default (no bottom summary bar)
-  uiStore.setState({ activeView: 'steps', stepsSubTab: 'steps', monitorVisible: true }, { sync: true });
+  uiStore.setState({ activeView: 'steps', monitorVisible: true }, { sync: true });
   telemetryStore.setState(
     {
       telemetry: {
@@ -392,24 +435,23 @@ test('Feature 5: backend aggregates top costly sessions consistently across full
   assert.equal(topList[0].title, 'Expensive Refactor');
   assert.equal(topList[0].totalTokens, 1_040_000);
   assert.equal(topList[0].cacheHitPct, 80);
-  assert.equal(Array.isArray(topList[0].models), true, 'Each top conversation carries per-model breakdown');
-  assert.equal(topList[0].models.length, 1);
-  assert.equal(topList[0].models[0].totalTokens, 1_040_000);
+  assert.equal(topList[0].models, undefined);
   assert.equal(topList[1].cascadeId, 'conv-low-cost');
   assert.equal(topList[1].totalTokens, 260_000);
   assert.equal(full24h.consumption.comparison, undefined);
 
   // Fast consumption slice path matches full path identically
-  const fast24h = JSON.parse(
+  const scoped = JSON.parse(
     (await harn.executeTelemetryAction({
       conversationId: 'conv-high-cost',
-      range: '24h',
+      range: 'custom',
+      startMs: h(24),
+      endMs: nowMs,
       scope: 'consumption',
     })).body
   );
-  assert.equal(fast24h.scope, 'consumption');
-  assert.equal(fast24h.consumption.topConversations.length, 2);
-  assert.equal(fast24h.consumption.topConversations[0].cascadeId, 'conv-high-cost');
+  assert.equal(scoped.scope, 'consumption');
+  assert.deepEqual(scoped.consumption.topConversations, JSON.parse(JSON.stringify(topList)));
 });
 
 test('Feature 5: TrendAreaChart drill-down click and unified Models/Sessions segmented ranking card', async (t) => {
@@ -514,10 +556,6 @@ test('Feature 5: TrendAreaChart drill-down click and unified Models/Sessions seg
               costUsd: 1.8,
               cacheHitPct: 66.7,
               canJump: true,
-              models: [
-                { label: '4-neon', shortName: '4-neon', calls: 4, totalTokens: 400_000, costUsd: 1.5 },
-                { label: '4-carbon', shortName: '4-carbon', calls: 2, totalTokens: 100_000, costUsd: 0.3 },
-              ],
             },
             {
               cascadeId: 'cid-heavy-tok',
@@ -532,19 +570,10 @@ test('Feature 5: TrendAreaChart drill-down click and unified Models/Sessions seg
               costUsd: 0.7,
               cacheHitPct: 94.7,
               canJump: true,
-              models: [
-                { label: '4-carbon', shortName: '4-carbon', calls: 9, totalTokens: 1_000_000, costUsd: 0.7 },
-              ],
             },
           ],
           trendSeries: [],
           sourcesBreakdown: [],
-          monthlyYear: 2026,
-          monthlySeries: Array.from({ length: 12 }, (_, idx) =>
-            idx === 4
-              ? { month: 5, totalTokens: 800_000, costUsd: 1.4, calls: 12, models: [] }
-              : { month: idx + 1, totalTokens: 0, costUsd: 0, calls: 0, models: [] }
-          ),
         },
         modelBreakdown: [],
       },
@@ -631,8 +660,6 @@ test('Feature 6: model table default sorted by tokens desc', async (t) => {
           account: { totalTokens: 3_000_000, costUsd: 5.0, calls: 30 },
           trendSeries: [],
           sourcesBreakdown: [],
-          monthlyYear: 2026,
-          monthlySeries: [],
         },
         modelBreakdown: [
           {
@@ -861,6 +888,7 @@ test('Feature 9: workspace/project cost aggregation (full + fast paths) and Proj
   assert.equal(topWs[0].sessionCount, 2);
   assert.equal(topWs[0].calls, 2);
   assert.equal(topWs[0].totalTokens, 512_000);
+  assert.equal(topWs[0].models, undefined);
   assert.equal(topWs[0].latestCascadeId, 'ws-conv-a2');
   assert.equal(topWs[0].canJump, true);
   assert.equal(topWs[1].label, 'docs-site');
@@ -869,13 +897,14 @@ test('Feature 9: workspace/project cost aggregation (full + fast paths) and Proj
   const fastPayload = JSON.parse(
     (await harn.executeTelemetryAction({
       conversationId: 'ws-conv-a2',
-      range: '24h',
+      range: 'custom',
+      startMs: now - 24 * 3600_000,
+      endMs: now,
       scope: 'consumption',
     })).body
   );
-  assert.equal(fastPayload.consumption.topWorkspaces.length, 2);
-  assert.equal(fastPayload.consumption.topWorkspaces[0].label, 'usage-monitor');
-  assert.equal(fastPayload.consumption.topWorkspaces[0].totalTokens, topWs[0].totalTokens);
+  assert.equal(fastPayload.scope, 'consumption');
+  assert.deepEqual(fastPayload.consumption.topWorkspaces, JSON.parse(JSON.stringify(topWs)));
 
   // 3. Frontend ConsumptionView Projects tab rendering, sorting, and click-to-jump
   const prevDoc = globalThis.document;
@@ -954,7 +983,6 @@ test('Feature 9: workspace/project cost aggregation (full + fast paths) and Proj
               cacheHitPct: 57.1,
               latestCascadeId: 'ws-conv-a2',
               canJump: true,
-              models: [{ label: '4-neon', shortName: '4-neon', calls: 6, totalTokens: 400_000, costUsd: 2.1 }],
             },
             {
               workspaceKey: 'f:/ppt/docs-site',
@@ -972,13 +1000,10 @@ test('Feature 9: workspace/project cost aggregation (full + fast paths) and Proj
               cacheHitPct: 90.9,
               latestCascadeId: 'ws-conv-b1',
               canJump: true,
-              models: [{ label: '4-carbon', shortName: '4-carbon', calls: 4, totalTokens: 600_000, costUsd: 0.9 }],
             },
           ],
           trendSeries: [],
           sourcesBreakdown: [],
-          monthlyYear: 2026,
-          monthlySeries: [],
         },
         modelBreakdown: [],
       },
@@ -1128,7 +1153,7 @@ test('Feature 10: StepsDetailView live search, dynamic diagnostic chips, and cli
     globalThis.window = prevWin;
   });
 
-  uiStore.setState({ activeView: 'steps', stepsSubTab: 'steps', monitorVisible: true }, { sync: true });
+  uiStore.setState({ activeView: 'steps', monitorVisible: true }, { sync: true });
   telemetryStore.setState(
     {
       telemetry: {
@@ -1423,6 +1448,7 @@ test('Feature 11: native multi-sheet localized XLSX, formula-safe CSV and biling
   assert.match(consMdEn, /## Projects/);
   assert.match(consMdEn, /usage-monitor/);
   assert.match(consMdEn, /## Top Sessions/);
+  assert.match(consMdEn, /Refactor.*87\.86M/);
 
   const consMdZh = buildConsumptionMarkdownReport(cons, models, { locale: 'zh-CN' });
   assert.match(consMdZh, /# 用量统计报告 · 近7天/);
@@ -1453,6 +1479,9 @@ test('Feature 11: native multi-sheet localized XLSX, formula-safe CSV and biling
   }
   assert.match(consXlsxEn.get('xl/worksheets/sheet1.xml'), /Last 7 Days/);
   assert.equal(consXlsxEn.get('xl/worksheets/sheet1.xml').includes('近7天'), false);
+  for (const sheet of [3, 4, 6]) {
+    assert.match(consXlsxEn.get(`xl/worksheets/sheet${sheet}.xml`), /<v>87858529<\/v>/);
+  }
 
   assert.equal(buildConsumptionExportBaseName(cons, '7d', { locale: 'zh-CN' }), '用量统计-近7天');
   assert.equal(buildConsumptionExportBaseName(cons, '7d', { locale: 'en-US' }), 'usage-7d');
@@ -1778,8 +1807,6 @@ test('Feature 14: compact vertical ActionMenu replaces export bars, backend expo
           topWorkspaces: [],
           trendSeries: [],
           sourcesBreakdown: [],
-          monthlyYear: 2026,
-          monthlySeries: [],
         },
         modelBreakdown: [],
       },
@@ -2093,7 +2120,8 @@ test('P0 regression: V4 display-projected steps open inspector, preserve waterfa
   assert.equal(diag.rows.length, 3);
   assert.match(diag.rows[1].text, /流式返回/);
   assert.match(diag.rows[2].text, /原生思考计时/);
-  assert.match(diag.hint, /重叠/);
+  assert.doesNotMatch(diag.hint, /重叠/);
+  assert.match(diag.hint, /含 1 次异常 · 退避 2\.5s/);
 
   // B-05: Merged and exported speeds use the median and skip short samples.
   const stepSlow = {
@@ -2276,7 +2304,7 @@ test('P0 regression: V4 display-projected steps open inspector, preserve waterfa
     globalThis.MutationObserver = prevMo;
   });
 
-  uiStore.setState({ activeView: 'steps', stepsSubTab: 'steps', monitorVisible: true }, { sync: true });
+  uiStore.setState({ activeView: 'steps', monitorVisible: true }, { sync: true });
   telemetryStore.setState(
     {
       telemetry: {

@@ -940,11 +940,9 @@ test('post-compaction context preserves static channels + checkpoint summary, ca
   assert.match(stylesCss, /\.long-pill-nav\s*\{[^}]*container-type:\s*inline-size;[^}]*minmax\(0,\s*1fr\)[^}]*overflow:\s*hidden;/s);
   assert.match(stylesCss, /\.pill-tab\s*\{[^}]*min-width:\s*0;/s);
   assert.match(stylesCss, /@container\s*\(max-width:\s*30em\)\s*\{[\s\S]*?\.pill-tab-badge\s*\{\s*display:\s*none\s*!important;/);
-  assert.doesNotMatch(stylesCss, /\.structure-preview-canvas[^{]*\{[^}]*zoom:/, 'Structure preview must stay 1:1 without zoom distortion');
-  assert.match(stylesCss, /\.preview-capsule-bar\s*\{[^}]*"Google Sans Flex"/s);
 });
 
-test('P0 audit fixes: main/bridge-daemon import isolation, standalone lsAddr, dual-window stepRevision LRU, CORTEX_STEP_TYPE_FIND, preview i18n, and header render purity', async () => {
+test('P0 audit fixes: import isolation, dual-window stepRevision LRU, CORTEX_STEP_TYPE_FIND, SQLite helper, and header render purity', async () => {
   // 1. Static import isolation on main.mjs and bridge-daemon.mjs
   const mainSrc = fs.readFileSync(new URL('../main.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(
@@ -1632,18 +1630,10 @@ test('ConsumptionView and TrendAreaChart patch text DOM nodes in-place without o
             totalTokens: tokBase,
             calls: 12,
             costUsd: 1.25,
-            models: [{ label: 'Claude Opus 4.6', shortName: 'Claude Opus 4.6', totalTokens: tokBase, calls: 12 }],
           },
         ],
         topConversations: [],
         topWorkspaces: [],
-        monthlyYear: 2026,
-        monthlySeries: Array.from({ length: 12 }, (_, m) => ({
-          month: m + 1,
-          totalTokens: m === 10 ? tokBase : 0,
-          costUsd: m === 10 ? 1.25 : 0,
-          calls: m === 10 ? 12 : 0,
-        })),
       },
       modelBreakdown: [
         {

@@ -29,8 +29,6 @@ import { CustomSelect } from '../components/ui/CustomSelect.js';
 import { CustomScrollbar } from '../components/ui/CustomScrollbar.js';
 import { SegmentedControl } from '../components/ui/SegmentedControl.js';
 
-export const SHOW_ACCOUNT_TAB = false;
-
 function getLanguageOptions() {
   return [
     { value: 'auto', label: t('settings.gen.langAuto') },
@@ -266,7 +264,7 @@ export const SettingsView = defineComponent({
       className: 'form-label',
       text: t('settings.simple.versionRow'),
     });
-    const versionTagEl = h('span', { className: 'text-mono text-secondary', text: 'v1.4.4' });
+    const versionTagEl = h('span', { className: 'text-mono text-secondary', text: '—' });
 
     const syncPricingBtnText = h('span', { text: t('settings.gen.syncBtn') });
     const syncPricingBtn = h(
@@ -320,8 +318,11 @@ export const SettingsView = defineComponent({
                 return;
               }
               if (!cs?.updateAvailable) {
-                const curVer = cs?.currentPluginVersion || '1.4.4';
-                showMaintFeedback(t('settings.gen.upToDateMsg', { ver: curVer }), 4000);
+                const ver = cs?.currentPluginVersion;
+                showMaintFeedback(
+                  ver ? t('settings.gen.upToDateVersionMsg', { ver }) : t('settings.gen.upToDateMsg'),
+                  4000
+                );
                 return;
               }
             }
@@ -507,16 +508,18 @@ export const SettingsView = defineComponent({
     function renderCloudStatus(cs) {
       if (!cs) return;
       latestCloudStatus = cs;
-      const curVer = cs.currentPluginVersion || '1.4.4';
-      const latVer = cs.latestPluginVersion || curVer;
-      patchText(versionTagEl, `v${curVer}`);
-      if (cs.updateAvailable) {
-        patchText(updatePluginBtnText, t('settings.gen.upgradeToBtn', { ver: latVer }));
-        patchClasses(updatePluginBtn, { 'btn-primary': true, 'btn-secondary': false });
-      } else {
-        patchText(updatePluginBtnText, t('settings.gen.checkUpdateBtn'));
-        patchClasses(updatePluginBtn, { 'btn-primary': false, 'btn-secondary': true });
-      }
+      const { currentPluginVersion, latestPluginVersion, updateAvailable } = cs;
+      patchText(versionTagEl, currentPluginVersion ? `v${currentPluginVersion}` : '—');
+      patchText(
+        updatePluginBtnText,
+        updateAvailable && latestPluginVersion
+          ? t('settings.gen.upgradeToBtn', { ver: latestPluginVersion })
+          : t('settings.gen.checkUpdateBtn')
+      );
+      patchClasses(updatePluginBtn, {
+        'btn-primary': Boolean(updateAvailable),
+        'btn-secondary': !updateAvailable,
+      });
     }
 
     function refreshGeneralLabels() {

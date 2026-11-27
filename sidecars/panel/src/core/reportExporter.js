@@ -100,18 +100,8 @@ function formatExportDate(ms) {
 function resolveLocalizedRangeLabel(range, en) {
   const r = range || {};
   const key = String(r.key || '').trim().toLowerCase();
-  const poolSuffix =
-    key === 'cycle' && r.pool && r.pool !== 'all' ? ` · ${r.poolLabel || r.pool}` : '';
-  if (en) {
-    const baseEn =
-      key === 'cycle' && r.isFallbackWeek
-        ? 'This Week'
-        : RANGE_LABELS_EN[key] || r.label || key || 'All Time';
-    return `${baseEn}${poolSuffix}`;
-  }
-  if (r.label) return r.label;
-  const baseZh = RANGE_LABELS_ZH[key] || key || '全部时间';
-  return `${baseZh}${poolSuffix}`;
+  if (en) return RANGE_LABELS_EN[key] || r.label || key || 'All Time';
+  return r.label || RANGE_LABELS_ZH[key] || key || '全部时间';
 }
 
 function resolveRangeSpanNote(range) {

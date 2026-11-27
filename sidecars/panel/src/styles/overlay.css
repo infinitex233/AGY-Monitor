@@ -353,16 +353,6 @@
   flex-shrink: 0;
 }
 
-.wm-quota-text {
-  min-width: 28px;
-  max-width: none;
-  overflow: visible;
-  text-overflow: clip;
-  text-align: left;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
 /* 缓存命中率槽位（固定预占宽度 44px 居中对齐） */
 .wm-seg-cache {
   width: 44px;
@@ -534,7 +524,6 @@
 :host(.wm-capsule-host[data-layout="ring-only"]) .wm-sep[data-sep-for-rank="5"],
 :host(.wm-capsule-host[data-layout="ring-only"]) .wm-cap-slot[data-vis-rank="1"] .wm-ctx-pct,
 :host(.wm-capsule-host[data-layout="ring-only"]) .wm-cap-slot[data-vis-rank="1"] .wm-slot-prefix,
-:host(.wm-capsule-host[data-layout="ring-only"]) .wm-cap-slot[data-vis-rank="1"] .wm-quota-text,
 :host(.wm-capsule-host[data-layout="ring-only"]) .wm-multi-label {
   display: none !important;
 }
@@ -651,7 +640,7 @@
   container-type: size;
 }
 
-.wm-popover-panel.is-floating .steps-embedded-panel > .table-scroll-host:not(.is-models-scroll) {
+.wm-popover-panel.is-floating .steps-embedded-panel > .table-scroll-host {
   max-height: clamp(200px, 76cqh, 640px);
 }
 

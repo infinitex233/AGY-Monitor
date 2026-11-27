@@ -78,7 +78,6 @@ test('isolated checkpoint without known neighbours stays unknown; its token tota
   assert.equal(p.modelBreakdown.find(m => m.label === '模型未知').unpricedCalls, 1);
   assert.equal(p.consumption.trendSeries.reduce((n,s) => n+(s.unpricedCalls || 0),0), 1);
   assert.equal(p.consumption.sourcesBreakdown[0].unpricedCalls, 1);
-  assert.equal(p.consumption.monthlySeries.reduce((n,s) => n+(s.unpricedCalls || 0),0), 1);
 });
 
 test('checkpoint can explicitly use a different model; no neighbour-based overwrite', async () => {

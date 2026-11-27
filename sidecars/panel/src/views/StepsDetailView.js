@@ -1,34 +1,16 @@
 /**
- * @fileoverview View 3: StepsDetailView (步骤明细与总汇总分析视图).
- * 提供“按步查看”与“总汇总”双子视图切换：
- * - 单步测速表通过 `stepColumnRegistry.js` 动态渲染用户自选的 2..12 个字段列，并支持行级增量对账；
- * - 总汇总视图提供会话线性走势图、多模型同图趋势拟合曲线与极简高密度模型总览卡片。
+ * @fileoverview Embedded step details with dot-matrix, curve, and table modes.
  */
 
 import { mergeSpeedRateBins } from '../../shared/telemetry-display-rules.mjs';
 import { resolveSettingsModernUi } from '../core/appearance.js';
 import { defineComponent } from '../core/component.js';
+import { h, patchAttr, patchClasses, patchText } from '../core/domPatch.js';
 import {
-  h,
-  patchAttr,
-  patchClasses,
-  patchKeyedList,
-  patchText,
-} from '../core/domPatch.js';
-import {
-  formatTimingDetailSec,
-  formatTokensPrecise,
-  formatUsd,
-  formatPctNumber,
   formatAnomalyKindLabel,
-  buildModelAnomalyDiagnostic,
-  formatAnomalyTagText,
-  mergeModelsByDisplayName,
   normalizeModelDisplayMode,
   normalizeOrchestratorIdDisplayMode,
-  resolveModelAnomalySummary,
   resolveModelDisplayInfo,
-  speedReasonText,
 } from '../core/formatters.js';
 import {
   computeStepQuickChipCounts,

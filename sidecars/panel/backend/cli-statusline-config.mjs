@@ -236,18 +236,37 @@ export function extractManagedCliStatusLineFlags(cmd) {
   return m[1].replace(/^--\s+/, '').trim();
 }
 
+let cliStatusLineProbeCache = null;
+
 /**
  * 探测本机是否已安装并初始化 Antigravity CLI（`~/.gemini/antigravity-cli`），
  * 及当前 CLI `settings.json` 中的 `statusLine` 托管状态（零子进程、纯本地文件探测）。
  *
- * @param {{ env?: Record<string, string|undefined>, homeDir?: string }} [options]
+ * @param {{ env?: Record<string, string|undefined>, homeDir?: string, maxAgeMs?: number }} [options]
  * @returns {{ installed: boolean, configured: boolean, preservedCustom: boolean, managedFlags: string }}
  */
 export function getCliStatusLineRuntimeStatus({
   env = process.env,
   homeDir = homedir(),
+  maxAgeMs = 0,
 } = {}) {
   const settingsPath = resolveCliSettingsPath(env, homeDir);
+  const now = Date.now();
+  const elapsedMs = cliStatusLineProbeCache ? now - cliStatusLineProbeCache.checkedAtMs : -1;
+  if (
+    maxAgeMs > 0 &&
+    cliStatusLineProbeCache?.settingsPath === settingsPath &&
+    elapsedMs >= 0 &&
+    elapsedMs < maxAgeMs
+  ) {
+    return cliStatusLineProbeCache.status;
+  }
+  const status = readCliStatusLineRuntimeStatus(settingsPath);
+  cliStatusLineProbeCache = { settingsPath, checkedAtMs: now, status };
+  return status;
+}
+
+function readCliStatusLineRuntimeStatus(settingsPath) {
   const cliDir = dirname(settingsPath);
   let installed = false;
   try {
@@ -503,6 +522,7 @@ export function ensureCliStatusLineConfigured({
 
     const serialized = `${JSON.stringify(applied.object, null, 2).replace(/\n/g, eol)}${eol}`;
     writeTextFileAtomicSync(settingsPath, serialized);
+    if (cliStatusLineProbeCache?.settingsPath === settingsPath) cliStatusLineProbeCache = null;
 
     return {
       checked: true,

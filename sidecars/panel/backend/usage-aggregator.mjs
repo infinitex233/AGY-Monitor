@@ -1,8 +1,8 @@
 /**
- * @fileoverview 多时间窗口解析、用量桶累加、趋势序列、月度序列与分模型/分来源聚合引擎。
+ * @fileoverview 多时间窗口解析、用量桶累加、趋势序列与分模型/分来源聚合引擎。
  *
  * 负责将内存缓存 (`trajectoryCache`) 与外部深层统计缓存 (`loadExternalDeepStatsCache`)
- * 中的所有步骤按预设窗口（`all`, `5h`, `today`, `24h`, `week`, `7d`, `14d`, `30d`）与当前选定窗口
+ * 中的所有步骤按预设窗口（`today`, `24h`, `7d`, `14d`, `30d`, `all`）与当前选定窗口
  * 进行去重遍历聚合，输出前端消费分析与模型明细所需的完整统计结构。
  */
 
@@ -494,7 +494,6 @@ function collectUsageEntriesToAggregate(familySet, endpoint = null) {
       cascadeId: groupCascadeId,
       title: entryTitle,
       appSource: isRemote ? 'ssh' : entry?.appSource || 'standalone',
-      accountName: entry?.accountName || extMatch?.accountName || '',
       workspaceUri: entryWorkspaceUri,
       steps: entry?.steps || [],
       isCurrentConv: familySet.has(cidLower),
@@ -510,7 +509,6 @@ function collectUsageEntriesToAggregate(familySet, endpoint = null) {
       cascadeId: extCidLower,
       title: String(ext.title || liveEntry?.title || '').trim(),
       appSource: ext.appSource || 'ide',
-      accountName: ext.accountName || liveEntry?.accountName || '',
       workspaceUri: String(ext.workspaceUri || liveEntry?.workspaceUri || '').trim(),
       steps: ext.steps || [],
       isCurrentConv: familySet.has(extCidLower),
@@ -542,15 +540,40 @@ export function normalizeWorkspaceBucket(rawUri) {
   };
 }
 
-function accumulateStepIntoWorkspaceMap(
-  perWorkspaceMap,
-  entry,
-  stepUsage,
-  tMs,
-  st = null,
-  mInfo = null,
-  stepCost = null
-) {
+function accumulateStepIntoSourceMap(perSourceMap, srcKey, srcName, usage) {
+  let source = perSourceMap.get(srcKey);
+  if (!source) {
+    source = {
+      name: srcName,
+      calls: 0,
+      inputTokens: 0,
+      cacheReadTokens: 0,
+      responseTokens: 0,
+      thinkingTokens: 0,
+      totalTokens: 0,
+      costUsd: 0,
+      unpricedCalls: 0,
+    };
+    perSourceMap.set(srcKey, source);
+  }
+  source.calls += 1;
+  source.inputTokens += usage.inTok;
+  source.cacheReadTokens += usage.cacheTok;
+  source.responseTokens += usage.respTok;
+  source.thinkingTokens += usage.thinkTok;
+  source.totalTokens += usage.stepTotalTokens;
+  source.costUsd += usage.resolvedCost;
+  source.unpricedCalls += usage.unpriced;
+}
+
+function finalizeSourcesBreakdown(perSourceMap) {
+  return Array.from(perSourceMap.values())
+    .filter((s) => s.totalTokens > 0 || s.calls > 0)
+    .map((s) => ({ ...s, costUsd: +s.costUsd.toFixed(2) }))
+    .sort((a, b) => b.totalTokens - a.totalTokens || b.calls - a.calls);
+}
+
+function accumulateStepIntoWorkspaceMap(perWorkspaceMap, entry, stepUsage, tMs) {
   const norm = normalizeWorkspaceBucket(entry?.workspaceUri);
   const key = norm ? norm.workspaceKey : UNBOUND_WORKSPACE_KEY;
   let acc = perWorkspaceMap.get(key);
@@ -571,7 +594,6 @@ function accumulateStepIntoWorkspaceMap(
       unpricedCalls: 0,
       lastTimestampMs: 0,
       latestCascadeId: '',
-      perModelStats: new Map(),
     };
     perWorkspaceMap.set(key, acc);
   }
@@ -588,9 +610,6 @@ function accumulateStepIntoWorkspaceMap(
   if (tMs >= acc.lastTimestampMs) {
     acc.lastTimestampMs = tMs;
     if (cid) acc.latestCascadeId = cid;
-  }
-  if (st && mInfo) {
-    accumulateStepIntoModelMap(acc.perModelStats, st, mInfo, stepCost);
   }
 }
 
@@ -626,22 +645,11 @@ function finalizeTopWorkspacesMap(perWorkspaceMap, maxItems = MAX_TOP_WORKSPACES
         cacheHitPct: promptTokens > 0 ? +((w.cacheReadTokens / promptTokens) * 100).toFixed(1) : 0,
         lastTimestampMs: w.lastTimestampMs,
         latestCascadeId: w.latestCascadeId,
-        models: finalizeModelBreakdownMap(w.perModelStats),
       };
     });
 }
 
-function accumulateStepIntoConversationMap(
-  perConvMap,
-  entry,
-  srcKey,
-  srcName,
-  stepUsage,
-  tMs,
-  st = null,
-  mInfo = null,
-  stepCost = null
-) {
+function accumulateStepIntoConversationMap(perConvMap, entry, srcKey, srcName, stepUsage, tMs) {
   const cid = String(entry?.cascadeId || '').trim();
   if (!cid) return;
   let acc = perConvMap.get(cid);
@@ -660,7 +668,6 @@ function accumulateStepIntoConversationMap(
       costUsd: 0,
       unpricedCalls: 0,
       lastTimestampMs: 0,
-      perModelStats: new Map(),
     };
     perConvMap.set(cid, acc);
   }
@@ -677,9 +684,6 @@ function accumulateStepIntoConversationMap(
   acc.unpricedCalls += stepUsage.unpriced;
   if (tMs > acc.lastTimestampMs) {
     acc.lastTimestampMs = tMs;
-  }
-  if (st && mInfo) {
-    accumulateStepIntoModelMap(acc.perModelStats, st, mInfo, stepCost);
   }
 }
 
@@ -705,7 +709,6 @@ function finalizeTopConversationsMap(perConvMap, maxItems = MAX_TOP_CONVERSATION
         unpricedCalls: c.unpricedCalls,
         cacheHitPct: promptTokens > 0 ? +((c.cacheReadTokens / promptTokens) * 100).toFixed(1) : 0,
         lastTimestampMs: c.lastTimestampMs,
-        models: finalizeModelBreakdownMap(c.perModelStats),
       };
     });
 }
@@ -1008,7 +1011,7 @@ function sameUsageEntries(previous, current) {
   return previous.length === current.length && current.every((entry, index) => {
     const before = previous[index];
     return entry.steps === before.steps && entry.cascadeId === before.cascadeId &&
-      entry.appSource === before.appSource && entry.accountName === before.accountName &&
+      entry.appSource === before.appSource &&
       entry.workspaceUri === before.workspaceUri;
   });
 }
@@ -1185,48 +1188,13 @@ export function aggregateMultiWindowUsage({
     nowMs
   );
 
-  const presetKeys = ['all', '5h', 'today', '24h', 'week', '7d', '14d', '30d'];
+  const presetKeys = CONSUMPTION_PRESET_RANGE_KEYS;
   const presetWindows = {};
-  const accountBuckets = {};
-  const sessionBuckets = {};
-
   for (const k of presetKeys) {
     presetWindows[k] = resolveTimeWindow(k, 0, 0, nowMs);
-    accountBuckets[k] = createUsageBucket();
-    sessionBuckets[k] = createUsageBucket();
   }
 
   const selectedRangeCacheKey = selectedWindow.key;
-  const selectedAccountBucket = accountBuckets[selectedWindow.key] || createUsageBucket();
-  const selectedSessionBucket = sessionBuckets[selectedWindow.key] || createUsageBucket();
-  const perModelStats = new Map();
-  const perConvStats = new Map();
-  const perWorkspaceStats = new Map();
-  const selectedWindowSteps = [];
-  let earliestSelectedStepMs = Infinity;
-  let latestSelectedStepMs = 0;
-
-  const currentYear = new Date(nowMs).getFullYear();
-  const monthBoundsMs = Array.from({ length: 13 }, (_, idx) =>
-    new Date(currentYear, idx, 1).getTime()
-  );
-  const yearStartMs = monthBoundsMs[0];
-  const nextYearStartMs = monthBoundsMs[12];
-  const monthlySeries = Array.from({ length: 12 }, (_, idx) => ({
-    month: idx + 1,
-    label: `${idx + 1}月`,
-    calls: 0,
-    inputTokens: 0,
-    cacheReadTokens: 0,
-    responseTokens: 0,
-    thinkingTokens: 0,
-    totalTokens: 0,
-    costUsd: 0,
-    unpricedCalls: 0,
-    perModelStats: new Map(),
-  }));
-
-  const perSourceStats = new Map();
   const allEntriesToAggregate = collectUsageEntriesToAggregate(familySet, endpoint);
   const familySig = buildFamilySig(familySet);
 
@@ -1234,7 +1202,6 @@ export function aggregateMultiWindowUsage({
   const windows = [selectedWindow, ...Object.values(presetWindows)];
   const snapshot = lastUsageSnapshotsByEndpoint.get(endpointKey) || null;
   const sameSnapshot = modelInputs && snapshot && timeZone === snapshot.timeZone &&
-    currentYear === snapshot.currentYear &&
     modelInputs.catalogRevision === snapshot.modelInputs.catalogRevision &&
     modelInputs.phaseEpoch === snapshot.modelInputs.phaseEpoch &&
     isDeepStrictEqual(modelInputs.dynamicModelMap, snapshot.modelInputs.dynamicModelMap) &&
@@ -1294,6 +1261,23 @@ export function aggregateMultiWindowUsage({
     }
   }
 
+  const accountBuckets = {};
+  const sessionBuckets = {};
+  for (const k of presetKeys) {
+    accountBuckets[k] = createUsageBucket();
+    sessionBuckets[k] = createUsageBucket();
+  }
+  const usesPresetBucket = Object.hasOwn(presetWindows, selectedWindow.key);
+  const selectedAccountBucket = accountBuckets[selectedWindow.key] || createUsageBucket();
+  const selectedSessionBucket = sessionBuckets[selectedWindow.key] || createUsageBucket();
+  const perModelStats = new Map();
+  const perSourceStats = new Map();
+  const perConvStats = new Map();
+  const perWorkspaceStats = new Map();
+  const selectedWindowSteps = [];
+  let earliestSelectedStepMs = Infinity;
+  let latestSelectedStepMs = 0;
+
   for (const entry of allEntriesToAggregate) {
     const { cascadeId, isCurrentConv } = entry;
     const srcKey = entry.appSource || 'standalone';
@@ -1323,28 +1307,6 @@ export function aggregateMultiWindowUsage({
       const stepUsage = { inTok, cacheTok, outTok, thinkTok, respTok, stepTotalTokens,
         resolvedCost, savedCost, unpriced };
 
-      if (tMs >= yearStartMs && tMs < nextYearStartMs) {
-        let monthIdx = 11;
-        for (let m = 0; m < 12; m++) {
-          if (tMs < monthBoundsMs[m + 1]) {
-            monthIdx = m;
-            break;
-          }
-        }
-        const mBucket = monthlySeries[monthIdx];
-        if (mBucket) {
-          mBucket.calls += 1;
-          mBucket.inputTokens += inTok;
-          mBucket.cacheReadTokens += cacheTok;
-          mBucket.responseTokens += respTok;
-          mBucket.thinkingTokens += thinkTok;
-          mBucket.totalTokens += stepTotalTokens;
-          mBucket.costUsd += resolvedCost;
-          mBucket.unpricedCalls = (mBucket.unpricedCalls || 0) + unpriced;
-          accumulateStepIntoModelMap(mBucket.perModelStats, st, mInfo, stepCost);
-        }
-      }
-
       for (const k of presetKeys) {
         const w = presetWindows[k];
         const matchesPreset = k === 'all' ? true : tMs > 0 && tMs >= w.startMs && tMs <= w.endMs;
@@ -1362,7 +1324,7 @@ export function aggregateMultiWindowUsage({
           : tMs > 0 && tMs >= selectedWindow.startMs && tMs <= selectedWindow.endMs;
 
       if (inSelectedWindow) {
-        if (selectedWindow.key === 'custom') {
+        if (!usesPresetBucket) {
           accumulateStepIntoBucket(selectedAccountBucket, stepUsage, cascadeId, st);
           if (isCurrentConv) {
             accumulateStepIntoBucket(selectedSessionBucket, stepUsage, cascadeId, st);
@@ -1386,62 +1348,13 @@ export function aggregateMultiWindowUsage({
           });
         }
 
-        if (!perSourceStats.has(srcKey)) {
-          perSourceStats.set(srcKey, {
-            name: srcName,
-            calls: 0,
-            inputTokens: 0,
-            cacheReadTokens: 0,
-            responseTokens: 0,
-            thinkingTokens: 0,
-            totalTokens: 0,
-            costUsd: 0,
-            perModelStats: new Map(),
-          });
-        }
-        const sAgg = perSourceStats.get(srcKey);
-        sAgg.calls += 1;
-        sAgg.inputTokens += inTok;
-        sAgg.cacheReadTokens += cacheTok;
-        sAgg.responseTokens += respTok;
-        sAgg.thinkingTokens += thinkTok;
-        sAgg.totalTokens += stepTotalTokens;
-        sAgg.costUsd += resolvedCost;
-        sAgg.unpricedCalls = (sAgg.unpricedCalls || 0) + unpriced;
-        accumulateStepIntoModelMap(sAgg.perModelStats, st, mInfo, stepCost);
-
+        accumulateStepIntoSourceMap(perSourceStats, srcKey, srcName, stepUsage);
         accumulateStepIntoModelMap(perModelStats, st, mInfo, stepCost);
-        accumulateStepIntoConversationMap(
-          perConvStats,
-          entry,
-          srcKey,
-          srcName,
-          stepUsage,
-          tMs,
-          st,
-          mInfo,
-          stepCost
-        );
-        accumulateStepIntoWorkspaceMap(
-          perWorkspaceStats,
-          entry,
-          stepUsage,
-          tMs,
-          st,
-          mInfo,
-          stepCost
-        );
+        accumulateStepIntoConversationMap(perConvStats, entry, srcKey, srcName, stepUsage, tMs);
+        accumulateStepIntoWorkspaceMap(perWorkspaceStats, entry, stepUsage, tMs);
       }
     }
   }
-
-  const finalizedMonthlySeries = monthlySeries.map(
-    ({ perModelStats: monthModelMap, ...mBucket }) => ({
-      ...mBucket,
-      costUsd: +mBucket.costUsd.toFixed(4),
-      models: finalizeModelBreakdownMap(monthModelMap),
-    })
-  );
 
   // 构建当前选定时间窗口的自适应自然整点/整日趋势序列 (trendSeries)
   const { trend, trendStartMs, trendEndMs, trendSeries } = buildUsageTrendSeries(
@@ -1465,17 +1378,7 @@ export function aggregateMultiWindowUsage({
   const finalizedSelectedSession = finalizeUsageBucket(selectedSessionBucket);
   const finalizedSelectedAccount = finalizeUsageBucket(selectedAccountBucket);
 
-  const sourcesBreakdown = Array.from(perSourceStats.values())
-    .filter((s) => s.totalTokens > 0 || s.calls > 0)
-    .map(({ perModelStats: sourceModelMap, ...s }) => ({
-      ...s,
-      costUsd: +s.costUsd.toFixed(2),
-      models: finalizeModelBreakdownMap(sourceModelMap),
-    }))
-    .sort((a, b) => b.totalTokens - a.totalTokens || b.calls - a.calls);
-
-  const todayBucket = finalizedPresets.today.account;
-  const weekBucket = finalizedPresets.week.account;
+  const sourcesBreakdown = finalizeSourcesBreakdown(perSourceStats);
   const modelBreakdown = finalizeModelBreakdownMap(perModelStats);
   const topConversations = finalizeTopConversationsMap(perConvStats);
   const topWorkspaces = finalizeTopWorkspacesMap(perWorkspaceStats);
@@ -1489,7 +1392,6 @@ export function aggregateMultiWindowUsage({
         revision: resolvedUsageRevision,
         timeZone,
         modelInputs,
-        currentYear,
         entries: allEntriesToAggregate,
         dates: null,
         ranges: new Map(),
@@ -1523,10 +1425,6 @@ export function aggregateMultiWindowUsage({
     finalizedPresets,
     trendSeries,
     sourcesBreakdown,
-    currentYear,
-    monthlySeries: finalizedMonthlySeries,
-    todayBucket,
-    weekBucket,
     modelBreakdown,
     topConversations,
     topWorkspaces,
@@ -1551,7 +1449,7 @@ export function aggregateMultiWindowUsage({
 
 /**
  * 轻量级单时间窗口剪枝聚合器（专为 `scope=consumption` / `scope=consumption-presets` 瞬切服务）：
- * 1. 跳过 12 个月年度柱与 8 预设桶；
+ * 1. 跳过 6 个预设桶；
  * 2. 基于会话级 `[minMs, maxMs]` 边界直接跳过时间完全不重叠的历史会话；
  * 3. 与 `aggregateMultiWindowUsage` 共用完全一致的时间窗口、来源/模型归并及趋势分桶逻辑。
  */
@@ -1586,7 +1484,6 @@ export function aggregateSelectedWindowUsage({
     ? precollectedEntries
     : collectUsageEntriesToAggregate(familySet, endpoint);
   const familySig = buildFamilySig(familySet);
-  const currentYear = new Date(nowMs).getFullYear();
   const timeZone = modelInputs ? resolveCachedLocalTimeZone() : '';
 
   const currentCheckWindows = [selectedWindow];
@@ -1596,7 +1493,6 @@ export function aggregateSelectedWindowUsage({
     modelInputs &&
       snapshot &&
       timeZone === snapshot.timeZone &&
-      currentYear === snapshot.currentYear &&
       modelInputs.catalogRevision === snapshot.modelInputs.catalogRevision &&
       modelInputs.phaseEpoch === snapshot.modelInputs.phaseEpoch &&
       isDeepStrictEqual(modelInputs.dynamicModelMap, snapshot.modelInputs.dynamicModelMap) &&
@@ -1746,51 +1642,10 @@ export function aggregateSelectedWindowUsage({
         });
       }
 
-      if (!perSourceStats.has(srcKey)) {
-        perSourceStats.set(srcKey, {
-          name: srcName,
-          calls: 0,
-          inputTokens: 0,
-          cacheReadTokens: 0,
-          responseTokens: 0,
-          thinkingTokens: 0,
-          totalTokens: 0,
-          costUsd: 0,
-          perModelStats: new Map(),
-        });
-      }
-      const sAgg = perSourceStats.get(srcKey);
-      sAgg.calls += 1;
-      sAgg.inputTokens += inTok;
-      sAgg.cacheReadTokens += cacheTok;
-      sAgg.responseTokens += respTok;
-      sAgg.thinkingTokens += thinkTok;
-      sAgg.totalTokens += stepTotalTokens;
-      sAgg.costUsd += resolvedCost;
-      sAgg.unpricedCalls = (sAgg.unpricedCalls || 0) + unpriced;
-      accumulateStepIntoModelMap(sAgg.perModelStats, st, mInfo, stepCost);
-
+      accumulateStepIntoSourceMap(perSourceStats, srcKey, srcName, stepUsage);
       accumulateStepIntoModelMap(perModelStats, st, mInfo, stepCost);
-      accumulateStepIntoConversationMap(
-        perConvStats,
-        entry,
-        srcKey,
-        srcName,
-        stepUsage,
-        tMs,
-        st,
-        mInfo,
-        stepCost
-      );
-      accumulateStepIntoWorkspaceMap(
-        perWorkspaceStats,
-        entry,
-        stepUsage,
-        tMs,
-        st,
-        mInfo,
-        stepCost
-      );
+      accumulateStepIntoConversationMap(perConvStats, entry, srcKey, srcName, stepUsage, tMs);
+      accumulateStepIntoWorkspaceMap(perWorkspaceStats, entry, stepUsage, tMs);
     }
   }
 
@@ -1805,14 +1660,7 @@ export function aggregateSelectedWindowUsage({
 
   const finalizedSelectedSession = finalizeUsageBucket(selectedSessionBucket);
   const finalizedSelectedAccount = finalizeUsageBucket(selectedAccountBucket);
-  const sourcesBreakdown = Array.from(perSourceStats.values())
-    .filter((s) => s.totalTokens > 0 || s.calls > 0)
-    .map(({ perModelStats: sourceModelMap, ...s }) => ({
-      ...s,
-      costUsd: +s.costUsd.toFixed(2),
-      models: finalizeModelBreakdownMap(sourceModelMap),
-    }))
-    .sort((a, b) => b.totalTokens - a.totalTokens || b.calls - a.calls);
+  const sourcesBreakdown = finalizeSourcesBreakdown(perSourceStats);
   const modelBreakdown = finalizeModelBreakdownMap(perModelStats);
   const topConversations = finalizeTopConversationsMap(perConvStats);
   const topWorkspaces = finalizeTopWorkspacesMap(perWorkspaceStats);
@@ -1878,7 +1726,7 @@ export function aggregateSessionUsageForFamily({
     filterOpts.endMs,
     nowMs
   );
-  const presetKeys = ['all', '5h', 'today', '24h', 'week', '7d', '14d', '30d'];
+  const presetKeys = CONSUMPTION_PRESET_RANGE_KEYS;
   const presetWindows = {};
   for (const k of presetKeys) {
     presetWindows[k] = resolveTimeWindow(k, 0, 0, nowMs);

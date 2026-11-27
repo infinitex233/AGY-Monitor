@@ -157,47 +157,60 @@ async function postLoopbackHttpsJson(urlStr, csrfToken, bodyText, timeoutMs) {
   });
 }
 
-export function getContextModelCatalog(endpoint = null) {
+export function getContextModelCatalog(
+  endpoint = null,
+  { allowStale = false, forceRefresh = false } = {}
+) {
   const isRemote = Boolean(endpoint && endpoint.isRemote);
-  if (isRemote) {
-    const baseUrl = endpoint.baseUrl || endpoint.origin || '';
-    const csrfToken = endpoint.csrfToken || '';
-    const cached = endpoint.contextModelCatalog;
-    if (
-      !cached ||
-      cached.baseUrl !== baseUrl ||
-      cached.csrfToken !== csrfToken ||
-      Date.now() >= cached.expiresAt
-    ) {
-      endpoint.contextModelCatalog = {
-        baseUrl,
-        csrfToken,
-        expiresAt: Date.now() + 30000,
-        promise: callLsRpc('GetAvailableModels', {}, 2500, endpoint)
-          .then((data) => data?.response?.models)
-          .catch(() => null),
-      };
-    }
-    return endpoint.contextModelCatalog.promise;
-  }
-
-  const { baseUrl, csrfToken } = lsRuntimeEndpoint;
-  if (
-    !contextModelCatalog ||
-    contextModelCatalog.baseUrl !== baseUrl ||
-    contextModelCatalog.csrfToken !== csrfToken ||
-    Date.now() >= contextModelCatalog.expiresAt
-  ) {
-    contextModelCatalog = {
+  const baseUrl = isRemote ? endpoint.baseUrl || endpoint.origin || '' : lsRuntimeEndpoint.baseUrl;
+  const csrfToken = isRemote ? endpoint.csrfToken || '' : lsRuntimeEndpoint.csrfToken;
+  const now = Date.now();
+  let cached = isRemote ? endpoint.contextModelCatalog : contextModelCatalog;
+  const sameEndpoint = cached && cached.baseUrl === baseUrl && cached.csrfToken === csrfToken;
+  const isExpired =
+    !sameEndpoint ||
+    now < (cached.fetchedAtMs ?? 0) ||
+    now >= cached.expiresAt ||
+    (forceRefresh && !cached.inFlight) ||
+    (!allowStale && cached.failed && !cached.inFlight && now >= (cached.retryAfterMs ?? 0));
+  if (isExpired) {
+    const prevGoodModels = sameEndpoint && cached.models !== undefined ? cached.models : undefined;
+    const next = {
       baseUrl,
       csrfToken,
-      expiresAt: Date.now() + 30000,
-      promise: callLsRpc('GetAvailableModels', {}, 1500)
-        .then((data) => data?.response?.models)
-        .catch(() => null),
+      fetchedAtMs: now,
+      expiresAt: now + 30_000,
+      retryAfterMs: 0,
+      failed: false,
+      inFlight: true,
+      models: prevGoodModels,
+      promise: null,
     };
+    next.promise = callLsRpc('GetAvailableModels', {}, isRemote ? 2500 : 1500, endpoint)
+      .then((data) => {
+        const models = data?.response?.models ?? null;
+        next.models = models;
+        next.failed = false;
+        next.inFlight = false;
+        return models;
+      })
+      .catch(() => {
+        const failNow = Date.now();
+        next.failed = true;
+        next.inFlight = false;
+        next.retryAfterMs = failNow + 2000;
+        next.expiresAt = Math.min(next.expiresAt, failNow + 2000);
+        if (next.models === undefined) {
+          next.models = null;
+        }
+        return next.models;
+      });
+    if (isRemote) endpoint.contextModelCatalog = next;
+    else contextModelCatalog = next;
+    cached = next;
   }
-  return contextModelCatalog.promise;
+  // Telemetry can report a previous result while strict callers wait for the refresh.
+  return allowStale && cached.models !== undefined ? Promise.resolve(cached.models) : cached.promise;
 }
 
 async function postLsRpcOnce(baseUrl, csrfToken, method, body, timeoutMs) {
