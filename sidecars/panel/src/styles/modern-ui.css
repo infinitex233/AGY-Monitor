@@ -1250,6 +1250,17 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   animation: anim-modern-pop-in 200ms var(--ease-modern);
 }
 
+[data-modern-ui="true"].wm-popover-panel.is-floating,
+:host([data-modern-ui="true"]) .wm-popover-panel.is-floating {
+  animation: none;
+}
+
+[data-modern-ui="true"].wm-popover-panel.is-floating .wm-floating-resize[data-edge="bottom-right"]::after,
+:host([data-modern-ui="true"]) .wm-popover-panel.is-floating .wm-floating-resize[data-edge="bottom-right"]::after {
+  right: 8px;
+  bottom: 8px;
+}
+
 [data-modern-ui="true"].wm-multi-panel,
 :host([data-modern-ui="true"]) .wm-multi-panel {
   border-radius: 22px;

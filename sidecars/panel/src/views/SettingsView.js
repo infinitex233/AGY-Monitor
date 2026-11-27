@@ -11,7 +11,7 @@ import {
   normalizeClientUiTheme,
 } from '../core/appearance.js';
 import { h, patchAttr, patchClasses, patchText } from '../core/domPatch.js';
-import { createSvgIcon } from '../icons/SvgIcon.js';
+import { createBrandIcon, createSvgIcon } from '../icons/SvgIcon.js';
 import { i18nStore, normalizeI18nLanguage, setI18nLanguage, t } from '../i18n/index.js';
 import {
   normalizeClientModelDisplayMode,
@@ -67,6 +67,7 @@ function getMountModeOptions() {
   return [
     { value: 'dual', label: t('settings.str.mountDual') },
     { value: 'composer', label: t('settings.str.mountComposer') },
+    { value: 'floating', label: t('settings.str.mountFloating') },
     { value: 'sidebar', label: t('settings.str.mountSidebar') },
   ];
 }
@@ -442,7 +443,10 @@ export const SettingsView = defineComponent({
       h('div', { className: 'form-row' }, [
         versionRowLabelEl,
         h('div', { className: 'settings-compact-actions' }, [
-          versionTagEl,
+          h('span', { className: 'settings-version-badge' }, [
+            createBrandIcon({ size: 14, className: 'settings-version-logo' }),
+            versionTagEl,
+          ]),
           syncPricingBtn,
           updatePluginBtn,
         ]),

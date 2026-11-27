@@ -13,6 +13,7 @@ import {
   readLocalSummaryIndex,
 } from '../backend/cli-sqlite-reader.mjs';
 import { writeTrajectoryCacheFile } from '../backend/trajectory-cache-file.mjs';
+import { normalizeWindowMountMode } from '../shared/settings-normalization.mjs';
 
 const raw={trajectory:{steps:[{status:'CORTEX_STEP_STATUS_DONE',metadata:{
   createdAt:'2026-01-01T00:00:00Z',finishedGeneratingAt:'2026-01-01T00:00:10Z',
@@ -928,6 +929,19 @@ test('modelBreakdown exposes avgTtftSec, cacheHitPct, and subagent scoped breakd
   assert.equal(aggMb.length, 2);
 });
 
+test('floating mount mode and its alias survive persisted settings and legacy overlay toggles', () => {
+  assert.equal(normalizeWindowMountMode('floating'), 'floating');
+  assert.equal(normalizeWindowMountMode(' FLOAT '), 'floating');
+  const h = backendHarness({ settings: { windowMountMode: 'float' } });
+  assert.equal(h.loadSettings().windowMountMode, 'floating');
+  assert.equal(h.loadSettings().enableWindowOverlay, true);
+  assert.equal(h.executeSettingsAction({ enableWindowOverlay: true }).updated.windowMountMode, 'floating');
+  assert.equal(h.executeSettingsAction({ enableWindowOverlay: false }).updated.windowMountMode, 'sidebar');
+  assert.equal(h.executeSettingsAction({ enableWindowOverlay: true }).updated.windowMountMode, 'dual');
+  assert.equal(h.executeSettingsAction({ windowMountMode: 'float' }).updated.windowMountMode, 'floating');
+  assert.equal(h.loadSettings().windowMountMode, 'floating');
+});
+
 test('saving preferences sends the same legacy values normalized by the backend', async (t) => {
   const { saveSettingsPatch, stopAsyncTelemetryLoop, telemetryStore } =
     await import('../src/store/telemetryStore.js');
@@ -979,6 +993,12 @@ test('saving preferences sends the same legacy values normalized by the backend'
   assert.deepEqual(patches[1], {
     topbarCapsuleSlots: ['context'],
   });
+
+  await saveSettingsPatch({ windowMountMode: 'float' });
+  await saveSettingsPatch({ enableWindowOverlay: true });
+  assert.deepEqual(patches.at(-1), { enableWindowOverlay: true });
+  assert.equal(savedSettings.windowMountMode, 'floating');
+  assert.equal(telemetryStore.getState().telemetry.settings.windowMountMode, 'floating');
 
   const telemetryBeforeFailure = telemetryStore.getState().telemetry;
   failSave = true;

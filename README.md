@@ -26,7 +26,7 @@ Switchable Liquid Glass & Classic UI · 2×2 four-metric live trends · Pure Dec
 
 <br />
 
-[Latest Release (`v1.1.1`)](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [Download `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
+[Latest Release (`v1.2.0`)](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [Download `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
 
 </div>
 
@@ -102,7 +102,7 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
 - **Multi-Dimensional Rankings**: Compare usage, estimated USD cost, cache hit %, speed, and TTFT across models, project workspaces, and sessions, with `.xlsx` and Markdown export support.
 
 ### 4. Streamlined Single-Page Preferences
-- Configure language (`Auto` / `简体中文` / `English`), **UI Style (`Liquid Glass` / `Default`)**, accent theme, font scale (`sm / md / lg / xl`), model name formatting, mount mode (`Dual` / `Composer` / `Sidebar`), pricing catalog sync, update checks, and local cache rebuild on a single clean page.
+- Configure language (`Auto` / `简体中文` / `English`), **UI Style (`Default` / `Liquid Glass`)**, accent theme, font scale (`sm / md / lg / xl`), model name formatting, mount mode (`Dual` / `Composer` / `Floating` / `Sidebar`), pricing catalog sync, update checks, and local cache rebuild on a single clean page.
 
 ---
 

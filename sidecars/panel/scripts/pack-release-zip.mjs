@@ -20,6 +20,7 @@ export const RELEASE_ARCHIVE_ROOT = 'agy-monitor';
 
 const ROOT_WHITELIST = Object.freeze([
   'plugin.json',
+  'assets/logo.svg',
   'mcp_config.json',
   'pricing-catalog.json',
   'LICENSE',

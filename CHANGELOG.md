@@ -2,6 +2,29 @@
 
 All notable changes to **AGY Monitor** are documented in this file.
 
+## [1.2.0] - 2026-11
+
+### English
+- **Floating Window Mount Mode (`floating`: In-Page Floating Window + Sidebar)**:
+  - Added a 4th panel mount mode (**Floating Window**) in Preferences alongside Dual, Composer, and Sidebar Only, allowing the full 3-tab monitor panel (including live recent-step cache & speed diagnostics) to stay pinned inside the page without repeated manual toggling.
+  - Built an interactive floating window controller (`floatingPanelController.js`) with smooth titlebar dragging, zero-layout-shift edge/corner resizing (right, bottom, bottom-right), position & size lock/unlock, one-click reset to default geometry, and viewport-aware clamping with automatic sidebar clearance.
+  - Added a collapsible **Floating Badge** mode (`.wm-floating-pill`): minimize the window into a compact draggable in-page pill showing live status dot, generation speed (`tok/s`), and context percentage, and click to expand back in place.
+  - Persists floating window bounds, lock state, and minimized state across reloads (`agy-monitor.floating-panel.v1`), supports hot-switching between all 4 mount modes without restart, and adapts cleanly to both **Default** and **Liquid Glass** themes.
+- **Vector Brand Logo & 5-Surface Identity Integration**:
+  - Created a transparent-background vector brand logo ([`assets/logo.svg`](assets/logo.svg)) faithfully matching the original AGY Monitor icon geometry and gradient spectrum, sharp in both light and dark modes with zero PNG bloat in the runtime archive.
+  - Registered `"logo": "assets/logo.svg"` in `plugin.json` and the release whitelist (`pack-release-zip.mjs`) so Antigravity's Plugins sidebar and manager display the custom icon automatically.
+  - Integrated the vector logo (`createBrandIcon` with per-instance unique SVG gradient/mask IDs) across the floating window header bar, minimized floating badge, Standalone Web browser tab favicon (`index.html`), and Preferences version badge.
+
+### 简体中文
+- **新增「悬浮窗挂载」模式（`floating`：页内悬浮 + 侧边栏）**：
+  - 在偏好设置挂载方式中新增第 4 项 **悬浮窗挂载 (页内悬浮 + 侧边栏)**，可将完整监控面板（含近期请求实时缓存、速度与调用明细）常驻钉在页面内，运行中无需反复手动点开查看。
+  - 新增悬浮窗交互控制器（`floatingPanelController.js`）：支持顶栏拖拽移动、右侧/底部/右下角无占位缩放热区（切换锁定/解锁时内容零位移、左右留白对称）、一键锁定/解锁位置与尺寸、一键还原初始位置与尺寸，以及视口边界防溢出与侧边栏自动避让。
+  - 支持 **一键收起为浮标**（`.wm-floating-pill`）：收起后化为可拖拽的页内迷你浮标，持续显示运行状态点、实时速度（`tok/s`）与上下文占比，点击即可原位展开；支持位置、尺寸、锁定与收起状态持久化，以及 4 种挂载模式热切换，完美适配 **默认** 与 **液态玻璃** 双主题。
+- **透明矢量品牌图标（`assets/logo.svg`）与 5 处全界面接入**：
+  - 按原版图标几何比例与色阶 1:1 矢量化制作透明背景 [`assets/logo.svg`](assets/logo.svg)，浅/深色主题下边缘锐利无白底，同时遵守运行时零 PNG 打包规范。
+  - 在 `plugin.json` 注册 `"logo": "assets/logo.svg"` 并加入发布白名单，自动替换 Antigravity 侧边栏插件菜单与插件管理页的默认拼图图标。
+  - 封装支持独立渐变/遮罩 ID 的 `createBrandIcon()`，同步接入悬浮窗顶栏标题前、最小化悬浮浮标、独立 Web 面板浏览器标签页 Favicon（`index.html`）以及偏好设置版本号前。
+
 ## [1.1.1] - 2026-11
 
 ### English

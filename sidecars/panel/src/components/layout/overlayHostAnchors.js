@@ -795,6 +795,11 @@ export function resolveActiveDockTarget(options = undefined) {
       options?.patchedNode || null
     );
   }
+  if (mountMode === 'floating') {
+    return {
+      kind: 'floating', workbench: null, titlebar: null, targetContainer: null, actionToolbar: null,
+    };
+  }
   if (mountMode === 'composer') {
     const composerTarget = findHostComposerAutoTarget(
       options?.capsuleNode || null,

@@ -33,7 +33,7 @@ import {
 } from '../../core/domPatch.js';
 import { deliverCdpBridgeResponses, getWindowBridgeConfig } from '../../core/httpClient.js';
 import { i18nStore, setI18nLanguage, t } from '../../i18n/index.js';
-import { createSvgIcon, patchSvgIcon } from '../../icons/SvgIcon.js';
+import { createBrandIcon, createSvgIcon, patchSvgIcon } from '../../icons/SvgIcon.js';
 import {
   buildCapsuleSlotContext,
   createCapsuleSlotNode,
@@ -78,6 +78,7 @@ import {
   isImmediatelyBeforeNode,
   resolveActiveDockTarget,
 } from './overlayHostAnchors.js';
+import { createFloatingPanelController } from './floatingPanelController.js';
 
 export { computeCapsuleLayoutMode };
 
@@ -87,6 +88,7 @@ const POPOVER_MAX_AUTO_WIDTH = 960;
 const MULTI_PANEL_WIDTH = 464;
 const LEGACY_TOPBAR_SLOTS_SIG = 'tps,ttft,context';
 const REALTIME_TOPBAR_SLOTS = Object.freeze(['tps', 'ttft', 'cache_hit', 'context']);
+const FLOATING_SUMMARY_SLOTS = Object.freeze(['tps', 'context']);
 
 function resolveEffectiveTopbarSlots(rawSlots) {
   const normalized = normalizeClientTopbarSlots(rawSlots);
@@ -99,6 +101,14 @@ function resolveEffectiveHoverModules(rawModules) {
   return normalizeClientHoverModules(rawModules);
 }
 
+function resolveOverlayMountMode(settings, fallback) {
+  if (settings?.enableWindowOverlay === false) return 'sidebar';
+  return normalizeClientWindowMountMode(
+    settings?.windowMountMode ?? fallback,
+    settings?.enableWindowOverlay
+  );
+}
+
 
 export function mountWindowOverlay() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return null;
@@ -109,6 +119,7 @@ export function mountWindowOverlay() {
   let carryOverPopoverOpen = false;
   let carryOverMultiHoverOpen = false;
   let carryOverMultiPinnedOpen = false;
+  let carryOverMountMode = null;
   let carryOverPointer = null;
   try {
     const prevOv = window[WINDOW_OVERLAY_KEY];
@@ -117,6 +128,7 @@ export function mountWindowOverlay() {
     carryOverPopoverOpen = Boolean(prevOv?.isOpen?.());
     carryOverMultiHoverOpen = Boolean(prevOv?.isMultiHoverOpen?.());
     carryOverMultiPinnedOpen = Boolean(prevOv?.isMultiPinnedOpen?.());
+    carryOverMountMode = prevOv?.[WINDOW_OVERLAY_METHODS.getMountMode]?.();
     carryOverPointer = prevOv?.getLastPointer?.() || null;
     prevOv?.[WINDOW_OVERLAY_METHODS.dispose]?.();
   } catch {
@@ -514,6 +526,8 @@ export function mountWindowOverlay() {
   attachShadowStyles(portalShadow, stylesCss, { slimCapsule: false });
 
   const initialSettings = telemetryStore.getState().telemetry?.settings;
+  let lastAppliedMountMode = resolveOverlayMountMode(initialSettings, bridgeConfig?.mountMode);
+  let floating = null;
 
   // 悬停全景概览浮层（完全解耦至 widgetRegistry，由 hoverModules 动态驱动 0..4 个独立组件，零硬编码）
   const hoverUpdateVerText = h('span', { text: t('capsule.hoverNewVerGeneric') });
@@ -644,6 +658,153 @@ export function mountWindowOverlay() {
     return appInstance;
   }
 
+  function getFloatingScale() {
+    const settings = telemetryStore.getState().telemetry?.settings;
+    return PANEL_SCALE_FACTORS[normalizeClientFontScale(settings?.fontScale)] ?? 1;
+  }
+
+  function clearPopoverGeometry() {
+    for (const prop of ['top', 'left', 'width', 'height', 'maxHeight']) popoverEl.style[prop] = '';
+    popoverEl.style.removeProperty?.('--wm-popover-w');
+    patchClasses(popoverEl, { 'is-above': false, 'is-instant': false });
+  }
+
+  function syncFloatingMode(active) {
+    if (active === Boolean(floating)) return;
+    if (!active) {
+      floating.controller.dispose();
+      for (const node of floating.nodes) node.remove();
+      floating = null;
+      patchClasses(popoverEl, { 'is-floating': false, 'is-locked': false });
+      clearPopoverGeometry();
+      setPopoverOpen(false);
+      return;
+    }
+
+    const preserveOpenPanel = popoverOpen;
+    setPopoverOpen(false);
+    setTooltipOpen(false);
+    setMultiOpen(false);
+    clearPopoverGeometry();
+    patchClasses(popoverEl, { 'is-floating': true });
+
+    const summaries = [];
+    function createSummary() {
+      const dot = h('span', { className: 'wm-multi-dot', 'aria-hidden': 'true' });
+      const slots = FLOATING_SUMMARY_SLOTS.map((metric, index) => createCapsuleSlotNode(index, metric));
+      const el = h('span', { className: 'wm-floating-summary' }, [dot, ...slots.map((slot) => slot.el)]);
+      summaries.push({ el, slots });
+      return el;
+    }
+
+    const title = h('span', { className: 'wm-floating-title', text: t('floating.title') });
+    const lockIcon = createSvgIcon('unlock');
+    const lock = h('button', {
+      type: 'button',
+      className: 'wm-floating-action',
+      onClick: () => floating?.controller.toggleLocked(),
+    }, [lockIcon]);
+    const reset = h('button', {
+      type: 'button',
+      className: 'wm-floating-action',
+      onClick: () => floating?.controller.reset(),
+    }, [createSvgIcon('refresh')]);
+    const brand = h('span', { className: 'wm-floating-brand' }, [
+      createBrandIcon({ size: 16, className: 'wm-floating-logo' }),
+      title,
+    ]);
+    const pill = h('button', {
+      type: 'button',
+      className: 'wm-floating-pill',
+      hidden: true,
+    }, [
+      createBrandIcon({ size: 15, className: 'wm-floating-pill-logo' }),
+      createSummary(),
+      createSvgIcon('chevron-up', { size: 12 }),
+    ]);
+    const collapse = h('button', {
+      type: 'button',
+      className: 'wm-floating-action',
+      onClick: () => {
+        floating?.controller.setCollapsed(true);
+        pill.focus?.({ preventScroll: true });
+      },
+    }, [createSvgIcon('minus')]);
+    const bar = h('div', { className: 'wm-floating-bar' }, [
+      brand, createSummary(), h('div', { className: 'wm-floating-actions' }, [lock, reset, collapse]),
+    ]);
+    const handles = ['right', 'bottom', 'bottom-right'].map((edge) => [
+      h('div', { className: 'wm-floating-resize', 'data-edge': edge, 'aria-hidden': 'true' }),
+      edge,
+    ]);
+    popoverEl.insertBefore(bar, popoverEl.firstChild);
+    for (const [node] of handles) popoverEl.appendChild(node);
+    portalShadow.appendChild(pill);
+
+    const controller = createFloatingPanelController({
+      bar,
+      pill,
+      handles,
+      getViewport: () => ({ width: window.innerWidth || 1280, height: window.innerHeight || 800 }),
+      getSidebarRight: getLeftSidebarRightEdge,
+      getScale: getFloatingScale,
+      onLayout({ x, y, width, height, collapsed, locked }, refreshContent) {
+        const target = collapsed ? pill : popoverEl;
+        target.style.left = `${x}px`;
+        target.style.top = `${y}px`;
+        target.style.width = `${width}px`;
+        target.style.height = `${height}px`;
+        const restoreFocus = !collapsed && portalShadow.activeElement === pill;
+        popoverOpen = !collapsed;
+        if (popoverOpen) ensureAppMounted();
+        patchAttr(popoverEl, 'hidden', collapsed);
+        patchAttr(pill, 'hidden', !collapsed);
+        patchClasses(popoverEl, { 'is-locked': locked });
+        patchClasses(pill, { 'is-locked': locked });
+        updateFloatingLock(locked);
+        uiStore.setState({ monitorVisible: popoverOpen && !document.hidden }, { sync: true });
+        if (refreshContent) refreshActiveViewScrollbars();
+        if (restoreFocus) collapse.focus?.({ preventScroll: true });
+      },
+    });
+    floating = {
+      controller, title, summaries, lock, lockIcon, reset, collapse, pill, scale: getFloatingScale(),
+      nodes: [bar, pill, ...handles.map(([node]) => node)],
+    };
+    renderFloatingSummary({ hasTelemetry: false });
+    if (preserveOpenPanel) {
+      controller.setCollapsed(false);
+    }
+    controller.reflow();
+  }
+
+  function setFloatingButtonLabel(button, label) {
+    patchAttr(button, 'aria-label', label);
+    patchAttr(button, 'title', label);
+  }
+
+  function updateFloatingLock(locked) {
+    setFloatingButtonLabel(floating.lock, locked ? t('floating.unlock') : t('floating.lock'));
+    patchAttr(floating.lock, 'aria-pressed', String(locked));
+    patchSvgIcon(floating.lockIcon, locked ? 'lock' : 'unlock');
+  }
+
+  function renderFloatingSummary(slotCtx, hasWaiting = false) {
+    if (!floating) return;
+    patchText(floating.title, t('floating.title'));
+    updateFloatingLock(popoverEl.classList.contains('is-locked'));
+    setFloatingButtonLabel(floating.reset, t('floating.reset'));
+    setFloatingButtonLabel(floating.collapse, t('floating.collapse'));
+    setFloatingButtonLabel(floating.pill, t('floating.expand'));
+    for (const { el, slots } of floating.summaries) {
+      patchClasses(el, {
+        'is-running': slotCtx.isRunning && !hasWaiting,
+        'is-waiting': hasWaiting,
+      });
+      syncCapsuleSlotNodes(slots, [], FLOATING_SUMMARY_SLOTS, slotCtx);
+    }
+  }
+
   function syncPortalAppearance(settings) {
     applyAppearanceToRoot(capsuleHost, settings, { includeFontScale: false });
     applyAppearanceToRoot(portalHost, settings, { includeFontScale: true });
@@ -671,6 +832,11 @@ export function mountWindowOverlay() {
       } else if (el.hasAttribute?.('data-modern-ui')) {
         el.removeAttribute?.('data-modern-ui');
       }
+    }
+    const nextScale = getFloatingScale();
+    if (floating && floating.scale !== nextScale) {
+      floating.scale = nextScale;
+      floating.controller.reflow(true);
     }
   }
 
@@ -869,7 +1035,9 @@ export function mountWindowOverlay() {
   }
 
   function resolveRuntimeDockTarget() {
+    if (lastAppliedMountMode === 'sidebar') return null;
     return resolveActiveDockTarget({
+      mountMode: lastAppliedMountMode,
       capsuleNode: capsuleHost,
       portalNode: portalHost,
       patchedNode: patchedActionToolbar,
@@ -879,6 +1047,9 @@ export function mountWindowOverlay() {
   function isDockPlacementSynced(dock) {
     const curDockAttr = capsuleHost.getAttribute('data-dock');
     if (!capsuleHost.isConnected || !portalHost.isConnected) return false;
+    if (lastAppliedMountMode === 'sidebar' || dock?.kind === 'floating') {
+      return curDockAttr === lastAppliedMountMode && capsuleHost.style.display === 'none';
+    }
     if (!dock) {
       if (isIdeExtensionChatFrame()) {
         return curDockAttr === 'pending-composer' && capsuleHost.style.display === 'none';
@@ -1083,7 +1254,7 @@ export function mountWindowOverlay() {
   }
 
   function positionFloatingElements() {
-    if (disposed || !capsuleBtn.getBoundingClientRect) return;
+    if (disposed || floating || !capsuleBtn.getBoundingClientRect) return;
     try {
       const bRect = capsuleBtn.getBoundingClientRect();
       if (bRect.width === 0 && bRect.height === 0) return;
@@ -1279,7 +1450,7 @@ export function mountWindowOverlay() {
   }
 
   function updateResponsiveLayout(dockOverride = undefined) {
-    if (disposed) return;
+    if (disposed || lastAppliedMountMode === 'floating' || lastAppliedMountMode === 'sidebar') return;
     const dockTarget = dockOverride === undefined ? resolveRuntimeDockTarget() : dockOverride;
     const avail = measureAvailableTitlebarWidth(dockTarget);
     const curTel = telemetryStore.getState().telemetry;
@@ -1319,7 +1490,25 @@ export function mountWindowOverlay() {
     ensureWorkbenchThemeObserved();
 
     const dockTarget = resolveRuntimeDockTarget();
-    if (dockTarget) {
+    syncFloatingMode(dockTarget?.kind === 'floating');
+    if (lastAppliedMountMode === 'sidebar' || dockTarget?.kind === 'floating') {
+      restorePatchedActionToolbar();
+      if (lastAppliedMountMode === 'sidebar') setPopoverOpen(false);
+      setTooltipOpen(false);
+      setMultiOpen(false);
+      if (observedTitlebar) {
+        observedTitlebar = null;
+        resizeObserver?.disconnect();
+        if (document.body) resizeObserver?.observe(document.body);
+      }
+      if (bodyOrDoc && capsuleHost.parentNode !== bodyOrDoc) bodyOrDoc.appendChild(capsuleHost);
+      capsuleHost.style.display = 'none';
+      patchAttr(capsuleHost, 'data-dock', lastAppliedMountMode);
+      patchAttr(capsuleHost, 'data-composer-push', null);
+      if (dockTarget?.kind === 'floating') {
+        floating?.controller.reflow();
+      }
+    } else if (dockTarget) {
       if (capsuleHost.style.display === 'none') {
         capsuleHost.style.display = '';
       }
@@ -1462,7 +1651,7 @@ export function mountWindowOverlay() {
   }
 
   function setMultiOpen(nextOpen, { pinned = false, instant = false } = {}) {
-    const targetOpen = Boolean(nextOpen);
+    const targetOpen = Boolean(nextOpen && !floating && lastAppliedMountMode !== 'sidebar');
     if (targetOpen && multiLeaveTimer) {
       clearTimeout(multiLeaveTimer);
       multiLeaveTimer = null;
@@ -1508,7 +1697,8 @@ export function mountWindowOverlay() {
 
   function setTooltipOpen(nextOpen, { instant = false } = {}) {
     const targetOpen = Boolean(
-      nextOpen && !popoverOpen && !(multiOpen && multiPinned) && canOpenHoverTooltip()
+      nextOpen && !floating && lastAppliedMountMode !== 'sidebar' &&
+      !popoverOpen && !(multiOpen && multiPinned) && canOpenHoverTooltip()
     );
     if (targetOpen && hoverLeaveTimer) {
       clearTimeout(hoverLeaveTimer);
@@ -1534,7 +1724,12 @@ export function mountWindowOverlay() {
   }
 
   function setPopoverOpen(nextOpen, { instant = false } = {}) {
-    const targetOpen = Boolean(nextOpen);
+    if (floating) {
+      floating.controller.setCollapsed(!nextOpen);
+      return;
+    }
+    const targetOpen = Boolean(nextOpen && lastAppliedMountMode !== 'sidebar' &&
+      lastAppliedMountMode !== 'floating');
     if (targetOpen) {
       setTooltipOpen(false);
       if (multiOpen) {
@@ -1635,6 +1830,10 @@ export function mountWindowOverlay() {
     }
 
     if (!telemetry) {
+      if (floating) {
+        renderFloatingSummary({ hasTelemetry: false });
+        return;
+      }
       patchClasses(multiBtn, { 'is-running': false, 'is-waiting': false });
       patchCapsuleOdometerText(multiLabel, t('capsule.multiZero'), { resetKey: 'multi' });
       patchText(multiRunningMetaEl, t('multi.loading'));
@@ -1675,6 +1874,16 @@ export function mountWindowOverlay() {
       latestTokPerSec: overviewActive.latestTokPerSec ?? null,
       contextUsedPct: slotCtx.usedPct,
     });
+
+    if (floating) {
+      const convId = capsuleScopedConv?.cascadeId || telemetry.activeConversation?.cascadeId;
+      const runningItem = convId ? rawRunningList.find((item) => item?.cascadeId === convId) : null;
+      const displayedWaiting =
+        capsuleScopedConv?.mainActivity?.phase === 'waiting' ||
+        runningItem?.mainActivity?.phase === 'waiting';
+      renderFloatingSummary(slotCtx, Boolean(slotCtx.isRunning && displayedWaiting));
+      return;
+    }
 
     patchClasses(multiBtn, {
       'is-running': runningCount > 0 && !hasWaiting,
@@ -1743,11 +1952,6 @@ export function mountWindowOverlay() {
     }
   }
 
-  let lastAppliedMountMode = normalizeClientWindowMountMode(
-    telemetryStore.getState().telemetry?.settings?.windowMountMode,
-    telemetryStore.getState().telemetry?.settings?.enableWindowOverlay
-  );
-
   const unsubStore = telemetryStore.subscribe(
     (st) => ({
       syncState: st.syncState,
@@ -1756,18 +1960,11 @@ export function mountWindowOverlay() {
       selectedConversationId: st.selectedConversationId,
     }),
     (slice) => {
-      const nextMountMode = normalizeClientWindowMountMode(
-        slice.telemetry?.settings?.windowMountMode,
-        slice.telemetry?.settings?.enableWindowOverlay
-      );
-      if (slice.telemetry?.settings?.enableWindowOverlay === false || nextMountMode === 'sidebar') {
-        if (popoverOpen) setPopoverOpen(false);
-        if (multiOpen) setMultiOpen(false);
-      } else if (nextMountMode !== lastAppliedMountMode) {
+      const nextMountMode = resolveOverlayMountMode(slice.telemetry?.settings, lastAppliedMountMode);
+      if (nextMountMode !== lastAppliedMountMode) {
         lastAppliedMountMode = nextMountMode;
         ensureCapsuleDocked();
       }
-      lastAppliedMountMode = nextMountMode;
       renderCapsuleTelemetry();
       if (popoverOpen) {
         positionFloatingElements();
@@ -1848,6 +2045,7 @@ export function mountWindowOverlay() {
   }
 
   const onDocMouseDown = (e) => {
+    if (floating) return;
     if (popoverOpen && !isEventInside(e, popoverEl) && !isEventInside(e, capsuleHost)) {
       setPopoverOpen(false);
     }
@@ -1857,6 +2055,7 @@ export function mountWindowOverlay() {
   };
 
   const onDocKeyDown = (e) => {
+    if (floating) return;
     if (e.key === 'Escape' && !e.defaultPrevented) {
       if (popoverOpen) {
         setPopoverOpen(false);
@@ -1877,7 +2076,10 @@ export function mountWindowOverlay() {
       setMultiOpen(false);
     }
   };
-  const onWindowResize = () => updateResponsiveLayout();
+  const onWindowResize = () => {
+    if (floating) floating.controller.reflow();
+    else updateResponsiveLayout();
+  };
   const onPopState = () => syncHostRouteIfChanged();
   const onDocFocusIn = () => syncHostRouteIfChanged();
   const onVisibilityChange = () => {
@@ -1913,6 +2115,8 @@ export function mountWindowOverlay() {
     const dock = resolveRuntimeDockTarget();
     if (!isDockPlacementSynced(dock)) {
       scheduleDockSync();
+    } else if (floating) {
+      floating.controller.reflow();
     }
   }
   function scheduleHostDomMutationCheck() {
@@ -1938,7 +2142,10 @@ export function mountWindowOverlay() {
   }
   try {
     if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => updateResponsiveLayout());
+      resizeObserver = new ResizeObserver(() => {
+        if (floating) floating.controller.reflow();
+        else updateResponsiveLayout();
+      });
       if (document.body) resizeObserver.observe(document.body);
     }
     if (typeof MutationObserver !== 'undefined') {
@@ -2005,6 +2212,8 @@ export function mountWindowOverlay() {
     const dock = resolveRuntimeDockTarget();
     if (!isDockPlacementSynced(dock)) {
       ensureCapsuleDocked();
+    } else if (floating) {
+      floating.controller.reflow();
     }
   }, 1200);
 
@@ -2012,14 +2221,16 @@ export function mountWindowOverlay() {
   renderCapsuleTelemetry();
   const allowMultiCarryOver =
     telemetryStore.getState().telemetry?.settings?.showTopbarMultiSession !== false;
-  if (carryOverPopoverOpen) {
-    setPopoverOpen(true, { instant: true });
-  } else if (carryOverMultiPinnedOpen && allowMultiCarryOver) {
-    setMultiOpen(true, { pinned: true, instant: true });
-  } else if (carryOverMultiHoverOpen && allowMultiCarryOver) {
-    setMultiOpen(true, { pinned: false, instant: true });
-  } else if (carryOverTooltipOpen) {
-    setTooltipOpen(true, { instant: true });
+  if (lastAppliedMountMode !== 'floating' && carryOverMountMode !== 'floating') {
+    if (carryOverPopoverOpen) {
+      setPopoverOpen(true, { instant: true });
+    } else if (carryOverMultiPinnedOpen && allowMultiCarryOver) {
+      setMultiOpen(true, { pinned: true, instant: true });
+    } else if (carryOverMultiHoverOpen && allowMultiCarryOver) {
+      setMultiOpen(true, { pinned: false, instant: true });
+    } else if (carryOverTooltipOpen) {
+      setTooltipOpen(true, { instant: true });
+    }
   }
   const stopPolling = startAsyncTelemetryLoop(2000);
 
@@ -2137,7 +2348,9 @@ export function mountWindowOverlay() {
         });
       }
       lastAppliedMountMode = normalized;
-      return ensureCapsuleDocked();
+      const alive = ensureCapsuleDocked();
+      renderCapsuleTelemetry();
+      return alive;
     },
     [WINDOW_OVERLAY_METHODS.dispose]() {
       if (disposed) return;
@@ -2169,6 +2382,8 @@ export function mountWindowOverlay() {
       unsubStore();
       unsubUiScope();
       unsubI18n();
+      syncFloatingMode(false);
+      uiStore.setState({ monitorVisible: false }, { sync: true });
       try {
         resizeObserver?.disconnect();
       } catch {}

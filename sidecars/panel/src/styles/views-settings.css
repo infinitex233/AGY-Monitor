@@ -135,6 +135,17 @@
   gap: 8px;
 }
 
+.settings-version-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.settings-version-logo {
+  flex: 0 0 auto;
+  display: block;
+}
+
 /* --- 主题色色卡选择器 (ThemeColorPicker) --- */
 .theme-color-picker {
   display: flex;

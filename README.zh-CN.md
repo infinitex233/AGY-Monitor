@@ -26,7 +26,7 @@
 
 <br />
 
-[下载最新版本 (`v1.1.1`)](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [直接下载 `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
+[下载最新版本 (`v1.2.0`)](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [直接下载 `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
 
 </div>
 
@@ -102,7 +102,7 @@
 - **多维排行与报表导出**：对比不同模型、项目工作区与历史会话的 Token、费用、缓存命中率、平均速度与首字表现，同样支持导出 `.xlsx` 与 Markdown。
 
 ### 4. 「偏好设置」：单页轻量控制
-- **界面与显示**：一键切换语言（跟随宿主 / 简体中文 / English）、**界面风格（液态玻璃 / 默认）**、主题强调色、字号缩放（`sm / md / lg / xl`）、模型名称展示格式与挂载方式（双栖挂载 / 输入框挂载 / 仅侧边栏）。
+- **界面与显示**：一键切换语言（跟随宿主 / 简体中文 / English）、**界面风格（默认 / 液态玻璃）**、主题强调色、字号缩放（`sm / md / lg / xl`）、模型名称展示格式与挂载方式（双栖挂载 / 输入框挂载 / 悬浮窗挂载 / 仅侧边栏）。
 - **维护与同步**：支持从 GitHub 检查插件更新、同步 [`pricing-catalog.json`](pricing-catalog.json) 公开定价目录，或按需重建本地轨迹缓存、恢复默认配置。
 
 ---

@@ -17,6 +17,7 @@ test('pack-release-zip ships only runtime-essential files, excludes dev bloat, a
   // Required runtime files exist in whitelist
   for (const mustHave of [
     'plugin.json',
+    'assets/logo.svg',
     'mcp_config.json',
     'pricing-catalog.json',
     'LICENSE',
@@ -94,11 +95,12 @@ test('pack-release-zip ships only runtime-essential files, excludes dev bloat, a
 
   const pluginRoot = join(extractDir, 'agy-monitor');
   assert.ok(existsSync(join(pluginRoot, 'plugin.json')));
+  assert.ok(existsSync(join(pluginRoot, 'assets', 'logo.svg')));
   const manifest = JSON.parse(readFileSync(join(pluginRoot, 'plugin.json'), 'utf8'));
   assert.equal(manifest.name, 'agy-monitor');
   assert.equal(manifest.displayName, 'AGY Monitor');
-  assert.equal(manifest.version, '1.1.1');
-  assert.equal(manifest.logo, undefined);
+  assert.equal(manifest.logo, 'assets/logo.svg');
+  assert.equal(manifest.version, '1.2.0');
 
   assert.equal(relFiles.includes('sidecars/panel/backend/quota-pools.mjs'), false);
 

@@ -1582,25 +1582,37 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
     assert.equal(mockSettings.modelDisplayMode, 'short');
     assert.equal(mockSettings.showUpstreamModel, false);
 
-    // Toggle windowMountSelect: dual -> composer -> sidebar -> dual
+    // Exercise each mount mode through the settings control in the compiled bundle.
     assert.ok(mountSelectEl.querySelector('.select-label').textContent.includes('顶部栏 + 侧边栏'));
     mountSelectEl.querySelector('.select-trigger').dispatchEvent({ type: 'click', stopPropagation() {} });
-    mountSelectEl.querySelectorAll('.select-option')[1].dispatchEvent({ type: 'click', stopPropagation() {} });
+    assert.deepEqual(
+      mountSelectEl.querySelectorAll('.select-option').map((option) => option.getAttribute('data-value')),
+      ['dual', 'composer', 'floating', 'sidebar']
+    );
+    mountSelectEl.querySelector('[data-value="composer"]').dispatchEvent({ type: 'click', stopPropagation() {} });
     await new Promise((r) => setTimeout(r, 30));
     assert.equal(mockSettings.windowMountMode, 'composer', 'windowMountMode persisted as composer');
     assert.equal(mockSettings.enableWindowOverlay, true);
     assert.ok(mountSelectEl.querySelector('.select-label').textContent.includes('输入框挂载'));
     mountSelectEl.querySelector('.select-trigger').dispatchEvent({ type: 'click', stopPropagation() {} });
-    mountSelectEl.querySelectorAll('.select-option')[2].dispatchEvent({ type: 'click', stopPropagation() {} });
+    mountSelectEl.querySelector('[data-value="floating"]').dispatchEvent({ type: 'click', stopPropagation() {} });
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(mockSettings.windowMountMode, 'floating');
+    assert.equal(mockSettings.enableWindowOverlay, true);
+    assert.ok(mountSelectEl.querySelector('.select-label').textContent.includes('悬浮窗挂载'));
+    assert.equal(popoverEl.classList.contains('is-floating'), true);
+    assert.equal(ov.isOpen(), true);
+    mountSelectEl.querySelector('.select-trigger').dispatchEvent({ type: 'click', stopPropagation() {} });
+    mountSelectEl.querySelector('[data-value="sidebar"]').dispatchEvent({ type: 'click', stopPropagation() {} });
     await new Promise((r) => setTimeout(r, 30));
     assert.equal(mockSettings.windowMountMode, 'sidebar', 'windowMountMode persisted as sidebar');
     assert.equal(mockSettings.enableWindowOverlay, false);
-    ov.open();
     mountSelectEl.querySelector('.select-trigger').dispatchEvent({ type: 'click', stopPropagation() {} });
-    mountSelectEl.querySelectorAll('.select-option')[0].dispatchEvent({ type: 'click', stopPropagation() {} });
+    mountSelectEl.querySelector('[data-value="dual"]').dispatchEvent({ type: 'click', stopPropagation() {} });
     await new Promise((r) => setTimeout(r, 30));
     assert.equal(mockSettings.windowMountMode, 'dual', 'windowMountMode persisted back to dual');
     assert.equal(mockSettings.enableWindowOverlay, true);
+    ov.open();
 
     // Topbar/hover update prompt still renders in default manual mode
     const topbarUpdateBtn = capsuleHost.shadowRoot.querySelector('.wm-update-btn');
@@ -3205,6 +3217,11 @@ test('Antigravity IDE composer mount mode (输入框挂载) docks inside extensi
     assert.equal(capsuleHost.style.display, 'none');
     assert.notEqual(capsuleHost.parentNode, paneHeader);
 
+    ov.applyMountMode('floating');
+    assert.equal(ov.getDockKind(), 'pending-composer');
+    assert.equal(capsuleHost.style.display, 'none');
+    assert.equal(mockDoc.getElementById('ag-usage-monitor-portal').shadowRoot.querySelector('.wm-floating-pill'), null);
+
     // Switching back to 'composer' restores capsule inside composer immediately
     ov.applyMountMode('composer');
     assert.equal(ov.getDockKind(), 'composer');
@@ -3320,7 +3337,7 @@ test('Antigravity IDE composer mount mode (输入框挂载) docks inside extensi
         if (br.isIdeChatFrame) {
           return mode === 'composer' && window.innerWidth > 80 ? 'composer' : 'pending-composer';
         }
-        return 'ide-titlebar';
+        return mode === 'floating' ? 'floating' : 'ide-titlebar';
       };
       window.__AGUsageMonitorOverlay = {
         bundleVersion: br.bundleVersion,
@@ -3390,11 +3407,19 @@ test('Antigravity IDE composer mount mode (输入框挂载) docks inside extensi
     await bridgeCtrl.syncAllWindows();
     assert.equal(Boolean(wbCtx.window.__AGUsageMonitorOverlay), false);
 
+    activeMountMode = 'floating';
+    await bridgeCtrl.notifySettingChanged(true);
+    assert.equal(Boolean(chatFrameCtx.window.__AGUsageMonitorOverlay), false, 'Floating disposes the IDE chat overlay');
+    const floatingWorkbench = wbCtx.window.__AGUsageMonitorOverlay;
+    assert.equal(floatingWorkbench.getDockKind(), 'floating');
+
     // Phase D: Switch back to 'dual' mode -> CHAT-1 disposed, WB-1 mounted
     activeMountMode = 'dual';
     await bridgeCtrl.notifySettingChanged(true);
     assert.equal(Boolean(chatFrameCtx.window.__AGUsageMonitorOverlay), false, 'CHAT-1 disposed on switch back to dual');
     assert.equal(Boolean(wbCtx.window.__AGUsageMonitorOverlay), true, 'WB-1 mounted on switch back to dual');
+    assert.equal(wbCtx.window.__AGUsageMonitorOverlay, floatingWorkbench, 'The bridge applies mount changes in place');
+    assert.equal(floatingWorkbench.getMountMode(), 'dual');
 
     // Phase E: Switch to 'sidebar' -> both disposed
     activeMountMode = 'sidebar';

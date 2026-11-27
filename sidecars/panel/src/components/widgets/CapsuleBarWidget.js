@@ -486,7 +486,7 @@ export function syncCapsuleSlotNodes(capsuleSlots, capsuleSeps, slotKeys, slotCt
 
 /**
  * Standalone Capsule Bar Preview Widget mounting the real `.wm-multi-btn` and `.wm-capsule-btn`
- * inside a contextual host bar (`dual` titlebar, `composer` toolbar, or `sidebar` disabled state).
+ * inside a contextual host bar, with a mode-specific note for sidebar and floating modes.
  */
 export const CapsuleBarWidget = defineComponent({
   name: 'CapsuleBarWidget',
@@ -593,7 +593,9 @@ export const CapsuleBarWidget = defineComponent({
 
       const isComposer = mountMode === 'composer';
       const isSidebar = mountMode === 'sidebar';
+      const isFloating = mountMode === 'floating';
       patchAttr(hostBarEl, 'data-mount-mode', mountMode);
+      patchAttr(hostBarEl, 'hidden', isFloating);
       patchClasses(hostBarEl, {
         'is-composer': isComposer,
         'is-sidebar-only': isSidebar,
@@ -602,8 +604,10 @@ export const CapsuleBarWidget = defineComponent({
       patchAttr(titlebarLeftMock, 'hidden', isComposer);
       patchAttr(composerLeftMock, 'hidden', !isComposer);
       patchAttr(composerSendMock, 'hidden', !isComposer);
-      patchAttr(sidebarHintEl, 'hidden', !isSidebar);
-      patchText(sidebarHintEl, t('settings.str.previewMountSidebarHint'));
+      patchAttr(sidebarHintEl, 'hidden', !isSidebar && !isFloating);
+      patchText(sidebarHintEl, isFloating
+        ? t('settings.str.previewMountFloatingHint')
+        : t('settings.str.previewMountSidebarHint'));
 
       patchAttr(multiBtn, 'hidden', !showMulti);
 

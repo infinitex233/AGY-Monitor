@@ -1803,6 +1803,8 @@ export async function saveSettingsPatch(patch) {
     safePatch.standalonePort =
       Number.isInteger(numPort) && numPort >= 1024 && numPort <= 65535 ? numPort : 0;
   }
+  const prevTelemetry = telemetryStore.getState().telemetry;
+  let requestPatch = safePatch;
   if (Object.prototype.hasOwnProperty.call(safePatch, 'windowMountMode')) {
     const normMount = normalizeClientWindowMountMode(
       safePatch.windowMountMode,
@@ -1812,10 +1814,13 @@ export async function saveSettingsPatch(patch) {
     safePatch.enableWindowOverlay = normMount !== 'sidebar';
   } else if (Object.prototype.hasOwnProperty.call(safePatch, 'enableWindowOverlay')) {
     safePatch.enableWindowOverlay = Boolean(safePatch.enableWindowOverlay);
-    safePatch.windowMountMode = safePatch.enableWindowOverlay ? 'dual' : 'sidebar';
+    requestPatch = { ...safePatch };
+    const currentMode = normalizeClientWindowMountMode(prevTelemetry?.settings?.windowMountMode);
+    safePatch.windowMountMode = safePatch.enableWindowOverlay
+      ? (currentMode === 'sidebar' ? 'dual' : currentMode)
+      : 'sidebar';
   }
   const myRev = ++settingsRevision;
-  const prevTelemetry = telemetryStore.getState().telemetry;
   const patchKeys = Object.keys(safePatch);
   const prevKeyValues = new Map();
   for (const key of patchKeys) {
@@ -1833,7 +1838,7 @@ export async function saveSettingsPatch(patch) {
   let res = null;
   try {
     res = await enqueueSettingsWrite(() =>
-      callSidecarApi('/api/settings', { method: 'POST', body: safePatch })
+      callSidecarApi('/api/settings', { method: 'POST', body: requestPatch })
     );
   } catch (err) {
     const rollbackKeys = [];

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="6 6 88 88" width="128" height="128" fill="none">
+  <defs>
+    <mask id="agy-m">
+      <path d="M16.3 59.9H24.2Q27.2 59.9 28.6 57.2L42.8 29Q44.5 25.6 46.2 29.1L65.9 70.5" stroke="#fff" stroke-width="9.6" stroke-linecap="round" stroke-linejoin="round" />
+    </mask>
+    <linearGradient id="agy-arch" x1="28" y1="49" x2="59" y2="41" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3484fe" />
+      <stop offset="18%" stop-color="#32b2b6" />
+      <stop offset="36%" stop-color="#6cc367" />
+      <stop offset="48%" stop-color="#f2a236" />
+      <stop offset="56%" stop-color="#fb6e44" />
+      <stop offset="72%" stop-color="#b46fb2" />
+      <stop offset="88%" stop-color="#5d7ef1" />
+      <stop offset="100%" stop-color="#3584fd" />
+    </linearGradient>
+    <linearGradient id="agy-base" x1="0" y1="43" x2="0" y2="62" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3484fe" stop-opacity="0" />
+      <stop offset="100%" stop-color="#3484fe" stop-opacity="1" />
+    </linearGradient>
+    <linearGradient id="agy-tail" x1="65.9" y1="70.5" x2="77" y2="53.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3a8dfd" />
+      <stop offset="35%" stop-color="#48a4fd" />
+      <stop offset="72%" stop-color="#56b4fe" />
+      <stop offset="100%" stop-color="#5dbbfd" />
+    </linearGradient>
+  </defs>
+  <g mask="url(#agy-m)">
+    <rect x="6" y="6" width="88" height="88" fill="url(#agy-arch)" />
+    <rect x="6" y="6" width="88" height="88" fill="url(#agy-base)" />
+  </g>
+  <path d="M65.9 70.5L73.2 56.8Q74.7 54.1 77.8 54.1H83.4" stroke="url(#agy-tail)" stroke-width="9.6" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

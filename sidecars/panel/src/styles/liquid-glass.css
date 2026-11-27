@@ -1130,6 +1130,38 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   background: transparent !important;
 }
 
+:host([data-ui-theme="liquid-glass"]) .wm-popover-panel.is-floating {
+  animation: none;
+}
+
+:host([data-ui-theme="liquid-glass"]) .wm-floating-bar {
+  border-color: var(--lg-divider);
+}
+
+:host([data-ui-theme="liquid-glass"]) .wm-floating-pill {
+  background-color: var(--lg-wash-overlay);
+  background-image: var(--lg-overlay-sheen);
+  backdrop-filter: blur(9px) saturate(185%);
+  -webkit-backdrop-filter: blur(9px) saturate(185%);
+  border-color: var(--lg-rim-edge);
+  box-shadow: var(--lg-shadow-overlay);
+}
+
+:host([data-ui-theme="liquid-glass"][data-color-scheme="dark"]) .wm-floating-pill {
+  backdrop-filter: blur(11px) saturate(180%);
+  -webkit-backdrop-filter: blur(11px) saturate(180%);
+}
+
+:host([data-ui-theme="liquid-glass"]) .wm-floating-pill:hover {
+  border-color: var(--lg-accent);
+}
+
+:host([data-ui-theme="liquid-glass"]) .wm-floating-resize[data-edge="bottom-right"]::after {
+  right: 8px;
+  bottom: 8px;
+  border-color: var(--lg-ink-2);
+}
+
 [data-ui-theme="liquid-glass"].wm-multi-panel,
 :host([data-ui-theme="liquid-glass"]) .wm-multi-panel {
   border-radius: 22px;

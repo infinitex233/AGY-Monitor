@@ -642,6 +642,7 @@ export function buildBundle(panelDir = PANEL_DIR) {
     'src/views/SettingsView.js',
     'src/App.js',
     'src/components/layout/overlayHostAnchors.js',
+    'src/components/layout/floatingPanelController.js',
     'src/components/layout/WindowOverlayShell.js',
     'src/main.js',
   ];

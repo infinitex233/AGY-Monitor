@@ -6768,6 +6768,17 @@ html[data-standalone="true"] .app-shell {
   gap: 8px;
 }
 
+.settings-version-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.settings-version-logo {
+  flex: 0 0 auto;
+  display: block;
+}
+
 /* --- 主题色色卡选择器 (ThemeColorPicker) --- */
 .theme-color-picker {
   display: flex;
@@ -8884,6 +8895,197 @@ html[data-standalone="true"] .app-shell {
   flex: 0 1 auto;
 }
 
+.wm-popover-panel.is-floating {
+  --wm-floating-resize-edge: 5px;
+  max-height: none;
+  animation: none;
+}
+
+.wm-popover-panel.is-floating .app-shell {
+  flex: 1;
+  width: auto;
+  height: auto;
+  min-height: 0;
+}
+
+.wm-popover-panel.is-floating .viewport-stage,
+.wm-popover-panel.is-floating .view-pane {
+  flex: 1;
+  min-height: 0;
+}
+
+.wm-popover-panel.is-floating .viewport-stage {
+  container-type: size;
+}
+
+.wm-popover-panel.is-floating .steps-embedded-panel > .table-scroll-host:not(.is-models-scroll) {
+  max-height: clamp(200px, 76cqh, 640px);
+}
+
+.wm-floating-bar,
+.wm-floating-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-primary);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.wm-floating-bar {
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: calc(34px * var(--ui-panel-scale, 1));
+  padding: 4px var(--space-3);
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+.wm-floating-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.wm-floating-logo,
+.wm-floating-pill-logo {
+  flex: 0 0 auto;
+  display: block;
+}
+
+.wm-floating-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wm-floating-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+}
+
+.wm-floating-summary.is-running .wm-multi-dot {
+  background: var(--accent-primary);
+  animation: wm-dot-pulse 1.5s ease-in-out infinite;
+}
+
+.wm-floating-summary.is-waiting .wm-multi-dot {
+  background: var(--metric-warn);
+  animation: wm-dot-pulse 1.5s ease-in-out infinite;
+}
+
+.wm-floating-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.wm-floating-action {
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.wm-floating-action:hover,
+.wm-floating-action[aria-pressed="true"] {
+  border-color: var(--border-hairline);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.wm-floating-pill {
+  position: fixed;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-bg);
+  box-shadow: var(--shadow-overlay);
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.wm-floating-pill:hover {
+  border-color: var(--accent-primary);
+}
+
+.wm-floating-pill:active,
+.wm-floating-bar:active {
+  cursor: grabbing;
+}
+
+.wm-popover-panel.is-locked .wm-floating-bar {
+  cursor: default;
+}
+
+.wm-floating-pill.is-locked {
+  cursor: pointer;
+}
+
+.wm-floating-action:focus-visible,
+.wm-floating-pill:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+.wm-floating-resize {
+  position: absolute;
+  z-index: 2;
+  touch-action: none;
+}
+
+.wm-floating-resize[data-edge="right"] {
+  inset: 0 0 20px auto;
+  width: var(--wm-floating-resize-edge);
+  cursor: ew-resize;
+}
+
+.wm-floating-resize[data-edge="bottom"] {
+  inset: auto 20px 0 0;
+  height: var(--wm-floating-resize-edge);
+  cursor: ns-resize;
+}
+
+.wm-floating-resize[data-edge="bottom-right"] {
+  right: 0;
+  bottom: 0;
+  width: 20px;
+  height: 20px;
+  cursor: nwse-resize;
+}
+
+.wm-floating-resize[data-edge="bottom-right"]::after {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--border-hairline);
+  border-bottom: 2px solid var(--border-hairline);
+  border-bottom-right-radius: var(--radius-sm);
+  content: '';
+}
+
+.wm-popover-panel.is-locked .wm-floating-resize {
+  display: none;
+}
+
 /* 顶栏胶囊悬停全景概览浮层（复用实时概览三卡片架构，全槽位预占，仅就地更新节点不跳动） */
 .wm-hover-tip {
   position: fixed;
@@ -10354,6 +10556,17 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   animation: anim-modern-pop-in 200ms var(--ease-modern);
 }
 
+[data-modern-ui="true"].wm-popover-panel.is-floating,
+:host([data-modern-ui="true"]) .wm-popover-panel.is-floating {
+  animation: none;
+}
+
+[data-modern-ui="true"].wm-popover-panel.is-floating .wm-floating-resize[data-edge="bottom-right"]::after,
+:host([data-modern-ui="true"]) .wm-popover-panel.is-floating .wm-floating-resize[data-edge="bottom-right"]::after {
+  right: 8px;
+  bottom: 8px;
+}
+
 [data-modern-ui="true"].wm-multi-panel,
 :host([data-modern-ui="true"]) .wm-multi-panel {
   border-radius: 22px;
@@ -11661,6 +11874,38 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
 [data-ui-theme="liquid-glass"].wm-popover-panel .app-shell,
 :host([data-ui-theme="liquid-glass"]) .wm-popover-panel .app-shell {
   background: transparent !important;
+}
+
+:host([data-ui-theme="liquid-glass"]) .wm-popover-panel.is-floating {
+  animation: none;
+}
+
+:host([data-ui-theme="liquid-glass"]) .wm-floating-bar {
+  border-color: var(--lg-divider);
+}
+
+:host([data-ui-theme="liquid-glass"]) .wm-floating-pill {
+  background-color: var(--lg-wash-overlay);
+  background-image: var(--lg-overlay-sheen);
+  backdrop-filter: blur(9px) saturate(185%);
+  -webkit-backdrop-filter: blur(9px) saturate(185%);
+  border-color: var(--lg-rim-edge);
+  box-shadow: var(--lg-shadow-overlay);
+}
+
+:host([data-ui-theme="liquid-glass"][data-color-scheme="dark"]) .wm-floating-pill {
+  backdrop-filter: blur(11px) saturate(180%);
+  -webkit-backdrop-filter: blur(11px) saturate(180%);
+}
+
+:host([data-ui-theme="liquid-glass"]) .wm-floating-pill:hover {
+  border-color: var(--lg-accent);
+}
+
+:host([data-ui-theme="liquid-glass"]) .wm-floating-resize[data-edge="bottom-right"]::after {
+  right: 8px;
+  bottom: 8px;
+  border-color: var(--lg-ink-2);
 }
 
 [data-ui-theme="liquid-glass"].wm-multi-panel,

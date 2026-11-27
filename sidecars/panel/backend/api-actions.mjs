@@ -324,16 +324,15 @@ export function executeSettingsAction(data) {
           ? 'auto'
           : 'manual'
         : normalizePluginUpdateMode(current.pluginUpdateMode, current.autoUpdatePlugin);
+  const prevMountMode = normalizeWindowMountMode(current.windowMountMode, current.enableWindowOverlay);
   const nextWindowMountMode =
     payload.windowMountMode !== undefined
       ? normalizeWindowMountMode(payload.windowMountMode)
       : typeof payload.enableWindowOverlay === 'boolean'
         ? payload.enableWindowOverlay
-          ? current.windowMountMode === 'composer'
-            ? 'composer'
-            : 'dual'
+          ? prevMountMode === 'sidebar' ? 'dual' : prevMountMode
           : 'sidebar'
-        : normalizeWindowMountMode(current.windowMountMode, current.enableWindowOverlay);
+        : prevMountMode;
   const nextModelDisplayMode =
     payload.modelDisplayMode !== undefined
       ? normalizeModelDisplayMode(payload.modelDisplayMode)
@@ -366,10 +365,6 @@ export function executeSettingsAction(data) {
       body: JSON.stringify({ ok: false, error: 'Failed to persist settings' }),
     };
   }
-  const prevMountMode = normalizeWindowMountMode(
-    current.windowMountMode,
-    current.enableWindowOverlay
-  );
   const contextWindowScopeChanged =
     (updated.contextWindowMainEnabled !== false) !== (current.contextWindowMainEnabled !== false) ||
     (updated.contextWindowSwarmEnabled === true) !== (current.contextWindowSwarmEnabled === true);

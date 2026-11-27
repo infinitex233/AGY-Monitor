@@ -314,15 +314,16 @@ function normalizePluginUpdateMode(mode, legacyAutoUpdate) {
 }
 
 /**
- * 归一化面板挂载方式枚举（`'dual'` | `'composer'` | `'sidebar'`），兼容历史 `enableWindowOverlay`。
+ * 归一化面板挂载方式枚举，兼容历史 `enableWindowOverlay`。
  *
  * @param {unknown} mode
  * @param {unknown} [legacyEnableOverlay]
- * @returns {'dual'|'composer'|'sidebar'}
+ * @returns {'dual'|'composer'|'floating'|'sidebar'}
  */
 function normalizeWindowMountMode(mode, legacyEnableOverlay) {
   const m = String(mode ?? '').trim().toLowerCase();
   if (m === 'composer' || m === 'input') return 'composer';
+  if (m === 'floating' || m === 'float') return 'floating';
   if (m === 'sidebar' || m === 'sidebar_only' || m === 'off') return 'sidebar';
   if (m === 'dual' || m === 'topbar') return 'dual';
   if (legacyEnableOverlay === false) return 'sidebar';
@@ -933,7 +934,7 @@ return { SVG_ICON_DEFS };
 })();
 
 // --- src/icons/SvgIcon.js ---
-const { SVG_NS, createSvgIcon, patchSvgIcon } = (() => {
+const { SVG_NS, createSvgIcon, patchSvgIcon, createBrandIcon } = (() => {
 /**
  * @fileoverview Dynamic SVG icon component and incremental icon patcher.
  */
@@ -979,7 +980,97 @@ function patchSvgIcon(svgEl, name) {
   }
   return true;
 }
-return { SVG_NS, createSvgIcon, patchSvgIcon };
+
+let brandGradientSeq = 0;
+
+function createSvgNode(tag, attrs, children = []) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    node.setAttribute(k, String(v));
+  }
+  for (const child of children) {
+    node.appendChild(child);
+  }
+  return node;
+}
+
+function createBrandIcon({ size = 16, className = '' } = {}) {
+  const id = ++brandGradientSeq;
+  const maskId = `agy-brand-m-${id}`;
+  const archId = `agy-brand-arch-${id}`;
+  const baseId = `agy-brand-base-${id}`;
+  const tailId = `agy-brand-tail-${id}`;
+  const strokeAttrs = {
+    'stroke-width': '9.6',
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round',
+  };
+  const defs = createSvgNode('defs', {}, [
+    createSvgNode('mask', { id: maskId }, [
+      createSvgNode('path', {
+        d: 'M16.3 59.9H24.2Q27.2 59.9 28.6 57.2L42.8 29Q44.5 25.6 46.2 29.1L65.9 70.5',
+        stroke: '#fff',
+        ...strokeAttrs,
+      }),
+    ]),
+    createSvgNode(
+      'linearGradient',
+      { id: archId, x1: '28', y1: '49', x2: '59', y2: '41', gradientUnits: 'userSpaceOnUse' },
+      [
+        createSvgNode('stop', { offset: '0%', 'stop-color': '#3484fe' }),
+        createSvgNode('stop', { offset: '18%', 'stop-color': '#32b2b6' }),
+        createSvgNode('stop', { offset: '36%', 'stop-color': '#6cc367' }),
+        createSvgNode('stop', { offset: '48%', 'stop-color': '#f2a236' }),
+        createSvgNode('stop', { offset: '56%', 'stop-color': '#fb6e44' }),
+        createSvgNode('stop', { offset: '72%', 'stop-color': '#b46fb2' }),
+        createSvgNode('stop', { offset: '88%', 'stop-color': '#5d7ef1' }),
+        createSvgNode('stop', { offset: '100%', 'stop-color': '#3584fd' }),
+      ]
+    ),
+    createSvgNode(
+      'linearGradient',
+      { id: baseId, x1: '0', y1: '43', x2: '0', y2: '62', gradientUnits: 'userSpaceOnUse' },
+      [
+        createSvgNode('stop', { offset: '0%', 'stop-color': '#3484fe', 'stop-opacity': '0' }),
+        createSvgNode('stop', { offset: '100%', 'stop-color': '#3484fe', 'stop-opacity': '1' }),
+      ]
+    ),
+    createSvgNode(
+      'linearGradient',
+      { id: tailId, x1: '65.9', y1: '70.5', x2: '77', y2: '53.5', gradientUnits: 'userSpaceOnUse' },
+      [
+        createSvgNode('stop', { offset: '0%', 'stop-color': '#3a8dfd' }),
+        createSvgNode('stop', { offset: '35%', 'stop-color': '#48a4fd' }),
+        createSvgNode('stop', { offset: '72%', 'stop-color': '#56b4fe' }),
+        createSvgNode('stop', { offset: '100%', 'stop-color': '#5dbbfd' }),
+      ]
+    ),
+  ]);
+  return createSvgNode(
+    'svg',
+    {
+      viewBox: '6 6 88 88',
+      width: size,
+      height: size,
+      fill: 'none',
+      'aria-hidden': 'true',
+      class: className ? `svg-icon agy-brand-icon ${className}` : 'svg-icon agy-brand-icon',
+    },
+    [
+      defs,
+      createSvgNode('g', { mask: `url(#${maskId})` }, [
+        createSvgNode('rect', { x: '6', y: '6', width: '88', height: '88', fill: `url(#${archId})` }),
+        createSvgNode('rect', { x: '6', y: '6', width: '88', height: '88', fill: `url(#${baseId})` }),
+      ]),
+      createSvgNode('path', {
+        d: 'M65.9 70.5L73.2 56.8Q74.7 54.1 77.8 54.1H83.4',
+        stroke: `url(#${tailId})`,
+        ...strokeAttrs,
+      }),
+    ]
+  );
+}
+return { SVG_NS, createSvgIcon, patchSvgIcon, createBrandIcon };
 })();
 
 // --- src/core/reactive.js ---
@@ -1190,6 +1281,12 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
 
   // Capsule & Multi-Session Overlay
   'capsule.ariaMonitor': '用量与速度监控',
+  'floating.title': 'AGY Monitor',
+  'floating.lock': '锁定位置与尺寸',
+  'floating.unlock': '解锁位置与尺寸',
+  'floating.reset': '还原初始位置与尺寸',
+  'floating.collapse': '收起为浮标',
+  'floating.expand': '展开监控悬浮窗',
   'capsule.ariaMulti': '多会话实时信息',
   'capsule.multiZero': '0 运行中',
   'capsule.multiRunning': '{count} 运行中',
@@ -1684,11 +1781,13 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'settings.str.tabOverview': '实时监控布局',
   'settings.str.tabSteps': '调用明细字段',
   'settings.str.previewMountSidebarHint': '当前为仅侧边栏模式，主窗口不挂载胶囊；切回顶部栏或输入框挂载后将按上方样式呈现',
+  'settings.str.previewMountFloatingHint': '监控面板显示为可移动的悬浮窗，收起为浮标后仍可查看实时指标。',
   'settings.str.mountSection': '挂载胶囊',
   'settings.str.mountBadge': '{count}/5 项',
   'settings.str.mountMode': '面板挂载方式',
   'settings.str.mountDual': '双栖挂载 (顶部栏 + 侧边栏)',
   'settings.str.mountComposer': '输入框挂载 (输入框 + 侧边栏)',
+  'settings.str.mountFloating': '悬浮窗挂载 (页内悬浮 + 侧边栏)',
   'settings.str.mountSidebar': '仅侧边栏',
   'settings.bridge.restartTitle': '已自动补齐启动参数，重启一次即可启用悬浮胶囊',
   'settings.bridge.ctxRestartTitle': '已自动补齐启动参数，重启一次即可激活上下文覆写',
@@ -2066,6 +2165,12 @@ const I18N_MESSAGES_EN_US = Object.freeze({
 
   // Capsule & Multi-Session Overlay
   'capsule.ariaMonitor': 'Usage & Speed Monitor',
+  'floating.title': 'AGY Monitor',
+  'floating.lock': 'Lock position and size',
+  'floating.unlock': 'Unlock position and size',
+  'floating.reset': 'Reset position and size',
+  'floating.collapse': 'Minimize to floating badge',
+  'floating.expand': 'Expand floating monitor',
   'capsule.ariaMulti': 'Active Sessions Overview',
   'capsule.multiZero': '0 active',
   'capsule.multiRunning': '{count} active',
@@ -2560,11 +2665,13 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'settings.str.tabOverview': 'Overview',
   'settings.str.tabSteps': 'Step Table',
   'settings.str.previewMountSidebarHint': 'Window capsule is disabled in Sidebar Only mode; switching back to Titlebar or Composer applies the capsule above',
+  'settings.str.previewMountFloatingHint': 'The monitor appears in a movable window. Minimize it to a floating badge to keep live metrics in view.',
   'settings.str.mountSection': 'Mount & Capsule Bar',
   'settings.str.mountBadge': '{count}/5 slots',
   'settings.str.mountMode': 'Panel Mount Mode',
   'settings.str.mountDual': 'Dual Mount (Titlebar + Sidebar)',
   'settings.str.mountComposer': 'Composer Mount (Input Box + Sidebar)',
+  'settings.str.mountFloating': 'Floating Window (In-Page + Sidebar)',
   'settings.str.mountSidebar': 'Sidebar Only',
   'settings.bridge.restartTitle': 'Launch Flag Auto-Configured — Restart Once to Activate',
   'settings.bridge.ctxRestartTitle': 'Launch Flag Auto-Configured — Restart Once for Context Override',
@@ -10462,6 +10569,8 @@ async function saveSettingsPatch(patch) {
     safePatch.standalonePort =
       Number.isInteger(numPort) && numPort >= 1024 && numPort <= 65535 ? numPort : 0;
   }
+  const prevTelemetry = telemetryStore.getState().telemetry;
+  let requestPatch = safePatch;
   if (Object.prototype.hasOwnProperty.call(safePatch, 'windowMountMode')) {
     const normMount = normalizeClientWindowMountMode(
       safePatch.windowMountMode,
@@ -10471,10 +10580,13 @@ async function saveSettingsPatch(patch) {
     safePatch.enableWindowOverlay = normMount !== 'sidebar';
   } else if (Object.prototype.hasOwnProperty.call(safePatch, 'enableWindowOverlay')) {
     safePatch.enableWindowOverlay = Boolean(safePatch.enableWindowOverlay);
-    safePatch.windowMountMode = safePatch.enableWindowOverlay ? 'dual' : 'sidebar';
+    requestPatch = { ...safePatch };
+    const currentMode = normalizeClientWindowMountMode(prevTelemetry?.settings?.windowMountMode);
+    safePatch.windowMountMode = safePatch.enableWindowOverlay
+      ? (currentMode === 'sidebar' ? 'dual' : currentMode)
+      : 'sidebar';
   }
   const myRev = ++settingsRevision;
-  const prevTelemetry = telemetryStore.getState().telemetry;
   const patchKeys = Object.keys(safePatch);
   const prevKeyValues = new Map();
   for (const key of patchKeys) {
@@ -10492,7 +10604,7 @@ async function saveSettingsPatch(patch) {
   let res = null;
   try {
     res = await enqueueSettingsWrite(() =>
-      callSidecarApi('/api/settings', { method: 'POST', body: safePatch })
+      callSidecarApi('/api/settings', { method: 'POST', body: requestPatch })
     );
   } catch (err) {
     const rollbackKeys = [];
@@ -20619,7 +20731,7 @@ function syncCapsuleSlotNodes(capsuleSlots, capsuleSeps, slotKeys, slotCtx) {
 
 /**
  * Standalone Capsule Bar Preview Widget mounting the real `.wm-multi-btn` and `.wm-capsule-btn`
- * inside a contextual host bar (`dual` titlebar, `composer` toolbar, or `sidebar` disabled state).
+ * inside a contextual host bar, with a mode-specific note for sidebar and floating modes.
  */
 const CapsuleBarWidget = defineComponent({
   name: 'CapsuleBarWidget',
@@ -20726,7 +20838,9 @@ const CapsuleBarWidget = defineComponent({
 
       const isComposer = mountMode === 'composer';
       const isSidebar = mountMode === 'sidebar';
+      const isFloating = mountMode === 'floating';
       patchAttr(hostBarEl, 'data-mount-mode', mountMode);
+      patchAttr(hostBarEl, 'hidden', isFloating);
       patchClasses(hostBarEl, {
         'is-composer': isComposer,
         'is-sidebar-only': isSidebar,
@@ -20735,8 +20849,10 @@ const CapsuleBarWidget = defineComponent({
       patchAttr(titlebarLeftMock, 'hidden', isComposer);
       patchAttr(composerLeftMock, 'hidden', !isComposer);
       patchAttr(composerSendMock, 'hidden', !isComposer);
-      patchAttr(sidebarHintEl, 'hidden', !isSidebar);
-      patchText(sidebarHintEl, t('settings.str.previewMountSidebarHint'));
+      patchAttr(sidebarHintEl, 'hidden', !isSidebar && !isFloating);
+      patchText(sidebarHintEl, isFloating
+        ? t('settings.str.previewMountFloatingHint')
+        : t('settings.str.previewMountSidebarHint'));
 
       patchAttr(multiBtn, 'hidden', !showMulti);
 
@@ -25699,6 +25815,7 @@ function getMountModeOptions() {
   return [
     { value: 'dual', label: t('settings.str.mountDual') },
     { value: 'composer', label: t('settings.str.mountComposer') },
+    { value: 'floating', label: t('settings.str.mountFloating') },
     { value: 'sidebar', label: t('settings.str.mountSidebar') },
   ];
 }
@@ -26074,7 +26191,10 @@ const SettingsView = defineComponent({
       h('div', { className: 'form-row' }, [
         versionRowLabelEl,
         h('div', { className: 'settings-compact-actions' }, [
-          versionTagEl,
+          h('span', { className: 'settings-version-badge' }, [
+            createBrandIcon({ size: 14, className: 'settings-version-logo' }),
+            versionTagEl,
+          ]),
           syncPricingBtn,
           updatePluginBtn,
         ]),
@@ -27413,6 +27533,11 @@ function resolveActiveDockTarget(options = undefined) {
       options?.patchedNode || null
     );
   }
+  if (mountMode === 'floating') {
+    return {
+      kind: 'floating', workbench: null, titlebar: null, targetContainer: null, actionToolbar: null,
+    };
+  }
   if (mountMode === 'composer') {
     const composerTarget = findHostComposerAutoTarget(
       options?.capsuleNode || null,
@@ -27538,6 +27663,251 @@ function attachShadowStyles(shadowRoot, fullCss, { slimCapsule = false } = {}) {
 return { CAPSULE_HOST_ID, PORTAL_HOST_ID, computeCapsuleLayoutMode, isImmediatelyBeforeNode, isIdeExtensionChatFrame, resolveActiveDockTarget, findNativeTopRightAnchor, getLeftSidebarRightEdge, attachShadowStyles };
 })();
 
+// --- src/components/layout/floatingPanelController.js ---
+const { FLOATING_PANEL_STORAGE_KEY, createFloatingPanelController } = (() => {
+const FLOATING_PANEL_STORAGE_KEY = 'agy-monitor.floating-panel.v1';
+
+const FLOATING_PANEL_WIDTH = 580;
+const FLOATING_PANEL_HEIGHT = 560;
+const FLOATING_PANEL_MIN_WIDTH = 400;
+const FLOATING_PANEL_MIN_HEIGHT = 340;
+const FLOATING_PANEL_THRESHOLD = 4;
+
+function clampFloatingValue(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getFloatingBounds({ width, height }) {
+  const left = Math.min(12, Math.floor((width - 1) / 2));
+  const top = Math.min(12, Math.floor((height - 1) / 2));
+  return { left, top, right: width - left, bottom: height - top };
+}
+
+function fitFloatingRect(rect, bounds) {
+  const width = Math.min(rect.width, bounds.right - bounds.left);
+  const height = Math.min(rect.height, bounds.bottom - bounds.top);
+  return {
+    x: clampFloatingValue(rect.x, bounds.left, bounds.right - width),
+    y: clampFloatingValue(rect.y, bounds.top, bounds.bottom - height),
+    width,
+    height,
+  };
+}
+
+function getDefaultFloatingRect(bounds, scale, sidebarRight) {
+  const right = Math.max(bounds.left + 1, bounds.right - 8);
+  const sidebarClearance = sidebarRight + 12;
+  const left = sidebarClearance < right ? Math.max(bounds.left, sidebarClearance) : bounds.left;
+  const top = clampFloatingValue(
+    52, bounds.top, Math.max(bounds.top, bounds.bottom - FLOATING_PANEL_MIN_HEIGHT)
+  );
+  const fitScale = Math.min(
+    scale, (right - left) / FLOATING_PANEL_WIDTH, (bounds.bottom - top) / FLOATING_PANEL_HEIGHT
+  );
+  const width = Math.max(1, Math.floor(FLOATING_PANEL_WIDTH * fitScale));
+  const height = Math.max(1, Math.floor(FLOATING_PANEL_HEIGHT * fitScale));
+  return { x: right - width, y: top, width, height };
+}
+
+function normalizeSavedRect(candidate) {
+  if (!candidate || typeof candidate !== 'object') return null;
+  const { x, y, width, height } = candidate;
+  if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return null;
+  return { x, y, width, height };
+}
+
+function loadFloatingPanelState(getStorage) {
+  try {
+    const state = JSON.parse(getStorage()?.getItem(FLOATING_PANEL_STORAGE_KEY) ?? 'null');
+    if (!state || typeof state !== 'object') return null;
+    const rect = state.rect === null ? null : normalizeSavedRect(state.rect);
+    if (state.rect !== null && !rect) return null;
+    return { rect, collapsed: state.collapsed === true, locked: state.locked === true };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tracks the preferred expanded rect independently of its current viewport fit.
+ * The badge shares its position, so dragging it moves the next expanded window.
+ */
+function createFloatingPanelController({
+  bar,
+  pill,
+  handles,
+  getViewport,
+  getSidebarRight = () => 0,
+  getScale = () => 1,
+  getStorage = () => window.localStorage,
+  onLayout,
+}) {
+  const saved = loadFloatingPanelState(getStorage);
+  let preferredRect = saved?.rect ?? null;
+  let collapsed = saved?.collapsed ?? false;
+  let locked = saved?.locked ?? false;
+  let lastLayout = null;
+  let gesture = null;
+  let suppressPillClick = false;
+
+  function getDefaultRect(viewport, bounds) {
+    return getDefaultFloatingRect(bounds, getScale(), getSidebarRight(viewport.width));
+  }
+
+  function persist(patch) {
+    try {
+      const base = loadFloatingPanelState(getStorage) ?? { rect: preferredRect, collapsed, locked };
+      getStorage()?.setItem(FLOATING_PANEL_STORAGE_KEY, JSON.stringify({ ...base, ...patch }));
+    } catch {
+      // Keep the window interactive when host storage is unavailable.
+    }
+  }
+
+  function reflow(forceRefresh = false) {
+    const viewport = getViewport();
+    const bounds = getFloatingBounds(viewport);
+    const rect = preferredRect ?? getDefaultRect(viewport, bounds);
+    const size = collapsed
+      ? { width: Math.round(216 * getScale()), height: Math.round(36 * getScale()) }
+      : rect;
+    const next = { ...fitFloatingRect({ ...rect, ...size }, bounds), collapsed, locked };
+    const previous = lastLayout;
+    if (!forceRefresh && previous && Object.keys(next).every((key) => previous[key] === next[key])) {
+      return;
+    }
+    lastLayout = next;
+    const refreshContent = !collapsed && (
+      forceRefresh || !previous || previous.collapsed ||
+      previous.width !== next.width || previous.height !== next.height
+    );
+    onLayout(next, refreshContent);
+  }
+
+  function updateGesture(event) {
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    const { start, rect, edges, initialRect } = gesture;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (!gesture.moved && Math.hypot(dx, dy) < FLOATING_PANEL_THRESHOLD) return;
+    gesture.moved = true;
+    if (gesture.target === pill) suppressPillClick = true;
+
+    const bounds = getFloatingBounds(getViewport());
+    if (edges) {
+      const availableWidth = Math.max(1, bounds.right - rect.x);
+      const availableHeight = Math.max(1, bounds.bottom - rect.y);
+      preferredRect = {
+        x: initialRect.x,
+        y: initialRect.y,
+        width: edges.includes('right')
+          ? clampFloatingValue(rect.width + dx, Math.min(FLOATING_PANEL_MIN_WIDTH, availableWidth), availableWidth)
+          : initialRect.width,
+        height: edges.includes('bottom')
+          ? clampFloatingValue(rect.height + dy, Math.min(FLOATING_PANEL_MIN_HEIGHT, availableHeight), availableHeight)
+          : initialRect.height,
+      };
+    } else {
+      const fitted = fitFloatingRect({ ...rect, x: rect.x + dx, y: rect.y + dy }, bounds);
+      preferredRect = { ...initialRect, x: fitted.x, y: fitted.y };
+    }
+    reflow();
+  }
+
+  function endGesture(commit) {
+    if (!gesture) return;
+    const { moved, target, pointerId, previousRect } = gesture;
+    gesture = null;
+    if (target.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId);
+    if (!moved) return;
+    if (commit) {
+      persist({ rect: preferredRect });
+    } else {
+      preferredRect = previousRect;
+      reflow();
+    }
+  }
+
+  function setCollapsed(next) {
+    if (collapsed === next) return;
+    endGesture(false);
+    collapsed = next;
+    persist({ collapsed });
+    reflow();
+  }
+
+  const unbind = [[bar], [pill], ...handles].map(([target, edges]) => {
+    const onDown = (event) => {
+      if (gesture || event.button !== 0 || event.isPrimary === false) return;
+      if (target === pill) suppressPillClick = false;
+      if (locked || (target === bar && event.target?.closest?.('button'))) return;
+      if (!lastLayout) reflow();
+      const viewport = getViewport();
+      const rect = preferredRect ?? getDefaultRect(viewport, getFloatingBounds(viewport));
+      target.setPointerCapture?.(event.pointerId);
+      gesture = {
+        target,
+        edges,
+        pointerId: event.pointerId,
+        start: { x: event.clientX, y: event.clientY },
+        rect: lastLayout,
+        initialRect: rect,
+        previousRect: preferredRect,
+        moved: false,
+      };
+    };
+    const onUp = (event) => {
+      if (!gesture || event.pointerId !== gesture.pointerId) return;
+      updateGesture(event);
+      endGesture(true);
+    };
+    const onCancel = (event) => {
+      if (event.pointerId === gesture?.pointerId) endGesture(false);
+    };
+    target.addEventListener('pointerdown', onDown);
+    target.addEventListener('pointermove', updateGesture);
+    target.addEventListener('pointerup', onUp);
+    target.addEventListener('pointercancel', onCancel);
+    target.addEventListener('lostpointercapture', onCancel);
+    return () => {
+      target.removeEventListener('pointerdown', onDown);
+      target.removeEventListener('pointermove', updateGesture);
+      target.removeEventListener('pointerup', onUp);
+      target.removeEventListener('pointercancel', onCancel);
+      target.removeEventListener('lostpointercapture', onCancel);
+    };
+  });
+
+  function onPillClick(event) {
+    if (event.detail > 0 && suppressPillClick) return;
+    setCollapsed(false);
+  }
+  pill.addEventListener('click', onPillClick);
+
+  return {
+    reflow,
+    setCollapsed,
+    toggleLocked() {
+      endGesture(false);
+      locked = !locked;
+      persist({ locked });
+      reflow();
+    },
+    reset() {
+      endGesture(false);
+      preferredRect = null;
+      persist({ rect: null });
+      reflow(true);
+    },
+    dispose() {
+      for (const remove of unbind) remove();
+      pill.removeEventListener('click', onPillClick);
+      endGesture(false);
+    },
+  };
+}
+return { FLOATING_PANEL_STORAGE_KEY, createFloatingPanelController };
+})();
+
 // --- src/components/layout/WindowOverlayShell.js ---
 const { mountWindowOverlay } = (() => {
 /**
@@ -27559,6 +27929,7 @@ const POPOVER_MAX_AUTO_WIDTH = 960;
 const MULTI_PANEL_WIDTH = 464;
 const LEGACY_TOPBAR_SLOTS_SIG = 'tps,ttft,context';
 const REALTIME_TOPBAR_SLOTS = Object.freeze(['tps', 'ttft', 'cache_hit', 'context']);
+const FLOATING_SUMMARY_SLOTS = Object.freeze(['tps', 'context']);
 
 function resolveEffectiveTopbarSlots(rawSlots) {
   const normalized = normalizeClientTopbarSlots(rawSlots);
@@ -27571,6 +27942,14 @@ function resolveEffectiveHoverModules(rawModules) {
   return normalizeClientHoverModules(rawModules);
 }
 
+function resolveOverlayMountMode(settings, fallback) {
+  if (settings?.enableWindowOverlay === false) return 'sidebar';
+  return normalizeClientWindowMountMode(
+    settings?.windowMountMode ?? fallback,
+    settings?.enableWindowOverlay
+  );
+}
+
 
 function mountWindowOverlay() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return null;
@@ -27581,6 +27960,7 @@ function mountWindowOverlay() {
   let carryOverPopoverOpen = false;
   let carryOverMultiHoverOpen = false;
   let carryOverMultiPinnedOpen = false;
+  let carryOverMountMode = null;
   let carryOverPointer = null;
   try {
     const prevOv = window[WINDOW_OVERLAY_KEY];
@@ -27589,6 +27969,7 @@ function mountWindowOverlay() {
     carryOverPopoverOpen = Boolean(prevOv?.isOpen?.());
     carryOverMultiHoverOpen = Boolean(prevOv?.isMultiHoverOpen?.());
     carryOverMultiPinnedOpen = Boolean(prevOv?.isMultiPinnedOpen?.());
+    carryOverMountMode = prevOv?.[WINDOW_OVERLAY_METHODS.getMountMode]?.();
     carryOverPointer = prevOv?.getLastPointer?.() || null;
     prevOv?.[WINDOW_OVERLAY_METHODS.dispose]?.();
   } catch {
@@ -27986,6 +28367,8 @@ function mountWindowOverlay() {
   attachShadowStyles(portalShadow, stylesCss, { slimCapsule: false });
 
   const initialSettings = telemetryStore.getState().telemetry?.settings;
+  let lastAppliedMountMode = resolveOverlayMountMode(initialSettings, bridgeConfig?.mountMode);
+  let floating = null;
 
   // 悬停全景概览浮层（完全解耦至 widgetRegistry，由 hoverModules 动态驱动 0..4 个独立组件，零硬编码）
   const hoverUpdateVerText = h('span', { text: t('capsule.hoverNewVerGeneric') });
@@ -28116,6 +28499,153 @@ function mountWindowOverlay() {
     return appInstance;
   }
 
+  function getFloatingScale() {
+    const settings = telemetryStore.getState().telemetry?.settings;
+    return PANEL_SCALE_FACTORS[normalizeClientFontScale(settings?.fontScale)] ?? 1;
+  }
+
+  function clearPopoverGeometry() {
+    for (const prop of ['top', 'left', 'width', 'height', 'maxHeight']) popoverEl.style[prop] = '';
+    popoverEl.style.removeProperty?.('--wm-popover-w');
+    patchClasses(popoverEl, { 'is-above': false, 'is-instant': false });
+  }
+
+  function syncFloatingMode(active) {
+    if (active === Boolean(floating)) return;
+    if (!active) {
+      floating.controller.dispose();
+      for (const node of floating.nodes) node.remove();
+      floating = null;
+      patchClasses(popoverEl, { 'is-floating': false, 'is-locked': false });
+      clearPopoverGeometry();
+      setPopoverOpen(false);
+      return;
+    }
+
+    const preserveOpenPanel = popoverOpen;
+    setPopoverOpen(false);
+    setTooltipOpen(false);
+    setMultiOpen(false);
+    clearPopoverGeometry();
+    patchClasses(popoverEl, { 'is-floating': true });
+
+    const summaries = [];
+    function createSummary() {
+      const dot = h('span', { className: 'wm-multi-dot', 'aria-hidden': 'true' });
+      const slots = FLOATING_SUMMARY_SLOTS.map((metric, index) => createCapsuleSlotNode(index, metric));
+      const el = h('span', { className: 'wm-floating-summary' }, [dot, ...slots.map((slot) => slot.el)]);
+      summaries.push({ el, slots });
+      return el;
+    }
+
+    const title = h('span', { className: 'wm-floating-title', text: t('floating.title') });
+    const lockIcon = createSvgIcon('unlock');
+    const lock = h('button', {
+      type: 'button',
+      className: 'wm-floating-action',
+      onClick: () => floating?.controller.toggleLocked(),
+    }, [lockIcon]);
+    const reset = h('button', {
+      type: 'button',
+      className: 'wm-floating-action',
+      onClick: () => floating?.controller.reset(),
+    }, [createSvgIcon('refresh')]);
+    const brand = h('span', { className: 'wm-floating-brand' }, [
+      createBrandIcon({ size: 16, className: 'wm-floating-logo' }),
+      title,
+    ]);
+    const pill = h('button', {
+      type: 'button',
+      className: 'wm-floating-pill',
+      hidden: true,
+    }, [
+      createBrandIcon({ size: 15, className: 'wm-floating-pill-logo' }),
+      createSummary(),
+      createSvgIcon('chevron-up', { size: 12 }),
+    ]);
+    const collapse = h('button', {
+      type: 'button',
+      className: 'wm-floating-action',
+      onClick: () => {
+        floating?.controller.setCollapsed(true);
+        pill.focus?.({ preventScroll: true });
+      },
+    }, [createSvgIcon('minus')]);
+    const bar = h('div', { className: 'wm-floating-bar' }, [
+      brand, createSummary(), h('div', { className: 'wm-floating-actions' }, [lock, reset, collapse]),
+    ]);
+    const handles = ['right', 'bottom', 'bottom-right'].map((edge) => [
+      h('div', { className: 'wm-floating-resize', 'data-edge': edge, 'aria-hidden': 'true' }),
+      edge,
+    ]);
+    popoverEl.insertBefore(bar, popoverEl.firstChild);
+    for (const [node] of handles) popoverEl.appendChild(node);
+    portalShadow.appendChild(pill);
+
+    const controller = createFloatingPanelController({
+      bar,
+      pill,
+      handles,
+      getViewport: () => ({ width: window.innerWidth || 1280, height: window.innerHeight || 800 }),
+      getSidebarRight: getLeftSidebarRightEdge,
+      getScale: getFloatingScale,
+      onLayout({ x, y, width, height, collapsed, locked }, refreshContent) {
+        const target = collapsed ? pill : popoverEl;
+        target.style.left = `${x}px`;
+        target.style.top = `${y}px`;
+        target.style.width = `${width}px`;
+        target.style.height = `${height}px`;
+        const restoreFocus = !collapsed && portalShadow.activeElement === pill;
+        popoverOpen = !collapsed;
+        if (popoverOpen) ensureAppMounted();
+        patchAttr(popoverEl, 'hidden', collapsed);
+        patchAttr(pill, 'hidden', !collapsed);
+        patchClasses(popoverEl, { 'is-locked': locked });
+        patchClasses(pill, { 'is-locked': locked });
+        updateFloatingLock(locked);
+        uiStore.setState({ monitorVisible: popoverOpen && !document.hidden }, { sync: true });
+        if (refreshContent) refreshActiveViewScrollbars();
+        if (restoreFocus) collapse.focus?.({ preventScroll: true });
+      },
+    });
+    floating = {
+      controller, title, summaries, lock, lockIcon, reset, collapse, pill, scale: getFloatingScale(),
+      nodes: [bar, pill, ...handles.map(([node]) => node)],
+    };
+    renderFloatingSummary({ hasTelemetry: false });
+    if (preserveOpenPanel) {
+      controller.setCollapsed(false);
+    }
+    controller.reflow();
+  }
+
+  function setFloatingButtonLabel(button, label) {
+    patchAttr(button, 'aria-label', label);
+    patchAttr(button, 'title', label);
+  }
+
+  function updateFloatingLock(locked) {
+    setFloatingButtonLabel(floating.lock, locked ? t('floating.unlock') : t('floating.lock'));
+    patchAttr(floating.lock, 'aria-pressed', String(locked));
+    patchSvgIcon(floating.lockIcon, locked ? 'lock' : 'unlock');
+  }
+
+  function renderFloatingSummary(slotCtx, hasWaiting = false) {
+    if (!floating) return;
+    patchText(floating.title, t('floating.title'));
+    updateFloatingLock(popoverEl.classList.contains('is-locked'));
+    setFloatingButtonLabel(floating.reset, t('floating.reset'));
+    setFloatingButtonLabel(floating.collapse, t('floating.collapse'));
+    setFloatingButtonLabel(floating.pill, t('floating.expand'));
+    for (const { el, slots } of floating.summaries) {
+      patchClasses(el, {
+        'is-running': slotCtx.isRunning && !hasWaiting,
+        'is-waiting': hasWaiting,
+      });
+      syncCapsuleSlotNodes(slots, [], FLOATING_SUMMARY_SLOTS, slotCtx);
+    }
+  }
+
   function syncPortalAppearance(settings) {
     applyAppearanceToRoot(capsuleHost, settings, { includeFontScale: false });
     applyAppearanceToRoot(portalHost, settings, { includeFontScale: true });
@@ -28143,6 +28673,11 @@ function mountWindowOverlay() {
       } else if (el.hasAttribute?.('data-modern-ui')) {
         el.removeAttribute?.('data-modern-ui');
       }
+    }
+    const nextScale = getFloatingScale();
+    if (floating && floating.scale !== nextScale) {
+      floating.scale = nextScale;
+      floating.controller.reflow(true);
     }
   }
 
@@ -28341,7 +28876,9 @@ function mountWindowOverlay() {
   }
 
   function resolveRuntimeDockTarget() {
+    if (lastAppliedMountMode === 'sidebar') return null;
     return resolveActiveDockTarget({
+      mountMode: lastAppliedMountMode,
       capsuleNode: capsuleHost,
       portalNode: portalHost,
       patchedNode: patchedActionToolbar,
@@ -28351,6 +28888,9 @@ function mountWindowOverlay() {
   function isDockPlacementSynced(dock) {
     const curDockAttr = capsuleHost.getAttribute('data-dock');
     if (!capsuleHost.isConnected || !portalHost.isConnected) return false;
+    if (lastAppliedMountMode === 'sidebar' || dock?.kind === 'floating') {
+      return curDockAttr === lastAppliedMountMode && capsuleHost.style.display === 'none';
+    }
     if (!dock) {
       if (isIdeExtensionChatFrame()) {
         return curDockAttr === 'pending-composer' && capsuleHost.style.display === 'none';
@@ -28555,7 +29095,7 @@ function mountWindowOverlay() {
   }
 
   function positionFloatingElements() {
-    if (disposed || !capsuleBtn.getBoundingClientRect) return;
+    if (disposed || floating || !capsuleBtn.getBoundingClientRect) return;
     try {
       const bRect = capsuleBtn.getBoundingClientRect();
       if (bRect.width === 0 && bRect.height === 0) return;
@@ -28751,7 +29291,7 @@ function mountWindowOverlay() {
   }
 
   function updateResponsiveLayout(dockOverride = undefined) {
-    if (disposed) return;
+    if (disposed || lastAppliedMountMode === 'floating' || lastAppliedMountMode === 'sidebar') return;
     const dockTarget = dockOverride === undefined ? resolveRuntimeDockTarget() : dockOverride;
     const avail = measureAvailableTitlebarWidth(dockTarget);
     const curTel = telemetryStore.getState().telemetry;
@@ -28791,7 +29331,25 @@ function mountWindowOverlay() {
     ensureWorkbenchThemeObserved();
 
     const dockTarget = resolveRuntimeDockTarget();
-    if (dockTarget) {
+    syncFloatingMode(dockTarget?.kind === 'floating');
+    if (lastAppliedMountMode === 'sidebar' || dockTarget?.kind === 'floating') {
+      restorePatchedActionToolbar();
+      if (lastAppliedMountMode === 'sidebar') setPopoverOpen(false);
+      setTooltipOpen(false);
+      setMultiOpen(false);
+      if (observedTitlebar) {
+        observedTitlebar = null;
+        resizeObserver?.disconnect();
+        if (document.body) resizeObserver?.observe(document.body);
+      }
+      if (bodyOrDoc && capsuleHost.parentNode !== bodyOrDoc) bodyOrDoc.appendChild(capsuleHost);
+      capsuleHost.style.display = 'none';
+      patchAttr(capsuleHost, 'data-dock', lastAppliedMountMode);
+      patchAttr(capsuleHost, 'data-composer-push', null);
+      if (dockTarget?.kind === 'floating') {
+        floating?.controller.reflow();
+      }
+    } else if (dockTarget) {
       if (capsuleHost.style.display === 'none') {
         capsuleHost.style.display = '';
       }
@@ -28934,7 +29492,7 @@ function mountWindowOverlay() {
   }
 
   function setMultiOpen(nextOpen, { pinned = false, instant = false } = {}) {
-    const targetOpen = Boolean(nextOpen);
+    const targetOpen = Boolean(nextOpen && !floating && lastAppliedMountMode !== 'sidebar');
     if (targetOpen && multiLeaveTimer) {
       clearTimeout(multiLeaveTimer);
       multiLeaveTimer = null;
@@ -28980,7 +29538,8 @@ function mountWindowOverlay() {
 
   function setTooltipOpen(nextOpen, { instant = false } = {}) {
     const targetOpen = Boolean(
-      nextOpen && !popoverOpen && !(multiOpen && multiPinned) && canOpenHoverTooltip()
+      nextOpen && !floating && lastAppliedMountMode !== 'sidebar' &&
+      !popoverOpen && !(multiOpen && multiPinned) && canOpenHoverTooltip()
     );
     if (targetOpen && hoverLeaveTimer) {
       clearTimeout(hoverLeaveTimer);
@@ -29006,7 +29565,12 @@ function mountWindowOverlay() {
   }
 
   function setPopoverOpen(nextOpen, { instant = false } = {}) {
-    const targetOpen = Boolean(nextOpen);
+    if (floating) {
+      floating.controller.setCollapsed(!nextOpen);
+      return;
+    }
+    const targetOpen = Boolean(nextOpen && lastAppliedMountMode !== 'sidebar' &&
+      lastAppliedMountMode !== 'floating');
     if (targetOpen) {
       setTooltipOpen(false);
       if (multiOpen) {
@@ -29107,6 +29671,10 @@ function mountWindowOverlay() {
     }
 
     if (!telemetry) {
+      if (floating) {
+        renderFloatingSummary({ hasTelemetry: false });
+        return;
+      }
       patchClasses(multiBtn, { 'is-running': false, 'is-waiting': false });
       patchCapsuleOdometerText(multiLabel, t('capsule.multiZero'), { resetKey: 'multi' });
       patchText(multiRunningMetaEl, t('multi.loading'));
@@ -29147,6 +29715,16 @@ function mountWindowOverlay() {
       latestTokPerSec: overviewActive.latestTokPerSec ?? null,
       contextUsedPct: slotCtx.usedPct,
     });
+
+    if (floating) {
+      const convId = capsuleScopedConv?.cascadeId || telemetry.activeConversation?.cascadeId;
+      const runningItem = convId ? rawRunningList.find((item) => item?.cascadeId === convId) : null;
+      const displayedWaiting =
+        capsuleScopedConv?.mainActivity?.phase === 'waiting' ||
+        runningItem?.mainActivity?.phase === 'waiting';
+      renderFloatingSummary(slotCtx, Boolean(slotCtx.isRunning && displayedWaiting));
+      return;
+    }
 
     patchClasses(multiBtn, {
       'is-running': runningCount > 0 && !hasWaiting,
@@ -29215,11 +29793,6 @@ function mountWindowOverlay() {
     }
   }
 
-  let lastAppliedMountMode = normalizeClientWindowMountMode(
-    telemetryStore.getState().telemetry?.settings?.windowMountMode,
-    telemetryStore.getState().telemetry?.settings?.enableWindowOverlay
-  );
-
   const unsubStore = telemetryStore.subscribe(
     (st) => ({
       syncState: st.syncState,
@@ -29228,18 +29801,11 @@ function mountWindowOverlay() {
       selectedConversationId: st.selectedConversationId,
     }),
     (slice) => {
-      const nextMountMode = normalizeClientWindowMountMode(
-        slice.telemetry?.settings?.windowMountMode,
-        slice.telemetry?.settings?.enableWindowOverlay
-      );
-      if (slice.telemetry?.settings?.enableWindowOverlay === false || nextMountMode === 'sidebar') {
-        if (popoverOpen) setPopoverOpen(false);
-        if (multiOpen) setMultiOpen(false);
-      } else if (nextMountMode !== lastAppliedMountMode) {
+      const nextMountMode = resolveOverlayMountMode(slice.telemetry?.settings, lastAppliedMountMode);
+      if (nextMountMode !== lastAppliedMountMode) {
         lastAppliedMountMode = nextMountMode;
         ensureCapsuleDocked();
       }
-      lastAppliedMountMode = nextMountMode;
       renderCapsuleTelemetry();
       if (popoverOpen) {
         positionFloatingElements();
@@ -29320,6 +29886,7 @@ function mountWindowOverlay() {
   }
 
   const onDocMouseDown = (e) => {
+    if (floating) return;
     if (popoverOpen && !isEventInside(e, popoverEl) && !isEventInside(e, capsuleHost)) {
       setPopoverOpen(false);
     }
@@ -29329,6 +29896,7 @@ function mountWindowOverlay() {
   };
 
   const onDocKeyDown = (e) => {
+    if (floating) return;
     if (e.key === 'Escape' && !e.defaultPrevented) {
       if (popoverOpen) {
         setPopoverOpen(false);
@@ -29349,7 +29917,10 @@ function mountWindowOverlay() {
       setMultiOpen(false);
     }
   };
-  const onWindowResize = () => updateResponsiveLayout();
+  const onWindowResize = () => {
+    if (floating) floating.controller.reflow();
+    else updateResponsiveLayout();
+  };
   const onPopState = () => syncHostRouteIfChanged();
   const onDocFocusIn = () => syncHostRouteIfChanged();
   const onVisibilityChange = () => {
@@ -29385,6 +29956,8 @@ function mountWindowOverlay() {
     const dock = resolveRuntimeDockTarget();
     if (!isDockPlacementSynced(dock)) {
       scheduleDockSync();
+    } else if (floating) {
+      floating.controller.reflow();
     }
   }
   function scheduleHostDomMutationCheck() {
@@ -29410,7 +29983,10 @@ function mountWindowOverlay() {
   }
   try {
     if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => updateResponsiveLayout());
+      resizeObserver = new ResizeObserver(() => {
+        if (floating) floating.controller.reflow();
+        else updateResponsiveLayout();
+      });
       if (document.body) resizeObserver.observe(document.body);
     }
     if (typeof MutationObserver !== 'undefined') {
@@ -29477,6 +30053,8 @@ function mountWindowOverlay() {
     const dock = resolveRuntimeDockTarget();
     if (!isDockPlacementSynced(dock)) {
       ensureCapsuleDocked();
+    } else if (floating) {
+      floating.controller.reflow();
     }
   }, 1200);
 
@@ -29484,14 +30062,16 @@ function mountWindowOverlay() {
   renderCapsuleTelemetry();
   const allowMultiCarryOver =
     telemetryStore.getState().telemetry?.settings?.showTopbarMultiSession !== false;
-  if (carryOverPopoverOpen) {
-    setPopoverOpen(true, { instant: true });
-  } else if (carryOverMultiPinnedOpen && allowMultiCarryOver) {
-    setMultiOpen(true, { pinned: true, instant: true });
-  } else if (carryOverMultiHoverOpen && allowMultiCarryOver) {
-    setMultiOpen(true, { pinned: false, instant: true });
-  } else if (carryOverTooltipOpen) {
-    setTooltipOpen(true, { instant: true });
+  if (lastAppliedMountMode !== 'floating' && carryOverMountMode !== 'floating') {
+    if (carryOverPopoverOpen) {
+      setPopoverOpen(true, { instant: true });
+    } else if (carryOverMultiPinnedOpen && allowMultiCarryOver) {
+      setMultiOpen(true, { pinned: true, instant: true });
+    } else if (carryOverMultiHoverOpen && allowMultiCarryOver) {
+      setMultiOpen(true, { pinned: false, instant: true });
+    } else if (carryOverTooltipOpen) {
+      setTooltipOpen(true, { instant: true });
+    }
   }
   const stopPolling = startAsyncTelemetryLoop(2000);
 
@@ -29609,7 +30189,9 @@ function mountWindowOverlay() {
         });
       }
       lastAppliedMountMode = normalized;
-      return ensureCapsuleDocked();
+      const alive = ensureCapsuleDocked();
+      renderCapsuleTelemetry();
+      return alive;
     },
     [WINDOW_OVERLAY_METHODS.dispose]() {
       if (disposed) return;
@@ -29641,6 +30223,8 @@ function mountWindowOverlay() {
       unsubStore();
       unsubUiScope();
       unsubI18n();
+      syncFloatingMode(false);
+      uiStore.setState({ monitorVisible: false }, { sync: true });
       try {
         resizeObserver?.disconnect();
       } catch {}

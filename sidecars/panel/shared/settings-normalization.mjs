@@ -309,15 +309,16 @@ export function normalizePluginUpdateMode(mode, legacyAutoUpdate) {
 }
 
 /**
- * 归一化面板挂载方式枚举（`'dual'` | `'composer'` | `'sidebar'`），兼容历史 `enableWindowOverlay`。
+ * 归一化面板挂载方式枚举，兼容历史 `enableWindowOverlay`。
  *
  * @param {unknown} mode
  * @param {unknown} [legacyEnableOverlay]
- * @returns {'dual'|'composer'|'sidebar'}
+ * @returns {'dual'|'composer'|'floating'|'sidebar'}
  */
 export function normalizeWindowMountMode(mode, legacyEnableOverlay) {
   const m = String(mode ?? '').trim().toLowerCase();
   if (m === 'composer' || m === 'input') return 'composer';
+  if (m === 'floating' || m === 'float') return 'floating';
   if (m === 'sidebar' || m === 'sidebar_only' || m === 'off') return 'sidebar';
   if (m === 'dual' || m === 'topbar') return 'dual';
   if (legacyEnableOverlay === false) return 'sidebar';
