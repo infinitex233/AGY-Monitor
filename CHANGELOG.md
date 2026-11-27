@@ -2,6 +2,12 @@
 
 All notable changes to **AGY Monitor** are documented in this file.
 
+## [1.0.2] - 2026-11
+
+### Fixes & Consistency
+- **Repository Slug Synchronization**: Updated `OFFICIAL_GITHUB_REPO`, pricing catalog URLs, updater links, and documentation to `infinitex233/AGY-Monitor` (preventing false custom-fork detection on clones of `infinitex233/AGY-Monitor`).
+- **Unified Branding**: Updated standalone web UI/CLI titles and page `<title>` from `Antigravity Usage Monitor` / `用量监控` to `AGY Monitor`.
+
 ## [1.0.1] - 2026-11
 
 ### Breaking Changes

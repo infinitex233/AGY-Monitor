@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @fileoverview Antigravity Usage Monitor 独立 Web 监控 CLI 入口 (`standalone.mjs`)。
+ * @fileoverview AGY Monitor 独立 Web 监控 CLI 入口 (`standalone.mjs`)。
  *
  * 在无头服务器 (`agy` / `agy remote-control serve`) 或纯终端环境下，脱离 `sidecar_sdk`
  * 直接拉起完整的四分页监控面板与 API 服务：

@@ -225,7 +225,7 @@ export function setLsRuntimeEndpoint(nextAddr, nextCsrfToken, { isDynamic = true
 /**
  * GitHub 官方云端价格目录与插件发布包地址配置。
  */
-export const OFFICIAL_GITHUB_REPO = 'infinitex233/antigravity-usage-monitor';
+export const OFFICIAL_GITHUB_REPO = 'infinitex233/AGY-Monitor';
 export const LEGACY_GITHUB_REPOS = Object.freeze([]);
 export const CLOUD_CATALOG_URLS = [
   `https://raw.githubusercontent.com/${OFFICIAL_GITHUB_REPO}/main/pricing-catalog.json`,

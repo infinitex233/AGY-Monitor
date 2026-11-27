@@ -38,17 +38,17 @@ export function readMcpServerVersion() {
   } catch {
     // 忽略清单读取失败
   }
-  return '1.0.1';
+  return '1.0.2';
 }
 
 /**
  * 纯函数处理单条 MCP JSON-RPC 2.0 消息；通知类消息（无 `id`）返回 `null`。
  *
  * @param {object} msg
- * @param {string} [serverVersion='1.0.1']
+ * @param {string} [serverVersion='1.0.2']
  * @returns {object|null}
  */
-export function handleMcpJsonRpcMessage(msg, serverVersion = '1.0.1') {
+export function handleMcpJsonRpcMessage(msg, serverVersion = '1.0.2') {
   if (!msg || typeof msg !== 'object') return null;
   const hasId = Object.prototype.hasOwnProperty.call(msg, 'id') && msg.id !== undefined;
   if (!hasId) {

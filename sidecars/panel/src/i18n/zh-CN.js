@@ -1,5 +1,5 @@
 /**
- * @fileoverview Simplified Chinese (zh-CN) dictionary for Antigravity Usage & Speed Monitor.
+ * @fileoverview Simplified Chinese (zh-CN) dictionary for AGY Monitor.
  * Matches 100% of the existing out-of-the-box UI copy. Zero emoji characters.
  */
 

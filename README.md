@@ -6,10 +6,10 @@
 
 Lightweight local telemetry and token analytics plugin for Google Antigravity — zero external dependencies, zero credential access, built for clarity.
 
-[![Release](https://img.shields.io/github/v/release/infinitex233/antigravity-usage-monitor?style=flat-square&color=2A5E76&label=release)](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/infinitex233/antigravity-usage-monitor/total?style=flat-square&color=0ea5e9)](https://github.com/infinitex233/antigravity-usage-monitor/releases)
-[![Stars](https://img.shields.io/github/stars/infinitex233/antigravity-usage-monitor?style=flat-square&color=f59e0b)](https://github.com/infinitex233/antigravity-usage-monitor/stargazers)
-[![License](https://img.shields.io/github/license/infinitex233/antigravity-usage-monitor?style=flat-square&color=3b82f6)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/infinitex233/AGY-Monitor?style=flat-square&color=2A5E76&label=release)](https://github.com/infinitex233/AGY-Monitor/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/infinitex233/AGY-Monitor/total?style=flat-square&color=0ea5e9)](https://github.com/infinitex233/AGY-Monitor/releases)
+[![Stars](https://img.shields.io/github/stars/infinitex233/AGY-Monitor?style=flat-square&color=f59e0b)](https://github.com/infinitex233/AGY-Monitor/stargazers)
+[![License](https://img.shields.io/github/license/infinitex233/AGY-Monitor?style=flat-square&color=3b82f6)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20npm-10b981?style=flat-square)](#local-development)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-6366f1?style=flat-square)](#client-support)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-1f2937?style=flat-square&logo=linux&logoColor=white)](https://linux.do)
@@ -24,7 +24,7 @@ Lightweight local telemetry and token analytics plugin for Google Antigravity �
 
 <br />
 
-[Latest Release](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest) · [Download `agy-monitor.zip`](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip)
+[Latest Release](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [Download `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
 
 </div>
 
@@ -38,7 +38,7 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
 
 - **Focused 3-Tab Interface**: Consolidated into **Live Monitor**, **Analytics**, and **Preferences** — removing subscription quota polling, account switching, quota reservation heuristics, cross-client session migration, and host UI translation injection.
 - **Zero Account & Credential Surface**: Ships with no OAuth login flows and no PowerShell/DPAPI credential scripts. All metrics are read strictly from local Antigravity telemetry and trajectory caches.
-- **Independent Releases & Pricing Sync**: Updates and releases target `infinitex233/antigravity-usage-monitor`, while public API pricing in [`pricing-catalog.json`](pricing-catalog.json) can be synced selectively via a standalone GitHub Actions workflow.
+- **Independent Releases & Pricing Sync**: Updates and releases target `infinitex233/AGY-Monitor`, while public API pricing in [`pricing-catalog.json`](pricing-catalog.json) can be synced selectively via a standalone GitHub Actions workflow.
 
 ---
 
@@ -122,7 +122,7 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
 
 ### Option 1: Download Release Archive (Recommended)
 
-Download [`agy-monitor.zip`](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip) from [Releases](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest) and extract it into `~/.gemini/config/plugins/` so the resulting directory is `~/.gemini/config/plugins/agy-monitor`.
+Download [`agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip) from [Releases](https://github.com/infinitex233/AGY-Monitor/releases/latest) and extract it into `~/.gemini/config/plugins/` so the resulting directory is `~/.gemini/config/plugins/agy-monitor`.
 
 <details>
 <summary>Windows PowerShell one-liner</summary>
@@ -130,7 +130,7 @@ Download [`agy-monitor.zip`](https://github.com/infinitex233/antigravity-usage-m
 ```powershell
 $pluginsDir = "$env:USERPROFILE\.gemini\config\plugins"
 New-Item -ItemType Directory -Path $pluginsDir -Force | Out-Null
-Invoke-WebRequest -Uri "https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip" -OutFile "$env:TEMP\agy-monitor.zip"
+Invoke-WebRequest -Uri "https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip" -OutFile "$env:TEMP\agy-monitor.zip"
 Expand-Archive -Path "$env:TEMP\agy-monitor.zip" -DestinationPath $pluginsDir -Force
 ```
 
@@ -140,12 +140,12 @@ Expand-Archive -Path "$env:TEMP\agy-monitor.zip" -DestinationPath $pluginsDir -F
 
 ```powershell
 # Windows (PowerShell)
-git clone --filter=blob:none --single-branch https://github.com/infinitex233/antigravity-usage-monitor.git "$env:USERPROFILE\.gemini\config\plugins\agy-monitor"
+git clone --filter=blob:none --single-branch https://github.com/infinitex233/AGY-Monitor.git "$env:USERPROFILE\.gemini\config\plugins\agy-monitor"
 ```
 
 ```bash
 # macOS / Linux
-git clone --filter=blob:none --single-branch https://github.com/infinitex233/antigravity-usage-monitor.git ~/.gemini/config/plugins/agy-monitor
+git clone --filter=blob:none --single-branch https://github.com/infinitex233/AGY-Monitor.git ~/.gemini/config/plugins/agy-monitor
 ```
 
 ### Enable & Standalone Web Mode

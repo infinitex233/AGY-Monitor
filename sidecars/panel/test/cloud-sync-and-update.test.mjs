@@ -68,7 +68,7 @@ test('sanitizeCatalogPayload filters malformed/null/zero entries, untrusted URLs
   assert.ok(sanitized);
   assert.equal(sanitized.catalogVersion, '2026.11.03.9');
   assert.equal(sanitized.latestPluginVersion, '1.5.0');
-  assert.ok(sanitized.downloadUrl.startsWith('https://github.com/infinitex233/'));
+  assert.ok(sanitized.downloadUrl.startsWith('https://github.com/infinitex233/AGY-Monitor/'));
   assert.deepEqual(Object.keys(sanitized.pricing), ['gemini-4.5-ultra']);
   assert.equal(sanitized.pricing['gemini-4.5-ultra'].phases.length, 2);
   assert.equal(sanitized.pricing['gemini-4.5-ultra'].phases[0].input, 1.75);
@@ -266,7 +266,7 @@ test('cloud catalog sync fetches from GitHub raw URL and dynamically prices newl
 
   // Sync cloud catalog from GitHub
   const syncStatus = await h.syncCloudCatalog({ force: true });
-  assert.ok(fetchedUrl.startsWith('https://raw.githubusercontent.com/infinitex233/antigravity-usage-monitor/main/pricing-catalog.json'));
+  assert.ok(fetchedUrl.startsWith('https://raw.githubusercontent.com/infinitex233/AGY-Monitor/main/pricing-catalog.json'));
   assert.equal(syncStatus.source, 'remote');
   assert.equal(syncStatus.catalogVersion, '2026.11.03.2');
   assert.equal(syncStatus.latestPluginVersion, '1.5.0');
@@ -488,18 +488,18 @@ test('repository decoupling: ignores foreign upstream catalog latestPluginVersio
   assert.equal(initialStatus.latestPluginVersion, '1.0.0');
   assert.equal(initialStatus.updateAvailable, false);
   assert.equal(initialStatus.lastSyncedAtMs, 0);
-  assert.equal(initialStatus.releaseUrl, 'https://github.com/infinitex233/antigravity-usage-monitor/releases/latest');
-  assert.equal(initialStatus.downloadUrl, 'https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip');
+  assert.equal(initialStatus.releaseUrl, 'https://github.com/infinitex233/AGY-Monitor/releases/latest');
+  assert.equal(initialStatus.downloadUrl, 'https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip');
 
   const synced = await cacheH.syncCloudCatalog({ force: false });
   assert.ok(
-    fetchedNewRepoUrl.startsWith('https://raw.githubusercontent.com/infinitex233/antigravity-usage-monitor/main/pricing-catalog.json')
+    fetchedNewRepoUrl.startsWith('https://raw.githubusercontent.com/infinitex233/AGY-Monitor/main/pricing-catalog.json')
   );
   assert.equal(synced.catalogVersion, '2026.11.26.1');
   assert.equal(synced.latestPluginVersion, '1.0.1');
 
   assert.equal(
-    cacheH.resolveMigratedGitRemoteUrl('https://github.com/infinitex233/antigravity-usage-monitor.git'),
+    cacheH.resolveMigratedGitRemoteUrl('https://github.com/infinitex233/AGY-Monitor.git'),
     ''
   );
   assert.equal(
@@ -520,7 +520,7 @@ test('repository decoupling: ignores foreign upstream catalog latestPluginVersio
         return;
       }
       if (args.includes('remote') && args.includes('get-url')) {
-        fn(null, 'https://github.com/infinitex233/antigravity-usage-monitor.git\n', '');
+        fn(null, 'https://github.com/infinitex233/AGY-Monitor.git\n', '');
         return;
       }
       if (args.includes('show')) {

@@ -1,5 +1,5 @@
 /**
- * @fileoverview English (en-US) dictionary for Antigravity Usage & Speed Monitor.
+ * @fileoverview English (en-US) dictionary for AGY Monitor.
  * Zero emoji characters.
  */
 

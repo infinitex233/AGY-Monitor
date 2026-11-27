@@ -107,7 +107,7 @@ function renderTokenLoginHtml(hasError = false) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>用量监控 · 访问验证</title>
+  <title>AGY Monitor · 访问验证</title>
   <style>
     :root { color-scheme: dark light; }
     * { box-sizing: border-box; }
@@ -161,7 +161,7 @@ function renderTokenLoginHtml(hasError = false) {
 </head>
 <body>
   <form class="card" method="POST" action="/api/standalone-auth">
-    <h1>Antigravity Usage Monitor</h1>
+    <h1>AGY Monitor</h1>
     <p>当前独立监控服务已启用访问令牌保护，请输入 Token 继续。</p>
     ${errHtml}
     <input type="password" name="token" placeholder="输入 --token 访问密钥" autocomplete="current-password" required autofocus>
@@ -259,7 +259,7 @@ export function parseStandaloneCliArgs(argv = [], env = process.env, { defaultPo
 
 export function formatStandaloneHelpText() {
   return [
-    'Antigravity Usage Monitor — Standalone Web Server (CLI / Remote Mode)',
+    'AGY Monitor — Standalone Web Server (CLI / Remote Mode)',
     '',
     'Usage:',
     '  node sidecars/panel/standalone.mjs [options]',

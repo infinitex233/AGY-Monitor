@@ -1,5 +1,5 @@
 /**
- * @fileoverview Antigravity Usage Monitor 面板 Sidecar HTTP 服务入口。
+ * @fileoverview AGY Monitor 面板 Sidecar HTTP 服务入口。
  *
  * 职责边界：
  * - 提供前端静态资产路由（`/`、`/app.js`、`/styles.css`，每次请求从磁盘读取最新产物）；

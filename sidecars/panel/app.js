@@ -1066,7 +1066,7 @@ return { createReactiveStore };
 // --- src/i18n/zh-CN.js ---
 const { I18N_MESSAGES_ZH_CN } = (() => {
 /**
- * @fileoverview Simplified Chinese (zh-CN) dictionary for Antigravity Usage & Speed Monitor.
+ * @fileoverview Simplified Chinese (zh-CN) dictionary for AGY Monitor.
  * Matches 100% of the existing out-of-the-box UI copy. Zero emoji characters.
  */
 
@@ -1933,7 +1933,7 @@ return { I18N_MESSAGES_ZH_CN };
 // --- src/i18n/en-US.js ---
 const { I18N_MESSAGES_EN_US } = (() => {
 /**
- * @fileoverview English (en-US) dictionary for Antigravity Usage & Speed Monitor.
+ * @fileoverview English (en-US) dictionary for AGY Monitor.
  * Zero emoji characters.
  */
 

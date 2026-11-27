@@ -6,10 +6,10 @@
 
 专注于本地实时性能指标与 Token 用量分析的 Google Antigravity 监控插件 —— 零外部依赖、零账号权限触碰、即装即用
 
-[![Release](https://img.shields.io/github/v/release/infinitex233/antigravity-usage-monitor?style=flat-square&color=2A5E76&label=release)](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/infinitex233/antigravity-usage-monitor/total?style=flat-square&color=0ea5e9)](https://github.com/infinitex233/antigravity-usage-monitor/releases)
-[![Stars](https://img.shields.io/github/stars/infinitex233/antigravity-usage-monitor?style=flat-square&color=f59e0b)](https://github.com/infinitex233/antigravity-usage-monitor/stargazers)
-[![License](https://img.shields.io/github/license/infinitex233/antigravity-usage-monitor?style=flat-square&color=3b82f6)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/infinitex233/AGY-Monitor?style=flat-square&color=2A5E76&label=release)](https://github.com/infinitex233/AGY-Monitor/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/infinitex233/AGY-Monitor/total?style=flat-square&color=0ea5e9)](https://github.com/infinitex233/AGY-Monitor/releases)
+[![Stars](https://img.shields.io/github/stars/infinitex233/AGY-Monitor?style=flat-square&color=f59e0b)](https://github.com/infinitex233/AGY-Monitor/stargazers)
+[![License](https://img.shields.io/github/license/infinitex233/AGY-Monitor?style=flat-square&color=3b82f6)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20npm-10b981?style=flat-square)](#本地开发)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-6366f1?style=flat-square)](#多端支持)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-1f2937?style=flat-square&logo=linux&logoColor=white)](https://linux.do)
@@ -24,7 +24,7 @@
 
 <br />
 
-[下载最新版本 (Releases)](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest) · [直接下载 `agy-monitor.zip`](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip)
+[下载最新版本 (Releases)](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [直接下载 `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
 
 </div>
 
@@ -38,7 +38,7 @@
 
 - **只保留核心监控**：去掉账号登录/切号、订阅额度轮询、配额预占估算、跨端会话迁移和宿主文案注入，界面回归干净的三栏结构（`实时监控` / `用量统计` / `偏好设置`）。
 - **零账号风险面**：彻底移除 Google OAuth 流程与 PowerShell/DPAPI 本地凭证脚本，不读取、不存储任何账号令牌，所有数据严格来自本机 Antigravity 遥测与本地轨迹缓存。
-- **独立发布与可选价格同步**：版本与更新完全托管在 `infinitex233/antigravity-usage-monitor`，公开模型定价（[`pricing-catalog.json`](pricing-catalog.json)）可通过独立 GitHub Actions 工作流按需同步。
+- **独立发布与可选价格同步**：版本与更新完全托管在 `infinitex233/AGY-Monitor`，公开模型定价（[`pricing-catalog.json`](pricing-catalog.json)）可通过独立 GitHub Actions 工作流按需同步。
 
 ---
 
@@ -123,7 +123,7 @@
 
 ### 方式一：下载 Release 压缩包（推荐）
 
-从 [Releases](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest) 下载 [`agy-monitor.zip`](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip)，解压到 `~/.gemini/config/plugins/` 下，使目录路径为 `~/.gemini/config/plugins/agy-monitor`。
+从 [Releases](https://github.com/infinitex233/AGY-Monitor/releases/latest) 下载 [`agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)，解压到 `~/.gemini/config/plugins/` 下，使目录路径为 `~/.gemini/config/plugins/agy-monitor`。
 
 <details>
 <summary>Windows PowerShell 一键安装命令</summary>
@@ -131,7 +131,7 @@
 ```powershell
 $pluginsDir = "$env:USERPROFILE\.gemini\config\plugins"
 New-Item -ItemType Directory -Path $pluginsDir -Force | Out-Null
-Invoke-WebRequest -Uri "https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip" -OutFile "$env:TEMP\agy-monitor.zip"
+Invoke-WebRequest -Uri "https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip" -OutFile "$env:TEMP\agy-monitor.zip"
 Expand-Archive -Path "$env:TEMP\agy-monitor.zip" -DestinationPath $pluginsDir -Force
 ```
 
@@ -141,12 +141,12 @@ Expand-Archive -Path "$env:TEMP\agy-monitor.zip" -DestinationPath $pluginsDir -F
 
 ```powershell
 # Windows (PowerShell)
-git clone --filter=blob:none --single-branch https://github.com/infinitex233/antigravity-usage-monitor.git "$env:USERPROFILE\.gemini\config\plugins\agy-monitor"
+git clone --filter=blob:none --single-branch https://github.com/infinitex233/AGY-Monitor.git "$env:USERPROFILE\.gemini\config\plugins\agy-monitor"
 ```
 
 ```bash
 # macOS / Linux
-git clone --filter=blob:none --single-branch https://github.com/infinitex233/antigravity-usage-monitor.git ~/.gemini/config/plugins/agy-monitor
+git clone --filter=blob:none --single-branch https://github.com/infinitex233/AGY-Monitor.git ~/.gemini/config/plugins/agy-monitor
 ```
 
 ### 启用与进阶用法
