@@ -22,6 +22,7 @@ import {
   applyAppearanceToRoot,
   normalizeClientFontScale,
   resolveSettingsModernUi,
+  resolveSettingsUiTheme,
 } from '../../core/appearance.js';
 import {
   h,
@@ -648,6 +649,10 @@ export function mountWindowOverlay() {
     applyAppearanceToRoot(portalHost, settings, { includeFontScale: true });
     const scaleKey = normalizeClientFontScale(settings?.fontScale);
     const isModernUi = resolveSettingsModernUi(settings);
+    const uiThemeAttr =
+      isModernUi && resolveSettingsUiTheme(settings) === 'liquid_glass'
+        ? 'liquid-glass'
+        : 'default';
     const colorScheme = portalHost.getAttribute?.('data-color-scheme') || 'light';
     for (const el of [popoverEl, hoverTipEl, multiPanelEl]) {
       if (el.getAttribute?.('data-font-scale') !== scaleKey) {
@@ -655,6 +660,9 @@ export function mountWindowOverlay() {
       }
       if (el.getAttribute?.('data-color-scheme') !== colorScheme) {
         el.setAttribute?.('data-color-scheme', colorScheme);
+      }
+      if (el.getAttribute?.('data-ui-theme') !== uiThemeAttr) {
+        el.setAttribute?.('data-ui-theme', uiThemeAttr);
       }
       if (isModernUi) {
         if (el.getAttribute?.('data-modern-ui') !== 'true') {
@@ -1214,15 +1222,15 @@ export function mountWindowOverlay() {
         let top;
         if (openPopAbove) {
           const maxPopH = Math.max(240, Math.floor(bRect.top - 20));
-          const targetPopH = Math.min(588, maxPopH);
-          popoverEl.style.height = `${targetPopH}px`;
-          popoverEl.style.maxHeight = `${maxPopH}px`;
-          const actualPopH = Math.min(Number(popoverEl.offsetHeight) || targetPopH, maxPopH);
+          const targetPopH = Math.min(620, maxPopH);
+          popoverEl.style.height = '';
+          popoverEl.style.maxHeight = `${targetPopH}px`;
+          const actualPopH = Math.min(Number(popoverEl.offsetHeight) || targetPopH, targetPopH);
           top = Math.max(12, Math.round(bRect.top - actualPopH - 8));
         } else {
           popoverEl.style.height = '';
           top = Math.max(38, Math.min(vh - 140, Math.round(bRect.bottom + 6)));
-          popoverEl.style.maxHeight = `${Math.max(240, vh - top - 12)}px`;
+          popoverEl.style.maxHeight = `${Math.min(620, Math.max(240, vh - top - 12))}px`;
         }
         patchClasses(popoverEl, { 'is-above': openPopAbove });
         let left = Math.round(rightAnchorEdge - panelW);
@@ -1773,6 +1781,7 @@ export function mountWindowOverlay() {
       ctxInspectorAgentId: st.ctxInspectorAgentId,
       activeView: st.activeView,
       stepsSubTab: st.stepsSubTab,
+      stepsViewMode: st.stepsViewMode,
       settingsSubTab: st.settingsSubTab,
       settingsStructureTab: st.settingsStructureTab,
     }),

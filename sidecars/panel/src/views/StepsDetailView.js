@@ -54,10 +54,11 @@ import {
   resolveScopedConversation,
   telemetryStore,
 } from '../store/telemetryStore.js';
-import { getVisibleMonitorView, uiStore } from '../store/uiStore.js';
+import { getVisibleMonitorView, setStepsViewMode, uiStore } from '../store/uiStore.js';
 import { CustomScrollbar } from '../components/ui/CustomScrollbar.js';
 import { CustomSelect } from '../components/ui/CustomSelect.js';
 import { createSearchInput } from '../components/ui/SearchInput.js';
+import { StepTrendChart } from '../components/charts/StepTrendChart.js';
 import { StepTableWidget } from '../components/widgets/StepTableWidget.js';
 import { sortStepsByColumn } from '../registries/stepColumnRegistry.js';
 
@@ -537,6 +538,103 @@ export const StepsDetailView = defineComponent({
       stepsModelSelect.el,
     ]);
 
+    // --- 三态视图切换（点阵 / 曲线 / 列表）与步骤趋势图 ---
+    const VIEW_MODE_DEFS = [
+      { value: 'dots', icon: 'dot-matrix', i18nKey: 'steps.modeDots' },
+      { value: 'curve', icon: 'trend-curve', i18nKey: 'steps.modeCurve' },
+      { value: 'table', icon: 'list', i18nKey: 'steps.modeTable' },
+    ];
+    let currentViewMode = uiStore.getState().stepsViewMode || 'dots';
+    const viewModeThumbEl = h('span', { className: 'steps-view-mode-thumb', 'aria-hidden': 'true' });
+    const viewModeBtns = VIEW_MODE_DEFS.map((def) => {
+      const labelEl = h('span', { text: t(def.i18nKey) });
+      const btn = h(
+        'button',
+        {
+          type: 'button',
+          className: 'steps-view-mode-btn',
+          'data-mode': def.value,
+          role: 'tab',
+          'aria-selected': def.value === currentViewMode ? 'true' : 'false',
+          onclick: () => setStepsViewMode(def.value),
+        },
+        [createSvgIcon(def.icon, { size: 11 }), labelEl]
+      );
+      return { def, btn, labelEl };
+    });
+    const viewModeSwitchEl = h(
+      'div',
+      {
+        className: 'steps-view-mode-switch',
+        role: 'tablist',
+        'aria-label': t('steps.modeSwitchAria'),
+      },
+      [viewModeThumbEl, ...viewModeBtns.map((item) => item.btn)]
+    );
+
+    const headerScrubStepEl = h('strong', { className: 'steps-scrub-step text-mono' });
+    const headerScrubMetaEl = h('span', { className: 'steps-scrub-meta' });
+    const headerScrubPillEl = h(
+      'span',
+      { className: 'steps-header-scrub-pill', hidden: true },
+      [headerScrubStepEl, headerScrubMetaEl]
+    );
+    const stepsTitleGroupEl = h('div', { className: 'steps-title-group' }, [
+      stepsTitleEl,
+      headerScrubPillEl,
+    ]);
+
+    const stepTrendChart = StepTrendChart({
+      onHoverChange: (info) => {
+        if (!info || currentViewMode === 'table') {
+          patchAttr(headerScrubPillEl, 'hidden', true);
+          return;
+        }
+        patchText(headerScrubStepEl, `#${info.stepIndex}`);
+        const metaParts = [info.modelText, info.outputTokensText].filter(Boolean);
+        patchText(headerScrubMetaEl, metaParts.length > 0 ? ` · ${metaParts.join(' · ')}` : '');
+        patchAttr(headerScrubPillEl, 'hidden', false);
+      },
+    });
+
+    function applyStepsViewMode(nextMode, { skipChartUpdate = false } = {}) {
+      const resolved =
+        nextMode === 'curve' || nextMode === 'table' || nextMode === 'dots' ? nextMode : 'dots';
+      currentViewMode = resolved;
+      const activeIdx = Math.max(
+        0,
+        VIEW_MODE_DEFS.findIndex((d) => d.value === resolved)
+      );
+      viewModeThumbEl.style.transform = `translateX(${activeIdx * 100}%)`;
+      for (const item of viewModeBtns) {
+        const isActive = item.def.value === resolved;
+        patchClasses(item.btn, { 'is-active': isActive });
+        patchAttr(item.btn, 'aria-selected', isActive ? 'true' : 'false');
+      }
+      const isTable = resolved === 'table';
+      patchAttr(stepTrendChart.el, 'hidden', isTable);
+      patchAttr(stepsScroll.el, 'hidden', !isTable);
+      if (isTable) {
+        stepTrendChart.refs.hideTooltip();
+        stepsScroll.refresh();
+        refreshStepTableViewport?.();
+      } else {
+        hideTurnTip();
+        hideAnomalyTip();
+        if (!skipChartUpdate) {
+          stepTrendChart.refs.update({
+            steps: currentTableSteps,
+            mode: resolved,
+            displaySettings: currentDisplaySettings,
+            immediate: true,
+          });
+        }
+      }
+      onLayoutChange?.();
+    }
+
+    applyStepsViewMode(currentViewMode, { skipChartUpdate: true });
+
     const panelEl = h(
       'section',
       {
@@ -548,15 +646,17 @@ export const StepsDetailView = defineComponent({
       [
         h('div', { className: 'panel-header steps-panel-header' }, [
           h('div', { className: 'steps-header-controls' }, [
-            stepsTitleEl,
+            stepsTitleGroupEl,
             h('div', { className: 'steps-header-right' }, [
               headerFiltersEl,
+              viewModeSwitchEl,
               stepsExportMenu.el,
             ]),
           ]),
         ]),
         stepsFilterToolbarEl,
         anomalyFilterBarEl,
+        stepTrendChart.el,
         stepsScroll.el,
         turnTipEl,
         anomalyTipEl,
@@ -592,6 +692,11 @@ export const StepsDetailView = defineComponent({
       const colKeys = resolveStepDisplayColumns(latestSlice?.stepTableColumns, isEmbedded);
       syncTableHeaderColumns(colKeys);
       patchText(stepsTitleTextEl, t('steps.detailTitle'));
+      patchAttr(viewModeSwitchEl, 'aria-label', t('steps.modeSwitchAria'));
+      for (const item of viewModeBtns) {
+        patchText(item.labelEl, t(item.def.i18nKey));
+      }
+      stepTrendChart.refs.refreshLabels();
     }
 
     function renderStepsData(slice, { allowNewRowFade = false } = {}) {
@@ -891,6 +996,14 @@ export const StepsDetailView = defineComponent({
         sortKey,
         sortDir,
       });
+      if (currentViewMode !== 'table') {
+        stepTrendChart.refs.update({
+          steps: tableSteps,
+          mode: currentViewMode,
+          displaySettings,
+          immediate: !allowNewRowFade,
+        });
+      }
       stepsScroll.refresh();
       onLayoutChange?.();
     }
@@ -934,11 +1047,13 @@ export const StepsDetailView = defineComponent({
 
     let prevScope = uiStore.getState().selectedAgentScope;
     let prevActiveView = getVisibleMonitorView();
+    let prevViewMode = currentViewMode;
 
     const unsubView = uiStore.subscribe(
       (st) => ({
         activeView: getVisibleMonitorView(st),
         selectedAgentScope: st.selectedAgentScope,
+        stepsViewMode: st.stepsViewMode || 'dots',
       }),
       (uiSlice) => {
         const scopeChanged = uiSlice.selectedAgentScope !== prevScope;
@@ -946,18 +1061,26 @@ export const StepsDetailView = defineComponent({
           lastSyncedUiScope = uiSlice.selectedAgentScope;
           selectedAgentScopes = [uiSlice.selectedAgentScope || 'all'];
         }
+        const modeChanged = uiSlice.stepsViewMode !== prevViewMode;
+        if (modeChanged) {
+          prevViewMode = uiSlice.stepsViewMode;
+          applyStepsViewMode(uiSlice.stepsViewMode);
+        }
         const viewEntered = isStepsViewActive(uiSlice.activeView) && !isStepsViewActive(prevActiveView);
         prevScope = uiSlice.selectedAgentScope;
         prevActiveView = uiSlice.activeView;
         if (!isStepsViewActive(uiSlice.activeView)) {
           hideTurnTip();
           hideAnomalyTip();
+          stepTrendChart.refs.hideTooltip();
           if (scopeChanged) isDirty = true;
           return;
         }
         if ((isDirty || scopeChanged || viewEntered) && latestSlice) {
           isDirty = false;
           renderStepsData(latestSlice);
+        } else if (viewEntered && currentViewMode !== 'table') {
+          stepTrendChart.refs.draw();
         }
       }
     );
@@ -976,6 +1099,7 @@ export const StepsDetailView = defineComponent({
 
     onCleanup(() => {
       stepsExportMenu.destroy();
+      stepTrendChart.destroy();
       unsubTelemetry();
       unsubView();
       unsubI18n();
@@ -998,6 +1122,8 @@ export const StepsDetailView = defineComponent({
         stepSearchInput,
         stepQuickChipsEl,
         stepsExportMenu,
+        viewModeSwitchEl,
+        stepTrendChart,
         inlineScopeSelect,
         stepsModelSelect,
         stepsScroll,

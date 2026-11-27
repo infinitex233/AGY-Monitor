@@ -17,6 +17,7 @@ import {
   DEFAULT_STEP_TABLE_COLUMNS,
   DEFAULT_STEP_TOKEN_COMBO_FORMAT,
   DEFAULT_TOPBAR_SLOTS,
+  DEFAULT_UI_THEME,
   FONT_SCALE_KEYS,
   MAX_CLI_STATUSLINE_SLOTS,
   MAX_POPOVER_WIDTH,
@@ -32,6 +33,7 @@ import {
   SUPPORTED_LANGUAGES,
   THEME_ACCENT_KEYS,
   TOPBAR_SLOT_KEYS,
+  UI_THEME_KEYS,
   normalizeCliStatusLineSlots,
   normalizeContextAgentMode,
   normalizeExperimentalModernUi,
@@ -51,6 +53,7 @@ import {
   normalizeStepTokenComboFormat,
   normalizeThemeAccent,
   normalizeTopbarCapsuleSlots,
+  normalizeUiTheme,
   normalizeWindowMountMode,
   parseStepTokenComboSegments,
   resolveEffectiveCliStatusLineSlots,
@@ -68,6 +71,7 @@ export {
   DEFAULT_STEP_TABLE_COLUMNS,
   DEFAULT_STEP_TOKEN_COMBO_FORMAT,
   DEFAULT_TOPBAR_SLOTS,
+  DEFAULT_UI_THEME,
   FONT_SCALE_KEYS,
   MAX_CLI_STATUSLINE_SLOTS,
   MAX_POPOVER_WIDTH,
@@ -83,6 +87,7 @@ export {
   SUPPORTED_LANGUAGES,
   THEME_ACCENT_KEYS,
   TOPBAR_SLOT_KEYS,
+  UI_THEME_KEYS,
   normalizeCliStatusLineSlots,
   normalizeContextAgentMode,
   normalizeExperimentalModernUi,
@@ -102,6 +107,7 @@ export {
   normalizeStepTokenComboFormat,
   normalizeThemeAccent,
   normalizeTopbarCapsuleSlots,
+  normalizeUiTheme,
   normalizeWindowMountMode,
   parseStepTokenComboSegments,
   resolveEffectiveCliStatusLineSlots,
@@ -121,6 +127,7 @@ export function normalizeModelContextWindows(value) {
 
 export const DEFAULT_SETTINGS_SCHEMA = Object.freeze({
   language: 'auto',
+  uiTheme: DEFAULT_UI_THEME,
   themeAccent: 'host',
   fontScale: 'md',
   modernUi: true,
@@ -193,6 +200,7 @@ export function normalizeFullSettings(rawInput) {
     safeRaw.modernUi !== undefined ? normalizeModernUi(safeRaw.modernUi) : true;
   return {
     language: normalizeLanguageSetting(safeRaw.language),
+    uiTheme: normalizeUiTheme(safeRaw.uiTheme),
     themeAccent: normalizeThemeAccent(safeRaw.themeAccent),
     fontScale: normalizeFontScale(safeRaw.fontScale),
     modernUi,

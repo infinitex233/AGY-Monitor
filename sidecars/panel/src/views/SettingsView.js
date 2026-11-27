@@ -8,6 +8,7 @@ import { defineComponent } from '../core/component.js';
 import {
   normalizeClientFontScale,
   normalizeClientThemeAccent,
+  normalizeClientUiTheme,
 } from '../core/appearance.js';
 import { h, patchAttr, patchClasses, patchText } from '../core/domPatch.js';
 import { createSvgIcon } from '../icons/SvgIcon.js';
@@ -35,6 +36,13 @@ function getLanguageOptions() {
     { value: 'auto', label: t('settings.gen.langAuto') },
     { value: 'zh-CN', label: t('settings.gen.langZh') },
     { value: 'en-US', label: t('settings.gen.langEn') },
+  ];
+}
+
+function getUiThemeOptions() {
+  return [
+    { value: 'liquid_glass', label: t('settings.gen.uiThemeLiquidGlass') },
+    { value: 'default', label: t('settings.gen.uiThemeDefault') },
   ];
 }
 
@@ -75,6 +83,7 @@ export const SettingsView = defineComponent({
 
     // --- 常规精简页状态与回调 ---
     let draftLanguage = 'auto';
+    let draftUiTheme = 'liquid_glass';
     let draftThemeAccent = 'host';
     let draftFontScale = 'md';
     let draftModelDisplayMode = 'short';
@@ -145,9 +154,10 @@ export const SettingsView = defineComponent({
       }
     }
 
-    // Card 1: 外观与显示 (语言、主题色、字号、模型名显示、挂载位置)
+    // Card 1: 外观与显示 (语言、界面风格、主题色、字号、模型名显示、挂载位置)
     const appearanceTitleEl = h('span', { text: t('settings.simple.appearanceTitle') });
     const langLabelEl = h('span', { className: 'form-label', text: t('settings.gen.language') });
+    const uiThemeLabelEl = h('span', { className: 'form-label', text: t('settings.gen.uiTheme') });
     const accentLabelEl = h('span', { className: 'form-label', text: t('settings.gen.themeAccent') });
     const fontLabelEl = h('span', { className: 'form-label', text: t('settings.gen.fontScale') });
     const modelFormatLabelEl = h('span', { className: 'form-label', text: t('settings.oth.modelFormat') });
@@ -163,6 +173,19 @@ export const SettingsView = defineComponent({
         setI18nLanguage(nextLang);
         languageSwitch.setValue(nextLang);
         void persistQuickPatch({ language: nextLang });
+      },
+    });
+
+    const uiThemeSwitch = SegmentedControl({
+      ariaLabel: t('settings.gen.uiTheme'),
+      modelValue: draftUiTheme,
+      options: getUiThemeOptions(),
+      onUpdateModelValue: (val) => {
+        const nextTheme = normalizeClientUiTheme(val);
+        draftUiTheme = nextTheme;
+        uiThemeSwitch.setValue(nextTheme);
+        refreshScroll();
+        void persistQuickPatch({ uiTheme: nextTheme });
       },
     });
 
@@ -229,6 +252,7 @@ export const SettingsView = defineComponent({
         displayStatusText,
       ]),
       h('div', { className: 'form-row' }, [langLabelEl, languageSwitch.el]),
+      h('div', { className: 'form-row' }, [uiThemeLabelEl, uiThemeSwitch.el]),
       h('div', { className: 'form-row' }, [accentLabelEl, themeColorPicker.el]),
       h('div', { className: 'form-row' }, [fontLabelEl, fontScaleSwitch.el]),
       h('div', { className: 'form-row' }, [modelFormatLabelEl, stepModelSelect.el]),
@@ -441,6 +465,7 @@ export const SettingsView = defineComponent({
       if (!settings) return;
       latestSettings = settings;
       draftLanguage = normalizeI18nLanguage(settings.language);
+      draftUiTheme = normalizeClientUiTheme(settings.uiTheme);
       draftThemeAccent = normalizeClientThemeAccent(settings.themeAccent);
       draftFontScale = normalizeClientFontScale(settings.fontScale);
       draftModelDisplayMode = normalizeClientModelDisplayMode(
@@ -455,6 +480,10 @@ export const SettingsView = defineComponent({
       languageSwitch.setProps({
         modelValue: draftLanguage,
         options: getLanguageOptions(),
+      });
+      uiThemeSwitch.setProps({
+        modelValue: draftUiTheme,
+        options: getUiThemeOptions(),
       });
       themeColorPicker.refs.setValue(draftThemeAccent);
       fontScaleSwitch.setProps({
@@ -489,6 +518,7 @@ export const SettingsView = defineComponent({
     function refreshGeneralLabels() {
       patchText(appearanceTitleEl, t('settings.simple.appearanceTitle'));
       patchText(langLabelEl, t('settings.gen.language'));
+      patchText(uiThemeLabelEl, t('settings.gen.uiTheme'));
       patchText(accentLabelEl, t('settings.gen.themeAccent'));
       patchText(fontLabelEl, t('settings.gen.fontScale'));
       patchText(modelFormatLabelEl, t('settings.oth.modelFormat'));
@@ -511,6 +541,10 @@ export const SettingsView = defineComponent({
       languageSwitch.setProps({
         modelValue: draftLanguage,
         options: getLanguageOptions(),
+      });
+      uiThemeSwitch.setProps({
+        modelValue: draftUiTheme,
+        options: getUiThemeOptions(),
       });
       themeColorPicker.refs.refreshLabels();
       fontScaleSwitch.setProps({
@@ -577,6 +611,7 @@ export const SettingsView = defineComponent({
       unsubUi();
       unsubI18n();
       languageSwitch.destroy();
+      uiThemeSwitch.destroy();
       themeColorPicker.destroy();
       fontScaleSwitch.destroy();
       stepModelSelect.destroy();
@@ -589,6 +624,7 @@ export const SettingsView = defineComponent({
       refs: {
         viewScrollbar,
         languageSwitch,
+        uiThemeSwitch,
         themeColorPicker,
         fontScaleSwitch,
         stepModelSelect,

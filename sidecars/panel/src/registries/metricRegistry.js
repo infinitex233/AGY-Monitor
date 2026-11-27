@@ -405,8 +405,8 @@ export function resolveOverviewMetricCell(metricKey, cellCtx = {}) {
       return {
         key: 'step_cost',
         label: t('ovMetric.step_cost'),
-        icon: 'bolt',
-        iconSize: 11,
+        icon: 'dollar',
+        iconSize: 12,
         isPulsing: false,
         valueText: stepCostText,
         valueClass: costTone ? `cell-value ${costTone}` : 'cell-value',
@@ -418,8 +418,8 @@ export function resolveOverviewMetricCell(metricKey, cellCtx = {}) {
     return {
       key: 'session_cost',
       label: t('ovMetric.session_cost'),
-      icon: 'bolt',
-      iconSize: 11,
+      icon: 'dollar',
+      iconSize: 12,
       isPulsing: false,
       valueText: totalCostText,
       valueClass: 'cell-value',

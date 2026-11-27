@@ -289,7 +289,6 @@ export const ConsumptionView = defineComponent({
         h('div', { className: 'cons-col' }, [
           totalTokensLabel,
           h('div', { className: 'cons-baseline' }, [heroTotalTokens]),
-          heroTokenSplitSub,
         ]),
         h('div', { className: 'cons-col is-bordered-col' }, [
           estCostLabel,
@@ -322,6 +321,7 @@ export const ConsumptionView = defineComponent({
       customRangeBar,
       unifiedMatrixEl,
       overviewSegBar.el,
+      heroTokenSplitSub,
     ]);
 
     function drillDownToTimeRange(startMs, endMs) {

@@ -13,10 +13,34 @@ export function getViewTabs() {
   ];
 }
 
+const STEPS_VIEW_MODE_STORAGE_KEY = 'agy.stepsViewMode';
+const VALID_STEPS_VIEW_MODES = new Set(['dots', 'curve', 'table']);
+
+function loadInitialStepsViewMode() {
+  try {
+    const saved = globalThis.localStorage?.getItem?.(STEPS_VIEW_MODE_STORAGE_KEY);
+    if (VALID_STEPS_VIEW_MODES.has(saved)) return saved;
+  } catch {
+    // ignore storage restriction
+  }
+  return 'dots';
+}
+
+export function setStepsViewMode(mode) {
+  const next = VALID_STEPS_VIEW_MODES.has(mode) ? mode : 'dots';
+  try {
+    globalThis.localStorage?.setItem?.(STEPS_VIEW_MODE_STORAGE_KEY, next);
+  } catch {
+    // ignore storage restriction
+  }
+  uiStore.setState({ stepsViewMode: next });
+}
+
 export const uiStore = createReactiveStore({
   activeView: 'overview',
   monitorVisible: true,
   stepsSubTab: 'steps', // 'steps' | 'models'
+  stepsViewMode: loadInitialStepsViewMode(), // 'dots' | 'curve' | 'table'
   settingsSubTab: 'general', // 'general' | 'structure' | 'account' | 'other'
   settingsStructureTab: 'mount', // 'mount' | 'hover' | 'overview' | 'steps'
   selectedAgentScope: 'all', // 'all' | 'main' | <subagent cascadeId>

@@ -2097,7 +2097,7 @@ test('P0 regression: V4 display-projected steps open inspector, preserve waterfa
 
   // B-05: Speed aggregation matches official summarizeSpeed (18.2 tok/s, not 55.0 tok/s) and skips <50 tok short samples
   const stepSlow = {
-    measurementVersion: 4,
+    measurementVersion: 5,
     isComplete: true,
     isCompactionStep: false,
     speedSampleEligible: true,

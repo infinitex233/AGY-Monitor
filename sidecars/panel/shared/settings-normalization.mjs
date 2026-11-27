@@ -14,6 +14,9 @@ export const THEME_ACCENT_KEYS = Object.freeze([
   'rose',
 ]);
 
+export const UI_THEME_KEYS = Object.freeze(['liquid_glass', 'default']);
+export const DEFAULT_UI_THEME = 'liquid_glass';
+
 export const FONT_SCALE_KEYS = Object.freeze(['sm', 'md', 'lg', 'xl']);
 
 export const TOPBAR_SLOT_KEYS = Object.freeze([
@@ -174,6 +177,23 @@ export function normalizeLanguageSetting(lang) {
 export function normalizeThemeAccent(accent) {
   const clean = String(accent ?? '').trim().toLowerCase();
   return THEME_ACCENT_KEYS.includes(clean) ? /** @type {any} */ (clean) : 'host';
+}
+
+/**
+ * 归一化界面视觉主题（`'liquid_glass'` | `'default'`，默认 `'liquid_glass'`）。
+ *
+ * @param {unknown} theme
+ * @returns {'liquid_glass'|'default'}
+ */
+export function normalizeUiTheme(theme) {
+  const clean = String(theme ?? '').trim().toLowerCase();
+  if (clean === 'default' || clean === 'classic' || clean === 'standard' || clean === 'native') {
+    return 'default';
+  }
+  if (clean === 'liquid_glass' || clean === 'liquid-glass' || clean === 'liquidglass' || clean === 'glass') {
+    return 'liquid_glass';
+  }
+  return DEFAULT_UI_THEME;
 }
 
 /**

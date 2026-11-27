@@ -347,6 +347,7 @@ export const TopSessionHeader = defineComponent({
 
       if (isSyncing) {
         patchSvgIcon(statusIcon, 'refresh');
+        patchClasses(statusIcon, { 'is-pulsing': false });
         patchText(statusText, t('header.statusSyncing'));
         patchClasses(statusTag, {
           'state-running': false,
@@ -355,6 +356,7 @@ export const TopSessionHeader = defineComponent({
         });
       } else if (isSynced) {
         patchSvgIcon(statusIcon, 'check');
+        patchClasses(statusIcon, { 'is-pulsing': false });
         patchText(statusText, t('header.statusSynced'));
         patchClasses(statusTag, {
           'state-running': false,
@@ -363,6 +365,7 @@ export const TopSessionHeader = defineComponent({
         });
       } else if (isError) {
         patchSvgIcon(statusIcon, 'warning');
+        patchClasses(statusIcon, { 'is-pulsing': false });
         patchText(statusText, t('header.statusRetrying'));
         patchClasses(statusTag, {
           'state-running': false,
@@ -373,7 +376,8 @@ export const TopSessionHeader = defineComponent({
         const runningAgent = (telemetry?.activeConversation?.agents || []).find((a) => a.isRunning);
         const runSuffix =
           hasSubagents && runningAgent ? ` · ${formatAgentBadgeText(runningAgent)}` : '';
-        patchSvgIcon(statusIcon, 'bolt');
+        patchSvgIcon(statusIcon, 'dot');
+        patchClasses(statusIcon, { 'is-pulsing': true });
         patchText(statusText, t('header.statusGenerating', { suffix: runSuffix }));
         patchClasses(statusTag, {
           'state-running': true,
@@ -382,6 +386,7 @@ export const TopSessionHeader = defineComponent({
         });
       } else {
         patchSvgIcon(statusIcon, 'pulse');
+        patchClasses(statusIcon, { 'is-pulsing': false });
         patchText(statusText, t('header.statusLive'));
         patchClasses(statusTag, {
           'state-running': false,

@@ -38,6 +38,43 @@ export function normalizeClientFontScale(raw) {
   return Object.prototype.hasOwnProperty.call(FONT_SCALE_FACTORS, val) ? val : 'md';
 }
 
+export function normalizeClientUiTheme(raw) {
+  const val = String(raw ?? '').trim().toLowerCase();
+  if (val === 'default' || val === 'classic' || val === 'standard' || val === 'native') {
+    return 'default';
+  }
+  if (val === 'liquid_glass' || val === 'liquid-glass' || val === 'liquidglass' || val === 'glass') {
+    return 'liquid_glass';
+  }
+  return 'liquid_glass';
+}
+
+export function resolveSettingsUiTheme(settings) {
+  if (!settings || typeof settings !== 'object') return 'liquid_glass';
+  return normalizeClientUiTheme(settings.uiTheme);
+}
+
+export function isLiquidGlassActiveForElement(el) {
+  let cur = el || null;
+  while (cur) {
+    if (typeof cur.getAttribute === 'function') {
+      const attr = cur.getAttribute('data-ui-theme');
+      if (attr) return attr === 'liquid-glass';
+    }
+    if (cur.parentNode) {
+      cur = cur.parentNode;
+    } else if (cur.host) {
+      cur = cur.host;
+    } else {
+      break;
+    }
+  }
+  if (typeof document !== 'undefined' && document.documentElement) {
+    return document.documentElement.getAttribute?.('data-ui-theme') === 'liquid-glass';
+  }
+  return false;
+}
+
 export function normalizeClientModernUi(raw) {
   if (raw === undefined || raw === null || raw === '') return true;
   if (typeof raw === 'string') {
@@ -417,6 +454,10 @@ export function applyAppearanceToRoot(targetEl, settings, { includeFontScale = t
     removeAttrIfPresent(targetEl, 'data-modern-ui');
   }
 
+  const uiThemeKey = resolveSettingsUiTheme(settings);
+  const effectiveThemeAttr = isModernUi && uiThemeKey === 'liquid_glass' ? 'liquid-glass' : 'default';
+  setAttrIfChanged(targetEl, 'data-ui-theme', effectiveThemeAttr);
+
   if (includeFontScale) {
     const scaleKey = normalizeClientFontScale(settings?.fontScale);
     const factor = FONT_SCALE_FACTORS[scaleKey] ?? 1;
@@ -429,4 +470,61 @@ export function applyAppearanceToRoot(targetEl, settings, { includeFontScale = t
     setOrClearStyleVar(targetEl, '--ui-panel-scale', '');
     removeAttrIfPresent(targetEl, 'data-font-scale');
   }
+}
+
+/**
+ * Attach cursor-tracking specular sheen coordinates (`--lg-mx`, `--lg-my`) onto
+ * Liquid Glass cards inside `rootEl`. Active only when `data-ui-theme="liquid-glass"`.
+ *
+ * @param {HTMLElement | null | undefined} rootEl
+ * @returns {() => void}
+ */
+export function attachLiquidGlassSheen(rootEl) {
+  if (!rootEl || typeof rootEl.addEventListener !== 'function') return () => {};
+  let activeCard = null;
+  let rafId = 0;
+  let pendingX = 0;
+  let pendingY = 0;
+
+  const commit = () => {
+    rafId = 0;
+    if (!activeCard || !activeCard.style) return;
+    const rect = activeCard.getBoundingClientRect?.();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+    const rx = Math.round(pendingX - rect.left);
+    const ry = Math.round(pendingY - rect.top);
+    activeCard.style.setProperty?.('--lg-mx', `${rx}px`);
+    activeCard.style.setProperty?.('--lg-my', `${ry}px`);
+  };
+
+  const onPointerMove = (e) => {
+    if (!isLiquidGlassActiveForElement(rootEl)) return;
+    const target = e?.target;
+    const card = target?.closest?.('.panel, .matrix-cell, .live-task-card');
+    if (!card || !rootEl.contains?.(card)) {
+      activeCard = null;
+      return;
+    }
+    activeCard = card;
+    pendingX = Number(e.clientX || 0);
+    pendingY = Number(e.clientY || 0);
+    if (!rafId && typeof requestAnimationFrame === 'function') {
+      rafId = requestAnimationFrame(commit);
+    }
+  };
+
+  const onPointerLeave = () => {
+    activeCard = null;
+  };
+
+  rootEl.addEventListener('pointermove', onPointerMove, { passive: true });
+  rootEl.addEventListener('pointerleave', onPointerLeave, { passive: true });
+  return () => {
+    if (rafId && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+    rootEl.removeEventListener('pointermove', onPointerMove);
+    rootEl.removeEventListener('pointerleave', onPointerLeave);
+  };
 }
