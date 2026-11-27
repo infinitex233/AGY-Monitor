@@ -376,6 +376,7 @@ export function computeRuntimeCodeVersion(options = {}) {
     join(HERE, 'cli-statusline.mjs'),
     join(HERE, 'trajectory-metrics.mjs'),
     LOCAL_CATALOG_FILE,
+    PLUGIN_MANIFEST_FILE,
   ];
   for (const subDir of ['shared', 'backend']) {
     const absDir = join(HERE, subDir);
@@ -402,7 +403,13 @@ export function computeRuntimeCodeVersion(options = {}) {
       // 忽略单文件 stat 异常
     }
   }
-  cachedRuntimeCodeVersion = String(maxMtime || nowMs);
+  const manifest = loadJson(PLUGIN_MANIFEST_FILE, null);
+  const rawVer = typeof manifest?.version === 'string' ? manifest.version.trim() : '';
+  const semver = /^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(rawVer)
+    ? rawVer.replace(/^v/i, '')
+    : '';
+  const mtimePart = String(maxMtime || nowMs);
+  cachedRuntimeCodeVersion = semver ? `${semver}:${mtimePart}` : mtimePart;
   cachedRuntimeCodeVersionExpiresAt = nowMs + RUNTIME_CODE_VERSION_TTL_MS;
   return cachedRuntimeCodeVersion;
 }

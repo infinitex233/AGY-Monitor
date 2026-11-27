@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { backendHarness } from './backend-harness.mjs';
+import { touchInstalledRuntimeMtimes } from '../backend/plugin-updater.mjs';
 
 const createdAtMs = Date.now() - 20_000;
 function makeStep(index, modelKey, responseModel = '') {
@@ -647,4 +651,54 @@ test('argon-b / argon-trial deployment shards resolve phased pricing without wil
     'https://github.com/custom-contributor/antigravity-usage-monitor/releases/latest'
   );
   assert.equal(forkH.resolveModelInfo('gemini-5-experimental').pricing.input, 6.0);
+});
+
+test('touchInstalledRuntimeMtimes advances backdated runtime files while preserving .git and .data', (t) => {
+  const rootDir = mkdtempSync(join(tmpdir(), 'ag-um-touch-mtime-'));
+  t.after(() => {
+    try {
+      rmSync(rootDir, { recursive: true, force: true });
+    } catch {
+      // ignore temp cleanup error
+    }
+  });
+
+  const panelDir = join(rootDir, 'sidecars', 'panel');
+  const gitDir = join(rootDir, '.git');
+  const dataDir = join(rootDir, '.data');
+  mkdirSync(panelDir, { recursive: true });
+  mkdirSync(gitDir, { recursive: true });
+  mkdirSync(dataDir, { recursive: true });
+
+  const runtimeFiles = [
+    join(rootDir, 'plugin.json'),
+    join(panelDir, 'app.js'),
+    join(panelDir, 'main.mjs'),
+  ];
+  const protectedFiles = [
+    join(gitDir, 'HEAD'),
+    join(dataDir, 'settings.json'),
+  ];
+
+  const eightHoursAgo = new Date(Date.now() - 8 * 3600 * 1000);
+  for (const file of [...runtimeFiles, ...protectedFiles]) {
+    writeFileSync(file, '{}', 'utf8');
+    utimesSync(file, eightHoursAgo, eightHoursAgo);
+  }
+
+  const stampedMs = Date.now() + 5000;
+  touchInstalledRuntimeMtimes(rootDir, stampedMs);
+
+  for (const file of runtimeFiles) {
+    assert.ok(
+      statSync(file).mtimeMs >= stampedMs - 2000,
+      `Runtime file ${file} mtime should be stamped forward`
+    );
+  }
+  for (const file of protectedFiles) {
+    assert.ok(
+      statSync(file).mtimeMs < stampedMs - 3600 * 1000,
+      `Protected file ${file} mtime must remain untouched`
+    );
+  }
 });

@@ -9,6 +9,7 @@ import vm from 'node:vm';
 import { MockMutationObserver, createMockDom } from './mock-dom.mjs';
 import {
   associateIdeIframeRoutes,
+  compareBundleVersions,
   createWindowBridgeController,
   ensureIdeRemoteDebuggingArgv,
   ensureRemoteDebuggingInArgvText,
@@ -5948,5 +5949,175 @@ test('WindowOverlayShell mirrors host --font-sans and --font-mono onto portalHos
     globalThis.ResizeObserver = prevRo;
     globalThis.MutationObserver = prevMo;
     globalThis.fetch = prevFetch;
+  }
+});
+
+test('compareBundleVersions prioritizes SemVer over cross-timezone mtime and prevents reload deadlock', async () => {
+  // 1. SemVer beats older mtime (e.g. UTC-packed ZIP unpacked in UTC+8)
+  assert.equal(compareBundleVersions('1.1.1:1795728814000', '1.0.2:1795753106634'), 1);
+  assert.equal(compareBundleVersions('1.0.2:1795753106634', '1.1.1:1795728814000'), -1);
+
+  // 2. SemVer-tagged format supersedes legacy bare-timestamp format even with older mtime
+  assert.equal(compareBundleVersions('1.1.0:1795728814000', '1795753106634'), 1);
+  assert.equal(compareBundleVersions('1795753106634', '1.1.0:1795728814000'), -1);
+
+  // 3. Same SemVer tie-breaks by mtime; legacy bare timestamps still compare numerically; opaque strings return 0
+  assert.equal(compareBundleVersions('1.1.0:2000', '1.1.0:1000'), 1);
+  assert.equal(compareBundleVersions('1.1.0:2000', '1.1.0:2000'), 0);
+  assert.equal(compareBundleVersions('2000', '1000'), 1);
+  assert.equal(compareBundleVersions('bundle-v2', 'bundle-v1'), 0);
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ag-wm-drift-guard-'));
+  const portFile = path.join(tmpDir, 'DevToolsActivePort');
+  const winObj = {};
+  winObj.window = winObj;
+  winObj.globalThis = winObj;
+  const winCtx = vm.createContext(winObj);
+
+  class MockDriftWs {
+    constructor(url) {
+      this.url = url;
+      this.listeners = new Map();
+      queueMicrotask(() => this._emit('open', {}));
+    }
+    addEventListener(type, fn) {
+      if (!this.listeners.has(type)) this.listeners.set(type, []);
+      this.listeners.get(type).push(fn);
+    }
+    send(raw) {
+      const msg = JSON.parse(raw);
+      if (msg.method === 'Runtime.evaluate') {
+        const value = vm.runInContext(msg.params.expression, winCtx);
+        Promise.resolve(value).then((result) =>
+          this._emit('message', {
+            data: JSON.stringify({ id: msg.id, result: { result: { value: result } } }),
+          })
+        );
+      }
+    }
+    close() {}
+    _emit(type, ev) {
+      for (const fn of this.listeners.get(type) || []) fn(ev);
+    }
+  }
+
+  const cdpSrv = http.createServer((req, res) => {
+    if (req.url === '/json/list') {
+      const p = cdpSrv.address().port;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify([
+          {
+            id: 'win-main',
+            type: 'page',
+            url: 'https://127.0.0.1:61234/c/11111111-1111-1111-1111-111111111111',
+            webSocketDebuggerUrl: `ws://127.0.0.1:${p}/devtools/page/win-main`,
+          },
+        ])
+      );
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+
+  await new Promise((resolve) => cdpSrv.listen(0, '127.0.0.1', resolve));
+  fs.writeFileSync(portFile, `${cdpSrv.address().port}\n/devtools/browser/mock`, 'utf8');
+
+  const mockAppJs = `
+    (() => {
+      window.__AGUsageMonitorOverlay?.dispose?.();
+      const br = window.__AGUsageMonitorBridge;
+      let alive = true;
+      window.__AGUsageMonitorOverlay = {
+        bundleVersion: br.bundleVersion,
+        ensureAlive: () => alive,
+        dispose: () => { alive = false; },
+      };
+    })();
+  `;
+
+  try {
+    // Scenario A: Legacy bare timestamp in window ('1795753106634') vs SemVer-tagged bundle with older mtime
+    vm.runInContext(
+      `window.__AGUsageMonitorOverlay = { bundleVersion: '1795753106634', ensureAlive: () => true, dispose: () => {} };`,
+      winCtx
+    );
+    let driftCalls = 0;
+    let diskVer = '1.1.1:1795728814000';
+    const ctrlA = createWindowBridgeController({
+      handleApiRequest: async () => ({ status: 200, body: '{}' }),
+      readAssetFn: async (rel) => (rel === 'styles.css' ? ':host{}' : mockAppJs),
+      getSettingsFn: () => ({ enableWindowOverlay: true }),
+      getBundleVersionFn: () => diskVer,
+      bootBundleVersion: diskVer,
+      onVersionDrift: () => {
+        driftCalls += 1;
+      },
+      env: { ANTIGRAVITY_DEVTOOLS_PORT_FILE: portFile },
+      WebSocketImpl: MockDriftWs,
+    });
+    const resA = await ctrlA.syncAllWindows();
+    assert.equal(driftCalls, 0);
+    assert.equal(resA.injected, 1);
+    assert.equal(winCtx.__AGUsageMonitorOverlay.bundleVersion, '1.1.1:1795728814000');
+    await ctrlA.stop();
+
+    // Scenario B: Same SemVer but window has higher mtime while disk already matches bootBundleVersion -> no reload deadlock, re-injects authoritative disk bundle
+    vm.runInContext(
+      `window.__AGUsageMonitorOverlay = { bundleVersion: '1.1.1:2000', ensureAlive: () => true, dispose: () => {} };`,
+      winCtx
+    );
+    driftCalls = 0;
+    diskVer = '1.1.1:1000';
+    const ctrlB = createWindowBridgeController({
+      handleApiRequest: async () => ({ status: 200, body: '{}' }),
+      readAssetFn: async (rel) => (rel === 'styles.css' ? ':host{}' : mockAppJs),
+      getSettingsFn: () => ({ enableWindowOverlay: true }),
+      getBundleVersionFn: () => diskVer,
+      bootBundleVersion: '1.1.1:1000',
+      onVersionDrift: () => {
+        driftCalls += 1;
+      },
+      env: { ANTIGRAVITY_DEVTOOLS_PORT_FILE: portFile },
+      WebSocketImpl: MockDriftWs,
+    });
+    const resB = await ctrlB.syncAllWindows();
+    assert.equal(driftCalls, 0);
+    assert.equal(resB.injected, 1);
+    assert.equal(winCtx.__AGUsageMonitorOverlay.bundleVersion, '1.1.1:1000');
+    await ctrlB.stop();
+
+    // Scenario C: Genuine disk drift (old worker booted with '1.1.1:1000', window & disk are '1.1.2:2000') -> triggers onVersionDrift without downgrading window
+    vm.runInContext(
+      `window.__AGUsageMonitorOverlay = { bundleVersion: '1.1.2:2000', ensureAlive: () => true, dispose: () => {} };`,
+      winCtx
+    );
+    driftCalls = 0;
+    let callCount = 0;
+    const ctrlC = createWindowBridgeController({
+      handleApiRequest: async () => ({ status: 200, body: '{}' }),
+      readAssetFn: async (rel) => (rel === 'styles.css' ? ':host{}' : mockAppJs),
+      getSettingsFn: () => ({ enableWindowOverlay: true }),
+      getBundleVersionFn: (opts) => {
+        callCount += 1;
+        return opts?.force ? '1.1.2:2000' : '1.1.1:1000';
+      },
+      bootBundleVersion: '1.1.1:1000',
+      onVersionDrift: () => {
+        driftCalls += 1;
+      },
+      env: { ANTIGRAVITY_DEVTOOLS_PORT_FILE: portFile },
+      WebSocketImpl: MockDriftWs,
+    });
+    const resC = await ctrlC.syncAllWindows();
+    assert.ok(callCount >= 2);
+    assert.equal(driftCalls, 1);
+    assert.equal(resC.injected, 0);
+    assert.equal(winCtx.__AGUsageMonitorOverlay.bundleVersion, '1.1.2:2000');
+    await ctrlC.stop();
+  } finally {
+    await new Promise((resolve) => cdpSrv.close(resolve));
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });

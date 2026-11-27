@@ -130,6 +130,18 @@ export function collectReleaseRuntimeFiles(repoRoot = DEFAULT_REPO_ROOT) {
   return uniqueSorted;
 }
 
+function buildUtcTimestampExtraField(date) {
+  const ms =
+    date instanceof Date && Number.isFinite(date.getTime()) ? date.getTime() : Date.now();
+  const unixSec = Math.max(0, Math.min(0xffffffff, Math.floor(ms / 1000)));
+  const buf = Buffer.alloc(9);
+  buf.writeUInt16LE(0x5455, 0); // Info-ZIP Extended Timestamp ("UT")
+  buf.writeUInt16LE(5, 2); // flags (1B) + UTC mtime (4B)
+  buf.writeUInt8(0x01, 4); // mtime present
+  buf.writeUInt32LE(unixSec >>> 0, 5);
+  return buf;
+}
+
 /**
  * Builds a standard PKZIP (DEFLATE level 9, UTF-8 POSIX entry names) buffer in pure Node.js.
  *
@@ -151,6 +163,7 @@ export function buildZipBuffer(entries) {
     const method = useDeflate ? 8 : 0;
     const checksum = crc32(rawBuf);
     const { dosTime, dosDate } = toDosTimeDate(entry.mtime);
+    const extraField = buildUtcTimestampExtraField(entry.mtime);
 
     const localHeader = Buffer.alloc(30);
     localHeader.writeUInt32LE(0x04034b50, 0);
@@ -163,9 +176,9 @@ export function buildZipBuffer(entries) {
     localHeader.writeUInt32LE(payload.length, 18);
     localHeader.writeUInt32LE(rawBuf.length, 22);
     localHeader.writeUInt16LE(nameBuf.length, 26);
-    localHeader.writeUInt16LE(0, 28);
+    localHeader.writeUInt16LE(extraField.length, 28);
 
-    localParts.push(localHeader, nameBuf, payload);
+    localParts.push(localHeader, nameBuf, extraField, payload);
 
     const centralHeader = Buffer.alloc(46);
     centralHeader.writeUInt32LE(0x02014b50, 0);
@@ -179,15 +192,15 @@ export function buildZipBuffer(entries) {
     centralHeader.writeUInt32LE(payload.length, 20);
     centralHeader.writeUInt32LE(rawBuf.length, 24);
     centralHeader.writeUInt16LE(nameBuf.length, 28);
-    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(extraField.length, 30);
     centralHeader.writeUInt16LE(0, 32);
     centralHeader.writeUInt16LE(0, 34);
     centralHeader.writeUInt16LE(0, 36);
     centralHeader.writeUInt32LE((0o100644 << 16) >>> 0, 38); // regular file mode
     centralHeader.writeUInt32LE(offset, 42);
 
-    centralParts.push(centralHeader, nameBuf);
-    offset += localHeader.length + nameBuf.length + payload.length;
+    centralParts.push(centralHeader, nameBuf, extraField);
+    offset += localHeader.length + nameBuf.length + extraField.length + payload.length;
   }
 
   const centralDirBuf = Buffer.concat(centralParts);

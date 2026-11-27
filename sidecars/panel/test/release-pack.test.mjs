@@ -64,6 +64,11 @@ test('pack-release-zip ships only runtime-essential files, excludes dev bloat, a
   const summary = packReleaseZip({ repoRoot: DEFAULT_REPO_ROOT, outFile: zipPath });
 
   assert.ok(existsSync(zipPath));
+  const zipBuf = readFileSync(zipPath);
+  assert.ok(
+    zipBuf.includes(Buffer.from([0x55, 0x54, 0x05, 0x00, 0x01])),
+    'ZIP entries must include Info-ZIP 0x5455 UTC extended timestamps'
+  );
   assert.ok(summary.zipBytes > 100 * 1024, 'ZIP should contain compiled assets and backend');
   assert.ok(
     summary.zipBytes < 900 * 1024,

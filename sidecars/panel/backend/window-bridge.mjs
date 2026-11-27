@@ -59,6 +59,7 @@ import {
 } from './endpoint-registry.mjs';
 import { getLocalHubPorts } from './ls-discovery.mjs';
 import { callLsRpc, getContextModelCatalog } from './ls-rpc.mjs';
+import { compareSemver } from './pricing-catalog.mjs';
 import { getDefaultCloudCodeProxy } from './cloudcode-proxy.mjs';
 
 const windowBridgeRef = `window[${JSON.stringify(WINDOW_BRIDGE_KEY)}]`;
@@ -1108,6 +1109,56 @@ function verifyBridgeToken(actual, expected, timingSafeEqualFn = null) {
 }
 
 /**
+ * 解析运行时 `bundleVersion` 字符串（支持 `"semver:mtimeMs"` 与旧版纯 `"mtimeMs"` 两种格式）。
+ *
+ * @param {unknown} raw
+ * @returns {{ semver: string, mtimeMs: number }}
+ */
+export function parseBundleVersion(raw) {
+  const str = String(raw || '').trim();
+  if (!str) return { semver: '', mtimeMs: 0 };
+  const taggedMatch = str.match(
+    /^v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?):(\d+)$/
+  );
+  if (taggedMatch) {
+    return {
+      semver: taggedMatch[1],
+      mtimeMs: Number(taggedMatch[2]) || 0,
+    };
+  }
+  if (/^\d+$/.test(str)) {
+    return { semver: '', mtimeMs: Number(str) || 0 };
+  }
+  return { semver: '', mtimeMs: 0 };
+}
+
+/**
+ * 比较两个 `bundleVersion`：优先按 SemVer 2.0 语义化版本裁决，同版本再比较 mtime；
+ * 带 SemVer 标签的新格式始终高于旧版纯时间戳格式，避免跨时区解压导致时间戳倒退误判。
+ *
+ * @param {unknown} a
+ * @param {unknown} b
+ * @returns {-1 | 0 | 1}
+ */
+export function compareBundleVersions(a, b) {
+  const pa = parseBundleVersion(a);
+  const pb = parseBundleVersion(b);
+  if (pa.semver && pb.semver) {
+    const semCmp = compareSemver(pa.semver, pb.semver);
+    if (semCmp !== 0) return semCmp;
+    if (pa.mtimeMs === pb.mtimeMs) return 0;
+    return pa.mtimeMs > pb.mtimeMs ? 1 : -1;
+  }
+  if (pa.semver && !pb.semver && pb.mtimeMs > 0) return 1;
+  if (!pa.semver && pa.mtimeMs > 0 && pb.semver) return -1;
+  if (!pa.semver && !pb.semver && pa.mtimeMs > 0 && pb.mtimeMs > 0) {
+    if (pa.mtimeMs === pb.mtimeMs) return 0;
+    return pa.mtimeMs > pb.mtimeMs ? 1 : -1;
+  }
+  return 0;
+}
+
+/**
  * 创建双栖模式桥接与 CDP 热挂载控制器实例。
  *
  * @param {{
@@ -1154,6 +1205,12 @@ export function createWindowBridgeController(options) {
 
   const activeCloudCodeProxy =
     cloudCodeProxy || (manageCloudCodeProxy ? getDefaultCloudCodeProxy() : null);
+
+  function hasDiskVersionDrifted() {
+    if (!bootBundleVersion) return false;
+    const latestDiskVer = String(getBundleVersionFn({ force: true }) || '');
+    return Boolean(latestDiskVer && latestDiskVer !== String(bootBundleVersion));
+  }
 
   function isPidAlive(pid) {
     if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -1892,13 +1949,18 @@ export function createWindowBridgeController(options) {
       const leasePid = Number(lease?.pid || 0);
       const leaseAgeMs = Date.now() - Number(lease?.updatedAtMs || 0);
       if (leasePid > 0 && leasePid !== process.pid && leaseAgeMs >= 0 && leaseAgeMs < 9000 && isPidAlive(leasePid)) {
-        const leaseVerNum = Number(lease?.bundleVersion) || 0;
-        const myVerNum = Number(bundleVersion) || 0;
-        if (leaseVerNum > myVerNum) {
+        const leaseCmp = compareBundleVersions(lease?.bundleVersion, bundleVersion);
+        if (leaseCmp > 0 && hasDiskVersionDrifted()) {
           onVersionDrift?.();
           return { ok: false, enabled: true, reason: 'older_than_leader', injected: 0 };
         }
-        if (leaseVerNum === myVerNum || String(lease?.bundleVersion || '') === bundleVersion) {
+        if (
+          leaseCmp > 0 ||
+          (leaseCmp === 0 &&
+            (String(lease?.bundleVersion || '') === bundleVersion ||
+              (parseBundleVersion(lease?.bundleVersion).mtimeMs > 0 &&
+                parseBundleVersion(bundleVersion).mtimeMs > 0)))
+        ) {
           const mergedConfigured = Boolean(
             lease?.launcherConfigured || lease?.argvConfigured || launcherConfigured || argvConfigured
           );
@@ -2470,9 +2532,8 @@ export function createWindowBridgeController(options) {
         const snap = probeRes?.result?.result?.value;
         probedRouteId = sanitizeRouteCascadeId(snap?.routeCascadeId);
         if (snap && snap.alive === true) {
-          const snapVerNum = Number(snap.bundleVersion) || 0;
-          const curVerNum = Number(bundleVersion) || 0;
-          if (snapVerNum > 0 && curVerNum > 0 && snapVerNum > curVerNum) {
+          const snapCmp = compareBundleVersions(snap.bundleVersion, bundleVersion);
+          if (snapCmp > 0 && hasDiskVersionDrifted()) {
             onVersionDrift?.();
             aliveCount += 1;
             return {

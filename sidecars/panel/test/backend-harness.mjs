@@ -119,6 +119,7 @@ export function backendHarness({
     console:{error:m=>state.errors.push(m)},
     cpSync:()=>{},
     rmSync:()=>{},
+    utimesSync:()=>{},
     renameSync:(from, to)=>{
       const key = String(from);
       if (pendingTmpWrites.has(key)) {

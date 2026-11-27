@@ -17,7 +17,16 @@
  */
 
 import { execFile } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, join } from 'node:path';
 import {
   CLOUD_CATALOG_URLS,
@@ -32,6 +41,7 @@ import {
   PLUGIN_ROOT,
   REMOTE_CATALOG_CACHE_FILE,
   cloudSyncState,
+  computeRuntimeCodeVersion,
   loadJson,
   loadSettings,
   lsRuntimeEndpoint,
@@ -184,6 +194,61 @@ function pruneExtraneousFiles(targetDir, referenceDir) {
       pruneExtraneousFiles(targetChild, refChild);
     }
   }
+}
+
+function parseBundleMtimeMs(raw) {
+  const str = String(raw || '').trim();
+  if (!str) return 0;
+  const colonIdx = str.lastIndexOf(':');
+  const tail = colonIdx >= 0 ? str.slice(colonIdx + 1) : str;
+  if (!/^\d+$/.test(tail)) return 0;
+  const num = Number(tail);
+  return Number.isFinite(num) && num > 0 ? num : 0;
+}
+
+/**
+ * 将覆盖写入的插件运行时文件时间戳刷新为不早于 `targetTimeMs` 的时间点，
+ * 防止跨时区 ZIP 解压产生的文件 mtime 倒退引发 Sidecar 误判版本漂移死循环。
+ *
+ * @param {string} rootDir
+ * @param {number} [targetTimeMs=Date.now()]
+ */
+export function touchInstalledRuntimeMtimes(rootDir, targetTimeMs = Date.now()) {
+  if (!rootDir || !existsSync(rootDir) || typeof utimesSync !== 'function') return;
+  const safeMs =
+    Number.isFinite(Number(targetTimeMs)) && Number(targetTimeMs) > 0
+      ? Math.floor(Number(targetTimeMs))
+      : Date.now();
+  const targetDate = new Date(safeMs);
+  const visit = (dirPath) => {
+    let names = [];
+    try {
+      names = readdirSync(dirPath);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      const childPath = join(dirPath, name);
+      if (!isSafeCopyPath(childPath)) continue;
+      let st = null;
+      try {
+        st = statSync(childPath, { throwIfNoEntry: false });
+      } catch {
+        st = null;
+      }
+      if (!st) continue;
+      if (st.isDirectory?.()) {
+        visit(childPath);
+      } else if (st.isFile?.()) {
+        try {
+          utimesSync(childPath, targetDate, targetDate);
+        } catch {
+          // 忽略单文件时间戳刷新异常
+        }
+      }
+    }
+  };
+  visit(rootDir);
 }
 
 /**
@@ -537,6 +602,7 @@ export async function performPluginUpdate({ isAuto = false } = {}) {
           await verifyPluginJsSyntax(extractedRoot);
 
           // 备份当前插件根目录关键文件，覆盖后清理已废弃旧文件；若覆盖途中异常则完整回滚并移除残留新文件
+          const prevBundleMtimeMs = parseBundleMtimeMs(computeRuntimeCodeVersion({ force: true }));
           mkdirSync(backupDir, { recursive: true });
           cpSync(PLUGIN_ROOT, backupDir, { recursive: true, force: true, filter: isSafeCopyPath });
           try {
@@ -546,6 +612,9 @@ export async function performPluginUpdate({ isAuto = false } = {}) {
               filter: isSafeCopyPath,
             });
             pruneExtraneousFiles(PLUGIN_ROOT, extractedRoot);
+            const stampedMs = Math.max(Date.now(), prevBundleMtimeMs + 1000);
+            touchInstalledRuntimeMtimes(PLUGIN_ROOT, stampedMs);
+            computeRuntimeCodeVersion({ force: true });
           } catch (copyErr) {
             try {
               cpSync(backupDir, PLUGIN_ROOT, {
