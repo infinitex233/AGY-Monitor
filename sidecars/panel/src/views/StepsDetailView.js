@@ -5,6 +5,7 @@
  * - 总汇总视图提供会话线性走势图、多模型同图趋势拟合曲线与极简高密度模型总览卡片。
  */
 
+import { mergeSpeedRateBins } from '../../shared/telemetry-display-rules.mjs';
 import { resolveSettingsModernUi } from '../core/appearance.js';
 import { defineComponent } from '../core/component.js';
 import {
@@ -116,7 +117,8 @@ export function mergeSelectedAgentUnits(units) {
           anomalyDangerCount: 0,
           anomalyTotalDelaySec: 0,
           anomalyByKind: {},
-          _hasAnySpeedSummary: false,
+          _speedSummaries: [],
+          _allSpeedHaveBins: true,
           _speedTokens: 0,
           _speedSeconds: 0,
           _speedSampleCount: 0,
@@ -179,7 +181,6 @@ export function mergeSelectedAgentUnits(units) {
         rawSpeedSec > 0 &&
         rawSpeedTok >= 0
       ) {
-        acc._hasAnySpeedSummary = true;
         acc._speedTokens += rawSpeedTok;
         acc._speedSeconds += rawSpeedSec;
       } else if (Number.isFinite(Number(m.avgTokPerSec)) && Number(m.avgTokPerSec) > 0) {
@@ -187,8 +188,11 @@ export function mergeSelectedAgentUnits(units) {
         acc._speedTokens += fallbackTok;
         acc._speedSeconds += fallbackTok / Number(m.avgTokPerSec);
       }
+      if (Number(m.avgTokPerSec) > 0 && !m.speedSummary?.rateBins) {
+        acc._allSpeedHaveBins = false;
+      }
       if (m.speedSummary) {
-        acc._hasAnySpeedSummary = true;
+        acc._speedSummaries.push(m.speedSummary);
         acc._speedSampleCount += Math.max(0, Number(m.speedSummary.sampleCount || 0));
         acc._speedExcludedCount += Math.max(0, Number(m.speedSummary.excludedCount || 0));
         if (m.speedSummary.excludedReasons && typeof m.speedSummary.excludedReasons === 'object') {
@@ -222,7 +226,10 @@ export function mergeSelectedAgentUnits(units) {
   const mergedModels = Array.from(modelMap.values())
     .map((acc) => {
       const promptTok = acc.inputTokens + acc.cacheReadTokens;
-      const rawAvgTps = acc._speedSeconds > 0 ? acc._speedTokens / acc._speedSeconds : null;
+      const mergedRates = acc._allSpeedHaveBins ? mergeSpeedRateBins(acc._speedSummaries) : null;
+      const rawAvgTps = mergedRates
+        ? mergedRates.avgTokPerSec
+        : acc._speedSeconds > 0 ? acc._speedTokens / acc._speedSeconds : null;
       return {
         label: acc.label,
         shortName: acc.shortName,
@@ -242,7 +249,7 @@ export function mergeSelectedAgentUnits(units) {
         avgTtftSec:
           acc._ttftWeight > 0 ? +(acc._ttftWeightedSum / acc._ttftWeight).toFixed(1) : null,
         ttftSampleCount: acc._ttftSampleCount,
-        ...(acc._hasAnySpeedSummary
+        ...(acc._speedSummaries.length > 0
           ? {
               speedSummary: {
                 tokens: acc._speedTokens,
@@ -251,6 +258,7 @@ export function mergeSelectedAgentUnits(units) {
                 excludedCount: acc._speedExcludedCount,
                 excludedReasons: acc._speedExcludedReasons,
                 avgTokPerSec: rawAvgTps,
+                ...mergedRates,
               },
             }
           : {}),

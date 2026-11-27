@@ -9,6 +9,7 @@
  * 5. 按月细分：12 个月垂直 4 段堆叠柱状图，直观对比全年各月费用、Token 总量与缓存/思考结构。
  */
 
+import { mergeSpeedRateBins } from '../../shared/telemetry-display-rules.mjs';
 import { defineComponent } from '../core/component.js';
 import {
   h,
@@ -384,6 +385,14 @@ export const ConsumptionView = defineComponent({
     function resolveAggregateAvgSpeed(acct, models) {
       const direct = Number(acct?.avgTokPerSec);
       if (Number.isFinite(direct) && direct > 0) return direct;
+      const list = models || [];
+      const allSpeedHaveBins = list.every(
+        (m) => !(Number(m?.avgTokPerSec) > 0) || Boolean(m?.speedSummary?.rateBins)
+      );
+      const mergedRates = allSpeedHaveBins
+        ? mergeSpeedRateBins(list.map((m) => m?.speedSummary))
+        : null;
+      if (mergedRates) return mergedRates.avgTokPerSec ?? 0;
       let sumTok = 0;
       let sumSec = 0;
       for (const m of models || []) {

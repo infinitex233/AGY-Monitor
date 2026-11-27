@@ -486,6 +486,16 @@ test('ConsumptionView: Top Models color dot + % bar, clutter-free Client Sources
     trendChannelsEl.querySelectorAll('.cons-pop-chan-val').map((el) => el.textContent),
     ['20.0k', '60.0k', '5.0k', '15.0k']
   );
+
+  const histogramTelemetry = structuredClone(baseTelemetry);
+  delete histogramTelemetry.consumption.account.avgTokPerSec;
+  histogramTelemetry.modelBreakdown = [
+    { ...mArgon, avgTokPerSec: 100, speedSummary: { avgTokPerSec: 100, rateBins: { 632: 3 } } },
+    { ...mCarbon, avgTokPerSec: 10, speedSummary: { avgTokPerSec: 10, rateBins: { 516: 1 } } },
+  ];
+  telemetryStore.setState({ telemetry: histogramTelemetry }, { sync: true });
+  await Promise.resolve();
+  assert.equal(view.el.querySelector('.cons-hero-speed')?.textContent, '99.9 tok/s');
 });
 
 test('selectConsumptionTimeRange serves prefetched presets with 0 network calls, blocks stale 2s poll overwrites, and TrendAreaChart heatmap batches via DocumentFragment', async (t) => {

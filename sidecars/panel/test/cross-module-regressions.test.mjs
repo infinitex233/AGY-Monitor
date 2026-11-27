@@ -423,6 +423,16 @@ test('BUG-09, BUG-14 & BUG-15: SemVer 2.0 prerelease/build ordering and zero quo
   assert.equal(speedReasonText('short_timing'), '耗时过短 (<0.5s)');
 });
 
+test('decode speed exclusions have Chinese and English labels', (t) => {
+  const prevLocale = i18nStore.getState().locale;
+  t.after(() => setI18nLanguage(prevLocale));
+  const reasons = ['missing_ttft', 'short_decode', 'held_burst', 'speed_outlier'];
+  setI18nLanguage('zh-CN');
+  assert.deepEqual(reasons.map(speedReasonText), ['缺少首字耗时', '解码过短 (<0.1s)', '缓冲突发', '速率异常 (>10k)']);
+  setI18nLanguage('en-US');
+  assert.deepEqual(reasons.map(speedReasonText), ['Missing TTFT', 'Decode too brief (<0.1s)', 'Buffered burst', 'Speed outlier (>10k)']);
+});
+
 test('BUG-17 & CANCEL-06: extractContextBreakdown classifies messagePrompts when children are empty and blocks post-compaction carryover', () => {
   const ctx = extractContextBreakdown({
     chatStartMetadata: {

@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { extractShortPromptTitle } from '../shared/prompt-clean.mjs';
 import {
+  MEASUREMENT_VERSION,
   extractLiveActivity,
   extractModelSteps,
   extractSwarmMetaFromSteps,
@@ -22,14 +23,13 @@ import {
   parseSwarmWorkerRole,
 } from '../trajectory-metrics.mjs';
 import {
-  ANNOTATION_DIRS,
-  BRAIN_DIR,
-  BRAIN_DIRS,
   CACHE_SCHEMA_VERSION,
   CONVERSATIONS_DIR,
-  CONVERSATION_DIRS,
-  DEEP_STATS_CACHE_CANDIDATES,
   externalDeepStatsMemo,
+  getAnnotationDirs,
+  getBrainDirs,
+  getConversationDirs,
+  getDeepStatsCacheCandidates,
   loadJson,
   localSummaryMemo,
 } from './config.mjs';
@@ -55,6 +55,7 @@ import {
 
 const CONV_FILE_RE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(db|pb|db-wal)$/i;
 const TRANSCRIPT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ACP_APP_DATA_PATH_RE = /(?:^|[\\/])antigravity-acp(?:[\\/]|$)/i;
 
 const brainDirListingMemo = new Map();
 const knownExistingTranscriptPaths = new Set();
@@ -67,13 +68,9 @@ let knownBrainCascadeSetRootsKey = '';
  *
  * @returns {Map<string, string[]>}
  */
-function discoverLocalConversationFiles() {
+function discoverLocalConversationFiles({ force = false } = {}) {
   const map = new Map();
-  const convDirs =
-    Array.isArray(CONVERSATION_DIRS) && CONVERSATION_DIRS.length > 0
-      ? CONVERSATION_DIRS
-      : [CONVERSATIONS_DIR];
-  for (const dir of convDirs) {
+  for (const dir of getConversationDirs({ force })) {
     if (!dir || !existsSync(dir)) continue;
     try {
       for (const rawName of readdirSync(dir)) {
@@ -89,8 +86,7 @@ function discoverLocalConversationFiles() {
     }
   }
 
-  const brainDirs =
-    Array.isArray(BRAIN_DIRS) && BRAIN_DIRS.length > 0 ? BRAIN_DIRS : [BRAIN_DIR];
+  const brainDirs = getBrainDirs();
   const nextBrainUuidSet = new Set();
   for (const dir of brainDirs) {
     if (!dir || !existsSync(dir)) continue;
@@ -130,9 +126,8 @@ function discoverLocalConversationFiles() {
   knownBrainCascadeSet = nextBrainUuidSet.size > 0 ? nextBrainUuidSet : null;
   knownBrainCascadeSetRootsKey = brainDirs.join('|');
 
-  const annotationDirs = Array.isArray(ANNOTATION_DIRS) ? ANNOTATION_DIRS : [];
-  if (annotationDirs.length > 0 && map.size > 0) {
-    for (const annDir of annotationDirs) {
+  if (map.size > 0) {
+    for (const annDir of getAnnotationDirs()) {
       if (!annDir || !existsSync(annDir)) continue;
       try {
         for (const rawName of readdirSync(annDir)) {
@@ -178,7 +173,7 @@ function readConversationMtime(files = []) {
 export function loadExternalDeepStatsCache() {
   const sigParts = [];
   const existingFiles = [];
-  for (const candidate of DEEP_STATS_CACHE_CANDIDATES) {
+  for (const candidate of getDeepStatsCacheCandidates()) {
     if (!existsSync(candidate)) continue;
     try {
       const st = statSync(candidate);
@@ -573,11 +568,8 @@ export function collectAuthoritativeLiveCascadeIds(endpoint = null) {
       ? new Set(endpoint.lastKnownLiveCascadeIds)
       : null;
   }
-  const convDirs =
-    Array.isArray(CONVERSATION_DIRS) && CONVERSATION_DIRS.length > 0
-      ? CONVERSATION_DIRS
-      : [CONVERSATIONS_DIR];
-  const hasAnyLocalConvDir = convDirs.some((d) => Boolean(d && existsSync(d)));
+  const hasAnyLocalConvDir = getConversationDirs({ force: true }).some((dir) => existsSync(dir));
+  localSummaryMemo.rootsKey = '';
   localSummaryMemo.sig = '';
   localSummaryMemo.byRootsKey.clear();
   brainDirListingMemo.clear();
@@ -650,7 +642,7 @@ function findSwarmMembersPath(cascadeId) {
   if (!cascadeId) return '';
   const normId = String(cascadeId).trim().toLowerCase();
   if (!UUID_RE.test(normId)) return '';
-  const dirs = Array.isArray(BRAIN_DIRS) && BRAIN_DIRS.length > 0 ? BRAIN_DIRS : [BRAIN_DIR];
+  const dirs = getBrainDirs();
   if (
     knownBrainCascadeSet &&
     knownBrainCascadeSetRootsKey === dirs.join('|') &&
@@ -777,7 +769,7 @@ function findTranscriptPath(cascadeId) {
   if (!cascadeId) return '';
   const normId = String(cascadeId).trim().toLowerCase();
   if (!UUID_RE.test(normId)) return '';
-  const dirs = Array.isArray(BRAIN_DIRS) && BRAIN_DIRS.length > 0 ? BRAIN_DIRS : [BRAIN_DIR];
+  const dirs = getBrainDirs();
   let bestPath = '';
   let bestMtime = -1;
   for (const dir of dirs) {
@@ -801,13 +793,13 @@ function findTranscriptPath(cascadeId) {
 }
 
 function inferConversationAppSource(diskFiles = [], extMatch = null) {
-  if (extMatch?.appSource && extMatch.appSource !== 'standalone') {
-    return extMatch.appSource;
-  }
   for (const filePath of Array.isArray(diskFiles) ? diskFiles : []) {
     const s = String(filePath || '');
-    if (/[\\/]antigravity-cli(?:[\\/]|$)/i.test(s)) return 'cli';
+    if (/[\\/]antigravity-(?:cli|acp)(?:[\\/]|$)/i.test(s)) return 'cli';
     if (/[\\/]antigravity-ide(?:[\\/]|$)/i.test(s)) return 'ide';
+  }
+  if (extMatch?.appSource && extMatch.appSource !== 'standalone') {
+    return extMatch.appSource;
   }
   return '';
 }
@@ -995,7 +987,8 @@ function findBestSqliteDbPath(diskFiles = []) {
   return resolveBestSqliteDbInfo(diskFiles)?.dbPath || '';
 }
 
-function inferAppSourceFromSummary(sourceEnum = '', diskFiles = [], fallback = '') {
+function inferAppSourceFromSummary(sourceEnum = '', diskFiles = [], fallback = '', appDataDir = '') {
+  if (ACP_APP_DATA_PATH_RE.test(appDataDir)) return 'cli';
   const fromDisk = inferConversationAppSource(diskFiles, null);
   if (fromDisk) return fromDisk;
   const src = String(sourceEnum || '').toUpperCase();
@@ -1882,7 +1875,7 @@ export async function enumerateAndSyncConversations({
   }
 
   let cacheDirty = hasPendingSave();
-  const diskConvMap = isRemote ? new Map() : discoverLocalConversationFiles();
+  const diskConvMap = isRemote ? new Map() : discoverLocalConversationFiles({ force: forceRefresh });
 
   // 构建大小写不敏感索引，将同一会话的不同大小写键合并至唯一规范键（优先保留 summariesObj 中的原始键以兼容 RPC）
   const mergedSideQuestionParents = { ...(sideQuestionParents || {}) };
@@ -2035,7 +2028,8 @@ export async function enumerateAndSyncConversations({
       : inferAppSourceFromSummary(
           item?.source || '',
           diskFiles,
-          cached?.appSource || 'standalone'
+          cached?.appSource || 'standalone',
+          item?.appDataDir || localSum?.appDataDir || ''
         );
 
     const sqParentInfo = mergedSideQuestionParents[cidLower] || null;
@@ -2266,16 +2260,22 @@ export async function enumerateAndSyncConversations({
     return true;
   }
 
+  function hasOutdatedMeasurement(cached) {
+    const steps = cached?.steps || [];
+    const lastCachedStep = steps[steps.length - 1];
+    return Boolean(lastCachedStep && lastCachedStep.measurementVersion !== MEASUREMENT_VERSION);
+  }
+
   /**
-   * 检查缓存条目是否缺少最新分解字段（含 10 通道上下文细分字段 `toolResultsTokens`）。
+   * 检查缓存条目的步骤分解字段是否缺失。
    */
   function hasMissingStepFields(cached) {
-    if (cached?._stepFlags) {
-      return Boolean(cached._stepFlags.hasMissingStepFields);
-    }
     const steps = cached?.steps || [];
     const lastCachedStep = steps[steps.length - 1];
     if (!lastCachedStep) return false;
+    if (cached?._stepFlags) {
+      return Boolean(cached._stepFlags.hasMissingStepFields);
+    }
     if (!Object.prototype.hasOwnProperty.call(lastCachedStep, 'contextBreakdown')) {
       return true;
     }
@@ -3037,12 +3037,12 @@ export async function enumerateAndSyncConversations({
         return true;
       }
     }
-    // 保留已有效的历史测速，按批补读需要确认原始状态与生成结束时间的旧步骤。
+    // 保留已有效的历史测速，按批补读旧版测量口径或需要确认原始状态与生成结束时间的历史步骤。
     const hasIncompleteTiming = cached?._stepFlags
       ? Boolean(cached._stepFlags.hasIncompleteTiming)
       : readStepFieldChecks(cached.steps).hasIncompleteTiming;
-    if (!cached.speedClearedTelemetry && hasIncompleteTiming) {
-      if (conv.cascadeId.toLowerCase() === selectedRootId || conv.rootConversationId === selectedRootId) return true;
+    if (hasOutdatedMeasurement(cached) || (!cached.speedClearedTelemetry && hasIncompleteTiming)) {
+      if (isSelectedFamily) return true;
       if (remainingTimingRefreshes > 0) {
         remainingTimingRefreshes -= 1;
         return true;
@@ -3216,7 +3216,8 @@ export async function enumerateAndSyncConversations({
             !hasMissingStepFields(existingSubCache) &&
             (!isImgGenSub || Boolean(existingSubCache.imageGenTelemetry)) &&
             (!isSelectedSubFamily ||
-              (Boolean(existingSubCache.turnRailTelemetry) &&
+              (!hasOutdatedMeasurement(existingSubCache) &&
+                Boolean(existingSubCache.turnRailTelemetry) &&
                 Boolean(existingSubCache.anomalyTelemetry) &&
                 !hasMissingTurnRailFields(existingSubCache) &&
                 !needsWakeupTurnRefresh(subConv, existingSubCache) &&

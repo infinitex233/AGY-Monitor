@@ -40,8 +40,9 @@ test('missing checkpoint identity infers model and pricing from neighbouring ste
     trajectory: {
       steps: rows,
       generatorMetadata: [
-        { stepIndices: [209], chatModel: { model: FLASH, responseModel: 'gemini-3.8-flash-n' } },
-        { stepIndices: [212], chatModel: { model: FLASH, responseModel: 'gemini-3.8-flash-n' } },
+        { stepIndices: [209], chatModel: { model: FLASH, responseModel: 'gemini-3.8-flash-n', timeToFirstToken: '0s' } },
+        { stepIndices: [211], chatModel: { timeToFirstToken: '0s' } },
+        { stepIndices: [212], chatModel: { model: FLASH, responseModel: 'gemini-3.8-flash-n', timeToFirstToken: '0s' } },
       ],
     },
   };
@@ -69,7 +70,8 @@ test('isolated checkpoint without known neighbours stays unknown; its token tota
   const cp = p.activeConversation.recentSteps.find(s => s.stepIndex === 211);
   assert.equal(cp.modelKey, 'unknown'); assert.equal(cp.modelShort, '模型未知·压缩');
   assert.equal(cp.costUsd, null); assert.equal(cp.inCostUsd, null);
-  assert.equal(cp.contextTokens, 11000); assert.equal(cp.tokPerSec, 100);
+  assert.equal(cp.contextTokens, 11000); assert.equal(cp.tokPerSec, null);
+  assert.equal(cp.selectedSpeedReason, 'missing_ttft');
   assert.equal(p.activeConversation.speedSummary.sampleCount, 0);
   assert.equal(p.consumption.account.totalTokens, 11000);
   assert.equal(p.consumption.account.unpricedCalls, 1);
@@ -89,7 +91,7 @@ test('checkpoint can explicitly use a different model; no neighbour-based overwr
 test('ordinary calls with missing model are unknown too', () => {
   const [s] = extractModelSteps([step(1)]);
   assert.equal(s.modelKey, 'unknown'); assert.equal(s.modelSource, 'unavailable');
-  assert.equal(s.totalTokPerSec, 100);
+  assert.equal(s.totalTokPerSec, null);
 });
 
 test('retry usage preserves its own model and counters', () => {
@@ -156,7 +158,10 @@ test('uncatalogued model keeps identity and does not borrow another model price'
 });
 
 test('old ambiguous Argon cache is persisted as unresolved while retaining modern measurements', async () => {
-  const original = extractModelSteps([step(211, ARGON, true)])[0];
+  const original = extractModelSteps(
+    [step(211, ARGON, true)],
+    [{ stepIndices: [211], chatModel: { timeToFirstToken: '0s' } }]
+  )[0];
   delete original.modelIdentityVersion; delete original.modelSource;
   const old = {signature:'v9-unified-throughput:old',steps:[original]};
   const h = backendHarness({cache:{test:old},trajectories:{test:new Error('offline')}});
@@ -1124,6 +1129,67 @@ test('mergeModelsByDisplayName collapses distinct backend buckets that share the
     { preferLabelInShort: true }
   );
   assert.equal(mergedShort.length, 2);
+});
+
+test('telemetry equivalence tracks changes to histogram counts at the same model median', () => {
+  const before = {
+    modelBreakdown: [{ avgTokPerSec: 100, speedSummary: { rateBins: { 516: 1, 632: 2 } } }],
+  };
+  const after = structuredClone(before);
+  assert.equal(isEquivalentTelemetry(before, after), true);
+  after.modelBreakdown[0].speedSummary.rateBins = { 632: 2, 650: 1 };
+  assert.equal(isEquivalentTelemetry(before, after), false);
+});
+
+test('mergeModelsByDisplayName falls back cleanly when mixing rateBins and legacy speed entries', () => {
+  const merged = mergeModelsByDisplayName(
+    [
+      {
+        label: 'Model A',
+        upstreamName: 'shared-upstream',
+        calls: 2,
+        outputTokens: 200,
+        avgTokPerSec: null,
+        speedSummary: { sampleCount: 0, rateBins: {}, avgTokPerSec: null },
+      },
+      {
+        label: 'Model B',
+        upstreamName: 'shared-upstream',
+        calls: 2,
+        outputTokens: 200,
+        avgTokPerSec: 80,
+      },
+    ],
+    { showUpstreamModel: true }
+  );
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].avgTokPerSec, 80);
+  assert.equal(merged[0].speedSummary?.rateBins, undefined);
+
+  const mixedWeighted = mergeModelsByDisplayName(
+    [
+      {
+        label: 'Model A',
+        upstreamName: 'shared-upstream',
+        calls: 1,
+        outputTokens: 100,
+        avgTokPerSec: 100,
+        speedSummary: { sampleCount: 1, tokens: 100, seconds: 1, rateBins: { 632: 1 }, avgTokPerSec: 100 },
+      },
+      {
+        label: 'Model B',
+        upstreamName: 'shared-upstream',
+        calls: 5,
+        outputTokens: 500,
+        avgTokPerSec: 20,
+      },
+    ],
+    { showUpstreamModel: true }
+  );
+  assert.equal(mixedWeighted.length, 1);
+  assert.equal(mixedWeighted[0].speedSummary?.rateBins, undefined);
+  assert.equal(mixedWeighted[0].speedSummary?.tokens, undefined);
+  assert.equal(mixedWeighted[0].speedSummary?.seconds, undefined);
 });
 
 test('Google AI Studio image resolution tiers and pricing map cleanly across Gemini 3.1 Flash Image, 3 Pro Image, and 2.5 Flash Image', () => {

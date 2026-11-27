@@ -1923,7 +1923,7 @@ test('Feature 14: compact vertical ActionMenu replaces export bars, backend expo
 });
 
 test('P0 regression: V4 display-projected steps open inspector, preserve waterfall/diagnostics/XLSX duration, match anomaly events, compute harmonic speed, and clean up UI observers/i18n', async (t) => {
-  const { extractModelSteps, summarizeSpeed } = await import('../trajectory-metrics.mjs');
+  const { extractModelSteps, MEASUREMENT_VERSION, summarizeSpeed } = await import('../trajectory-metrics.mjs');
   const {
     getStepSelectionKey,
     computeStepTimingWaterfall,
@@ -2095,9 +2095,9 @@ test('P0 regression: V4 display-projected steps open inspector, preserve waterfa
   assert.match(diag.rows[2].text, /原生思考计时/);
   assert.match(diag.hint, /重叠/);
 
-  // B-05: Speed aggregation matches official summarizeSpeed (18.2 tok/s, not 55.0 tok/s) and skips <50 tok short samples
+  // B-05: Merged and exported speeds use the median and skip short samples.
   const stepSlow = {
-    measurementVersion: 5,
+    measurementVersion: MEASUREMENT_VERSION,
     isComplete: true,
     isCompactionStep: false,
     speedSampleEligible: true,
@@ -2108,6 +2108,7 @@ test('P0 regression: V4 display-projected steps open inspector, preserve waterfa
     modelLabel: 'Gemini 4 Neon',
     outputTokens: 100,
     totalDurationSec: 10,
+    nativeTtftSec: 0,
     totalTokPerSec: 10,
     tokPerSec: 10,
   };
@@ -2153,15 +2154,17 @@ test('P0 regression: V4 display-projected steps open inspector, preserve waterfa
     [mSlow, { ...mFast, rawModel: 'MODEL_B' }],
     { modelDisplayMode: 'short' }
   );
-  assert.equal(mergedDisplay[0].avgTokPerSec, 18.2);
+  assert.equal(mergedDisplay[0].avgTokPerSec, 55);
   assert.equal(mergedDisplay[0].speedSummary.tokens, 200);
   assert.equal(mergedDisplay[0].speedSummary.seconds, 11);
+  assert.deepEqual(mergedDisplay[0].speedSummary.rateBins, { 516: 1, 632: 1 });
 
   const mergedUnits = mergeSelectedAgentUnits([
     { recentSteps: [stepSlow], modelBreakdown: [mSlow] },
     { recentSteps: [stepFast], modelBreakdown: [mFast] },
   ]);
-  assert.equal(mergedUnits.models[0].avgTokPerSec, 18.2);
+  assert.equal(mergedUnits.models[0].avgTokPerSec, 55);
+  assert.deepEqual(mergedUnits.models[0].speedSummary.rateBins, { 516: 1, 632: 1 });
 
   const consXlsxXml = parseZipEntries(
     buildConsumptionXlsx(
@@ -2173,10 +2176,47 @@ test('P0 regression: V4 display-projected steps open inspector, preserve waterfa
       { locale: 'en-US' }
     )
   ).get('xl/worksheets/sheet2.xml');
-  assert.match(consXlsxXml, /<c r="I4"[^>]*><v>18\.2<\/v><\/c>/);
+  assert.match(consXlsxXml, /<c r="I4"[^>]*><v>55<\/v><\/c>/);
+
+  const exactMedianXlsxXml = parseZipEntries(
+    buildConsumptionXlsx(
+      { selectedRange: { key: '7d', label: '7d' }, account: { calls: 2, outputTokens: 200, avgTokPerSec: 100 } },
+      [
+        { ...mFast, label: 'Fast A', shortName: 'fast-a' },
+        { ...mFast, label: 'Fast B', shortName: 'fast-b' },
+      ],
+      { locale: 'en-US' }
+    )
+  ).get('xl/worksheets/sheet2.xml');
+  assert.match(exactMedianXlsxXml, /<c r="I4"[^>]*><v>100<\/v><\/c>/);
+
+  const mixedMergeXlsxXml = parseZipEntries(
+    buildConsumptionXlsx(
+      { selectedRange: { key: '7d', label: '7d' }, account: { calls: 6, outputTokens: 600 } },
+      [
+        {
+          label: 'Model A',
+          upstreamName: 'shared-upstream',
+          calls: 1,
+          outputTokens: 100,
+          avgTokPerSec: 100,
+          speedSummary: { sampleCount: 1, tokens: 100, seconds: 1, rateBins: { 632: 1 }, avgTokPerSec: 100 },
+        },
+        {
+          label: 'Model B',
+          upstreamName: 'shared-upstream',
+          calls: 5,
+          outputTokens: 500,
+          avgTokPerSec: 20,
+        },
+      ],
+      { displaySettings: { showUpstreamModel: true }, locale: 'en-US' }
+    )
+  ).get('xl/worksheets/sheet2.xml');
+  assert.match(mixedMergeXlsxXml, /<c r="I3"[^>]*><v>20\.2<\/v><\/c>/);
   assert.match(
     buildStepsMarkdownReport([stepSlow, stepFast, stepShort], { locale: 'en-US' }),
-    /\*\*Avg Speed\*\*: 18\.2 tok\/s/
+    /\*\*Avg Speed\*\*: 55\.0 tok\/s/
   );
 
   // B-01 & B-07 DOM checks: click real projected step opens drawer + i18n controls + WindowOverlayShell ResizeObserver cleanup

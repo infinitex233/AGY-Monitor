@@ -2,6 +2,65 @@
  * @fileoverview 跨 Backend / Frontend / CLI 共用的纯展示阈值、紧凑格式化与精确整数缩放规则。
  */
 
+// Magpie's logarithmic bins place 1 tok/s in bin 400.
+const SPEED_HIST_ZERO = 400;
+const SPEED_HIST_LOG = Math.log(1.02);
+
+export function speedRateBin(rate) {
+  return Math.max(0, Math.floor(Math.log(rate) / SPEED_HIST_LOG) + SPEED_HIST_ZERO);
+}
+
+export function medianSpeed(rates) {
+  if (rates.length < 2) return rates[0] ?? null;
+  const sorted = [...rates].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return (sorted[Math.floor((sorted.length - 1) / 2)] + sorted[middle]) / 2;
+}
+
+function medianFromRateBins(rateBins) {
+  const bins = Object.entries(rateBins);
+  const count = bins.reduce((sum, [, samples]) => sum + samples, 0);
+  const lowerRank = Math.floor((count - 1) / 2);
+  const upperRank = Math.floor(count / 2);
+  let seen = 0;
+  let lowerRate = null;
+  // Integer object keys are enumerated in ascending bin order.
+  for (const [bin, samples] of bins) {
+    seen += samples;
+    if (seen <= lowerRank) continue;
+    const midpoint = Math.exp((Number(bin) - SPEED_HIST_ZERO + 0.5) * SPEED_HIST_LOG);
+    lowerRate ??= midpoint;
+    if (seen > upperRank) return (lowerRate + midpoint) / 2;
+  }
+  return null;
+}
+
+/** Merge available speed histograms and preserve the exact median of a sole contributor. */
+export function mergeSpeedRateBins(summaries) {
+  let rateBins;
+  let populatedSummaries = 0;
+  let exactMedian;
+  for (const summary of summaries) {
+    if (!summary?.rateBins) continue;
+    rateBins ??= {};
+    const entries = Object.entries(summary.rateBins);
+    if (entries.length === 0) continue;
+    populatedSummaries++;
+    exactMedian = summary.avgTokPerSec;
+    for (const [bin, samples] of entries) {
+      rateBins[bin] = (rateBins[bin] || 0) + samples;
+    }
+  }
+  if (!rateBins) return null;
+  return {
+    rateBins,
+    avgTokPerSec:
+      populatedSummaries === 1 && Number.isFinite(exactMedian)
+        ? exactMedian
+        : medianFromRateBins(rateBins),
+  };
+}
+
 /**
  * 输出速度四档语义色阶分类（`'muted'|'good'|'info'|'warn'|'danger'`）。
  */

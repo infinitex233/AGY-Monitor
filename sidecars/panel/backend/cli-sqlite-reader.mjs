@@ -18,7 +18,7 @@ import {
   parseWorkspaceUrisColumn,
 } from '../shared/workspace-uri.mjs';
 import { parseIsoMs } from '../trajectory-metrics.mjs';
-import { ANNOTATION_DIRS, PRODUCT_DATA_ROOTS, localSummaryMemo } from './config.mjs';
+import { getAnnotationDirs, getProductDataRoots, localSummaryMemo } from './config.mjs';
 import {
   SQLITE_IN_CHUNK_SIZE,
   computeSqliteWalSig,
@@ -73,10 +73,10 @@ export function parseAnnotationPbtxtTitle(rawText) {
  * 按会话 ID 在各产品目录的 `annotations/<cascadeId>.pbtxt` 中查找标题。
  *
  * @param {string} cascadeId
- * @param {string[]} [annotationDirs=ANNOTATION_DIRS]
+ * @param {string[]} [annotationDirs=getAnnotationDirs()]
  * @returns {string}
  */
-export function readAnnotationTitleForCascade(cascadeId, annotationDirs = ANNOTATION_DIRS) {
+export function readAnnotationTitleForCascade(cascadeId, annotationDirs = getAnnotationDirs()) {
   const normId = String(cascadeId || '').trim().toLowerCase();
   if (!normId) return '';
   const dirs = Array.isArray(annotationDirs) ? annotationDirs : [];
@@ -407,19 +407,20 @@ function decodeProtoCascadeTrajectorySummary(rawBlob) {
  * 读取并缓存各产品数据根目录（Desktop / IDE / CLI）下的 `conversation_summaries.db` 完整快照。
  * 使用 `.db` 与 `.db-wal` 复合签名做内存 Memoize，未发生写入时零 I/O 返回。
  *
- * @param {string[]} [productRoots=PRODUCT_DATA_ROOTS]
+ * @param {string[]} [productRoots=getProductDataRoots()]
  * @param {{ forceRefresh?: boolean }} [options={}]
  */
-export function readLocalSummarySnapshot(productRoots = PRODUCT_DATA_ROOTS, { forceRefresh = false } = {}) {
+export function readLocalSummarySnapshot(productRoots, { forceRefresh = false } = {}) {
   const DatabaseSync = getNodeSqliteDatabaseSync();
   if (!DatabaseSync) {
     return { available: false, sig: '', byId: new Map(), summariesObj: {}, sideQuestionParents: {} };
   }
-  const roots = Array.isArray(productRoots) ? productRoots : [];
+  const useDefaultRoots = productRoots === undefined;
+  const roots = useDefaultRoots ? getProductDataRoots({ force: forceRefresh }) : productRoots;
   const sigParts = [];
   const targets = [];
 
-  for (const root of roots) {
+  for (const root of Array.isArray(roots) ? roots : []) {
     if (!root) continue;
     const dbPath = join(root, 'conversation_summaries.db');
     const walInfo = computeSqliteWalSig(dbPath);
@@ -428,20 +429,17 @@ export function readLocalSummarySnapshot(productRoots = PRODUCT_DATA_ROOTS, { fo
     targets.push({ rootName: basename(root).toLowerCase(), dbPath });
   }
 
-  const rootsKey = roots
-    .map((r) => String(r || '').trim())
-    .filter(Boolean)
-    .join('\n');
+  const rootsKey = Array.isArray(roots) ? JSON.stringify(roots) : '';
 
   if (targets.length === 0) {
-    if (productRoots === PRODUCT_DATA_ROOTS) {
+    if (useDefaultRoots) {
+      localSummaryMemo.rootsKey = '';
       localSummaryMemo.sig = '';
       localSummaryMemo.byId.clear();
       localSummaryMemo.available = false;
       localSummaryMemo.summariesObj = {};
       localSummaryMemo.sideQuestionParents = {};
-    }
-    if (rootsKey && localSummaryMemo.byRootsKey instanceof Map) {
+    } else if (rootsKey) {
       localSummaryMemo.byRootsKey.delete(rootsKey);
     }
     return { available: false, sig: '', byId: new Map(), summariesObj: {}, sideQuestionParents: {} };
@@ -450,7 +448,8 @@ export function readLocalSummarySnapshot(productRoots = PRODUCT_DATA_ROOTS, { fo
   const sig = sigParts.join('||');
   if (!forceRefresh) {
     if (
-      productRoots === PRODUCT_DATA_ROOTS &&
+      useDefaultRoots &&
+      localSummaryMemo.rootsKey === rootsKey &&
       localSummaryMemo.sig === sig &&
       localSummaryMemo.available
     ) {
@@ -462,7 +461,7 @@ export function readLocalSummarySnapshot(productRoots = PRODUCT_DATA_ROOTS, { fo
         sideQuestionParents: localSummaryMemo.sideQuestionParents || {},
       };
     }
-    if (rootsKey && localSummaryMemo.byRootsKey instanceof Map) {
+    if (!useDefaultRoots && rootsKey) {
       const cached = localSummaryMemo.byRootsKey.get(rootsKey);
       if (cached && cached.sig === sig && cached.available) {
         localSummaryMemo.byRootsKey.delete(rootsKey);
@@ -482,8 +481,10 @@ export function readLocalSummarySnapshot(productRoots = PRODUCT_DATA_ROOTS, { fo
   const nextSummariesObj = {};
   const nextSideQuestionParents = {};
   let anyDbSucceeded = false;
+  let anyDbFailed = false;
 
   for (const { rootName, dbPath } of targets) {
+    let dbSucceeded = false;
     try {
       withReadOnlySqliteDb(dbPath, (db) => {
         let rows = [];
@@ -551,6 +552,7 @@ export function readLocalSummarySnapshot(productRoots = PRODUCT_DATA_ROOTS, { fo
             .all();
         }
         anyDbSucceeded = true;
+        dbSucceeded = true;
 
         let parentRows = [];
         try {
@@ -739,30 +741,36 @@ export function readLocalSummarySnapshot(productRoots = PRODUCT_DATA_ROOTS, { fo
     } catch {
       // 忽略正在初始化或不可读的单个 SQLite 摘要库
     }
+    if (!dbSucceeded) {
+      anyDbFailed = true;
+    }
   }
 
   if (!anyDbSucceeded) {
     return { available: false, sig: '', byId: new Map(), summariesObj: {}, sideQuestionParents: {} };
   }
 
-  if (productRoots === PRODUCT_DATA_ROOTS) {
-    localSummaryMemo.sig = sig;
-    localSummaryMemo.byId = nextMap;
-    localSummaryMemo.available = true;
-    localSummaryMemo.summariesObj = nextSummariesObj;
-    localSummaryMemo.sideQuestionParents = nextSideQuestionParents;
-  } else if (rootsKey && localSummaryMemo.byRootsKey instanceof Map) {
-    if (!localSummaryMemo.byRootsKey.has(rootsKey) && localSummaryMemo.byRootsKey.size >= 8) {
-      localSummaryMemo.byRootsKey.delete(localSummaryMemo.byRootsKey.keys().next().value);
+  if (!anyDbFailed) {
+    if (useDefaultRoots) {
+      localSummaryMemo.rootsKey = rootsKey;
+      localSummaryMemo.sig = sig;
+      localSummaryMemo.byId = nextMap;
+      localSummaryMemo.available = true;
+      localSummaryMemo.summariesObj = nextSummariesObj;
+      localSummaryMemo.sideQuestionParents = nextSideQuestionParents;
+    } else if (rootsKey) {
+      if (!localSummaryMemo.byRootsKey.has(rootsKey) && localSummaryMemo.byRootsKey.size >= 8) {
+        localSummaryMemo.byRootsKey.delete(localSummaryMemo.byRootsKey.keys().next().value);
+      }
+      localSummaryMemo.byRootsKey.delete(rootsKey);
+      localSummaryMemo.byRootsKey.set(rootsKey, {
+        available: true,
+        sig,
+        byId: nextMap,
+        summariesObj: nextSummariesObj,
+        sideQuestionParents: nextSideQuestionParents,
+      });
     }
-    localSummaryMemo.byRootsKey.delete(rootsKey);
-    localSummaryMemo.byRootsKey.set(rootsKey, {
-      available: true,
-      sig,
-      byId: nextMap,
-      summariesObj: nextSummariesObj,
-      sideQuestionParents: nextSideQuestionParents,
-    });
   }
 
   return {
@@ -777,10 +785,10 @@ export function readLocalSummarySnapshot(productRoots = PRODUCT_DATA_ROOTS, { fo
 /**
  * 读取并缓存各产品数据根目录下的 `conversation_summaries.db` 摘要索引（返回 `Map`，保持向后兼容）。
  *
- * @param {string[]} [productRoots=PRODUCT_DATA_ROOTS]
+ * @param {string[]} [productRoots=getProductDataRoots()]
  * @returns {Map<string, object>}
  */
-export function readLocalSummaryIndex(productRoots = PRODUCT_DATA_ROOTS) {
+export function readLocalSummaryIndex(productRoots) {
   return readLocalSummarySnapshot(productRoots).byId;
 }
 

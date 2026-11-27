@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {extractContextBreakdown, extractLiveActivity, extractModelSteps, normalizeCachedStep, speedMetric, summarizeSpeed, summarizeTtft} from '../trajectory-metrics.mjs';
+import {computeDecodeDurationSec, extractContextBreakdown, extractLiveActivity, extractModelSteps, normalizeCachedStep, speedMetric, summarizeSpeed, summarizeTtft} from '../trajectory-metrics.mjs';
 
 function sample({total=12,ttft='2s',stream='10s',output=1100,thinking=100,response=1000,
   thinkingDuration='4s',tools=false,text=true,status='CORTEX_STEP_STATUS_DONE'}={}) {
@@ -25,9 +25,9 @@ test('text, tools and mixed output all use pure decode TPS (total output / decod
 test('streaming and thinking phase timers cannot alter pure decode TPS',()=>{
   for(const stream of ['0.001s','0.01s','1s','10s',undefined]){
     for(const thinkingDuration of ['0.01s','9.999s',undefined]){
-      const step=parse({total:10,ttft:'9.999s',stream,thinkingDuration,output:300,tools:true,text:false});
-      assert.equal(step.totalTokPerSec,300/0.05);
-      assert.equal(step.ttftSec,9.999);
+      const step=parse({total:10,ttft:'8s',stream,thinkingDuration,output:300,tools:true,text:false});
+      assert.equal(step.totalTokPerSec,150);
+      assert.equal(step.ttftSec,8);
     }
   }
 });
@@ -36,6 +36,11 @@ test('TTFT is the exact native value, never a token-ratio guess or viewable-even
   const {s,gm}=sample();delete gm.chatModel.timeToFirstToken;
   const step=extractModelSteps([s],[gm])[0];
   assert.equal(step.ttftSec,null);assert.equal(step.viewableDelaySec,2);
+  assert.equal(step.speedReason, 'missing_ttft');
+  assert.equal(step.totalTokPerSec, null);
+  assert.equal(step.decodeDurationSec, null);
+  assert.equal(step.speedBasis, 'unavailable');
+  assert.equal(speedMetric(step).reason, 'missing_ttft');
   assert.deepEqual(summarizeTtft([step]),{sampleCount:0,avgSec:null});
 });
 test('zero TTFT is preserved and malformed or negative durations remain unknown',()=>{
@@ -46,7 +51,7 @@ test('zero TTFT is preserved and malformed or negative durations remain unknown'
 });
 test('short output keeps the same formula but does not bias the mean',()=>{
   const short=parse({output:13,response:13,thinking:0,total:5.015,stream:'0.118s'});
-  assert.equal(short.totalTokPerSec,13/(5.015-2));
+  assert.equal(short.totalTokPerSec,13/3.015);
   assert.equal(short.speedReason,'short_sample');
   assert.equal(summarizeSpeed([short,parse()]).avgTokPerSec,1100/10);
   assert.equal(summarizeSpeed([short]).avgTokPerSec,null);
@@ -59,11 +64,65 @@ test('sub-half-second whole requests are withheld, never divided by a tiny inter
   assert.equal(summarizeSpeed([tiny]).sampleCount,0);
   assert.equal(parse({total:.5,output:100,ttft:'0.1s'}).totalTokPerSec,100/(0.5-0.1));
 });
-test('weighted mean matches token/decode-time totals and does not average step rates',()=>{
-  const a=parse({output:1000,total:10}),b=parse({output:1000,total:20,tools:true});
-  const mean=summarizeSpeed([a,b]);
-  assert.equal(mean.tokens,2000);assert.equal(mean.seconds,26);
-  assert.equal(mean.avgTokPerSec,2000/26);assert.equal(mean.sampleCount,2);
+test('decode duration requires valid native TTFT and a window of at least 100 ms', () => {
+  assert.equal(computeDecodeDurationSec(0.1, 0), 0.1);
+  assert.equal(computeDecodeDurationSec(0.5, 0.4), 0.1);
+  assert.equal(computeDecodeDurationSec(2.5, 2), 0.5);
+  for (const [total, ttft] of [[1, null], [2, -1], [2, NaN], [2, 2.02], [2, 2.005], [0, 0], [Infinity, 1], [2, 1.901]]) {
+    assert.equal(computeDecodeDurationSec(total, ttft), null);
+  }
+});
+test('held bursts are excluded while longer windows and brief waits are accepted', () => {
+  const held = parse({ total: 7.5, ttft: '7.2s', output: 300 });
+  assert.equal(held.speedReason, 'held_burst');
+  assert.equal(held.totalTokPerSec, null);
+  assert.equal(held.decodeDurationSec, null);
+  assert.equal(speedMetric(held).reason, 'held_burst');
+  for (const [total, ttft, expected] of [
+    [10.5, 8, 120],
+    [1.2, 0.4, 375],
+    [8.2, 7.2, 300],
+    [8.25, 7.25, 300],
+    [0.5, 0.4, 3000],
+    [2.5, 2, 600],
+  ]) {
+    const step = parse({ total, ttft: `${ttft}s`, output: 300 });
+    assert.equal(step.speedSampleEligible, true);
+    assert.ok(Math.abs(speedMetric(step).value - expected) < 1e-9);
+  }
+});
+test('rates above 10,000 tok/s are excluded', () => {
+  const atLimit = parse({ total: 0.7, ttft: '0.5s', output: 2000 });
+  const outlier = parse({ total: 0.7, ttft: '0.5s', output: 2001 });
+  assert.equal(speedMetric(atLimit).value, 10000);
+  assert.equal(outlier.totalTokPerSec, null);
+  assert.equal(speedMetric(outlier).reason, 'speed_outlier');
+  assert.deepEqual(summarizeSpeed([atLimit, outlier]).excludedReasons, { speed_outlier: 1 });
+});
+test('speed metrics reconstruct a slim step only when it has valid decode timing', () => {
+  const { decodeDurationSec, ...slim } = parse();
+  assert.equal(speedMetric(slim).seconds, decodeDurationSec);
+  assert.equal(speedMetric({ ...slim, nativeTtftSec: null }).reason, 'missing_ttft');
+  assert.equal(speedMetric({ ...slim, totalDurationSec: 2.05 }).reason, 'short_decode');
+  assert.equal(speedMetric({ ...slim, totalDurationSec: 2.25 }).reason, 'held_burst');
+  assert.equal(speedMetric({ ...slim, outputTokens: 100001 }).reason, 'speed_outlier');
+});
+test('speed summaries use exact odd and even medians and emit sparse bins', () => {
+  const stalled = parse({ output: 100, total: 102 });
+  const normal = parse({ output: 100, total: 3 });
+  const faster = parse({ output: 200, total: 3 });
+  const fastOutlier = parse({ output: 9000, total: 3 });
+  const even = summarizeSpeed([fastOutlier, normal, stalled, faster]);
+  assert.equal(even.avgTokPerSec, 150);
+  assert.equal(even.tokens, 9400);
+  assert.equal(even.seconds, 103);
+  assert.equal(even.sampleCount, 4);
+  assert.equal(even.rateBins[400], 1);
+  assert.equal(Object.values(even.rateBins).reduce((sum, count) => sum + count, 0), 4);
+  assert.equal(Object.hasOwn(even, 'rates'), false);
+  assert.equal(summarizeSpeed([normal, stalled, faster]).avgTokPerSec, 100);
+  assert.equal(summarizeSpeed([normal, fastOutlier, faster]).avgTokPerSec, 200);
+  assert.equal(summarizeSpeed([parse()]).avgTokPerSec, 110);
 });
 test('unfinished, missing-completion and reversed-time requests cannot fabricate speed',()=>{
   const {s,gm}=sample();delete s.metadata.finishedGeneratingAt;
@@ -95,6 +154,8 @@ test('cleared steps with a recorded generation end retain their original decode 
 test('zero output is a real zero; malformed or missing output counts cannot produce rates',()=>{
   const zero=parse({output:0,response:0,thinking:0});
   assert.equal(zero.totalTokPerSec,0);assert.equal(zero.responseTokens,0);
+  assert.equal(zero.speedSampleEligible, false);
+  assert.equal(zero.speedReason, 'short_sample');
   for(const output of [-1,1.5,NaN,Infinity])assert.equal(parse({output}).totalTokPerSec,null);
   const {s,gm}=sample();delete s.metadata.modelUsage.outputTokens;
   assert.equal(extractModelSteps([s],[gm])[0].totalTokPerSec,null);
@@ -111,7 +172,7 @@ test('no rate-dependent cap or formula switch at the former 260 TPS boundary',()
   assert.equal(a.speedBasis,b.speedBasis);
 });
 test('legacy cache retains billing but cannot masquerade as current measurements',()=>{
-  for(const measurementVersion of [undefined,1,2,3,4]){
+  for(const measurementVersion of [undefined,1,2,3,4,5]){
     const old={measurementVersion,inputTokens:500,cacheReadTokens:2000,outputTokens:1100,ttftSec:0.4,totalTokPerSec:55};
     const migrated=normalizeCachedStep(old);
     assert.equal(migrated.outputTokens,1100);assert.equal(migrated.inputTokens,500);
@@ -141,7 +202,9 @@ test('non-chat generator metadata cannot overwrite matching model timing',()=>{
 test('a paginated source step never borrows timing from an unrelated array position',()=>{
   const {s,gm}=sample();s.metadata.sourceTrajectoryStepInfo={stepIndex:42};
   const step=extractModelSteps([s],[gm])[0];
-  assert.equal(step.nativeTtftSec,null);assert.equal(step.totalTokPerSec,1100/12);
+  assert.equal(step.nativeTtftSec, null);
+  assert.equal(step.totalTokPerSec, null);
+  assert.equal(step.speedReason, 'missing_ttft');
 });
 test('contradictory native TTFT is preserved but cannot validate TPS or bias the TTFT mean',()=>{
   const bad=parse({total:5,ttft:'9s'});
@@ -159,14 +222,16 @@ test('coercible non-token values cannot silently become zero or one output token
     assert.equal(extractModelSteps([s],[gm])[0].speedReason,'invalid_output_tokens');
   }
 });
-test('visible buffered text and tools clamp tiny decode gap to 50ms floor',()=>{
+test('visible buffered text and tools with a decode window below 100 ms have no speed',()=>{
   const {s,gm}=sample({output:64,thinking:33,response:31,ttft:'7.0108593s',stream:'0.0045919s'});
   s.metadata.finishedGeneratingAt='2026-01-01T00:00:07.015451200Z';
   delete s.plannerResponse.thinkingDuration;
   const step=extractModelSteps([s],[gm])[0];
   assert.equal(step.totalDurationSec,7.0154512);
-  assert.equal(speedMetric(step).value,64/0.05);
-  assert.equal(step.speedBasis,'decode');
+  assert.equal(speedMetric(step).value, null);
+  assert.equal(speedMetric(step).reason, 'short_decode');
+  assert.equal(step.decodeDurationSec, null);
+  assert.equal(step.speedBasis, 'unavailable');
 });
 test('compaction displays a valid rate and retains billing but is excluded from speed/TTFT means',()=>{
   const {s,gm}=sample();s.type='CORTEX_STEP_TYPE_CHECKPOINT';

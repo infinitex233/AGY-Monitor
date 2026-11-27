@@ -1,15 +1,16 @@
 /**
  * 客户端观测请求级纯吐字吞吐率（Pure Decode TPS）、首字延迟（TTFT）、上下文构成拆解与模型身份归因计算模块。
  *
- * 核心设计原则：
- * 1. 采用扣除原生首字延迟（TTFT）后的纯解码耗时 `max(totalDurationSec - nativeTtftSec, 0.05s)` 计算纯吐字速度（缺失 TTFT 时回退至总耗时）。
- * 2. 严禁基于速率上限裁剪异常值或使用易失真的流式/思考分片计时器篡改分母，保证统计口径客观一致。
+ * 文本生成速率为总输出 Token 除以扣除原生首字延迟（TTFT）后的解码耗时。
+ * 依照 Magpie 的解码窗口规则排除缺失 TTFT、低于 100ms 的窗口、缓冲突发及超过 10,000 tok/s 的速率。
+ * 聚合使用有效单步速率的中位数，并附带可合并的 2% 对数分桶。
  */
 
 import { extractCleanUserRequestBody } from './shared/prompt-clean.mjs';
+import { medianSpeed, speedRateBin } from './shared/telemetry-display-rules.mjs';
 
 /** 速度测量口径版本号；当耗时或样本过滤算法变更时递增，用于触发旧版缓存测量字段失效重算 */
-export const MEASUREMENT_VERSION = 5;
+export const MEASUREMENT_VERSION = 6;
 
 /** 模型身份归因版本号；当模型识别优先级或占位符清洗策略变更时递增 */
 export const MODEL_IDENTITY_VERSION = 1;
@@ -17,32 +18,53 @@ export const MODEL_IDENTITY_VERSION = 1;
 /** 纳入有效测速的最小请求总耗时阈值（0.5 秒），过滤极短请求因时钟抖动导致的速率失真 */
 export const MIN_SPEED_DURATION_SECONDS = 0.5;
 
-/** 纯吐字解码耗时下限（50 毫秒），防止极短解码窗口除零或放大时钟抖动 */
-export const MIN_DECODE_DURATION_SECONDS = 0.05;
+export const MIN_DECODE_DURATION_SECONDS = 0.1;
+export const MAX_DECODE_SPEED_TPS = 10000;
+export const HELD_WINDOW_SECONDS = 1.0;
+export const HELD_SHARE = 4;
 
-/** 纳入平均吞吐率（Mean TPS）统计的最小输出 Token 数阈值（50 Tokens），避免短回复噪声干扰均速 */
+const NS_PER_SECOND = 1e9;
+const MIN_DECODE_DURATION_NS = MIN_DECODE_DURATION_SECONDS * NS_PER_SECOND;
+const HELD_WINDOW_NS = HELD_WINDOW_SECONDS * NS_PER_SECOND;
+const NS_PER_TOKEN_AT_MAX_SPEED = NS_PER_SECOND / MAX_DECODE_SPEED_TPS;
+
+/** 纳入速度中位数统计的最小输出 Token 数（50 Tokens） */
 export const MIN_MEAN_OUTPUT_TOKENS = 50;
 
 /**
- * 计算纯吐字解码阶段耗时秒数：`max(totalDurationSec - nativeTtftSec, MIN_DECODE_DURATION_SECONDS)`。
- * 若原生 TTFT 缺失或不可用，则回退为请求总耗时 `totalDurationSec`。
+ * 从有效请求总耗时扣除原生 TTFT，仅保留达到最短解码阈值的窗口。
  *
  * @param {number | null} totalDurationSec 请求总耗时（秒）
  * @param {number | null} nativeTtftSec 原生首字延迟（秒）
  * @returns {number | null}
  */
 export function computeDecodeDurationSec(totalDurationSec, nativeTtftSec) {
-  if (!(Number.isFinite(totalDurationSec) && totalDurationSec > 0)) {
+  if (
+    !Number.isFinite(totalDurationSec) || totalDurationSec <= 0 ||
+    !Number.isFinite(nativeTtftSec) || nativeTtftSec < 0 ||
+    nativeTtftSec > totalDurationSec + 0.01
+  ) {
     return null;
   }
-  if (
-    Number.isFinite(nativeTtftSec) &&
-    nativeTtftSec >= 0 &&
-    nativeTtftSec <= totalDurationSec + 0.01
-  ) {
-    return Math.max(totalDurationSec - nativeTtftSec, MIN_DECODE_DURATION_SECONDS);
+  const decodeNs =
+    Math.round(totalDurationSec * NS_PER_SECOND) - Math.round(nativeTtftSec * NS_PER_SECOND);
+  return decodeNs >= MIN_DECODE_DURATION_NS ? decodeNs / NS_PER_SECOND : null;
+}
+
+function measureDecodeSpeed(totalDurationSec, nativeTtftSec, outputTokens) {
+  if (nativeTtftSec == null) return { timingReason: 'missing_ttft' };
+  if (nativeTtftSec > totalDurationSec + 0.01) return { timingReason: 'inconsistent_timing' };
+  const decodeDurationSec = computeDecodeDurationSec(totalDurationSec, nativeTtftSec);
+  if (decodeDurationSec === null) return { timingReason: 'short_decode' };
+  const decodeNs = Math.round(decodeDurationSec * NS_PER_SECOND);
+  const ttftNs = Math.round(nativeTtftSec * NS_PER_SECOND);
+  if (decodeNs < HELD_WINDOW_NS && ttftNs > HELD_SHARE * decodeNs) {
+    return { timingReason: 'held_burst' };
   }
-  return totalDurationSec;
+  if (outputTokens * NS_PER_TOKEN_AT_MAX_SPEED > decodeNs) {
+    return { timingReason: 'speed_outlier' };
+  }
+  return { decodeDurationSec, totalTokPerSec: outputTokens / decodeDurationSec };
 }
 
 /**
@@ -895,6 +917,8 @@ function buildStepAnomalyRecord(step, meta, chat, pendingErrorSteps = []) {
  *    - `'invalid_output_tokens'`：`outputTokens` 不是合法的非负安全整数；
  *    - `'short_timing'`：请求总耗时低于 `MIN_SPEED_DURATION_SECONDS`（0.5s），易受计时器粒度噪声干扰；
  *    - `'inconsistent_timing'`：原生首字延迟 `nativeTtftSec` 大于请求总耗时 `totalDurationSec + 0.01s`（时钟或元数据自相矛盾）；
+ *    - `'missing_ttft'` / `'short_decode'`：缺少原生首字延迟，或解码窗口不足 100ms；
+ *    - `'held_burst'` / `'speed_outlier'`：解码不足 1s 且首字延迟超过解码耗时的四倍，或解码速率超过 10,000 tok/s；
  *    - `'compaction'` / `'short_sample'`：单步吞吐率可计算，但属于上下文压缩检查点步骤（`CORTEX_STEP_TYPE_CHECKPOINT`）
  *      或输出不足 `MIN_MEAN_OUTPUT_TOKENS`（50 Tokens），因此从平均速度样本（`speedSampleEligible`）中剔除。
  * 3. **末尾步骤上下文回填逻辑**：
@@ -1497,21 +1521,14 @@ export function extractModelSteps(rawSteps = [], generatorMetadata = []) {
       timingReason = 'invalid_output_tokens';
     } else if (totalDurationSec < MIN_SPEED_DURATION_SECONDS) {
       timingReason = 'short_timing';
-    } else if (
-      nativeTtftSec !== null &&
-      nativeTtftSec > totalDurationSec + 0.01
-    ) {
-      timingReason = 'inconsistent_timing';
     }
 
-    const decodeDurationSec =
-      timingReason === null
-        ? computeDecodeDurationSec(totalDurationSec, nativeTtftSec)
-        : null;
-    const totalTokPerSec =
-      timingReason === null && decodeDurationSec > 0
-        ? outputTokens / decodeDurationSec
-        : null;
+    const {
+      decodeDurationSec = null,
+      totalTokPerSec = null,
+      timingReason: decodeReason = null,
+    } = timingReason === null ? measureDecodeSpeed(totalDurationSec, nativeTtftSec, outputTokens) : {};
+    timingReason ??= decodeReason;
     const shortOutputSample =
       totalTokPerSec !== null && outputTokens < MIN_MEAN_OUTPUT_TOKENS;
     const speedReason =
@@ -1613,12 +1630,7 @@ export function extractModelSteps(rawSteps = [], generatorMetadata = []) {
       totalDurationSec,
       decodeDurationSec,
       totalTokPerSec,
-      speedBasis:
-        totalTokPerSec === null
-          ? 'unavailable'
-          : nativeTtftSec !== null
-            ? 'decode'
-            : 'request_total',
+      speedBasis: totalTokPerSec === null ? 'unavailable' : 'decode',
       speedSampleEligible:
         totalTokPerSec !== null && !shortOutputSample && !isCompactionStep,
       speedReason,
@@ -1957,16 +1969,15 @@ export function speedMetric(step) {
       : reason);
   }
 
-  const speedSeconds =
-    Number.isFinite(step.decodeDurationSec) && step.decodeDurationSec > 0
-      ? step.decodeDurationSec
-      : computeDecodeDurationSec(step.totalDurationSec, step.nativeTtftSec) ??
-        step.totalDurationSec;
+  const measurement = step.isImageGenStep
+    ? { totalTokPerSec: step.totalTokPerSec, decodeDurationSec: step.totalDurationSec }
+    : measureDecodeSpeed(step.totalDurationSec, step.nativeTtftSec, step.outputTokens);
+  if (measurement.timingReason) return missing(measurement.timingReason);
 
   return {
-    value: step.totalTokPerSec,
+    value: measurement.totalTokPerSec,
     tokens: step.outputTokens,
-    seconds: speedSeconds,
+    seconds: measurement.decodeDurationSec,
     eligible:
       step.speedSampleEligible === true &&
       !step.isCompactionStep &&
@@ -1978,7 +1989,7 @@ export function speedMetric(step) {
 /**
  * 创建用于聚合多步骤吞吐率的累加器初始状态。
  *
- * @returns {{ tokens: number, seconds: number, sampleCount: number, excludedCount: number, excludedReasons: Record<string, number> }}
+ * @returns {{ tokens: number, seconds: number, sampleCount: number, excludedCount: number, excludedReasons: Record<string, number>, rates: number[] }}
  */
 export function createSpeedAccumulator() {
   return {
@@ -1987,6 +1998,7 @@ export function createSpeedAccumulator() {
     sampleCount: 0,
     excludedCount: 0,
     excludedReasons: {},
+    rates: [],
   };
 }
 
@@ -2005,6 +2017,7 @@ export function accumulateSpeed(acc, step) {
     acc.tokens += metric.tokens;
     acc.seconds += metric.seconds;
     acc.sampleCount++;
+    acc.rates.push(metric.value);
   } else {
     acc.excludedCount++;
     acc.excludedReasons[metric.reason] =
@@ -2013,15 +2026,22 @@ export function accumulateSpeed(acc, step) {
 }
 
 /**
- * 完成速度累加并计算加权平均吞吐率（`总输出 Tokens / 总有效耗时秒数`）。
+ * 计算精确速度中位数，并以对数分桶传递可合并的速度分布。
  *
  * @param {ReturnType<typeof createSpeedAccumulator>} acc 速度累加器
- * @returns {ReturnType<typeof createSpeedAccumulator> & { avgTokPerSec: number | null }}
+ * @returns {Omit<ReturnType<typeof createSpeedAccumulator>, 'rates'> & { avgTokPerSec: number | null, rateBins: Record<number, number> }}
  */
 export function finishSpeed(acc) {
+  const { rates, ...summary } = acc;
+  const rateBins = {};
+  for (const rate of rates) {
+    const bin = speedRateBin(rate);
+    rateBins[bin] = (rateBins[bin] || 0) + 1;
+  }
   return {
-    ...acc,
-    avgTokPerSec: acc.seconds > 0 ? acc.tokens / acc.seconds : null,
+    ...summary,
+    avgTokPerSec: medianSpeed(rates),
+    rateBins,
   };
 }
 

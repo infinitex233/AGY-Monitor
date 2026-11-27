@@ -579,10 +579,69 @@ return { SUPPORTED_LANGUAGES, THEME_ACCENT_KEYS, UI_THEME_KEYS, DEFAULT_UI_THEME
 })();
 
 // --- shared/telemetry-display-rules.mjs ---
-const { classifySpeedTier, classifyCacheTier, classifyStepCostTier, classifyTtftTier, formatCompactTokens, formatCompactCapsuleCost, formatCompactCapsuleTtft, scaleBucketsExact } = (() => {
+const { speedRateBin, medianSpeed, mergeSpeedRateBins, classifySpeedTier, classifyCacheTier, classifyStepCostTier, classifyTtftTier, formatCompactTokens, formatCompactCapsuleCost, formatCompactCapsuleTtft, scaleBucketsExact } = (() => {
 /**
  * @fileoverview 跨 Backend / Frontend / CLI 共用的纯展示阈值、紧凑格式化与精确整数缩放规则。
  */
+
+// Magpie's logarithmic bins place 1 tok/s in bin 400.
+const SPEED_HIST_ZERO = 400;
+const SPEED_HIST_LOG = Math.log(1.02);
+
+function speedRateBin(rate) {
+  return Math.max(0, Math.floor(Math.log(rate) / SPEED_HIST_LOG) + SPEED_HIST_ZERO);
+}
+
+function medianSpeed(rates) {
+  if (rates.length < 2) return rates[0] ?? null;
+  const sorted = [...rates].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return (sorted[Math.floor((sorted.length - 1) / 2)] + sorted[middle]) / 2;
+}
+
+function medianFromRateBins(rateBins) {
+  const bins = Object.entries(rateBins);
+  const count = bins.reduce((sum, [, samples]) => sum + samples, 0);
+  const lowerRank = Math.floor((count - 1) / 2);
+  const upperRank = Math.floor(count / 2);
+  let seen = 0;
+  let lowerRate = null;
+  // Integer object keys are enumerated in ascending bin order.
+  for (const [bin, samples] of bins) {
+    seen += samples;
+    if (seen <= lowerRank) continue;
+    const midpoint = Math.exp((Number(bin) - SPEED_HIST_ZERO + 0.5) * SPEED_HIST_LOG);
+    lowerRate ??= midpoint;
+    if (seen > upperRank) return (lowerRate + midpoint) / 2;
+  }
+  return null;
+}
+
+/** Merge available speed histograms and preserve the exact median of a sole contributor. */
+function mergeSpeedRateBins(summaries) {
+  let rateBins;
+  let populatedSummaries = 0;
+  let exactMedian;
+  for (const summary of summaries) {
+    if (!summary?.rateBins) continue;
+    rateBins ??= {};
+    const entries = Object.entries(summary.rateBins);
+    if (entries.length === 0) continue;
+    populatedSummaries++;
+    exactMedian = summary.avgTokPerSec;
+    for (const [bin, samples] of entries) {
+      rateBins[bin] = (rateBins[bin] || 0) + samples;
+    }
+  }
+  if (!rateBins) return null;
+  return {
+    rateBins,
+    avgTokPerSec:
+      populatedSummaries === 1 && Number.isFinite(exactMedian)
+        ? exactMedian
+        : medianFromRateBins(rateBins),
+  };
+}
 
 /**
  * 输出速度四档语义色阶分类（`'muted'|'good'|'info'|'warn'|'danger'`）。
@@ -714,7 +773,7 @@ function scaleBucketsExact(buckets, keys, targetTotal) {
   }
   return out;
 }
-return { classifySpeedTier, classifyCacheTier, classifyStepCostTier, classifyTtftTier, formatCompactTokens, formatCompactCapsuleCost, formatCompactCapsuleTtft, scaleBucketsExact };
+return { speedRateBin, medianSpeed, mergeSpeedRateBins, classifySpeedTier, classifyCacheTier, classifyStepCostTier, classifyTtftTier, formatCompactTokens, formatCompactCapsuleCost, formatCompactCapsuleTtft, scaleBucketsExact };
 })();
 
 // --- shared/window-bridge-protocol.mjs ---
@@ -1250,6 +1309,10 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'fmt.speedCompactionTimingUnavailable': '压缩无计时',
   'fmt.speedInvalidOutput': '无有效输出',
   'fmt.speedInconsistent': '耗时数据异常',
+  'fmt.speedMissingTtft': '缺少首字耗时',
+  'fmt.speedShortDecode': '解码过短 (<0.1s)',
+  'fmt.speedHeldBurst': '缓冲突发',
+  'fmt.speedOutlier': '速率异常 (>10k)',
   'fmt.speedShort': '耗时过短 (<0.5s)',
   'fmt.speedLegacy': '旧版缓存记录',
   'fmt.sampleSteps': '{valid}/{total} 步',
@@ -2134,6 +2197,10 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'fmt.speedCompactionTimingUnavailable': 'Untimed compaction',
   'fmt.speedInvalidOutput': 'No valid output',
   'fmt.speedInconsistent': 'Invalid timing',
+  'fmt.speedMissingTtft': 'Missing TTFT',
+  'fmt.speedShortDecode': 'Decode too brief (<0.1s)',
+  'fmt.speedHeldBurst': 'Buffered burst',
+  'fmt.speedOutlier': 'Speed outlier (>10k)',
   'fmt.speedShort': 'Too brief (<0.5s)',
   'fmt.speedLegacy': 'Legacy cached',
   'fmt.sampleSteps': '{valid}/{total} steps',
@@ -4264,6 +4331,10 @@ const SPEED_REASON_LABELS = {
   compaction_timing_unavailable: 'fmt.speedCompactionTimingUnavailable',
   invalid_output_tokens: 'fmt.speedInvalidOutput',
   inconsistent_timing: 'fmt.speedInconsistent',
+  missing_ttft: 'fmt.speedMissingTtft',
+  short_decode: 'fmt.speedShortDecode',
+  held_burst: 'fmt.speedHeldBurst',
+  speed_outlier: 'fmt.speedOutlier',
   short_timing: 'fmt.speedShort',
   legacy_cache: 'fmt.speedLegacy',
 };
@@ -5025,7 +5096,8 @@ function mergeModelsByDisplayName(models = [], settings = {}, options = {}) {
         totalTokens: totTok,
         costUsd,
         unpricedCalls,
-        hasAnySpeedSummary: Boolean(m.speedSummary),
+        speedSummaries: m.speedSummary ? [m.speedSummary] : [],
+        allSpeedHaveBins: !hasSpeed || Boolean(m.speedSummary?.rateBins),
         allSpeedExact: !hasSpeed || hasExactSpeedSummary,
         speedTokens: hasExactSpeedSummary ? rawSpeedTokens : 0,
         speedSeconds: hasExactSpeedSummary ? rawSpeedSeconds : 0,
@@ -5082,7 +5154,8 @@ function mergeModelsByDisplayName(models = [], settings = {}, options = {}) {
       }
     }
 
-    if (m.speedSummary) acc.hasAnySpeedSummary = true;
+    if (m.speedSummary) acc.speedSummaries.push(m.speedSummary);
+    if (hasSpeed && !m.speedSummary?.rateBins) acc.allSpeedHaveBins = false;
     if (hasSpeed && !hasExactSpeedSummary) acc.allSpeedExact = false;
     if (hasExactSpeedSummary) {
       acc.speedTokens += rawSpeedTokens;
@@ -5119,8 +5192,10 @@ function mergeModelsByDisplayName(models = [], settings = {}, options = {}) {
     }
     const promptTok = acc.inputTokens + acc.cacheReadTokens;
     const cacheHitPct = promptTok > 0 ? +((acc.cacheReadTokens / promptTok) * 100).toFixed(1) : 0;
-    const rawAvgTps =
-      acc.allSpeedExact && acc.speedSeconds > 0
+    const mergedRates = acc.allSpeedHaveBins ? mergeSpeedRateBins(acc.speedSummaries) : null;
+    const rawAvgTps = mergedRates
+      ? mergedRates.avgTokPerSec
+      : acc.allSpeedExact && acc.speedSeconds > 0
         ? acc.speedTokens / acc.speedSeconds
         : acc.speedWeight > 0
           ? acc.speedWeightedSum / acc.speedWeight
@@ -5158,16 +5233,26 @@ function mergeModelsByDisplayName(models = [], settings = {}, options = {}) {
             anomalyByKind: acc.anomalyByKind,
           }
         : {}),
-      speedSummary: acc.hasAnySpeedSummary
-        ? {
-            ...(acc.baseItem.speedSummary || {}),
-            tokens: acc.speedTokens,
-            seconds: +acc.speedSeconds.toFixed(6),
-            sampleCount: acc.speedSampleCount,
-            excludedCount: acc.speedExcludedCount,
-            excludedReasons: acc.speedExcludedReasons,
-            avgTokPerSec: rawAvgTps,
-          }
+      speedSummary: acc.speedSummaries.length > 0
+        ? (() => {
+            const {
+              rateBins: _droppedBins,
+              tokens: _droppedTokens,
+              seconds: _droppedSeconds,
+              ...baseSummary
+            } = acc.baseItem.speedSummary || {};
+            return {
+              ...baseSummary,
+              ...(acc.allSpeedExact
+                ? { tokens: acc.speedTokens, seconds: +acc.speedSeconds.toFixed(6) }
+                : {}),
+              sampleCount: acc.speedSampleCount,
+              excludedCount: acc.speedExcludedCount,
+              excludedReasons: acc.speedExcludedReasons,
+              avgTokPerSec: rawAvgTps,
+              ...mergedRates,
+            };
+          })()
         : undefined,
       upstreamModels,
       displayText: acc.displayText,
@@ -6610,7 +6695,7 @@ return { MAX_EXCEL_CELL_CHARS, uint8ArrayToBase64, buildXlsxWorkbookBytes };
 const { escapeCsvCell, sanitizeExportFilename, buildConsumptionExportBaseName, buildStepsExportBaseName, buildStepsCsv, buildStepsXlsx, buildStepsMarkdownReport, buildConsumptionCsv, buildConsumptionXlsx, buildConsumptionMarkdownReport } = (() => {
 /**
  * @fileoverview 原生多工作表 Excel (`.xlsx`)、RFC-4180 防公式注入 CSV 及双语 Markdown 诊断报告生成纯函数模块 (`reportExporter.js`)。
- * 零外部依赖、单遍 O(N) 聚合，供「按步查看」和「用量统计」视图复用。
+ * 零外部依赖，供「按步查看」和「用量统计」视图复用。
  */
 
 
@@ -6772,6 +6857,10 @@ function formatTrendWindowLabel(slot, isHourly) {
   return String(slot?.fullLabel || slot?.label || '');
 }
 
+function roundExportSpeed(rate) {
+  return rate === null ? null : +rate.toFixed(1);
+}
+
 function summarizeStepsForExport(list, displaySettings) {
   let sumIn = 0;
   let sumCache = 0;
@@ -6781,9 +6870,7 @@ function summarizeStepsForExport(list, displaySettings) {
   let sumCost = 0;
   let sumDuration = 0;
   let maxContext = 0;
-  let tpsTokSum = 0;
-  let tpsSecSum = 0;
-  let tpsCnt = 0;
+  const rates = [];
   let ttftSum = 0;
   let ttftCnt = 0;
   let anomSteps = 0;
@@ -6816,29 +6903,22 @@ function summarizeStepsForExport(list, displaySettings) {
     if (Number.isFinite(cost) && cost > 0) sumCost += cost;
     if (Number.isFinite(dur) && dur > 0) sumDuration += dur;
 
+    const rate = Number(st.totalTokPerSec ?? st.tokPerSec);
     const validTps =
       !st.isCompactionStep &&
       !st.isImageGenStep &&
+      st.speedSampleEligible !== false &&
       outTok >= 50 &&
-      !st.selectedSpeedReason &&
-      Number.isFinite(Number(st.tokPerSec)) &&
-      Number(st.tokPerSec) > 0;
-    const stepSpeedSec = validTps
-      ? st.totalDurationSec != null && Number(st.totalDurationSec) >= 0.5
-        ? Number(st.totalDurationSec)
-        : outTok / Number(st.tokPerSec)
-      : 0;
+      !(st.selectedSpeedReason ?? st.speedReason) &&
+      Number.isFinite(rate) &&
+      rate > 0;
     const validTtft =
       !st.isCompactionStep &&
       !st.isImageGenStep &&
       st.ttftSec != null &&
       Number.isFinite(Number(st.ttftSec)) &&
       Number(st.ttftSec) >= 0;
-    if (validTps && stepSpeedSec > 0) {
-      tpsTokSum += outTok;
-      tpsSecSum += stepSpeedSec;
-      tpsCnt += 1;
-    }
+    if (validTps) rates.push(rate);
     if (validTtft) {
       ttftSum += Number(st.ttftSec);
       ttftCnt += 1;
@@ -6861,9 +6941,7 @@ function summarizeStepsForExport(list, displaySettings) {
         cacheTok: 0,
         outTok: 0,
         cost: 0,
-        tpsTokSum: 0,
-        tpsSecSum: 0,
-        tpsCnt: 0,
+        rates: [],
         ttftSum: 0,
         ttftCnt: 0,
       };
@@ -6874,11 +6952,7 @@ function summarizeStepsForExport(list, displaySettings) {
     mAcc.cacheTok += cacheTok;
     mAcc.outTok += outTok;
     if (Number.isFinite(cost) && cost > 0) mAcc.cost += cost;
-    if (validTps && stepSpeedSec > 0) {
-      mAcc.tpsTokSum += outTok;
-      mAcc.tpsSecSum += stepSpeedSec;
-      mAcc.tpsCnt += 1;
-    }
+    if (validTps) mAcc.rates.push(rate);
     if (validTtft) {
       mAcc.ttftSum += Number(st.ttftSec);
       mAcc.ttftCnt += 1;
@@ -6900,9 +6974,7 @@ function summarizeStepsForExport(list, displaySettings) {
     sumCost,
     sumDuration,
     maxContext,
-    tpsTokSum,
-    tpsSecSum,
-    tpsCnt,
+    avgTokPerSec: medianSpeed(rates),
     ttftSum,
     ttftCnt,
     anomSteps,
@@ -7212,7 +7284,7 @@ function buildStepsXlsx(
             ? `${agg.compactionCount} compact`
             : `含 ${agg.compactionCount} 次压缩`
           : '',
-        agg.tpsSecSum > 0 ? +(agg.tpsTokSum / agg.tpsSecSum).toFixed(1) : null,
+        roundExportSpeed(agg.avgTokPerSec),
         agg.ttftCnt > 0 ? +(agg.ttftSum / agg.ttftCnt).toFixed(2) : null,
         agg.sumDuration > 0 ? +agg.sumDuration.toFixed(2) : null,
         agg.sumIn,
@@ -7271,7 +7343,7 @@ function buildStepsXlsx(
         m.outTok,
         mTotal,
         computeCacheHitRatio(m.inTok, m.cacheTok),
-        m.tpsSecSum > 0 ? +(m.tpsTokSum / m.tpsSecSum).toFixed(1) : null,
+        roundExportSpeed(medianSpeed(m.rates)),
         m.ttftCnt > 0 ? +(m.ttftSum / m.ttftCnt).toFixed(2) : null,
         m.cost,
       ];
@@ -7286,7 +7358,7 @@ function buildStepsXlsx(
         agg.sumOut,
         agg.sumIn + agg.sumCache + agg.sumOut,
         computeCacheHitRatio(agg.sumIn, agg.sumCache),
-        agg.tpsSecSum > 0 ? +(agg.tpsTokSum / agg.tpsSecSum).toFixed(1) : null,
+        roundExportSpeed(agg.avgTokPerSec),
         agg.ttftCnt > 0 ? +(agg.ttftSum / agg.ttftCnt).toFixed(2) : null,
         agg.sumCost,
       ],
@@ -7330,8 +7402,7 @@ function buildStepsMarkdownReport(
 
   const totalTok = agg.sumIn + agg.sumCache + agg.sumOut;
   const cacheHitPct = formatPctNumber(computeCacheHitRatio(agg.sumIn, agg.sumCache) * 100);
-  const avgTps =
-    agg.tpsSecSum > 0 ? formatSpeedMetric(agg.tpsTokSum / agg.tpsSecSum, ' tok/s') : '—';
+  const avgTps = formatSpeedMetric(agg.avgTokPerSec, ' tok/s');
   const avgTtft = agg.ttftCnt > 0 ? formatMetric(agg.ttftSum / agg.ttftCnt, 's') : '—';
   const heading = title
     ? `# ${title}`
@@ -7374,8 +7445,7 @@ function buildStepsMarkdownReport(
       const mCache = formatPctNumber(computeCacheHitRatio(m.inTok, m.cacheTok) * 100, {
         withSymbol: true,
       });
-      const mTps =
-        m.tpsSecSum > 0 ? formatSpeedMetric(m.tpsTokSum / m.tpsSecSum, ' tok/s') : '—';
+      const mTps = formatSpeedMetric(medianSpeed(m.rates), ' tok/s');
       lines.push(
         `| ${escapeMdCell(m.label)} | ${m.calls} | ${formatTokensPrecise(mTotal)} | ${mCache} | ${mTps} | ${formatUsd(m.cost, { precise: m.cost > 0 && m.cost < 0.1 })} |`
       );
@@ -7692,6 +7762,12 @@ function buildConsumptionXlsx(
     let mOut = 0;
     let mTot = 0;
     let mCost = 0;
+    const allSpeedHaveBins = models.every(
+      (m) => !(Number(m?.avgTokPerSec) > 0) || Boolean(m?.speedSummary?.rateBins)
+    );
+    const mergedRates = allSpeedHaveBins
+      ? mergeSpeedRateBins(models.map((m) => m.speedSummary))
+      : null;
     let tpsTokSum = 0;
     let tpsSecSum = 0;
     const modelRows = models.map((m, idx) => {
@@ -7739,6 +7815,10 @@ function buildConsumptionXlsx(
         cost,
       ];
     });
+    const directAccountTps =
+      acc.avgTokPerSec != null && Number.isFinite(Number(acc.avgTokPerSec)) && Number(acc.avgTokPerSec) > 0
+        ? Number(acc.avgTokPerSec)
+        : null;
     modelRows.push({
       tone: 'summary',
       values: [
@@ -7750,7 +7830,14 @@ function buildConsumptionXlsx(
         mOut,
         mTot,
         computeCacheHitRatio(mIn, mCache),
-        tpsSecSum > 0 ? +(tpsTokSum / tpsSecSum).toFixed(1) : null,
+        roundExportSpeed(
+          directAccountTps ??
+            (mergedRates
+              ? mergedRates.avgTokPerSec
+              : tpsSecSum > 0
+                ? tpsTokSum / tpsSecSum
+                : null)
+        ),
         mCost,
       ],
     });
@@ -9259,6 +9346,13 @@ const normalizeClientUpdateMode = normalizePluginUpdateMode;
 const normalizeClientOrchestratorIdMode = normalizeOrchestratorIdMode;
 const normalizeClientWindowMountMode = normalizeWindowMountMode;
 
+function sameSpeedRateBins(before, after) {
+  if (before === after) return true;
+  if (!before || !after) return false;
+  const bins = Object.keys(before);
+  return bins.length === Object.keys(after).length && bins.every((bin) => before[bin] === after[bin]);
+}
+
 function isEquivalentTelemetry(prev, next) {
   if (!prev || !next) return false;
   if (prev === next) return true;
@@ -9695,6 +9789,7 @@ function isEquivalentTelemetry(prev, next) {
         a[k]?.responseTokens !== b[k]?.responseTokens ||
         a[k]?.calls !== b[k]?.calls ||
         (a[k]?.avgTokPerSec ?? null) !== (b[k]?.avgTokPerSec ?? null) ||
+        !sameSpeedRateBins(a[k]?.speedSummary?.rateBins, b[k]?.speedSummary?.rateBins) ||
         (a[k]?.avgTtftSec ?? null) !== (b[k]?.avgTtftSec ?? null) ||
         (a[k]?.cacheHitPct ?? null) !== (b[k]?.cacheHitPct ?? null) ||
         Number(a[k]?.anomalyCount || 0) !== Number(b[k]?.anomalyCount || 0) ||
@@ -9744,6 +9839,12 @@ function isEquivalentTelemetry(prev, next) {
 
   // 7. 比对按模型汇总明细与数据来源汇总明细
   if (!areModelSlicesEqual(pAct?.modelBreakdown, nAct?.modelBreakdown)) {
+    return false;
+  }
+  if (!areModelSlicesEqual(pAct?.aggregated?.modelBreakdown, nAct?.aggregated?.modelBreakdown)) {
+    return false;
+  }
+  if (pAgents.some((agent, i) => !areModelSlicesEqual(agent?.modelBreakdown, nAgents[i]?.modelBreakdown))) {
     return false;
   }
   if (!areModelSlicesEqual(prev.modelBreakdown, next.modelBreakdown)) {
@@ -23776,7 +23877,8 @@ function mergeSelectedAgentUnits(units) {
           anomalyDangerCount: 0,
           anomalyTotalDelaySec: 0,
           anomalyByKind: {},
-          _hasAnySpeedSummary: false,
+          _speedSummaries: [],
+          _allSpeedHaveBins: true,
           _speedTokens: 0,
           _speedSeconds: 0,
           _speedSampleCount: 0,
@@ -23839,7 +23941,6 @@ function mergeSelectedAgentUnits(units) {
         rawSpeedSec > 0 &&
         rawSpeedTok >= 0
       ) {
-        acc._hasAnySpeedSummary = true;
         acc._speedTokens += rawSpeedTok;
         acc._speedSeconds += rawSpeedSec;
       } else if (Number.isFinite(Number(m.avgTokPerSec)) && Number(m.avgTokPerSec) > 0) {
@@ -23847,8 +23948,11 @@ function mergeSelectedAgentUnits(units) {
         acc._speedTokens += fallbackTok;
         acc._speedSeconds += fallbackTok / Number(m.avgTokPerSec);
       }
+      if (Number(m.avgTokPerSec) > 0 && !m.speedSummary?.rateBins) {
+        acc._allSpeedHaveBins = false;
+      }
       if (m.speedSummary) {
-        acc._hasAnySpeedSummary = true;
+        acc._speedSummaries.push(m.speedSummary);
         acc._speedSampleCount += Math.max(0, Number(m.speedSummary.sampleCount || 0));
         acc._speedExcludedCount += Math.max(0, Number(m.speedSummary.excludedCount || 0));
         if (m.speedSummary.excludedReasons && typeof m.speedSummary.excludedReasons === 'object') {
@@ -23882,7 +23986,10 @@ function mergeSelectedAgentUnits(units) {
   const mergedModels = Array.from(modelMap.values())
     .map((acc) => {
       const promptTok = acc.inputTokens + acc.cacheReadTokens;
-      const rawAvgTps = acc._speedSeconds > 0 ? acc._speedTokens / acc._speedSeconds : null;
+      const mergedRates = acc._allSpeedHaveBins ? mergeSpeedRateBins(acc._speedSummaries) : null;
+      const rawAvgTps = mergedRates
+        ? mergedRates.avgTokPerSec
+        : acc._speedSeconds > 0 ? acc._speedTokens / acc._speedSeconds : null;
       return {
         label: acc.label,
         shortName: acc.shortName,
@@ -23902,7 +24009,7 @@ function mergeSelectedAgentUnits(units) {
         avgTtftSec:
           acc._ttftWeight > 0 ? +(acc._ttftWeightedSum / acc._ttftWeight).toFixed(1) : null,
         ttftSampleCount: acc._ttftSampleCount,
-        ...(acc._hasAnySpeedSummary
+        ...(acc._speedSummaries.length > 0
           ? {
               speedSummary: {
                 tokens: acc._speedTokens,
@@ -23911,6 +24018,7 @@ function mergeSelectedAgentUnits(units) {
                 excludedCount: acc._speedExcludedCount,
                 excludedReasons: acc._speedExcludedReasons,
                 avgTokPerSec: rawAvgTps,
+                ...mergedRates,
               },
             }
           : {}),
@@ -25322,6 +25430,14 @@ const ConsumptionView = defineComponent({
     function resolveAggregateAvgSpeed(acct, models) {
       const direct = Number(acct?.avgTokPerSec);
       if (Number.isFinite(direct) && direct > 0) return direct;
+      const list = models || [];
+      const allSpeedHaveBins = list.every(
+        (m) => !(Number(m?.avgTokPerSec) > 0) || Boolean(m?.speedSummary?.rateBins)
+      );
+      const mergedRates = allSpeedHaveBins
+        ? mergeSpeedRateBins(list.map((m) => m?.speedSummary))
+        : null;
+      if (mergedRates) return mergedRates.avgTokPerSec ?? 0;
       let sumTok = 0;
       let sumSec = 0;
       for (const m of models || []) {

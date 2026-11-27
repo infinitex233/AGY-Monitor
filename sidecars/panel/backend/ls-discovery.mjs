@@ -10,7 +10,7 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { DAEMON_DIRS, lsRuntimeEndpoint, setLsRuntimeEndpoint } from './config.mjs';
+import { getDaemonDirs, lsRuntimeEndpoint, setLsRuntimeEndpoint } from './config.mjs';
 
 const LS_DISC_COOLDOWN_MS = 4000;
 
@@ -425,7 +425,8 @@ export async function discoverAntigravityLsEndpoint(options = {}) {
     ppid = Number(process?.ppid || 0),
     ancestorPids = [],
     platform = process?.platform || 'win32',
-    daemonDirs = options.execCmdFn ? [] : DAEMON_DIRS,
+    force = false,
+    daemonDirs = options.execCmdFn ? [] : getDaemonDirs({ force }),
     isPidAliveFn = defaultIsLsPidAlive,
     procFs = null,
     execCmdFn = execLsDiscoveryCmd,
@@ -537,6 +538,7 @@ export async function ensureLsEndpointDiscovered({
   lsDiscoveryState.inFlight = (async () => {
     try {
       const found = await discoverAntigravityLsEndpoint({
+        force,
         ancestorPids: [...envHintPids, ...ancestorPids],
       });
       if (found && found.addr && found.csrfToken) {
@@ -567,9 +569,9 @@ const localHubPortsCache = {
  * @returns {{ allPorts: Set<number>, httpPorts: Set<number>, httpsPorts: Set<number>, csrfTokens: Set<string> }}
  */
 export function getLocalHubPorts({
-  daemonDirs = DAEMON_DIRS,
-  isPidAliveFn = defaultIsLsPidAlive,
   force = false,
+  daemonDirs = getDaemonDirs({ force }),
+  isPidAliveFn = defaultIsLsPidAlive,
 } = {}) {
   const dirs = Array.isArray(daemonDirs) ? daemonDirs : [];
   const cacheKey = `${dirs.join('|')}::${lsRuntimeEndpoint.baseUrl || ''}::${lsRuntimeEndpoint.csrfToken || ''}`;

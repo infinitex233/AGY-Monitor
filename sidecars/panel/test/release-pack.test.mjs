@@ -96,11 +96,12 @@ test('pack-release-zip ships only runtime-essential files, excludes dev bloat, a
   const pluginRoot = join(extractDir, 'agy-monitor');
   assert.ok(existsSync(join(pluginRoot, 'plugin.json')));
   assert.ok(existsSync(join(pluginRoot, 'assets', 'logo.svg')));
+  const sourceManifest = JSON.parse(readFileSync(join(DEFAULT_REPO_ROOT, 'plugin.json'), 'utf8'));
   const manifest = JSON.parse(readFileSync(join(pluginRoot, 'plugin.json'), 'utf8'));
   assert.equal(manifest.name, 'agy-monitor');
   assert.equal(manifest.displayName, 'AGY Monitor');
   assert.equal(manifest.logo, 'assets/logo.svg');
-  assert.equal(manifest.version, '1.2.0');
+  assert.equal(manifest.version, sourceManifest.version);
 
   assert.equal(relFiles.includes('sidecars/panel/backend/quota-pools.mjs'), false);
 

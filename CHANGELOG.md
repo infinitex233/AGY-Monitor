@@ -2,6 +2,26 @@
 
 All notable changes to **AGY Monitor** are documented in this file.
 
+## [1.2.1] - 2026-11
+
+### 更新内容
+- **Magpie 口径实时 TPS 算法与中位数聚合（Measurement v6）**：
+  - 参照 `yetone/magpie` 的解码测速规则将 `MEASUREMENT_VERSION` 升至 `6`：移除旧版 `50ms` 下限强行 clamp 及缺失 TTFT 时的总耗时回退，改为原生 TTFT 必需、最小解码窗口 `0.1s`、缓冲突发过滤（`decode < 1.0s && ttft > 4 * decode`）与 `10,000 tok/s` 物理上限过滤，消除服务端思考/工具调用攒包突发带来的数千 `tok/s` 假高值；采用整数纳秒比较消除浮点边界误判。
+  - 会话均速、模型排行均速及导出报告由加权算术平均改为有效单步速度的**中位数**，并附带 2% 对数分桶 `rateBins` 支持前端多模型/多代理合并精确求中位数；补齐 `missing_ttft` / `short_decode` / `held_burst` / `speed_outlier` 双语排除标签。
+  - 升级后选中会话家族立即按 v6 重算，非选中历史会话按批限流刷新，避免首屏卡顿。
+- **Antigravity CLI / ACP（含 T3 Code）调用数据自动发现**：
+  - 自动发现 `~/.gemini/antigravity-acp` 与 `~/.t3/userdata/providers/antigravity/*/{antigravity-acp,antigravity-cli}`（支持 `T3_USERDATA_DIR` 环境变量），动态刷新会话 SQLite、脑图日志、注释标题与 `daemon/` 端点目录。
+  - 按会话 ID 合并多端 `conversation_summaries.db`（优先保留原生记录），将 ACP 路径正确归类为 CLI 来源，并修复部分库未就绪时的不完整快照误缓存问题。
+
+### English
+- **Magpie-Aligned Decode TPS & Median Aggregation (Measurement v6)**:
+  - Upgraded `MEASUREMENT_VERSION` to `6` following `yetone/magpie`'s `DecodeWindow` / `DecodeOf` rules: removed the `50ms` floor clamp and missing-TTFT total-duration fallback, enforcing native TTFT presence, `>= 0.1s` decode window, held-burst rejection (`decode < 1.0s && ttft > 4 * decode`), and a `10,000 tok/s` cap using exact nanosecond integer comparisons to eliminate buffered-burst TPS spikes.
+  - Switched session, model, and exported average speeds from weighted mean to **median** with compact 2% logarithmic histograms (`rateBins`) for accurate frontend multi-model/multi-agent merging, and added bilingual exclusion labels (`missing_ttft`, `short_decode`, `held_burst`, `speed_outlier`).
+  - Refreshes the selected conversation family to v6 immediately on upgrade while throttling non-selected historical refreshes across polls.
+- **Antigravity CLI / ACP (including T3 Code) Telemetry Discovery**:
+  - Dynamically discovers `~/.gemini/antigravity-acp` and `~/.t3/userdata/providers/antigravity/*/{antigravity-acp,antigravity-cli}` (with `T3_USERDATA_DIR` override) for conversations, brain transcripts, annotations, and `daemon/` endpoints with a 5s TTL refresh.
+  - Merges multi-root `conversation_summaries.db` snapshots by conversation ID (preferring native rows), classifies ACP sessions under CLI, and avoids memoizing partial summary snapshots when a database is temporarily unavailable.
+
 ## [1.2.0] - 2026-11
 
 ### English

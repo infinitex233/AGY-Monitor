@@ -97,7 +97,8 @@ function dedupeDirCandidates(list) {
   for (const item of list) {
     const clean = String(item || '').trim();
     if (!clean) continue;
-    const key = process.platform === 'win32' ? clean.toLowerCase() : clean;
+    const normalized = join(clean, '.');
+    const key = process.platform === 'win32' ? normalized.toLowerCase() : normalized;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(clean);
@@ -105,8 +106,35 @@ function dedupeDirCandidates(list) {
   return out;
 }
 
-function resolveProductDataRoots() {
-  const geminiBase = resolveGeminiBaseDir();
+function resolveT3ProductDataRoots() {
+  const explicitT3Dir = String(process.env.T3_USERDATA_DIR || '').trim();
+  if (!explicitT3Dir && String(process.env.ANTIGRAVITY_GEMINI_DIR || '').trim()) return [];
+  const providerDir = join(explicitT3Dir || join(homedir(), '.t3', 'userdata'), 'providers', 'antigravity');
+  let providerNames;
+  try {
+    providerNames = readdirSync(providerDir);
+  } catch {
+    return [];
+  }
+  const roots = [];
+  for (const providerName of providerNames.sort((a, b) => a.localeCompare(b))) {
+    const providerRoot = join(providerDir, providerName);
+    try {
+      if (!statSync(providerRoot, { throwIfNoEntry: false })?.isDirectory?.()) continue;
+      for (const name of ['antigravity-acp', 'antigravity-cli']) {
+        const candidate = join(providerRoot, name);
+        if (statSync(candidate, { throwIfNoEntry: false })?.isDirectory?.()) {
+          roots.push(candidate);
+        }
+      }
+    } catch {
+      // 忽略权限受限或瞬态移除的目录
+    }
+  }
+  return roots;
+}
+
+function resolveProductDataRoots(geminiBase) {
   const explicitAppDir = String(
     process.env.USAGE_MONITOR_APP_DATA_DIR || process.env.ANTIGRAVITY_APP_DATA_DIR || ''
   ).trim();
@@ -119,8 +147,10 @@ function resolveProductDataRoots() {
     customRoot,
     join(geminiBase, 'antigravity'),
     join(geminiBase, 'antigravity-cli'),
+    join(geminiBase, 'antigravity-acp'),
     join(geminiBase, 'antigravity-ide'),
     join(geminiBase, 'antigravity-idea'),
+    ...resolveT3ProductDataRoots(),
   ]);
 }
 
@@ -171,23 +201,70 @@ export const CLI_STATUS_SNAPSHOT_FILE = join(DATA_DIR, 'cli-status-snapshot.json
 /**
  * 本地对话记录目录、脑图日志目录、守护发现目录与跨端深层统计缓存路径候选列表（联合覆盖 Desktop / CLI / IDE）。
  */
-export const PRODUCT_DATA_ROOTS = resolveProductDataRoots();
-export const CONVERSATION_DIRS = PRODUCT_DATA_ROOTS.map((root) => join(root, 'conversations'));
-export const BRAIN_DIRS = PRODUCT_DATA_ROOTS.map((root) => join(root, 'brain'));
-export const ANNOTATION_DIRS = PRODUCT_DATA_ROOTS.map((root) => join(root, 'annotations'));
-export const DAEMON_DIRS = dedupeDirCandidates([
-  join(resolveGeminiBaseDir(), 'antigravity-cli', 'daemon'),
-  ...PRODUCT_DATA_ROOTS.map((root) => join(root, 'daemon')),
-]);
+const PRODUCT_DATA_PATHS_TTL_MS = 5000;
+let cachedProductDataPaths;
+let productDataPathsExpiresAt = 0;
+
+function getProductDataPaths({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && now < productDataPathsExpiresAt) return cachedProductDataPaths;
+
+  const geminiBase = resolveGeminiBaseDir();
+  const roots = resolveProductDataRoots(geminiBase);
+  const brainDirs = roots.map((root) => join(root, 'brain'));
+  cachedProductDataPaths = {
+    roots,
+    conversationDirs: roots.map((root) => join(root, 'conversations')),
+    brainDirs,
+    annotationDirs: roots.map((root) => join(root, 'annotations')),
+    daemonDirs: dedupeDirCandidates([
+      join(geminiBase, 'antigravity-cli', 'daemon'),
+      ...roots.map((root) => join(root, 'daemon')),
+    ]),
+    deepStatsCacheCandidates: dedupeDirCandidates([
+      join(geminiBase, 'antigravity-ide', 'brain', '.deep_stats_cache.json'),
+      join(geminiBase, 'antigravity-cli', 'brain', '.deep_stats_cache.json'),
+      join(geminiBase, 'antigravity', 'brain', '.deep_stats_cache.json'),
+      join(geminiBase, 'antigravity-idea', 'brain', '.deep_stats_cache.json'),
+      ...brainDirs.map((dir) => join(dir, '.deep_stats_cache.json')),
+    ]),
+  };
+  productDataPathsExpiresAt = now + PRODUCT_DATA_PATHS_TTL_MS;
+  return cachedProductDataPaths;
+}
+
+export function getProductDataRoots(opts) {
+  return getProductDataPaths(opts).roots;
+}
+
+export function getConversationDirs(opts) {
+  return getProductDataPaths(opts).conversationDirs;
+}
+
+export function getBrainDirs(opts) {
+  return getProductDataPaths(opts).brainDirs;
+}
+
+export function getAnnotationDirs(opts) {
+  return getProductDataPaths(opts).annotationDirs;
+}
+
+export function getDaemonDirs(opts) {
+  return getProductDataPaths(opts).daemonDirs;
+}
+
+export function getDeepStatsCacheCandidates(opts) {
+  return getProductDataPaths(opts).deepStatsCacheCandidates;
+}
+
+export const PRODUCT_DATA_ROOTS = getProductDataRoots();
+export const CONVERSATION_DIRS = getConversationDirs();
+export const BRAIN_DIRS = getBrainDirs();
+export const ANNOTATION_DIRS = getAnnotationDirs();
+export const DAEMON_DIRS = getDaemonDirs();
 export const CONVERSATIONS_DIR = CONVERSATION_DIRS[0];
 export const BRAIN_DIR = BRAIN_DIRS[0];
-export const DEEP_STATS_CACHE_CANDIDATES = dedupeDirCandidates([
-  join(resolveGeminiBaseDir(), 'antigravity-ide', 'brain', '.deep_stats_cache.json'),
-  join(resolveGeminiBaseDir(), 'antigravity-cli', 'brain', '.deep_stats_cache.json'),
-  join(resolveGeminiBaseDir(), 'antigravity', 'brain', '.deep_stats_cache.json'),
-  join(resolveGeminiBaseDir(), 'antigravity-idea', 'brain', '.deep_stats_cache.json'),
-  ...BRAIN_DIRS.map((dir) => join(dir, '.deep_stats_cache.json')),
-]);
+export const DEEP_STATS_CACHE_CANDIDATES = getDeepStatsCacheCandidates();
 
 /**
  * Antigravity 本地 Language Server Connect RPC 端点与鉴权 Token（支持环境变量静态注入与进程/守护文件动态发现）。
@@ -489,6 +566,7 @@ export const externalDeepStatsMemo = {
 };
 
 export const localSummaryMemo = {
+  rootsKey: '',
   sig: '',
   byId: new Map(),
   available: false,
@@ -535,8 +613,10 @@ export const pluginUpdateState = {
  */
 export function clearRuntimeCaches(options = {}) {
   if (!localTrajectoryCacheStore.clearCache(options)) return false;
+  productDataPathsExpiresAt = 0;
   externalDeepStatsMemo.sig = '';
   externalDeepStatsMemo.convos.clear();
+  localSummaryMemo.rootsKey = '';
   localSummaryMemo.sig = '';
   localSummaryMemo.byId.clear();
   localSummaryMemo.available = false;

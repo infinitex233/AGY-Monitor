@@ -493,6 +493,13 @@ export const normalizeClientUpdateMode = normalizePluginUpdateMode;
 export const normalizeClientOrchestratorIdMode = normalizeOrchestratorIdMode;
 export const normalizeClientWindowMountMode = normalizeWindowMountMode;
 
+function sameSpeedRateBins(before, after) {
+  if (before === after) return true;
+  if (!before || !after) return false;
+  const bins = Object.keys(before);
+  return bins.length === Object.keys(after).length && bins.every((bin) => before[bin] === after[bin]);
+}
+
 export function isEquivalentTelemetry(prev, next) {
   if (!prev || !next) return false;
   if (prev === next) return true;
@@ -929,6 +936,7 @@ export function isEquivalentTelemetry(prev, next) {
         a[k]?.responseTokens !== b[k]?.responseTokens ||
         a[k]?.calls !== b[k]?.calls ||
         (a[k]?.avgTokPerSec ?? null) !== (b[k]?.avgTokPerSec ?? null) ||
+        !sameSpeedRateBins(a[k]?.speedSummary?.rateBins, b[k]?.speedSummary?.rateBins) ||
         (a[k]?.avgTtftSec ?? null) !== (b[k]?.avgTtftSec ?? null) ||
         (a[k]?.cacheHitPct ?? null) !== (b[k]?.cacheHitPct ?? null) ||
         Number(a[k]?.anomalyCount || 0) !== Number(b[k]?.anomalyCount || 0) ||
@@ -978,6 +986,12 @@ export function isEquivalentTelemetry(prev, next) {
 
   // 7. 比对按模型汇总明细与数据来源汇总明细
   if (!areModelSlicesEqual(pAct?.modelBreakdown, nAct?.modelBreakdown)) {
+    return false;
+  }
+  if (!areModelSlicesEqual(pAct?.aggregated?.modelBreakdown, nAct?.aggregated?.modelBreakdown)) {
+    return false;
+  }
+  if (pAgents.some((agent, i) => !areModelSlicesEqual(agent?.modelBreakdown, nAgents[i]?.modelBreakdown))) {
     return false;
   }
   if (!areModelSlicesEqual(prev.modelBreakdown, next.modelBreakdown)) {

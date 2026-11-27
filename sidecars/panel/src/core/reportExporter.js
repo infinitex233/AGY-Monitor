@@ -1,8 +1,9 @@
 /**
  * @fileoverview 原生多工作表 Excel (`.xlsx`)、RFC-4180 防公式注入 CSV 及双语 Markdown 诊断报告生成纯函数模块 (`reportExporter.js`)。
- * 零外部依赖、单遍 O(N) 聚合，供「按步查看」和「用量统计」视图复用。
+ * 零外部依赖，供「按步查看」和「用量统计」视图复用。
  */
 
+import { medianSpeed, mergeSpeedRateBins } from '../../shared/telemetry-display-rules.mjs';
 import { isEnglishLocale } from '../i18n/index.js';
 import {
   formatAnomalyKindLabel,
@@ -176,6 +177,10 @@ function formatTrendWindowLabel(slot, isHourly) {
   return String(slot?.fullLabel || slot?.label || '');
 }
 
+function roundExportSpeed(rate) {
+  return rate === null ? null : +rate.toFixed(1);
+}
+
 function summarizeStepsForExport(list, displaySettings) {
   let sumIn = 0;
   let sumCache = 0;
@@ -185,9 +190,7 @@ function summarizeStepsForExport(list, displaySettings) {
   let sumCost = 0;
   let sumDuration = 0;
   let maxContext = 0;
-  let tpsTokSum = 0;
-  let tpsSecSum = 0;
-  let tpsCnt = 0;
+  const rates = [];
   let ttftSum = 0;
   let ttftCnt = 0;
   let anomSteps = 0;
@@ -220,29 +223,22 @@ function summarizeStepsForExport(list, displaySettings) {
     if (Number.isFinite(cost) && cost > 0) sumCost += cost;
     if (Number.isFinite(dur) && dur > 0) sumDuration += dur;
 
+    const rate = Number(st.totalTokPerSec ?? st.tokPerSec);
     const validTps =
       !st.isCompactionStep &&
       !st.isImageGenStep &&
+      st.speedSampleEligible !== false &&
       outTok >= 50 &&
-      !st.selectedSpeedReason &&
-      Number.isFinite(Number(st.tokPerSec)) &&
-      Number(st.tokPerSec) > 0;
-    const stepSpeedSec = validTps
-      ? st.totalDurationSec != null && Number(st.totalDurationSec) >= 0.5
-        ? Number(st.totalDurationSec)
-        : outTok / Number(st.tokPerSec)
-      : 0;
+      !(st.selectedSpeedReason ?? st.speedReason) &&
+      Number.isFinite(rate) &&
+      rate > 0;
     const validTtft =
       !st.isCompactionStep &&
       !st.isImageGenStep &&
       st.ttftSec != null &&
       Number.isFinite(Number(st.ttftSec)) &&
       Number(st.ttftSec) >= 0;
-    if (validTps && stepSpeedSec > 0) {
-      tpsTokSum += outTok;
-      tpsSecSum += stepSpeedSec;
-      tpsCnt += 1;
-    }
+    if (validTps) rates.push(rate);
     if (validTtft) {
       ttftSum += Number(st.ttftSec);
       ttftCnt += 1;
@@ -265,9 +261,7 @@ function summarizeStepsForExport(list, displaySettings) {
         cacheTok: 0,
         outTok: 0,
         cost: 0,
-        tpsTokSum: 0,
-        tpsSecSum: 0,
-        tpsCnt: 0,
+        rates: [],
         ttftSum: 0,
         ttftCnt: 0,
       };
@@ -278,11 +272,7 @@ function summarizeStepsForExport(list, displaySettings) {
     mAcc.cacheTok += cacheTok;
     mAcc.outTok += outTok;
     if (Number.isFinite(cost) && cost > 0) mAcc.cost += cost;
-    if (validTps && stepSpeedSec > 0) {
-      mAcc.tpsTokSum += outTok;
-      mAcc.tpsSecSum += stepSpeedSec;
-      mAcc.tpsCnt += 1;
-    }
+    if (validTps) mAcc.rates.push(rate);
     if (validTtft) {
       mAcc.ttftSum += Number(st.ttftSec);
       mAcc.ttftCnt += 1;
@@ -304,9 +294,7 @@ function summarizeStepsForExport(list, displaySettings) {
     sumCost,
     sumDuration,
     maxContext,
-    tpsTokSum,
-    tpsSecSum,
-    tpsCnt,
+    avgTokPerSec: medianSpeed(rates),
     ttftSum,
     ttftCnt,
     anomSteps,
@@ -616,7 +604,7 @@ export function buildStepsXlsx(
             ? `${agg.compactionCount} compact`
             : `含 ${agg.compactionCount} 次压缩`
           : '',
-        agg.tpsSecSum > 0 ? +(agg.tpsTokSum / agg.tpsSecSum).toFixed(1) : null,
+        roundExportSpeed(agg.avgTokPerSec),
         agg.ttftCnt > 0 ? +(agg.ttftSum / agg.ttftCnt).toFixed(2) : null,
         agg.sumDuration > 0 ? +agg.sumDuration.toFixed(2) : null,
         agg.sumIn,
@@ -675,7 +663,7 @@ export function buildStepsXlsx(
         m.outTok,
         mTotal,
         computeCacheHitRatio(m.inTok, m.cacheTok),
-        m.tpsSecSum > 0 ? +(m.tpsTokSum / m.tpsSecSum).toFixed(1) : null,
+        roundExportSpeed(medianSpeed(m.rates)),
         m.ttftCnt > 0 ? +(m.ttftSum / m.ttftCnt).toFixed(2) : null,
         m.cost,
       ];
@@ -690,7 +678,7 @@ export function buildStepsXlsx(
         agg.sumOut,
         agg.sumIn + agg.sumCache + agg.sumOut,
         computeCacheHitRatio(agg.sumIn, agg.sumCache),
-        agg.tpsSecSum > 0 ? +(agg.tpsTokSum / agg.tpsSecSum).toFixed(1) : null,
+        roundExportSpeed(agg.avgTokPerSec),
         agg.ttftCnt > 0 ? +(agg.ttftSum / agg.ttftCnt).toFixed(2) : null,
         agg.sumCost,
       ],
@@ -734,8 +722,7 @@ export function buildStepsMarkdownReport(
 
   const totalTok = agg.sumIn + agg.sumCache + agg.sumOut;
   const cacheHitPct = formatPctNumber(computeCacheHitRatio(agg.sumIn, agg.sumCache) * 100);
-  const avgTps =
-    agg.tpsSecSum > 0 ? formatSpeedMetric(agg.tpsTokSum / agg.tpsSecSum, ' tok/s') : '—';
+  const avgTps = formatSpeedMetric(agg.avgTokPerSec, ' tok/s');
   const avgTtft = agg.ttftCnt > 0 ? formatMetric(agg.ttftSum / agg.ttftCnt, 's') : '—';
   const heading = title
     ? `# ${title}`
@@ -778,8 +765,7 @@ export function buildStepsMarkdownReport(
       const mCache = formatPctNumber(computeCacheHitRatio(m.inTok, m.cacheTok) * 100, {
         withSymbol: true,
       });
-      const mTps =
-        m.tpsSecSum > 0 ? formatSpeedMetric(m.tpsTokSum / m.tpsSecSum, ' tok/s') : '—';
+      const mTps = formatSpeedMetric(medianSpeed(m.rates), ' tok/s');
       lines.push(
         `| ${escapeMdCell(m.label)} | ${m.calls} | ${formatTokensPrecise(mTotal)} | ${mCache} | ${mTps} | ${formatUsd(m.cost, { precise: m.cost > 0 && m.cost < 0.1 })} |`
       );
@@ -1096,6 +1082,12 @@ export function buildConsumptionXlsx(
     let mOut = 0;
     let mTot = 0;
     let mCost = 0;
+    const allSpeedHaveBins = models.every(
+      (m) => !(Number(m?.avgTokPerSec) > 0) || Boolean(m?.speedSummary?.rateBins)
+    );
+    const mergedRates = allSpeedHaveBins
+      ? mergeSpeedRateBins(models.map((m) => m.speedSummary))
+      : null;
     let tpsTokSum = 0;
     let tpsSecSum = 0;
     const modelRows = models.map((m, idx) => {
@@ -1143,6 +1135,10 @@ export function buildConsumptionXlsx(
         cost,
       ];
     });
+    const directAccountTps =
+      acc.avgTokPerSec != null && Number.isFinite(Number(acc.avgTokPerSec)) && Number(acc.avgTokPerSec) > 0
+        ? Number(acc.avgTokPerSec)
+        : null;
     modelRows.push({
       tone: 'summary',
       values: [
@@ -1154,7 +1150,14 @@ export function buildConsumptionXlsx(
         mOut,
         mTot,
         computeCacheHitRatio(mIn, mCache),
-        tpsSecSum > 0 ? +(tpsTokSum / tpsSecSum).toFixed(1) : null,
+        roundExportSpeed(
+          directAccountTps ??
+            (mergedRates
+              ? mergedRates.avgTokPerSec
+              : tpsSecSum > 0
+                ? tpsTokSum / tpsSecSum
+                : null)
+        ),
         mCost,
       ],
     });

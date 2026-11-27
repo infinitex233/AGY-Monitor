@@ -14,6 +14,7 @@ import {
   classifyStepCostTier,
   classifyTtftTier,
   formatCompactTokens,
+  mergeSpeedRateBins,
 } from '../../shared/telemetry-display-rules.mjs';
 
 const EN_MONTH_SHORT = Object.freeze([
@@ -207,6 +208,10 @@ const SPEED_REASON_LABELS = {
   compaction_timing_unavailable: 'fmt.speedCompactionTimingUnavailable',
   invalid_output_tokens: 'fmt.speedInvalidOutput',
   inconsistent_timing: 'fmt.speedInconsistent',
+  missing_ttft: 'fmt.speedMissingTtft',
+  short_decode: 'fmt.speedShortDecode',
+  held_burst: 'fmt.speedHeldBurst',
+  speed_outlier: 'fmt.speedOutlier',
   short_timing: 'fmt.speedShort',
   legacy_cache: 'fmt.speedLegacy',
 };
@@ -969,7 +974,8 @@ export function mergeModelsByDisplayName(models = [], settings = {}, options = {
         totalTokens: totTok,
         costUsd,
         unpricedCalls,
-        hasAnySpeedSummary: Boolean(m.speedSummary),
+        speedSummaries: m.speedSummary ? [m.speedSummary] : [],
+        allSpeedHaveBins: !hasSpeed || Boolean(m.speedSummary?.rateBins),
         allSpeedExact: !hasSpeed || hasExactSpeedSummary,
         speedTokens: hasExactSpeedSummary ? rawSpeedTokens : 0,
         speedSeconds: hasExactSpeedSummary ? rawSpeedSeconds : 0,
@@ -1026,7 +1032,8 @@ export function mergeModelsByDisplayName(models = [], settings = {}, options = {
       }
     }
 
-    if (m.speedSummary) acc.hasAnySpeedSummary = true;
+    if (m.speedSummary) acc.speedSummaries.push(m.speedSummary);
+    if (hasSpeed && !m.speedSummary?.rateBins) acc.allSpeedHaveBins = false;
     if (hasSpeed && !hasExactSpeedSummary) acc.allSpeedExact = false;
     if (hasExactSpeedSummary) {
       acc.speedTokens += rawSpeedTokens;
@@ -1063,8 +1070,10 @@ export function mergeModelsByDisplayName(models = [], settings = {}, options = {
     }
     const promptTok = acc.inputTokens + acc.cacheReadTokens;
     const cacheHitPct = promptTok > 0 ? +((acc.cacheReadTokens / promptTok) * 100).toFixed(1) : 0;
-    const rawAvgTps =
-      acc.allSpeedExact && acc.speedSeconds > 0
+    const mergedRates = acc.allSpeedHaveBins ? mergeSpeedRateBins(acc.speedSummaries) : null;
+    const rawAvgTps = mergedRates
+      ? mergedRates.avgTokPerSec
+      : acc.allSpeedExact && acc.speedSeconds > 0
         ? acc.speedTokens / acc.speedSeconds
         : acc.speedWeight > 0
           ? acc.speedWeightedSum / acc.speedWeight
@@ -1102,16 +1111,26 @@ export function mergeModelsByDisplayName(models = [], settings = {}, options = {
             anomalyByKind: acc.anomalyByKind,
           }
         : {}),
-      speedSummary: acc.hasAnySpeedSummary
-        ? {
-            ...(acc.baseItem.speedSummary || {}),
-            tokens: acc.speedTokens,
-            seconds: +acc.speedSeconds.toFixed(6),
-            sampleCount: acc.speedSampleCount,
-            excludedCount: acc.speedExcludedCount,
-            excludedReasons: acc.speedExcludedReasons,
-            avgTokPerSec: rawAvgTps,
-          }
+      speedSummary: acc.speedSummaries.length > 0
+        ? (() => {
+            const {
+              rateBins: _droppedBins,
+              tokens: _droppedTokens,
+              seconds: _droppedSeconds,
+              ...baseSummary
+            } = acc.baseItem.speedSummary || {};
+            return {
+              ...baseSummary,
+              ...(acc.allSpeedExact
+                ? { tokens: acc.speedTokens, seconds: +acc.speedSeconds.toFixed(6) }
+                : {}),
+              sampleCount: acc.speedSampleCount,
+              excludedCount: acc.speedExcludedCount,
+              excludedReasons: acc.speedExcludedReasons,
+              avgTokPerSec: rawAvgTps,
+              ...mergedRates,
+            };
+          })()
         : undefined,
       upstreamModels,
       displayText: acc.displayText,

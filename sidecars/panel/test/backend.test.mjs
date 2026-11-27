@@ -14,6 +14,7 @@ import {
 } from '../backend/cli-sqlite-reader.mjs';
 import { writeTrajectoryCacheFile } from '../backend/trajectory-cache-file.mjs';
 import { normalizeWindowMountMode } from '../shared/settings-normalization.mjs';
+import { extractModelSteps, MEASUREMENT_VERSION } from '../trajectory-metrics.mjs';
 
 const raw={trajectory:{steps:[{status:'CORTEX_STEP_STATUS_DONE',metadata:{
   createdAt:'2026-01-01T00:00:00Z',finishedGeneratingAt:'2026-01-01T00:00:10Z',
@@ -65,7 +66,7 @@ test('failed migration retains all accounting, makes legacy speed and TTFT unava
   assert.equal(h.state.saves[0].data.test.steps[0].outputTokens,600);
   assert.equal(h.state.saves[0].data.test.steps[0].modelKey,'unknown');
 });
-test('successful migration rebuilds measurements and uses the same mean in both tables',async()=>{
+test('successful migration rebuilds measurements and uses the same median in both tables',async()=>{
   const h=backendHarness({cache:{test:old},trajectories:{test:raw}});
   const p=await h.buildTelemetryPayloadInternal('test');
   assert.equal(p.activeConversation.latestTokPerSec,85.7);
@@ -83,6 +84,36 @@ test('a legacy stream setting cannot re-enable mixed speed formulas',async()=>{
   assert.equal(p.activeConversation.avgTokPerSec,85.7);
   assert.equal(p.modelBreakdown[0].avgTokPerSec,85.7);
   assert.equal(p.settings.speedMode,undefined);
+});
+test('version 5 measurements refresh even when the trajectory signature matches and throttle non-selected upgrades', async () => {
+  const lastModifiedTime = '2026-01-01T00:00:10Z';
+  const [step] = extractModelSteps(raw.trajectory.steps, raw.trajectory.generatorMetadata);
+  const mkCachedV5 = () => ({
+    signature: `v10-model-identity:1:${lastModifiedTime}`,
+    contextLimitTelemetry: true,
+    turnRailTelemetry: true,
+    anomalyTelemetry: true,
+    subagentRefs: [],
+    steps: [{ ...step, measurementVersion: 5, totalTokPerSec: 60 }],
+  });
+  const cache = { test: mkCachedV5() };
+  const summaries = { test: { stepCount: 1, lastModifiedTime, status: 'IDLE' } };
+  const trajectories = { test: raw };
+  for (let i = 1; i <= 12; i += 1) {
+    const id = `hist-${i}`;
+    cache[id] = mkCachedV5();
+    summaries[id] = { stepCount: 1, lastModifiedTime, status: 'IDLE' };
+    trajectories[id] = raw;
+  }
+  const h = backendHarness({ cache, summaries, trajectories });
+  const payload = await h.buildTelemetryPayloadInternal('test');
+  assert.equal(payload.activeConversation.avgTokPerSec, 85.7);
+  const saved = h.state.saves.at(-1).data;
+  assert.equal(saved.test.steps[0].measurementVersion, MEASUREMENT_VERSION);
+  const upgradedHistCount = Object.entries(saved).filter(
+    ([id, entry]) => id.startsWith('hist-') && entry.steps[0].measurementVersion === MEASUREMENT_VERSION
+  ).length;
+  assert.ok(upgradedHistCount > 0 && upgradedHistCount < 12);
 });
 test('a malformed successful RPC cannot erase previously recorded usage',async()=>{
   const h=backendHarness({cache:{test:old},trajectories:{test:{}}});
@@ -1601,7 +1632,7 @@ function encodeProtoFieldBytes(fieldNo, payload) {
   ]);
 }
 
-test('Antigravity CLI annotations.pbtxt + SQLite trajectory reader recovers title, TPS, TTFT, thinking split, and 10-channel context', () => {
+test('Antigravity CLI annotations.pbtxt + SQLite reader recovers title, TTFT, and context while excluding a held burst', () => {
   assert.equal(
     parseAnnotationPbtxtTitle('last_user_view_time:{seconds:1794759792}\ntitle:"Greeting and Hello"\n'),
     'Greeting and Hello'
@@ -1830,7 +1861,8 @@ test('Antigravity CLI annotations.pbtxt + SQLite trajectory reader recovers titl
     const parsed = JSON.parse(rawOut);
     assert.equal(parsed.title, 'Greeting and Hello');
     assert.equal(parsed.modelLabel, 'Gemini 4 Hydrogen (Medium)');
-    assert.equal(parsed.tokPerSec, 160.5);
+    assert.equal(parsed.tokPerSec, null);
+    assert.equal(parsed.step.selectedSpeedReason, 'held_burst');
     assert.ok(Math.abs(parsed.ttftSec - 3.2766) < 0.01);
     assert.equal(parsed.step.thinkingTokens, 57);
     assert.equal(parsed.step.responseTokens, 32);

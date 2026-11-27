@@ -18,7 +18,7 @@ import {
   resolveTranscriptPathInLogsDir,
 } from '../backend/transcript-fallback.mjs';
 import { resolveCliLocalSessionMetrics } from '../cli-statusline.mjs';
-import { extractModelSteps } from '../trajectory-metrics.mjs';
+import { extractModelSteps, MEASUREMENT_VERSION } from '../trajectory-metrics.mjs';
 import { backendHarness } from './backend-harness.mjs';
 import { i18nStore } from '../src/i18n/index.js';
 import {
@@ -928,9 +928,12 @@ test('legacy pre-PR#38 empty-WAL sqlite cache signatures migrate in-place withou
             responseTokens: 567,
             createdAtMs: baseSec * 1000,
             completedAtMs: (baseSec + 2) * 1000,
-            durationSec: 2,
-            ttftSec: 0.5,
-            streamSec: 1.5,
+            measurementVersion: MEASUREMENT_VERSION,
+            isComplete: true,
+            totalDurationSec: 2,
+            nativeTtftSec: 0.5,
+            totalTokPerSec: 378,
+            speedSampleEligible: true,
             contextBreakdown: { toolResultsTokens: 0 },
           },
         ],
