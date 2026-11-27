@@ -124,9 +124,9 @@ function resolveProductDataRoots() {
 }
 
 /**
- * 插件持久化数据目录（默认由 Antigravity 宿主注入 `~/.gemini/antigravity/sidecar_data/usage-monitor/panel/data`）。
+ * 插件持久化数据目录（默认由 Antigravity 宿主注入 `~/.gemini/antigravity/sidecar_data/agy-monitor/panel/data`）。
  * 兼容桌面端、Antigravity IDE 与无头 `agy` CLI（`~/.gemini/antigravity-cli`）：
- * 优先使用已存在的持久化目录，纯 CLI 服务器自动落入 `~/.gemini/antigravity-cli/sidecar_data/usage-monitor/panel/data`，
+ * 优先使用已存在的持久化目录，纯 CLI 服务器自动落入 `~/.gemini/antigravity-cli/sidecar_data/agy-monitor/panel/data`，
  * 避免落入插件源码目录而在自更新时丢失缓存与设置。
  */
 function resolveDefaultDataDir() {
@@ -143,9 +143,9 @@ function resolveDefaultDataDir() {
   const geminiBase = resolveGeminiBaseDir();
   const antigravityRoot = join(geminiBase, 'antigravity');
   const cliRoot = join(geminiBase, 'antigravity-cli');
-  const panelDataDir = join(antigravityRoot, 'sidecar_data', 'usage-monitor', 'panel', 'data');
-  const legacyDataDir = join(antigravityRoot, 'sidecar_data', 'usage-monitor', 'data');
-  const cliPanelDataDir = join(cliRoot, 'sidecar_data', 'usage-monitor', 'panel', 'data');
+  const panelDataDir = join(antigravityRoot, 'sidecar_data', 'agy-monitor', 'panel', 'data');
+  const legacyDataDir = join(antigravityRoot, 'sidecar_data', 'agy-monitor', 'data');
+  const cliPanelDataDir = join(cliRoot, 'sidecar_data', 'agy-monitor', 'panel', 'data');
   if (existsSync(panelDataDir)) return panelDataDir;
   if (existsSync(legacyDataDir)) return legacyDataDir;
   if (existsSync(cliPanelDataDir)) return cliPanelDataDir;
@@ -233,7 +233,7 @@ export const CLOUD_CATALOG_URLS = [
 export const DEFAULT_RELEASE_URL =
   `https://github.com/${OFFICIAL_GITHUB_REPO}/releases/latest`;
 export const DEFAULT_DOWNLOAD_URL =
-  `https://github.com/${OFFICIAL_GITHUB_REPO}/releases/latest/download/usage-monitor.zip`;
+  `https://github.com/${OFFICIAL_GITHUB_REPO}/releases/latest/download/agy-monitor.zip`;
 export const DEFAULT_ARCHIVE_FALLBACK_URL =
   `https://codeload.github.com/${OFFICIAL_GITHUB_REPO}/zip/refs/heads/main`;
 

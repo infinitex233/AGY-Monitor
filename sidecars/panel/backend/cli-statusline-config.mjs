@@ -112,7 +112,7 @@ export function resolvePreferredCliStatusLineScriptPath({
     geminiBase,
     'config',
     'plugins',
-    'usage-monitor',
+    'agy-monitor',
     'sidecars',
     'panel',
     'cli-statusline.mjs'

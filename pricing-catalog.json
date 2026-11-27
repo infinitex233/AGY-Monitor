@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "catalogVersion": "2026.11.25.1",
   "updatedAt": "2026-11-25T14:23:00+09:00",
-  "latestPluginVersion": "1.0.0",
+  "latestPluginVersion": "1.0.1",
   "releaseUrl": "https://github.com/infinitex233/antigravity-usage-monitor/releases/latest",
-  "downloadUrl": "https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/usage-monitor.zip",
+  "downloadUrl": "https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip",
   "archiveFallbackUrl": "https://codeload.github.com/infinitex233/antigravity-usage-monitor/zip/refs/heads/main",
   "pricing": {
     "gemini-pro-orchestrator": { "input": 2.00, "cache": 0.10, "output": 10.0, "short": "orch-carbon", "family": "Gemini", "phases": [{ "until": "2026-12-01T00:00:00Z", "input": 2.00, "cache": 0.10, "output": 10.0 }, { "from": "2026-12-01T00:00:00Z", "input": 4.00, "cache": 0.20, "output": 20.0 }] },

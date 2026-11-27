@@ -234,7 +234,7 @@ test('cloud catalog sync fetches from GitHub raw URL and dynamically prices newl
   let fetchedUrl = '';
 
   const h = backendHarness({
-    pluginManifest: { name: 'usage-monitor', version: '1.4.0' },
+    pluginManifest: { name: 'agy-monitor', version: '1.4.0' },
     summaries: { conv1: { stepCount: 1 } },
     trajectories: { conv1: { trajectory: { steps: [step] } } },
     remoteFetch: async (url) => {
@@ -297,13 +297,13 @@ test('resolveModelInfo falls back to responseModel when placeholder enum is unma
 test('performPluginUpdate blocks overwriting dirty worktrees (including untracked ?? files) without stashing', async () => {
   for (const [rootPath, porcelainOutput] of [
     ['/workspace/antigravity-usage-monitor', ' M sidecars/panel/main.mjs\n'],
-    ['/Users/test/.gemini/config/plugins/usage-monitor', '?? sidecars/panel/backend/config.mjs\n'],
+    ['/Users/test/.gemini/config/plugins/agy-monitor', '?? sidecars/panel/backend/config.mjs\n'],
   ]) {
     const gitCalls = [];
     const h = backendHarness({
       hasGitDir: true,
       pluginRootPath: rootPath,
-      pluginManifest: { name: 'usage-monitor', version: '1.4.0' },
+      pluginManifest: { name: 'agy-monitor', version: '1.4.0' },
       execFileImpl: (_cmd, args, opts, cb) => {
         const fn = typeof opts === 'function' ? opts : cb;
         gitCalls.push(args);
@@ -328,8 +328,8 @@ test('performPluginUpdate blocks overwriting dirty worktrees (including untracke
 test('performPluginUpdate blocks non-main branches and diverged git history', async () => {
   const branchH = backendHarness({
     hasGitDir: true,
-    pluginRootPath: '/Users/test/.gemini/config/plugins/usage-monitor',
-    pluginManifest: { name: 'usage-monitor', version: '1.4.0' },
+    pluginRootPath: '/Users/test/.gemini/config/plugins/agy-monitor',
+    pluginManifest: { name: 'agy-monitor', version: '1.4.0' },
     execFileImpl: (_cmd, args, opts, cb) => {
       const fn = typeof opts === 'function' ? opts : cb;
       if (args.includes('rev-parse')) {
@@ -345,8 +345,8 @@ test('performPluginUpdate blocks non-main branches and diverged git history', as
 
   const divergedH = backendHarness({
     hasGitDir: true,
-    pluginRootPath: '/Users/test/.gemini/config/plugins/usage-monitor',
-    pluginManifest: { name: 'usage-monitor', version: '1.3.0' },
+    pluginRootPath: '/Users/test/.gemini/config/plugins/agy-monitor',
+    pluginManifest: { name: 'agy-monitor', version: '1.3.0' },
     execFileImpl: (_cmd, args, opts, cb) => {
       const fn = typeof opts === 'function' ? opts : cb;
       if (args.includes('rev-parse')) {
@@ -354,7 +354,7 @@ test('performPluginUpdate blocks non-main branches and diverged git history', as
         return;
       }
       if (args.includes('show')) {
-        fn(null, JSON.stringify({ name: 'usage-monitor', version: '1.4.0' }), '');
+        fn(null, JSON.stringify({ name: 'agy-monitor', version: '1.4.0' }), '');
         return;
       }
       if (args.includes('merge-base')) {
@@ -371,15 +371,15 @@ test('performPluginUpdate blocks non-main branches and diverged git history', as
 
 test('performPluginUpdate refuses to downgrade or pull when remote version is older, equal, or unreadable', async () => {
   for (const showOutput of [
-    JSON.stringify({ name: 'usage-monitor', version: '1.2.0' }),
-    JSON.stringify({ name: 'usage-monitor', version: '1.4.0' }),
+    JSON.stringify({ name: 'agy-monitor', version: '1.2.0' }),
+    JSON.stringify({ name: 'agy-monitor', version: '1.4.0' }),
     '', // git show failed or empty — must NOT fall back to cloudSyncState.latestPluginVersion
   ]) {
     const gitCalls = [];
     const h = backendHarness({
       hasGitDir: true,
-      pluginRootPath: '/Users/test/.gemini/config/plugins/usage-monitor',
-      pluginManifest: { name: 'usage-monitor', version: '1.4.0' },
+      pluginRootPath: '/Users/test/.gemini/config/plugins/agy-monitor',
+      pluginManifest: { name: 'agy-monitor', version: '1.4.0' },
       remoteCatalog: {
         schemaVersion: 1,
         catalogVersion: '2026.11.03.9',
@@ -420,8 +420,8 @@ test('performPluginUpdate pulls fast-forward when git worktree is clean, on main
   const gitCalls = [];
   const h = backendHarness({
     hasGitDir: true,
-    pluginRootPath: '/Users/test/.gemini/config/plugins/usage-monitor',
-    pluginManifest: { name: 'usage-monitor', version: '1.3.1' },
+    pluginRootPath: '/Users/test/.gemini/config/plugins/agy-monitor',
+    pluginManifest: { name: 'agy-monitor', version: '1.3.1' },
     execFileImpl: (_cmd, args, opts, cb) => {
       const fn = typeof opts === 'function' ? opts : cb;
       gitCalls.push(args);
@@ -430,11 +430,11 @@ test('performPluginUpdate pulls fast-forward when git worktree is clean, on main
         return;
       }
       if (args.includes('show')) {
-        fn(null, JSON.stringify({ name: 'usage-monitor', version: '1.4.0' }), '');
+        fn(null, JSON.stringify({ name: 'agy-monitor', version: '1.4.0' }), '');
         return;
       }
       if (args.includes('pull')) {
-        h.state.pluginManifest = { name: 'usage-monitor', version: '1.4.0' };
+        h.state.pluginManifest = { name: 'agy-monitor', version: '1.4.0' };
       }
       fn(null, '', '');
     },
@@ -451,7 +451,7 @@ test('performPluginUpdate pulls fast-forward when git worktree is clean, on main
 test('repository decoupling: ignores foreign upstream catalog latestPluginVersion/TTL and syncs from infinitex233', async () => {
   let fetchedNewRepoUrl = '';
   const cacheH = backendHarness({
-    pluginManifest: { name: 'usage-monitor', version: '1.0.0' },
+    pluginManifest: { name: 'agy-monitor', version: '1.0.0' },
     remoteCatalog: {
       schemaVersion: 1,
       catalogVersion: '2026.11.25.1',
@@ -489,7 +489,7 @@ test('repository decoupling: ignores foreign upstream catalog latestPluginVersio
   assert.equal(initialStatus.updateAvailable, false);
   assert.equal(initialStatus.lastSyncedAtMs, 0);
   assert.equal(initialStatus.releaseUrl, 'https://github.com/infinitex233/antigravity-usage-monitor/releases/latest');
-  assert.equal(initialStatus.downloadUrl, 'https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/usage-monitor.zip');
+  assert.equal(initialStatus.downloadUrl, 'https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip');
 
   const synced = await cacheH.syncCloudCatalog({ force: false });
   assert.ok(
@@ -510,8 +510,8 @@ test('repository decoupling: ignores foreign upstream catalog latestPluginVersio
   const gitCalls = [];
   const updateH = backendHarness({
     hasGitDir: true,
-    pluginRootPath: '/Users/test/.gemini/config/plugins/usage-monitor',
-    pluginManifest: { name: 'usage-monitor', version: '1.0.0' },
+    pluginRootPath: '/Users/test/.gemini/config/plugins/agy-monitor',
+    pluginManifest: { name: 'agy-monitor', version: '1.0.0' },
     execFileImpl: (_cmd, args, opts, cb) => {
       const fn = typeof opts === 'function' ? opts : cb;
       gitCalls.push(args);
@@ -524,11 +524,11 @@ test('repository decoupling: ignores foreign upstream catalog latestPluginVersio
         return;
       }
       if (args.includes('show')) {
-        fn(null, JSON.stringify({ name: 'usage-monitor', version: '1.0.1' }), '');
+        fn(null, JSON.stringify({ name: 'agy-monitor', version: '1.0.1' }), '');
         return;
       }
       if (args.includes('pull')) {
-        updateH.state.pluginManifest = { name: 'usage-monitor', version: '1.0.1' };
+        updateH.state.pluginManifest = { name: 'agy-monitor', version: '1.0.1' };
       }
       fn(null, '', '');
     },
@@ -554,8 +554,8 @@ test('pluginUpdateMode supports manual (default), auto, and off with legacy auto
   const offH = backendHarness({
     settings: offSettings,
     hasGitDir: true,
-    pluginRootPath: '/Users/test/.gemini/config/plugins/usage-monitor',
-    pluginManifest: { name: 'usage-monitor', version: '1.4.0' },
+    pluginRootPath: '/Users/test/.gemini/config/plugins/agy-monitor',
+    pluginManifest: { name: 'agy-monitor', version: '1.4.0' },
     remoteFetch: async () => ({
       ok: true,
       json: async () => ({
@@ -616,7 +616,7 @@ test('argon-b / argon-trial deployment shards resolve phased pricing without wil
   const forkH = backendHarness({
     hasGitDir: true,
     gitConfigText: '[core]\n\trepositoryformatversion = 0\n[remote "origin"]\n\turl = https://github.com/custom-contributor/antigravity-usage-monitor.git\n',
-    pluginManifest: { name: 'usage-monitor', version: '1.5.0' },
+    pluginManifest: { name: 'agy-monitor', version: '1.5.0' },
     remoteFetch: async () => ({
       ok: true,
       json: async () => ({

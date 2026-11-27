@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * @fileoverview Pure Node.js whitelist packager for `usage-monitor.zip`.
+ * @fileoverview Pure Node.js whitelist packager for `agy-monitor.zip`.
  *
  * Packs ONLY the runtime-essential plugin files (~520 KB compressed) into a
- * cross-platform PKZIP archive prefixed with `usage-monitor/`, excluding dev-only
+ * cross-platform PKZIP archive prefixed with `agy-monitor/`, excluding dev-only
  * frontend sources (`src/`), unit tests (`test/`), build scripts (`scripts/`),
  * README preview PNGs (`assets/*.png`), local data (`.data/`), and planning docs (`plan/`).
  */
@@ -15,8 +15,8 @@ import { deflateRawSync } from 'node:zlib';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_REPO_ROOT = resolve(__dirname, '..', '..', '..');
-export const DEFAULT_ZIP_OUT = join(DEFAULT_REPO_ROOT, 'dist', 'usage-monitor.zip');
-export const RELEASE_ARCHIVE_ROOT = 'usage-monitor';
+export const DEFAULT_ZIP_OUT = join(DEFAULT_REPO_ROOT, 'dist', 'agy-monitor.zip');
+export const RELEASE_ARCHIVE_ROOT = 'agy-monitor';
 
 const ROOT_WHITELIST = Object.freeze([
   'plugin.json',
@@ -205,7 +205,7 @@ export function buildZipBuffer(entries) {
 }
 
 /**
- * Packs the runtime-only `usage-monitor.zip` release bundle.
+ * Packs the runtime-only `agy-monitor.zip` release bundle.
  *
  * @param {{ repoRoot?: string, outFile?: string, rootPrefix?: string }} [options]
  */

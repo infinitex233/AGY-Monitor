@@ -24,7 +24,7 @@
 
 <br />
 
-[下载最新版本 (Releases)](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest) · [直接下载 `usage-monitor.zip`](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/usage-monitor.zip)
+[下载最新版本 (Releases)](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest) · [直接下载 `agy-monitor.zip`](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip)
 
 </div>
 
@@ -119,11 +119,11 @@
 ## 安装与启用
 
 > [!IMPORTANT]
-> 插件目录名**必须保持为 `usage-monitor`**，无需运行 `npm install`。
+> 插件目录名**必须保持为 `agy-monitor`**，无需运行 `npm install`。
 
 ### 方式一：下载 Release 压缩包（推荐）
 
-从 [Releases](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest) 下载 [`usage-monitor.zip`](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/usage-monitor.zip)，解压到 `~/.gemini/config/plugins/` 下，使目录路径为 `~/.gemini/config/plugins/usage-monitor`。
+从 [Releases](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest) 下载 [`agy-monitor.zip`](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip)，解压到 `~/.gemini/config/plugins/` 下，使目录路径为 `~/.gemini/config/plugins/agy-monitor`。
 
 <details>
 <summary>Windows PowerShell 一键安装命令</summary>
@@ -131,8 +131,8 @@
 ```powershell
 $pluginsDir = "$env:USERPROFILE\.gemini\config\plugins"
 New-Item -ItemType Directory -Path $pluginsDir -Force | Out-Null
-Invoke-WebRequest -Uri "https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/usage-monitor.zip" -OutFile "$env:TEMP\usage-monitor.zip"
-Expand-Archive -Path "$env:TEMP\usage-monitor.zip" -DestinationPath $pluginsDir -Force
+Invoke-WebRequest -Uri "https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip" -OutFile "$env:TEMP\agy-monitor.zip"
+Expand-Archive -Path "$env:TEMP\agy-monitor.zip" -DestinationPath $pluginsDir -Force
 ```
 
 </details>
@@ -141,25 +141,25 @@ Expand-Archive -Path "$env:TEMP\usage-monitor.zip" -DestinationPath $pluginsDir 
 
 ```powershell
 # Windows (PowerShell)
-git clone --filter=blob:none --single-branch https://github.com/infinitex233/antigravity-usage-monitor.git "$env:USERPROFILE\.gemini\config\plugins\usage-monitor"
+git clone --filter=blob:none --single-branch https://github.com/infinitex233/antigravity-usage-monitor.git "$env:USERPROFILE\.gemini\config\plugins\agy-monitor"
 ```
 
 ```bash
 # macOS / Linux
-git clone --filter=blob:none --single-branch https://github.com/infinitex233/antigravity-usage-monitor.git ~/.gemini/config/plugins/usage-monitor
+git clone --filter=blob:none --single-branch https://github.com/infinitex233/antigravity-usage-monitor.git ~/.gemini/config/plugins/agy-monitor
 ```
 
 ### 启用与进阶用法
 
-1. 在 Antigravity 左侧边栏进入 **Customizations → Installed**，找到 **AGY Monitor**（`usage-monitor`）并启用。
+1. 在 Antigravity 左侧边栏进入 **Customizations → Installed**，找到 **AGY Monitor**（`agy-monitor`）并启用。
 2. 若使用 **Antigravity IDE**，首次启用后重启一次 IDE，保持默认「双栖挂载」即可在顶栏看到胶囊。
 3. 如需在纯终端或服务器环境下访问面板，可运行独立 Web 服务（绑定非回环地址时强制要求 `--token` 或环境变量 `USAGE_MONITOR_STANDALONE_TOKEN`）：
 
 ```bash
-node ~/.gemini/config/plugins/usage-monitor/sidecars/panel/standalone.mjs --port 8787
+node ~/.gemini/config/plugins/agy-monitor/sidecars/panel/standalone.mjs --port 8787
 ```
 
-所有设置与解析缓存保存在 `~/.gemini/antigravity/sidecar_data/usage-monitor/`，升级版本不会丢失既有统计记录。
+所有设置与解析缓存保存在 `~/.gemini/antigravity/sidecar_data/agy-monitor/`，升级版本不会丢失既有统计记录。
 
 ---
 
@@ -176,7 +176,7 @@ npm run build
 # 运行全套单元测试与集成测试
 npm test
 
-# 打包仅含运行时必需文件的纯净发行包（dist/usage-monitor.zip）
+# 打包仅含运行时必需文件的纯净发行包（dist/agy-monitor.zip）
 npm run pack:release
 ```
 

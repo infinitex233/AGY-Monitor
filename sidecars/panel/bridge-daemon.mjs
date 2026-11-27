@@ -91,14 +91,14 @@ export async function startBridgeDaemon() {
           const status = await srv.start();
           standaloneController = srv;
           activeStandalonePort = nextPort;
-          console.error(`[usage-monitor] Auto-hosted standalone Web UI at ${status.url}`);
+          console.error(`[agy-monitor] Auto-hosted standalone Web UI at ${status.url}`);
         } catch (err) {
           if (err?.code === 'EADDRINUSE') {
             console.error(
-              `[usage-monitor] Standalone port ${nextPort} already in use; keeping existing listener.`
+              `[agy-monitor] Standalone port ${nextPort} already in use; keeping existing listener.`
             );
           } else {
-            console.error(`[usage-monitor] Auto-hosted standalone server skipped: ${err.message}`);
+            console.error(`[agy-monitor] Auto-hosted standalone server skipped: ${err.message}`);
           }
         }
       })

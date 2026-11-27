@@ -59,7 +59,7 @@ export async function runStandaloneCli(argv = process.argv.slice(2)) {
   try {
     parsed = parseStandaloneCliArgs(argv, process.env, { defaultPort: 8787 });
   } catch (err) {
-    console.error(`[usage-monitor] ${err.message}`);
+    console.error(`[agy-monitor] ${err.message}`);
     process.exitCode = 1;
     return null;
   }
@@ -86,12 +86,12 @@ export async function runStandaloneCli(argv = process.argv.slice(2)) {
     const authDesc = status.tokenProtected
       ? 'token required (--token)'
       : 'loopback-only (use ssh -L for remote access)';
-    console.log(`[usage-monitor] Standalone Web UI listening at ${status.url}`);
-    console.log(`[usage-monitor] Security mode: ${authDesc}`);
-    console.log(`[usage-monitor] Language Server: ${lsDesc}`);
-    console.log(`[usage-monitor] Data directory: ${DATA_DIR}`);
+    console.log(`[agy-monitor] Standalone Web UI listening at ${status.url}`);
+    console.log(`[agy-monitor] Security mode: ${authDesc}`);
+    console.log(`[agy-monitor] Language Server: ${lsDesc}`);
+    console.log(`[agy-monitor] Data directory: ${DATA_DIR}`);
   } catch (err) {
-    console.error(`[usage-monitor] Failed to start standalone server: ${err.message}`);
+    console.error(`[agy-monitor] Failed to start standalone server: ${err.message}`);
     process.exitCode = 1;
     return null;
   }

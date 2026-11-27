@@ -3,6 +3,7 @@ node_modules/
 plan/
 /dist/
 usage-monitor.zip
+agy-monitor.zip
 *.log
 *.dpapi
 .account-test-*
@@ -10,5 +11,6 @@ usage-monitor.zip
 Thumbs.db
 docs/
 .agents/
+AGENTS.md
 host-i18n/README.md
 host-i18n/.tmp-*.json

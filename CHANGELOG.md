@@ -2,6 +2,12 @@
 
 All notable changes to **AGY Monitor** are documented in this file.
 
+## [1.0.1] - 2026-11
+
+### Breaking Changes
+- **Plugin ID & Archive Rename (`usage-monitor` → `agy-monitor`)**: Renamed the plugin identifier in `plugin.json`, installation directory (`~/.gemini/config/plugins/agy-monitor`), sidecar data directory (`~/.gemini/antigravity/sidecar_data/agy-monitor/`), and release archive (`agy-monitor.zip`).
+- **Upgrade Note**: Existing `v1.0.0` installations should remove `~/.gemini/config/plugins/usage-monitor` and reinstall under `~/.gemini/config/plugins/agy-monitor` (legacy `usage-monitor` data is not auto-migrated).
+
 ## [1.0.0] - 2026-11
 
 ### Highlights

@@ -31,5 +31,5 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/usage-monitor.zip
+          files: dist/agy-monitor.zip
           generate_release_notes: true

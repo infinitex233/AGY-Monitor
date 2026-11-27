@@ -59,7 +59,7 @@ test('pack-release-zip ships only runtime-essential files, excludes dev bloat, a
     }
   });
 
-  const zipPath = join(workDir, 'usage-monitor.zip');
+  const zipPath = join(workDir, 'agy-monitor.zip');
   const extractDir = join(workDir, 'extracted');
   const summary = packReleaseZip({ repoRoot: DEFAULT_REPO_ROOT, outFile: zipPath });
 
@@ -87,12 +87,12 @@ test('pack-release-zip ships only runtime-essential files, excludes dev bloat, a
     execFileSync('unzip', ['-oq', zipPath, '-d', extractDir], { stdio: 'pipe' });
   }
 
-  const pluginRoot = join(extractDir, 'usage-monitor');
+  const pluginRoot = join(extractDir, 'agy-monitor');
   assert.ok(existsSync(join(pluginRoot, 'plugin.json')));
   const manifest = JSON.parse(readFileSync(join(pluginRoot, 'plugin.json'), 'utf8'));
-  assert.equal(manifest.name, 'usage-monitor');
+  assert.equal(manifest.name, 'agy-monitor');
   assert.equal(manifest.displayName, 'AGY Monitor');
-  assert.equal(manifest.version, '1.0.0');
+  assert.equal(manifest.version, '1.0.1');
   assert.equal(manifest.logo, undefined);
 
   assert.equal(relFiles.includes('sidecars/panel/backend/quota-pools.mjs'), false);

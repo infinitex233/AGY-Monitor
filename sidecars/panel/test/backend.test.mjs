@@ -1841,14 +1841,14 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
 
   const h = backendHarness();
   assert.equal(
-    h.buildCliStatusLineCommand('C:\\Users\\Administrator\\.gemini\\config\\plugins\\usage-monitor\\sidecars\\panel\\cli-statusline.mjs', {
+    h.buildCliStatusLineCommand('C:\\Users\\Administrator\\.gemini\\config\\plugins\\agy-monitor\\sidecars\\panel\\cli-statusline.mjs', {
       platform: 'win32',
       nodeOnPath: true,
     }),
-    'node C:/Users/Administrator/.gemini/config/plugins/usage-monitor/sidecars/panel/cli-statusline.mjs'
+    'node C:/Users/Administrator/.gemini/config/plugins/agy-monitor/sidecars/panel/cli-statusline.mjs'
   );
   const winSpaceCmd = h.buildCliStatusLineCommand(
-    'C:\\Users\\Alice Smith\\.gemini\\config\\plugins\\usage-monitor\\sidecars\\panel\\cli-statusline.mjs',
+    'C:\\Users\\Alice Smith\\.gemini\\config\\plugins\\agy-monitor\\sidecars\\panel\\cli-statusline.mjs',
     {
       platform: 'win32',
       execPath: 'C:\\Program Files\\nodejs\\node.exe',
@@ -1857,7 +1857,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
   );
   assert.equal(
     winSpaceCmd,
-    "node --input-type=module -e import('file:///C:/Users/Alice%20Smith/.gemini/config/plugins/usage-monitor/sidecars/panel/cli-statusline.mjs#autorun')"
+    "node --input-type=module -e import('file:///C:/Users/Alice%20Smith/.gemini/config/plugins/agy-monitor/sidecars/panel/cli-statusline.mjs#autorun')"
   );
   assert.equal(winSpaceCmd.includes('"'), false, 'Windows command must contain zero double quotes so Go syscall.EscapeArg never injects \\"');
   assert.equal(h.isManagedCliStatusLineCommand('node C:/path/to/cli-statusline.mjs'), true);

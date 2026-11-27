@@ -22,7 +22,7 @@ body:
     id: version
     attributes:
       label: 插件及客户端版本 / Versions
-      placeholder: "例如 / e.g. usage-monitor v1.5.2, Antigravity 2.33.0, Node.js 22.x"
+      placeholder: "例如 / e.g. agy-monitor v1.0.1, Antigravity 2.33.0, Node.js 22.x"
     validations:
       required: true
 

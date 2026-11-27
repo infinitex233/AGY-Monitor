@@ -871,7 +871,7 @@ test('legacy pre-PR#38 empty-WAL sqlite cache signatures migrate in-place withou
 
   const geminiDir = join(tempRoot, '.gemini');
   const convDir = join(geminiDir, 'antigravity', 'conversations');
-  const dataDir = join(geminiDir, 'antigravity', 'sidecar_data', 'usage-monitor', 'panel', 'data');
+  const dataDir = join(geminiDir, 'antigravity', 'sidecar_data', 'agy-monitor', 'panel', 'data');
   mkdirSync(convDir, { recursive: true });
   mkdirSync(dataDir, { recursive: true });
 
@@ -1244,7 +1244,7 @@ test('Empty-shell .db + encrypted .pb fallback recovers CLI conversation steps, 
   const geminiDir = join(tempRoot, '.gemini');
   const cliDir = join(geminiDir, 'antigravity-cli');
   const cliConvDir = join(cliDir, 'conversations');
-  const dataDir = join(geminiDir, 'antigravity', 'sidecar_data', 'usage-monitor', 'panel', 'data');
+  const dataDir = join(geminiDir, 'antigravity', 'sidecar_data', 'agy-monitor', 'panel', 'data');
   mkdirSync(cliConvDir, { recursive: true });
   mkdirSync(dataDir, { recursive: true });
 

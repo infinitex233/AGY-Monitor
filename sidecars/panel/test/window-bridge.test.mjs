@@ -2667,7 +2667,7 @@ test('Antigravity IDE iframe route association, LS process discovery, and 0-tool
     '1.4.4'
   );
   assert.equal(initResp.result.protocolVersion, '2025-03-26');
-  assert.equal(initResp.result.serverInfo.name, 'usage-monitor-host');
+  assert.equal(initResp.result.serverInfo.name, 'agy-monitor-host');
 
   assert.equal(
     handleMcpJsonRpcMessage({ jsonrpc: '2.0', method: 'notifications/initialized' }),

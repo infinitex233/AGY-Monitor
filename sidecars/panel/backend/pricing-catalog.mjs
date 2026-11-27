@@ -224,7 +224,7 @@ export function compareSemver(a, b) {
 export function readInstalledPluginVersion() {
   const manifest = loadJson(PLUGIN_MANIFEST_FILE, null);
   const ver = typeof manifest?.version === 'string' ? manifest.version.trim() : '';
-  return isValidSemver(ver) ? ver.replace(/^v/i, '') : '1.0.0';
+  return isValidSemver(ver) ? ver.replace(/^v/i, '') : '1.0.1';
 }
 
 function normalizeModelFamily(rawFamily) {
@@ -445,7 +445,7 @@ export function rebuildActiveCatalog() {
     ? `https://github.com/${customForkRepo}/releases/latest`
     : DEFAULT_RELEASE_URL;
   let downloadUrl = customForkRepo
-    ? `https://github.com/${customForkRepo}/releases/latest/download/usage-monitor.zip`
+    ? `https://github.com/${customForkRepo}/releases/latest/download/agy-monitor.zip`
     : DEFAULT_DOWNLOAD_URL;
   let archiveFallbackUrl = customForkRepo
     ? `https://codeload.github.com/${customForkRepo}/zip/refs/heads/main`

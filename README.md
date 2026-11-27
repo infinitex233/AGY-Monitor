@@ -24,7 +24,7 @@ Lightweight local telemetry and token analytics plugin for Google Antigravity �
 
 <br />
 
-[Latest Release](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest) · [Download `usage-monitor.zip`](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/usage-monitor.zip)
+[Latest Release](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest) · [Download `agy-monitor.zip`](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip)
 
 </div>
 
@@ -118,11 +118,11 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
 ## Installation
 
 > [!IMPORTANT]
-> Keep the installed directory named **`usage-monitor`**. No `npm install` step is needed.
+> Keep the installed directory named **`agy-monitor`**. No `npm install` step is needed.
 
 ### Option 1: Download Release Archive (Recommended)
 
-Download [`usage-monitor.zip`](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/usage-monitor.zip) from [Releases](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest) and extract it into `~/.gemini/config/plugins/` so the resulting directory is `~/.gemini/config/plugins/usage-monitor`.
+Download [`agy-monitor.zip`](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip) from [Releases](https://github.com/infinitex233/antigravity-usage-monitor/releases/latest) and extract it into `~/.gemini/config/plugins/` so the resulting directory is `~/.gemini/config/plugins/agy-monitor`.
 
 <details>
 <summary>Windows PowerShell one-liner</summary>
@@ -130,8 +130,8 @@ Download [`usage-monitor.zip`](https://github.com/infinitex233/antigravity-usage
 ```powershell
 $pluginsDir = "$env:USERPROFILE\.gemini\config\plugins"
 New-Item -ItemType Directory -Path $pluginsDir -Force | Out-Null
-Invoke-WebRequest -Uri "https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/usage-monitor.zip" -OutFile "$env:TEMP\usage-monitor.zip"
-Expand-Archive -Path "$env:TEMP\usage-monitor.zip" -DestinationPath $pluginsDir -Force
+Invoke-WebRequest -Uri "https://github.com/infinitex233/antigravity-usage-monitor/releases/latest/download/agy-monitor.zip" -OutFile "$env:TEMP\agy-monitor.zip"
+Expand-Archive -Path "$env:TEMP\agy-monitor.zip" -DestinationPath $pluginsDir -Force
 ```
 
 </details>
@@ -140,25 +140,25 @@ Expand-Archive -Path "$env:TEMP\usage-monitor.zip" -DestinationPath $pluginsDir 
 
 ```powershell
 # Windows (PowerShell)
-git clone --filter=blob:none --single-branch https://github.com/infinitex233/antigravity-usage-monitor.git "$env:USERPROFILE\.gemini\config\plugins\usage-monitor"
+git clone --filter=blob:none --single-branch https://github.com/infinitex233/antigravity-usage-monitor.git "$env:USERPROFILE\.gemini\config\plugins\agy-monitor"
 ```
 
 ```bash
 # macOS / Linux
-git clone --filter=blob:none --single-branch https://github.com/infinitex233/antigravity-usage-monitor.git ~/.gemini/config/plugins/usage-monitor
+git clone --filter=blob:none --single-branch https://github.com/infinitex233/antigravity-usage-monitor.git ~/.gemini/config/plugins/agy-monitor
 ```
 
 ### Enable & Standalone Web Mode
 
-1. Open **Customizations → Installed** in Antigravity and enable **AGY Monitor** (`usage-monitor`).
+1. Open **Customizations → Installed** in Antigravity and enable **AGY Monitor** (`agy-monitor`).
 2. For **Antigravity IDE**, restart the IDE once after enabling to mount the titlebar capsule.
 3. For headless/remote environments, launch the built-in standalone server (non-loopback bindings require `--token <secret>` or `USAGE_MONITOR_STANDALONE_TOKEN`):
 
 ```bash
-node ~/.gemini/config/plugins/usage-monitor/sidecars/panel/standalone.mjs --port 8787
+node ~/.gemini/config/plugins/agy-monitor/sidecars/panel/standalone.mjs --port 8787
 ```
 
-Settings and local trajectory caches persist under `~/.gemini/antigravity/sidecar_data/usage-monitor/`.
+Settings and local trajectory caches persist under `~/.gemini/antigravity/sidecar_data/agy-monitor/`.
 
 ---
 
@@ -175,7 +175,7 @@ npm run build
 # Run full unit & integration test suite
 npm test
 
-# Package clean runtime archive (dist/usage-monitor.zip)
+# Package clean runtime archive (dist/agy-monitor.zip)
 npm run pack:release
 ```
 
