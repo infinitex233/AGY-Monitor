@@ -1,6 +1,6 @@
 /**
  * @fileoverview Decoupled Overview & Hover Widget Registry (`widgetRegistry.js`).
- * Maps module keys (`metrics`, `context`, `quotas`, `live_tasks`) to standalone
+ * Maps module keys (`metrics`, `context`, `live_tasks`) to standalone
  * widget components and provides `createDynamicWidgetHost` for zero-hardcode mounting,
  * live reordering, and clean instance disposal.
  */

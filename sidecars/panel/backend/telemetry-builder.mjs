@@ -2,8 +2,8 @@
  * @fileoverview 遥测载荷组装器与并发请求合并入口。
  *
  * 将遥测构建拆解为清晰的子阶段：
- * 1. 拉取用户状态、轨迹摘要与官方实时配额摘要（含账号切换缓存校验）；
- * 2. 调用 `buildOfficialQuotaPools` 构建动态模型映射与多模型配额池；
+ * 1. 拉取本地型号目录与轨迹摘要（零账号身份、零订阅配额 RPC）；
+ * 2. 调用 `buildDynamicModelMap` 构建动态模型映射表；
  * 3. 调用 `enumerateAndSyncConversations` 枚举会话并增量更新轨迹缓存；
  * 4. 调用 `enrichActiveConversationSteps` 与 `extractActiveContextTelemetry` 计算当前活跃会话指标与 10 通道上下文拆解；
  * 5. 调用 `aggregateMultiWindowUsage` 完成全量多窗口聚合，并组装精简的前端遥测 JSON。
@@ -14,7 +14,6 @@ import { LOCAL_ENDPOINT_ID } from '../shared/window-bridge-protocol.mjs';
 import { scaleBucketsExact } from '../shared/telemetry-display-rules.mjs';
 import {
   extractLiveActivity,
-  parseIsoMs,
   parseSwarmWorkerRole,
   speedMetric,
   summarizeSpeed,
@@ -35,16 +34,14 @@ import { getCliStatusLineRuntimeStatus } from './cli-statusline-config.mjs';
 import { readLocalSummarySnapshot } from './cli-sqlite-reader.mjs';
 import { enumerateAndSyncConversations } from './local-scanner.mjs';
 import { ensureLsEndpointDiscovered } from './ls-discovery.mjs';
-import { callLsRpc, getContextModelCatalog, getOfficialQuotaSummary } from './ls-rpc.mjs';
+import { callLsRpc, getContextModelCatalog } from './ls-rpc.mjs';
 import {
+  buildDynamicModelMap,
   computeStepCost,
   createStepModelResolver,
   formatUpstreamModelId,
-  isArgonModelIdentifier,
-  isCarbonModelIdentifier,
 } from './model-pricing.mjs';
 import { getCloudStatus, getPricingPhaseEpoch, pricingCatalogRevision } from './pricing-catalog.mjs';
-import { buildOfficialQuotaPools } from './quota-pools.mjs';
 import { getDefaultCloudCodeProxyStatus } from './cloudcode-proxy.mjs';
 import { getDefaultWindowBridgeStatus } from './window-bridge.mjs';
 import {
@@ -54,14 +51,12 @@ import {
   aggregateSessionUsageForFamily,
   buildScopedModelBreakdown,
   clearUsageAggregatorMemo,
-  getNextMondayResetIso,
   normalizeWorkspaceBucket,
 } from './usage-aggregator.mjs';
 
 const MAX_RECENT_QUICK_STATS = 30;
 const MAX_CONVERSATION_ASSEMBLY_CACHE = 8;
 const MAX_TELEMETRY_SNAPSHOT_ENDPOINTS = 8;
-const POOL_PRIORITY_ORDER = ['Gemini', 'Argon', 'Carbon', 'Claude & GPT'];
 const inFlightTelemetrySources = new Map();
 const trajectoryModelFacts = new WeakMap();
 let agentStepPrepCache = new WeakMap();
@@ -918,21 +913,17 @@ export function buildAgentUnitTelemetry({
 
 async function readTelemetrySources(
   requestedConvId,
-  forceQuotaRefresh,
-  currentAccountName,
-  accountScope,
-  userStatus,
+  forceRefresh,
   endpoint = null
 ) {
   const isRemote = Boolean(endpoint && endpoint.isRemote);
   const localSummaries = isRemote
     ? { available: false, summariesObj: {}, sideQuestionParents: {} }
-    : readLocalSummarySnapshot(undefined, { forceRefresh: forceQuotaRefresh });
-  const [allTrajRes, officialQuotaInfo, contextModelCatalog] = await Promise.all([
+    : readLocalSummarySnapshot(undefined, { forceRefresh });
+  const [allTrajRes, contextModelCatalog] = await Promise.all([
     localSummaries.available
       ? Promise.resolve(null)
       : callLsRpc('GetAllCascadeTrajectories', {}, 5000, endpoint).catch(() => ({})),
-    userStatus ? getOfficialQuotaSummary(forceQuotaRefresh, currentAccountName, endpoint) : null,
     getContextModelCatalog(endpoint),
   ]);
 
@@ -942,28 +933,23 @@ async function readTelemetrySources(
       : allTrajRes?.trajectorySummaries || {},
     summariesFromLocalDb: localSummaries.available,
     sideQuestionParents: localSummaries.available ? localSummaries.sideQuestionParents : {},
-    currentAccountName: accountScope,
+    currentAccountName: '',
     requestedConvId,
-    forceRefresh: forceQuotaRefresh,
+    forceRefresh,
     endpoint,
   });
-  return { officialQuotaInfo, contextModelCatalog, sessions };
+  return { contextModelCatalog, sessions };
 }
 
 function getTelemetrySources(
   requestedConvId,
-  forceQuotaRefresh,
-  currentAccountName,
-  accountScope,
-  userStatus,
+  forceRefresh,
   endpoint = null
 ) {
   const endpointKey = endpoint?.isRemote ? String(endpoint.id || 'remote') : LOCAL_ENDPOINT_ID;
-  const read = () => readTelemetrySources(
-    requestedConvId, forceQuotaRefresh, currentAccountName, accountScope, userStatus, endpoint
-  );
-  if (forceQuotaRefresh) return read();
-  const key = JSON.stringify([endpointKey, requestedConvId || '', accountScope, Boolean(userStatus)]);
+  const read = () => readTelemetrySources(requestedConvId, forceRefresh, endpoint);
+  if (forceRefresh) return read();
+  const key = JSON.stringify([endpointKey, requestedConvId || '']);
   const existing = inFlightTelemetrySources.get(key);
   if (existing) return existing;
   const pending = read().finally(() => {
@@ -1569,192 +1555,17 @@ function buildActiveConversationAssembly({
   return result;
 }
 
-function createEmptyCycleSummary() {
-  return {
-    calls: 0,
-    tokens: 0,
-    inputTokens: 0,
-    cacheReadTokens: 0,
-    outputTokens: 0,
-    costUsd: 0,
-    unpricedCalls: 0,
-  };
-}
-
-function resolveActivePoolKeyFromStep(latestFamilyStep, quotaPoolsMap) {
-  const hasResolvedStepModel = Boolean(
-    latestFamilyStep && latestFamilyStep.modelKey && latestFamilyStep.modelKey !== 'unknown'
-  );
-  const latestIsCarbon = hasResolvedStepModel
-    ? isCarbonModelIdentifier(
-        latestFamilyStep.modelKey,
-        latestFamilyStep.responseModel,
-        latestFamilyStep.modelUpstream,
-        latestFamilyStep.modelLabel
-      )
-    : false;
-  const latestIsArgon = hasResolvedStepModel
-    ? isArgonModelIdentifier(
-        latestFamilyStep.modelKey,
-        latestFamilyStep.responseModel,
-        latestFamilyStep.modelUpstream,
-        latestFamilyStep.modelLabel
-      )
-    : false;
-  const rawActiveFamily = latestFamilyStep?.family || 'Other';
-  const activePoolKey = !hasResolvedStepModel
-    ? 'Unknown'
-    : latestIsCarbon && quotaPoolsMap.has('Carbon')
-      ? 'Carbon'
-      : latestIsArgon && quotaPoolsMap.has('Argon')
-        ? 'Argon'
-        : rawActiveFamily === 'Gemini'
-          ? 'Gemini'
-          : ['Claude', 'GPT', 'Other'].includes(rawActiveFamily)
-            ? 'Claude & GPT'
-            : 'Unknown';
-  const matchedActivePool = quotaPoolsMap.get(activePoolKey) || null;
-  const activeLive5h = matchedActivePool?.has5h
-    ? {
-        remainingPct: matchedActivePool.remainingPct,
-        remainingIntPct: matchedActivePool.remainingIntPct,
-        usedPct: matchedActivePool.usedPct,
-        resetTime: matchedActivePool.resetTime,
-      }
-    : null;
-  const activeLiveWeekly = matchedActivePool?.hasWeekly
-    ? {
-        remainingPct: matchedActivePool.weeklyRemainingPct,
-        remainingIntPct: matchedActivePool.weeklyRemainingIntPct,
-        usedPct: matchedActivePool.weeklyUsedPct,
-        resetTime: matchedActivePool.weeklyResetTime,
-      }
-    : null;
-  return { activePoolKey, matchedActivePool, activeLive5h, activeLiveWeekly };
-}
-
-function buildActivePoolAndWeeklyQuotas({
-  activePoolKey,
-  activeLive5h,
-  activeLiveWeekly,
-  quotaPoolsMap,
-  isCustomWeeklyMode,
-  settings,
-  weekBucket,
-  quotaWeekBucket,
-  poolsWeeklySummary,
-}) {
-  const familyPoolQuota = quotaPoolsMap.get(activePoolKey);
-  const activePoolLabel = familyPoolQuota?.poolLabel || activePoolKey;
-  const activePoolQuota = familyPoolQuota || {
-    poolKey: activePoolKey,
-    poolLabel: activePoolKey === 'Unknown' ? '未知' : activePoolKey,
-    poolName:
-      activePoolKey === 'Carbon'
-        ? 'Gemini 4 Carbon 模型池'
-        : activePoolKey === 'Argon'
-          ? 'Gemini 4 Argon 模型池'
-          : activePoolKey === 'Gemini'
-            ? 'Gemini 模型池'
-            : activePoolKey === 'Claude & GPT'
-              ? 'Claude & GPT 模型池'
-              : '模型池未知',
-    family: activePoolKey,
-    isAvailable: Boolean(activeLive5h || activeLiveWeekly),
-    has5h: Boolean(activeLive5h),
-    hasWeekly: Boolean(activeLiveWeekly),
-    remainingPct: activeLive5h?.remainingPct ?? null,
-    remainingIntPct: activeLive5h?.remainingIntPct ?? null,
-    usedPct: activeLive5h?.usedPct ?? null,
-    resetTime: activeLive5h?.resetTime || null,
-    weeklyRemainingPct: activeLiveWeekly?.remainingPct ?? null,
-    weeklyRemainingIntPct: activeLiveWeekly?.remainingIntPct ?? null,
-    weeklyUsedPct: activeLiveWeekly?.usedPct ?? null,
-    weeklyResetTime: activeLiveWeekly?.resetTime || null,
-    cycle5h: createEmptyCycleSummary(),
-    cycleWeekly: createEmptyCycleSummary(),
-    models: [],
-  };
-
-  const fallbackWeeklyPct =
-    settings.weeklyLimitMode === 'custom_cost'
-      ? weekBucket.unpricedCalls > 0
-        ? null
-        : Math.min(
-            100,
-            +((weekBucket.costUsd / Math.max(1, settings.weeklyCostBudget)) * 100).toFixed(1)
-          )
-      : Math.min(
-          100,
-          +((weekBucket.totalTokens / Math.max(1000, settings.weeklyTokenBudget)) * 100).toFixed(1)
-        );
-
-  const useOfficialWeekly = Boolean(activeLiveWeekly) && !isCustomWeeklyMode;
-  const weeklyUsedPct = useOfficialWeekly
-    ? activeLiveWeekly.usedPct
-    : isCustomWeeklyMode
-      ? fallbackWeeklyPct
-      : null;
-  const weeklyRemainingPct = useOfficialWeekly
-    ? activeLiveWeekly.remainingPct
-    : isCustomWeeklyMode && fallbackWeeklyPct !== null
-      ? +(100 - fallbackWeeklyPct).toFixed(1)
-      : null;
-  const weeklyRemainingIntPct = useOfficialWeekly
-    ? activeLiveWeekly.remainingIntPct
-    : isCustomWeeklyMode && fallbackWeeklyPct !== null
-      ? Math.max(0, Math.floor(100 - fallbackWeeklyPct))
-      : null;
-  const officialFallbackWeekBucket = quotaWeekBucket || weekBucket;
-  const weeklyQuota = {
-    isOfficial: useOfficialWeekly,
-    poolFamily: activePoolKey,
-    title: isCustomWeeklyMode
-      ? '每周限额 (自定义本机)'
-      : `每周限额 (${activePoolLabel && activePoolLabel !== 'Unknown' ? activePoolLabel : '当前'})`,
-    calls: isCustomWeeklyMode
-      ? weekBucket.calls
-      : poolsWeeklySummary
-        ? poolsWeeklySummary.calls
-        : officialFallbackWeekBucket.calls,
-    tokens: isCustomWeeklyMode
-      ? weekBucket.totalTokens
-      : poolsWeeklySummary
-        ? poolsWeeklySummary.tokens
-        : officialFallbackWeekBucket.totalTokens,
-    costUsd: isCustomWeeklyMode
-      ? weekBucket.costUsd
-      : poolsWeeklySummary
-        ? poolsWeeklySummary.costUsd
-        : officialFallbackWeekBucket.costUsd,
-    unpricedCalls: isCustomWeeklyMode
-      ? weekBucket.unpricedCalls
-      : poolsWeeklySummary
-        ? poolsWeeklySummary.unpricedCalls
-        : officialFallbackWeekBucket.unpricedCalls,
-    usedPct: weeklyUsedPct,
-    remainingPct: weeklyRemainingPct,
-    remainingIntPct: weeklyRemainingIntPct,
-    resetTime: useOfficialWeekly
-      ? activeLiveWeekly.resetTime
-      : isCustomWeeklyMode
-        ? getNextMondayResetIso()
-        : null,
-  };
-  return { activePoolQuota, weeklyQuota };
-}
-
 /**
  * 构建完整的前端遥测载荷（核心内部实现，直接供单元测试沙箱调用）。
  *
  * @param {string} requestedConvId 请求指定的会话 ID（为空时自动选定最近活跃会话）
- * @param {boolean} [forceQuotaRefresh=false] 是否强制穿透官方配额缓存与失败退避
+ * @param {boolean} [forceRefresh=false] 是否强制穿透本地轨迹/目录缓存
  * @param {{ range?: string, startMs?: number, endMs?: number, endpoint?: object|null }} [filterOpts={}] 时间范围筛选选项与可选远端端点
  * @returns {Promise<object>}
  */
 export async function buildTelemetryPayloadInternal(
   requestedConvId,
-  forceQuotaRefresh = false,
+  forceRefresh = false,
   filterOpts = {}
 ) {
   const endpoint = filterOpts?.endpoint && filterOpts.endpoint.isRemote ? filterOpts.endpoint : null;
@@ -1777,7 +1588,7 @@ export async function buildTelemetryPayloadInternal(
     const prevCsrf = lsRuntimeEndpoint.csrfToken;
     await ensureLsEndpointDiscovered({
       force: true,
-      respectCooldown: !forceQuotaRefresh,
+      respectCooldown: !forceRefresh,
     });
     if (
       lsRuntimeEndpoint.baseUrl &&
@@ -1788,23 +1599,16 @@ export async function buildTelemetryPayloadInternal(
         .catch(() => null);
     }
   }
-  const currentAccountName = userStatus?.email || userStatus?.name || '';
-  const accountStatus = currentAccountName ? 'signedIn' :
-    userStatus && !userStatus.userTier && !userStatus.planStatus ? 'signedOut' : 'unknown';
-  const accountScope = accountStatus === 'signedOut' ? null : currentAccountName;
-  const { officialQuotaInfo, contextModelCatalog, sessions } = await getTelemetrySources(
-    requestedConvId, forceQuotaRefresh, currentAccountName, accountScope, userStatus, endpoint
+  const { contextModelCatalog, sessions } = await getTelemetrySources(
+    requestedConvId,
+    forceRefresh,
+    endpoint
   );
   const { conversations, activeConvSummary, activeCascadeId } = sessions;
 
-  const officialQuota = officialQuotaInfo?.data || null;
+  // 仅读取静态模型配置列表用于占位符名称映射（绝不提取用户身份或订阅配额信息）
   const clientConfigs = userStatus?.cascadeModelConfigData?.clientModelConfigs || [];
-
-  // 1. 构建官方实时配额池与动态模型目录
-  const { dynamicModelMap, quotaPoolsMap } = buildOfficialQuotaPools(
-    officialQuota,
-    clientConfigs
-  );
+  const dynamicModelMap = buildDynamicModelMap(clientConfigs);
 
   const resolveStepModel = createStepModelResolver(dynamicModelMap);
 
@@ -1820,7 +1624,6 @@ export async function buildTelemetryPayloadInternal(
   const {
     activeConversation: assembledActiveConversation,
     activeFamilyCascadeIds,
-    latestFamilyStep,
   } = buildActiveConversationAssembly({
     activeCascadeId,
     activeConvSummary,
@@ -1828,40 +1631,12 @@ export async function buildTelemetryPayloadInternal(
     resolveStepModel,
     knownUpstreamByModelKey,
     modelInputs,
-    accountScope,
+    accountScope: '',
     endpointId,
     cacheStore,
   });
 
-  // 4. 识别当前活跃会话家族绑定的模型池（与 quota-pools.mjs 保持一致，将 Other 第三方模型归入 Claude & GPT）
-  const { activePoolKey, activeLive5h, activeLiveWeekly } = resolveActivePoolKeyFromStep(
-    latestFamilyStep,
-    quotaPoolsMap
-  );
-
-  // 全局账号周期锚点采用稳定的配额池优先级（Gemini -> Argon -> Carbon -> Claude & GPT），
-  // 防止切换不同会话时全局消费统计（consumption.presets.week / 5h）因重置时间偏移而突变
-  let accountFiveHourResetMs = 0;
-  let accountWeeklyResetMs = 0;
-  for (const pk of POOL_PRIORITY_ORDER) {
-    const pool = quotaPoolsMap.get(pk);
-    if (!pool) continue;
-    if (!accountFiveHourResetMs && pool.resetTime) {
-      accountFiveHourResetMs = parseIsoMs(pool.resetTime);
-    }
-    if (!accountWeeklyResetMs && pool.weeklyResetTime) {
-      accountWeeklyResetMs = parseIsoMs(pool.weeklyResetTime);
-    }
-  }
-  const cycleAnchors = {
-    fiveHourResetMs: accountFiveHourResetMs || parseIsoMs(activeLive5h?.resetTime),
-    weeklyResetMs: accountWeeklyResetMs || parseIsoMs(activeLiveWeekly?.resetTime),
-  };
-
-  const isCustomWeeklyMode =
-    settings.weeklyLimitMode === 'custom_tokens' || settings.weeklyLimitMode === 'custom_cost';
-
-  // 5. 多时间窗口聚合（预设窗口 + 当前选定窗口 + 趋势 + 月序列 + 来源与模型拆解 + 各配额池独立周期统计）
+  // 4. 多时间窗口聚合（预设窗口 + 当前选定窗口 + 趋势 + 月序列 + 来源与模型拆解）
   const {
     usageRevision,
     selectedWindow,
@@ -1874,84 +1649,19 @@ export async function buildTelemetryPayloadInternal(
     sourcesBreakdown,
     currentYear,
     monthlySeries,
-    weekBucket,
-    quotaWeekBucket,
     modelBreakdown,
     topConversations,
     topWorkspaces,
-    poolCycleStats,
-    poolsWeeklySummary,
   } = aggregateMultiWindowUsage({
     filterOpts,
-    cycleAnchors,
-    isCustomWeeklyMode,
-    currentAccountName: accountScope,
     activeCascadeId,
     activeFamilyCascadeIds,
     resolveStepModel,
-    quotaPoolsMap,
     modelInputs,
     endpoint,
   });
 
-  for (const [pk, poolObj] of quotaPoolsMap.entries()) {
-    const pStats = poolCycleStats?.get(pk);
-    poolObj.cycle5h = pStats?.cycle5h || createEmptyCycleSummary();
-    poolObj.cycleWeekly = pStats?.cycleWeekly || createEmptyCycleSummary();
-  }
-
-  // 6. 组装当前活跃配额池与每周限额视图数据
-  const { activePoolQuota, weeklyQuota } = buildActivePoolAndWeeklyQuotas({
-    activePoolKey,
-    activeLive5h,
-    activeLiveWeekly,
-    quotaPoolsMap,
-    isCustomWeeklyMode,
-    settings,
-    weekBucket,
-    quotaWeekBucket,
-    poolsWeeklySummary,
-  });
-
-  const g1CreditEntry = (userStatus?.userTier?.availableCredits || []).find(
-    (c) => c?.creditType === 'GOOGLE_ONE_AI'
-  );
-  const realAiCredits = Number(g1CreditEntry?.creditAmount || 0);
   const uiBundleVersion = computeRuntimeCodeVersion();
-
-  const rawTierId = String(userStatus?.userTier?.id || '').trim();
-  const rawTierName = String(userStatus?.userTier?.name || '').trim();
-  const rawTierDesc = String(userStatus?.userTier?.description || '').trim();
-  const rawPlanName = String(userStatus?.planStatus?.planInfo?.planName || '').trim();
-  const tierIdLower = rawTierId.toLowerCase();
-  const tierText = `${rawTierId} ${rawTierName} ${rawTierDesc}`;
-  const resolvedTierMultiplier = /(?:^|[-_\s])5x(?:$|[-_\s])|ultra[-_]?lite/i.test(tierText)
-    ? '5x'
-    : /(?:^|[-_\s])20x(?:$|[-_\s])/i.test(tierText) ||
-        tierIdLower === 'g1-ultra-tier' ||
-        (/^g1-ultra(?:-[a-z0-9]+)?-tier$/i.test(tierIdLower) && !/lite|5x/i.test(tierIdLower))
-      ? '20x'
-      : '';
-  const resolvedTierName =
-    rawTierName ||
-    (/ultra/i.test(tierIdLower)
-      ? 'Google AI Ultra'
-      : /pro/i.test(tierIdLower)
-        ? 'Google AI Pro'
-        : /free|standard/i.test(tierIdLower)
-          ? 'Google AI Free'
-          : 'Google AI');
-  const isUltraTier = /\bultra\b/i.test(resolvedTierName) || /ultra/i.test(tierIdLower);
-  const inferredPlanFallback = /\bfree\b/i.test(resolvedTierName)
-    ? 'Free'
-    : isUltraTier
-      ? resolvedTierMultiplier || 'Ultra'
-      : 'Pro';
-  // Google 上游对 Ultra 订阅的 planStatus.planInfo.planName 仍会返回 "Pro"，按 userTier.id 还原 5x / 20x
-  const resolvedPlanName = isUltraTier
-    ? resolvedTierMultiplier ||
-      (rawPlanName && !/^pro$/i.test(rawPlanName) ? rawPlanName : 'Ultra')
-    : rawPlanName || inferredPlanFallback;
 
   // 预计算近期会话与运行中会话的轻量缓存速览指标（零额外 RPC 开销）
   const quickStatsMemo = new Map();
@@ -2260,16 +1970,6 @@ export async function buildTelemetryPayloadInternal(
     });
   }
 
-  const sortedQuotaPools = Array.from(quotaPoolsMap.values()).sort((a, b) => {
-    const order = { Gemini: 0, Argon: 1, Carbon: 2, 'Claude & GPT': 3 };
-    return (order[a.family] ?? 99) - (order[b.family] ?? 99);
-  });
-  const weeklyCapacityEstimate = buildWeeklyCapacityEstimate({
-    sortedPools: sortedQuotaPools,
-    isCustomWeeklyMode,
-    hasOfficialData: Boolean(officialQuotaInfo?.data),
-  });
-
   const finalPayload = {
     timestamp: new Date().toISOString(),
     hostPlatform: process.platform || 'unknown',
@@ -2283,7 +1983,9 @@ export async function buildTelemetryPayloadInternal(
     cloudCodeProxy: getDefaultCloudCodeProxyStatus(),
     cliStatusLine: getCliStatusLineRuntimeStatus(),
     settings,
-    contextWindowModels: getContextWindowGroups(getContextWindowModels(clientConfigs, contextModelCatalog)).map((group) => {
+    contextWindowModels: getContextWindowGroups(
+      getContextWindowModels(clientConfigs, contextModelCatalog)
+    ).map((group) => {
       const latest = group.members.reduce((previous, id) => {
         const reported = reportedContextLimits.get(id);
         return reported && (!previous || reported.at > previous.at) ? reported : previous;
@@ -2291,17 +1993,7 @@ export async function buildTelemetryPayloadInternal(
       return { ...group, reportedLimitTokens: latest?.tokens ?? null };
     }),
     cloudStatus: getCloudStatus(),
-    account: {
-      status: accountStatus,
-      email: userStatus?.email || '',
-      name: userStatus?.name || '',
-      tierId: rawTierId,
-      tierName: resolvedTierName,
-      tierMultiplier: resolvedTierMultiplier,
-      planName: resolvedPlanName,
-      aiCredits: realAiCredits > 0 ? realAiCredits : null,
-      totalConversations: conversations.length,
-    },
+    totalConversations: conversations.length,
     runningConversations,
     conversations: conversations.map((c, idx) => {
       const rawSubs = Array.isArray(c.subagents) ? c.subagents : [];
@@ -2353,9 +2045,6 @@ export async function buildTelemetryPayloadInternal(
       revision: usageRevision,
       selectedRange: {
         key: selectedWindow.key,
-        ...(selectedWindow.pool ? { pool: selectedWindow.pool } : {}),
-        ...(selectedWindow.poolLabel ? { poolLabel: selectedWindow.poolLabel } : {}),
-        ...(selectedWindow.isFallbackWeek ? { isFallbackWeek: true } : {}),
         label: selectedWindow.label,
         startMs: trendStartMs,
         endMs: trendEndMs,
@@ -2369,20 +2058,6 @@ export async function buildTelemetryPayloadInternal(
       topWorkspaces: enrichTopWorkspaces(topWorkspaces, conversations),
       monthlyYear: currentYear,
       monthlySeries,
-    },
-    quotas: {
-      meta: {
-        fetchedAtMs: officialQuotaInfo?.fetchedAtMs || 0,
-        hasOfficialData: Boolean(officialQuotaInfo?.data),
-        isStale: Boolean(officialQuotaInfo?.isStale),
-        refreshFailed: Boolean(officialQuotaInfo?.refreshFailed),
-        error: officialQuotaInfo?.error || null,
-        errorMessage: officialQuotaInfo?.error || null,
-      },
-      activePool: activePoolQuota,
-      pools: sortedQuotaPools,
-      weekly: weeklyQuota,
-      weeklyCapacityEstimate,
     },
     modelBreakdown,
   };
@@ -2401,9 +2076,6 @@ export async function buildTelemetryPayloadInternal(
     endpointId,
     isRemote,
     endpointSig,
-    weeklyLimitMode: settings.weeklyLimitMode,
-    weeklyTokenBudget: settings.weeklyTokenBudget,
-    weeklyCostBudget: settings.weeklyCostBudget,
     catalogRevision: modelInputs.catalogRevision,
     phaseEpoch: modelInputs.phaseEpoch,
     basePayload: finalPayload,
@@ -2411,21 +2083,10 @@ export async function buildTelemetryPayloadInternal(
       conversations,
     },
     knownUpstreamByModelKey,
-    quotaContext: {
-      quotaPoolsMap,
-      isCustomWeeklyMode,
-      weekBucket,
-      quotaWeekBucket,
-      poolsWeeklySummary,
-    },
     aggContext: {
-      cycleAnchors,
-      isCustomWeeklyMode,
-      currentAccountName: accountScope,
       activeCascadeId,
       activeFamilyCascadeIds,
       resolveStepModel,
-      quotaPoolsMap,
       modelInputs,
       endpoint,
     },
@@ -2454,14 +2115,6 @@ function resolveValidFastSnapshot(endpoint = null) {
   if (
     snap.catalogRevision !== pricingCatalogRevision ||
     snap.phaseEpoch !== getPricingPhaseEpoch()
-  ) {
-    return null;
-  }
-  const latestSettings = loadSettings();
-  if (
-    latestSettings.weeklyLimitMode !== snap.weeklyLimitMode ||
-    latestSettings.weeklyTokenBudget !== snap.weeklyTokenBudget ||
-    latestSettings.weeklyCostBudget !== snap.weeklyCostBudget
   ) {
     return null;
   }
@@ -2524,11 +2177,9 @@ function tryBuildFastConversationPayload(requestedConvId, filterOpts = {}) {
     }
   }
 
-  const settings = loadSettings();
   const {
     activeConversation,
     activeFamilyCascadeIds,
-    latestFamilyStep,
   } = buildActiveConversationAssembly({
     activeCascadeId,
     activeConvSummary,
@@ -2536,36 +2187,16 @@ function tryBuildFastConversationPayload(requestedConvId, filterOpts = {}) {
     resolveStepModel: snap.aggContext.resolveStepModel,
     knownUpstreamByModelKey: snap.knownUpstreamByModelKey,
     modelInputs: snap.aggContext.modelInputs,
-    accountScope: snap.aggContext.currentAccountName,
+    accountScope: '',
     endpointId,
     cacheStore,
   });
 
-  const { activePoolKey, activeLive5h, activeLiveWeekly } = resolveActivePoolKeyFromStep(
-    latestFamilyStep,
-    snap.quotaContext.quotaPoolsMap
-  );
-  const { activePoolQuota, weeklyQuota } = buildActivePoolAndWeeklyQuotas({
-    activePoolKey,
-    activeLive5h,
-    activeLiveWeekly,
-    quotaPoolsMap: snap.quotaContext.quotaPoolsMap,
-    isCustomWeeklyMode: snap.quotaContext.isCustomWeeklyMode,
-    settings,
-    weekBucket: snap.quotaContext.weekBucket,
-    quotaWeekBucket: snap.quotaContext.quotaWeekBucket,
-    poolsWeeklySummary: snap.quotaContext.poolsWeeklySummary,
-  });
-
   const sessionUsage = aggregateSessionUsageForFamily({
     filterOpts,
-    cycleAnchors: snap.aggContext.cycleAnchors,
-    isCustomWeeklyMode: snap.aggContext.isCustomWeeklyMode,
-    currentAccountName: snap.aggContext.currentAccountName,
     activeCascadeId,
     activeFamilyCascadeIds,
     resolveStepModel: snap.aggContext.resolveStepModel,
-    quotaPoolsMap: snap.quotaContext.quotaPoolsMap,
     endpoint,
   });
 
@@ -2574,133 +2205,13 @@ function tryBuildFastConversationPayload(requestedConvId, filterOpts = {}) {
     timestamp: new Date().toISOString(),
     endpoint: snap.basePayload.endpoint,
     uiBundleVersion: snap.basePayload.uiBundleVersion || computeRuntimeCodeVersion(),
-    account: snap.basePayload.account,
     activeCascadeId,
     activeConversation,
-    quotas: {
-      activePool: activePoolQuota,
-      weekly: weeklyQuota,
-      weeklyCapacityEstimate: snap.basePayload.quotas?.weeklyCapacityEstimate || null,
-    },
     consumption: {
       session: sessionUsage.finalizedSelectedSession,
       sessionPresets: sessionUsage.sessionPresets,
     },
     needsBackgroundSync,
-  };
-}
-
-function buildWeeklyCapacityEstimate({
-  sortedPools = [],
-  isCustomWeeklyMode = false,
-  hasOfficialData = false,
-} = {}) {
-  if (isCustomWeeklyMode) {
-    return {
-      status: 'custom_mode',
-      totalEqWeeklyUsd: null,
-      totalEqWeeklyTokens: null,
-      readyPoolCount: 0,
-      totalPoolCount: 0,
-      hasPreliminary: false,
-      pools: [],
-    };
-  }
-  const rawPools = Array.isArray(sortedPools) ? sortedPools : [];
-  const candidatePools = rawPools.filter(
-    (p) =>
-      p &&
-      (p.hasWeekly ||
-        p.weeklyUsedPct != null ||
-        Number.isFinite(p.rateEstimate?.eqFullWeeklyUsd))
-  );
-  const targetPools = candidatePools.length > 0 ? candidatePools : rawPools;
-  if (!hasOfficialData && targetPools.length === 0) {
-    return {
-      status: 'unavailable',
-      totalEqWeeklyUsd: null,
-      totalEqWeeklyTokens: null,
-      readyPoolCount: 0,
-      totalPoolCount: 0,
-      hasPreliminary: false,
-      pools: [],
-    };
-  }
-
-  let sumUsd = 0;
-  let sumTokens = 0;
-  let readyPoolCount = 0;
-  let tokenReadyPoolCount = 0;
-  let hasPreliminary = false;
-  const pools = [];
-
-  for (const p of targetPools) {
-    const est = p?.rateEstimate && typeof p.rateEstimate === 'object' ? p.rateEstimate : null;
-    let eqUsd =
-      Number.isFinite(est?.eqFullWeeklyUsd) && est.eqFullWeeklyUsd > 0
-        ? Number(est.eqFullWeeklyUsd)
-        : null;
-    let eqTok =
-      Number.isFinite(est?.eqFullWeeklyTokens) && est.eqFullWeeklyTokens > 0
-        ? Math.round(Number(est.eqFullWeeklyTokens))
-        : null;
-    if (eqUsd === null && Array.isArray(est?.models) && est.models.length > 0) {
-      const wkModels = est.models.filter(
-        (m) => Number.isFinite(m?.eqFullWeeklyUsd) && m.eqFullWeeklyUsd > 0
-      );
-      if (wkModels.length > 0) {
-        eqUsd =
-          wkModels.reduce((acc, m) => acc + Number(m.eqFullWeeklyUsd), 0) / wkModels.length;
-        const tokModels = wkModels.filter(
-          (m) => Number.isFinite(m?.eqFullWeeklyTokens) && m.eqFullWeeklyTokens > 0
-        );
-        if (tokModels.length === wkModels.length) {
-          eqTok = Math.round(
-            tokModels.reduce((acc, m) => acc + Number(m.eqFullWeeklyTokens), 0) / tokModels.length
-          );
-        }
-      }
-    }
-
-    const isPrelim = Boolean(est?.isPreliminaryWeekly);
-    if (eqUsd !== null) {
-      readyPoolCount += 1;
-      sumUsd += eqUsd;
-      if (isPrelim) hasPreliminary = true;
-      if (eqTok !== null) {
-        tokenReadyPoolCount += 1;
-        sumTokens += eqTok;
-      }
-    }
-
-    pools.push({
-      poolKey: p.poolKey || p.family || '',
-      poolLabel: p.poolLabel || p.family || p.poolKey || 'Pool',
-      usedWeeklyPct: Number.isFinite(Number(p.weeklyUsedPct)) ? +Number(p.weeklyUsedPct).toFixed(1) : null,
-      eqFullWeeklyUsd: eqUsd !== null ? +eqUsd.toFixed(1) : null,
-      eqFullWeeklyTokens: eqTok,
-      source: est?.sourceWeekly || null,
-      isPreliminary: isPrelim,
-    });
-  }
-
-  const totalPoolCount = pools.length;
-  const status =
-    readyPoolCount === 0
-      ? 'collecting'
-      : readyPoolCount < totalPoolCount
-        ? 'partial'
-        : 'ready';
-
-  return {
-    status,
-    totalEqWeeklyUsd: readyPoolCount > 0 ? +sumUsd.toFixed(1) : null,
-    totalEqWeeklyTokens:
-      readyPoolCount > 0 && tokenReadyPoolCount === readyPoolCount ? Math.round(sumTokens) : null,
-    readyPoolCount,
-    totalPoolCount,
-    hasPreliminary,
-    pools,
   };
 }
 
@@ -2876,7 +2387,6 @@ export function buildCliStatusSnapshot(finalPayload, updatedAtMs = Date.now()) {
     ),
     hasWaiting: waitingCascadeIds.length > 0,
     waitingCascadeIds,
-    quotas: finalPayload?.quotas || null,
     activeConversation: {
       cascadeId: ac.cascadeId || '',
       isRunning: Boolean(capSource.isRunning || ac.isRunning),

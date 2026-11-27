@@ -183,10 +183,10 @@ test('explicit historical models and verified real Argon identities survive cach
   assert.equal(normalizeCachedStep(flash).modelIdentityVersion, MODEL_IDENTITY_VERSION);
 });
 
-test('empty session does not invent an Argon model or a model quota pool', async () => {
+test('empty session does not invent an Argon model or expose quota telemetry', async () => {
   const p = await backendHarness().buildTelemetryPayloadInternal('test');
   assert.equal(p.activeConversation.activeModelShort,'模型未知');
-  assert.equal(p.quotas.activePool.isAvailable,false); assert.equal(p.quotas.activePool.family,'Unknown');
+  assert.equal(p.quotas,undefined); assert.equal(p.account,undefined);
 });
 
 test('unknown single-step cost renders as pending while aggregate subtotals omit pending suffix', (t) => {
@@ -197,9 +197,10 @@ test('unknown single-step cost renders as pending while aggregate subtotals omit
   assert.equal(formatUsd(0.1,{unpricedCalls:1}),'$0.10');
 });
 
-test('custom cost budget cannot claim a complete remaining percentage when prices are missing', async () => {
-  const p = await payload([step(211)], {settings:{weeklyLimitMode:'custom_cost'}});
-  assert.equal(p.quotas.weekly.usedPct,null); assert.equal(p.quotas.weekly.remainingPct,null);
+test('unpriced steps remain tracked in local consumption without quota fields', async () => {
+  const p = await payload([step(211)]);
+  assert.equal(p.consumption.account.unpricedCalls, 1);
+  assert.equal(p.quotas, undefined); assert.equal(p.account, undefined);
 });
 
 test('frontend considers a model-only correction a real telemetry update', () => {
@@ -527,8 +528,8 @@ test('Orchestrator (Opus 5.5) resolves Claude family, Opus 5.5 pricing, distinct
   assert.equal(h.isArgonModelIdentifier(OPUS_ORCH_PH, 'claude-opus-5-5-orchestrator', 'Orchestrator (Opus 5.5)'), false);
   assert.equal(h.isNeonModelIdentifier(OPUS_ORCH_PH, 'claude-opus-5-5-orchestrator', 'Orchestrator (Opus 5.5)'), false);
 
-  // GetUserStatus clientModelConfig without apiProvider and with opaque modelId still classifies as Claude & GPT pool
-  const { quotaPoolsMap, modelQuotas } = h.buildOfficialQuotaPools(null, [
+  // GetUserStatus clientModelConfig without apiProvider maps placeholder to label without retaining quotaInfo
+  const dynOpusMap = h.buildDynamicModelMap([
     {
       modelOrAlias: { model: 'MODEL_PLACEHOLDER_M949' },
       modelId: 'orchestrator-v2',
@@ -536,10 +537,10 @@ test('Orchestrator (Opus 5.5) resolves Claude family, Opus 5.5 pricing, distinct
       quotaInfo: { remainingFraction: 0.75, resetTime: '2026-11-25T00:00:00Z' },
     },
   ]);
-  const opusQuotaEntry = modelQuotas.find((m) => m.rawKey === 'MODEL_PLACEHOLDER_M949');
-  assert.equal(opusQuotaEntry?.family, 'Claude & GPT');
-  assert.ok(quotaPoolsMap.get('Claude & GPT').models.includes('Orchestrator (Opus 5.5)'));
-  assert.equal(quotaPoolsMap.get('Gemini').models.includes('Orchestrator (Opus 5.5)'), false);
+  const opusEntry = dynOpusMap.get('MODEL_PLACEHOLDER_M949');
+  assert.equal(opusEntry?.label, 'Orchestrator (Opus 5.5)');
+  assert.equal(opusEntry?.quotaInfo, undefined);
+  assert.equal(h.resolveModelInfo('MODEL_PLACEHOLDER_M949', dynOpusMap).family, 'Claude');
 
   // Frontend compact/full Orchestrator display works cleanly and stays separate from standalone Opus 5.5
   assert.equal(resolveModelDisplayInfo(s1, { orchestratorIdMode: 'compact' }).text, 'orchestrator-opus-5.5');

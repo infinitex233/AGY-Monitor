@@ -507,10 +507,31 @@ function resolveModelCatalogEntry(
 }
 
 /**
+ * 从 `GetUserStatus` 的 `clientModelConfigs` 提取纯动态模型映射表（仅保留 `modelId` 与 `label`，绝不读取任何配额字段）。
+ *
+ * @param {object[]} [clientConfigs=[]]
+ * @returns {Map<string, { modelId: string, label: string }>}
+ */
+export function buildDynamicModelMap(clientConfigs = []) {
+  const dynamicModelMap = new Map();
+  if (!Array.isArray(clientConfigs)) return dynamicModelMap;
+  for (const cfg of clientConfigs) {
+    const rawKey = cfg?.modelOrAlias?.model;
+    if (rawKey) {
+      dynamicModelMap.set(rawKey, {
+        modelId: cfg.modelId || '',
+        label: cfg.label || cfg.modelId || rawKey,
+      });
+    }
+  }
+  return dynamicModelMap;
+}
+
+/**
  * 综合动态模型目录、占位符字典与价格表，解析步骤对应的模型元数据与指定时刻的单价配置。
  *
  * @param {string} rawModelKey 步骤记录的原始模型键（如 `MODEL_PLACEHOLDER_M320`）
- * @param {Map<string, {modelId: string, label: string, quotaInfo?: object}>} [dynamicModelMap=new Map()] 从 `GetUserStatus` 提取的动态模型表
+ * @param {Map<string, {modelId: string, label: string}>} [dynamicModelMap=new Map()] 从 `GetUserStatus` 提取的动态模型表
  * @param {string} [apiProvider=''] API 提供商枚举
  * @param {string} [modelDisplayName=''] 已知的模型展示名称
  * @param {string} [responseModel=''] 实际响应的上游模型 ID（如 `gemini-3.8-flash-n`）

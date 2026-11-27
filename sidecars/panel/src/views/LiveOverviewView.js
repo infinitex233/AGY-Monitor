@@ -1,7 +1,7 @@
 /**
  * @fileoverview View 1: Decoupled `LiveOverviewView.js` (实时监控视图).
  * Acts as a lightweight host container delegating all telemetry cards
- * (`metrics`, `context`, `quotas`, `live_tasks`) to `widgetRegistry.js` (`a` calls `b`),
+ * (`metrics`, `context`, `live_tasks`) to `widgetRegistry.js` (`a` calls `b`),
  * allowing users to freely reorder or remove any module down to 1 item.
  */
 
@@ -21,8 +21,8 @@ import { StepsDetailView } from './StepsDetailView.js';
 export { CTX_CHANNEL_DEFS } from '../components/widgets/ContextWindowWidget.js';
 
 function resolveOverviewModules(raw) {
-  const filtered = normalizeClientOverviewModules(raw).filter((k) => k !== 'quotas');
-  return filtered.length > 0 ? filtered : ['metrics', 'context', 'live_tasks'];
+  const normalized = normalizeClientOverviewModules(raw);
+  return normalized.length > 0 ? normalized : ['metrics', 'context', 'live_tasks'];
 }
 
 export const LiveOverviewView = defineComponent({

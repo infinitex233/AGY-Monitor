@@ -341,8 +341,6 @@ export const TopSessionHeader = defineComponent({
       const isSynced = telSt.syncState === 'synced';
       const isError = telSt.syncState === 'error';
       const isRunning = Boolean(aggregated?.isRunning || telemetry?.activeConversation?.isRunning);
-      const quotaMeta = telemetry?.quotas?.meta;
-      const quotaStale = Boolean(quotaMeta?.refreshFailed || quotaMeta?.isStale);
 
       patchClasses(refreshBtn, { 'is-spinning': isSyncing });
       patchAttr(refreshBtn, 'disabled', isSyncing);
@@ -381,17 +379,6 @@ export const TopSessionHeader = defineComponent({
           'state-running': true,
           'state-synced': false,
           'state-warn': false,
-        });
-      } else if (quotaStale) {
-        patchSvgIcon(statusIcon, 'warning');
-        patchText(
-          statusText,
-          quotaMeta?.hasOfficialData ? t('header.statusQuotaCached') : t('header.statusQuotaOffline')
-        );
-        patchClasses(statusTag, {
-          'state-running': false,
-          'state-synced': false,
-          'state-warn': true,
         });
       } else {
         patchSvgIcon(statusIcon, 'pulse');

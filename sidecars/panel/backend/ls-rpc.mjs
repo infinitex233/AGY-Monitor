@@ -1,5 +1,5 @@
 /**
- * @fileoverview Antigravity Language Server Connect RPC 客户端与官方配额摘要缓存。
+ * @fileoverview Antigravity Language Server Connect RPC 客户端 (`ls-rpc.mjs`)。
  *
  * 负责：
  * 1. 向本地或 SSH 远端窗口对应的 Language Server 发起带 CSRF 鉴权与超时保护的 Connect RPC 调用 (`callLsRpc`)；
@@ -7,27 +7,23 @@
  *    - Tier-1：严格限定回环地址 (`127.0.0.1`/`localhost`/`::1`) 的 HTTP/HTTPS 直连（HTTPS 仅对回环允许宿主自签证书）；
  *    - Tier-2：Tier-1 不可用或鉴权依赖 Electron Partition Cookie / 2.33.0+ 省略 `csrfToken` 时，
  *      自动熔断并回退至窗口内同源 `window.fetch` / `/connect-websocket`（通过 CDP 按需执行）；
- * 3. 拉取并按端点隔离缓存 `RetrieveUserQuotaSummary` 官方实时配额摘要与 `GetAvailableModels` 模型目录。
+ * 3. 按端点隔离缓存 `GetAvailableModels` 模型目录（不采集账号或订阅配额数据）。
  */
 
 import { lsRuntimeEndpoint } from './config.mjs';
 import {
-  getEndpointQuotaCache,
   getRemoteWindowRpcInvoker,
   markRemoteEndpointPreferTier2,
   shouldRemoteEndpointPreferTier2,
 } from './endpoint-registry.mjs';
 import { ensureLsEndpointDiscovered } from './ls-discovery.mjs';
 
-const QUOTA_CACHE_TTL_MS = 10_000;
-const QUOTA_RETRY_COOLDOWN_MS = 5_000;
 const REMOTE_HTTPS_MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
 const REMOTE_ALLOWED_LS_METHODS = new Set([
   'GetUserStatus',
   'GetAvailableModels',
   'GetAllCascadeTrajectories',
   'GetCascadeTrajectory',
-  'RetrieveUserQuotaSummary',
 ]);
 
 let contextModelCatalog = null;
@@ -360,92 +356,4 @@ export async function callLsRpc(method, body = {}, timeoutMs = 5000, endpoint = 
     throw new Error(`RPC ${method} failed (${res.status}): ${text}`);
   }
   return res.json();
-}
-
-/**
- * 获取官方实时配额摘要（`RetrieveUserQuotaSummary`），按端点与账号隔离短期缓存。
- *
- * @param {boolean} [forceRefresh=false] 是否强制穿透本地缓存与失败冷却
- * @param {string} [accountName=''] 发起查询时宿主报告的账号，用于隔离配额缓存
- * @param {object|null} [endpoint=null] 可选远端端点对象
- * @returns {Promise<{data: object|null, fetchedAtMs: number, isStale: boolean, refreshFailed: boolean, error: string|null, fromCache: boolean}>}
- */
-export async function getOfficialQuotaSummary(forceRefresh = false, accountName = '', endpoint = null) {
-  const qCache = getEndpointQuotaCache(endpoint);
-  if (qCache.accountName !== accountName) {
-    Object.assign(qCache, {
-      accountName,
-      accountGeneration: qCache.accountGeneration + 1,
-      ts: 0,
-      lastAttemptTs: 0,
-      data: null,
-      error: null,
-    });
-  }
-  const generation = qCache.accountGeneration;
-  const now = Date.now();
-  if (!forceRefresh && qCache.data && now - qCache.ts < QUOTA_CACHE_TTL_MS) {
-    return {
-      data: qCache.data,
-      fetchedAtMs: qCache.ts,
-      isStale: false,
-      refreshFailed: false,
-      error: null,
-      fromCache: true,
-    };
-  }
-  if (
-    !forceRefresh &&
-    qCache.lastAttemptTs > 0 &&
-    now - qCache.lastAttemptTs < QUOTA_RETRY_COOLDOWN_MS &&
-    qCache.error
-  ) {
-    return {
-      data: qCache.data,
-      fetchedAtMs: qCache.ts || 0,
-      isStale: Boolean(qCache.data),
-      refreshFailed: true,
-      error: qCache.error,
-      fromCache: true,
-    };
-  }
-
-  qCache.lastAttemptTs = now;
-  try {
-    const res = await callLsRpc('RetrieveUserQuotaSummary', { forceRefresh: true }, 6000, endpoint);
-    const { userStatus } = await callLsRpc('GetUserStatus', {}, 2500, endpoint);
-    if ((userStatus?.email || userStatus?.name || '') !== accountName) return {};
-    if (generation !== qCache.accountGeneration) return {};
-    const payload = res?.response !== undefined ? res.response : res;
-    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-      const normalized =
-        Array.isArray(payload.groups) || Array.isArray(payload.buckets)
-          ? payload
-          : { ...payload, groups: [] };
-      qCache.ts = now;
-      qCache.data = normalized;
-      qCache.error = null;
-      return {
-        data: normalized,
-        fetchedAtMs: now,
-        isStale: false,
-        refreshFailed: false,
-        error: null,
-        fromCache: false,
-      };
-    }
-    qCache.error = 'Quota summary empty';
-  } catch (err) {
-    if (generation !== qCache.accountGeneration) return {};
-    console.error(`RetrieveUserQuotaSummary failed: ${err.message}`);
-    qCache.error = err.message;
-  }
-  return {
-    data: qCache.data,
-    fetchedAtMs: qCache.ts || 0,
-    isStale: Boolean(qCache.data),
-    refreshFailed: true,
-    error: qCache.error || 'Quota RPC unavailable',
-    fromCache: false,
-  };
 }

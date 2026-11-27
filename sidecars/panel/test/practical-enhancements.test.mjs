@@ -747,7 +747,8 @@ test('Feature 7: telemetry exposes all local conversations beyond 30 and recover
 
   const payload = await harness.buildTelemetryPayloadInternal();
   assert.equal(payload.conversations.length, 36, 'All 36 local conversations should be exposed without 30-item truncation');
-  assert.equal(payload.account.totalConversations, 36);
+  assert.equal(payload.totalConversations, 36);
+  assert.equal(payload.account, undefined);
   assert.ok(payload.conversations[0].sessionCostUsd !== undefined, 'Recent conversations keep quick stats');
   assert.equal(payload.conversations[35].sessionCostUsd, undefined, 'Older historical conversations omit heavy quick stats');
 

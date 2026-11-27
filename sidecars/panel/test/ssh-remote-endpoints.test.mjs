@@ -250,7 +250,8 @@ test('Per-endpoint backend isolation keeps local and multiple SSH windows comple
 
   assert.equal(localTel.endpoint.id, LOCAL_ENDPOINT_ID);
   assert.equal(localTel.endpoint.isRemote, false);
-  assert.equal(localTel.account.email, 'local@example.com');
+  assert.equal(localTel.account, undefined);
+  assert.equal(localTel.quotas, undefined);
   assert.equal(localTel.activeConversation.cascadeId, '11111111-1111-1111-1111-111111111111');
   // Local includes deepStats (5500) + local session (1200) = 6700
   assert.equal(localTel.consumption.account.totalTokens, 6700);
@@ -258,7 +259,8 @@ test('Per-endpoint backend isolation keeps local and multiple SSH windows comple
   assert.equal(telA.endpoint.id, remoteA.id);
   assert.equal(telA.endpoint.isRemote, true);
   assert.equal(telA.endpoint.label, 'gpu-4090');
-  assert.equal(telA.account.email, 'remote-a@example.com');
+  assert.equal(telA.account, undefined);
+  assert.equal(telA.quotas, undefined);
   assert.equal(telA.activeConversation.cascadeId, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
   // Remote A excludes local sessions & local deepStats: strictly 3400 tokens
   assert.equal(telA.consumption.account.totalTokens, 3400);
@@ -266,7 +268,8 @@ test('Per-endpoint backend isolation keeps local and multiple SSH windows comple
 
   assert.equal(telB.endpoint.id, remoteB.id);
   assert.equal(telB.endpoint.isRemote, true);
-  assert.equal(telB.account.email, 'remote-b@example.com');
+  assert.equal(telB.account, undefined);
+  assert.equal(telB.quotas, undefined);
   assert.equal(telB.activeConversation.cascadeId, 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
   assert.equal(telB.consumption.account.totalTokens, 800);
 
@@ -326,7 +329,10 @@ test('Tier-1 loopback HTTPS falls back with 60s circuit breaker to Tier-2 window
 
   const first = await h.executeTelemetryAction({ range: 'today' }, { endpointId: ep.id });
   assert.equal(first.status, 200);
-  assert.equal(JSON.parse(first.body).account.email, 'tier2@example.com');
+  const firstBody = JSON.parse(first.body);
+  assert.equal(firstBody.endpoint.id, ep.id);
+  assert.equal(firstBody.account, undefined);
+  assert.equal(firstBody.quotas, undefined);
   assert.equal(tier1Calls, 1); // Circuit breaker tripped after first 403!
   assert.ok(tier2Calls >= 2);
 

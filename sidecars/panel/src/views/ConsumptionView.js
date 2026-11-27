@@ -41,7 +41,6 @@ import { createSvgIcon } from '../icons/SvgIcon.js';
 import { ActionMenu } from '../components/ui/ActionMenu.js';
 import {
   prefetchConsumptionPresets,
-  selectConsumptionCyclePool,
   selectConsumptionTimeRange,
   telemetryStore,
 } from '../store/telemetryStore.js';
@@ -52,7 +51,6 @@ import {
 } from '../components/charts/TrendAreaChart.js';
 import { CustomDateTimePicker } from '../components/ui/CustomDateTimePicker.js';
 import { CustomScrollbar } from '../components/ui/CustomScrollbar.js';
-import { CustomSelect } from '../components/ui/CustomSelect.js';
 import { createFourSegmentBar } from '../components/ui/FourSegmentBar.js';
 import { SegmentedControl } from '../components/ui/SegmentedControl.js';
 import {
@@ -62,7 +60,6 @@ import {
 /** 消耗统计顶栏支持的时间范围预设项 */
 function getConsumptionTimeRangeOptions() {
   return [
-    { value: 'cycle', label: t('cons.rangeCycle') },
     { value: 'today', label: t('cons.rangeToday') },
     { value: '24h', label: t('cons.range24h') },
     { value: '7d', label: t('cons.range7d') },
@@ -97,86 +94,6 @@ function ceilToEndOfMinuteMs(ms) {
   const d = new Date(n);
   d.setSeconds(59, 999);
   return d.getTime();
-}
-
-function formatCyclePoolShortLabel(poolKey, poolLabel) {
-  if (poolKey === 'Argon') return 'Argon';
-  if (poolKey === 'Carbon') return 'Carbon';
-  if (poolKey === 'Claude & GPT') return 'Claude/GPT';
-  return poolLabel || poolKey;
-}
-
-function buildCyclePoolSelectOptions(pools, isCustomWeeklyMode = false) {
-  const list = Array.isArray(pools) ? pools : [];
-  let sumCycleCost = 0;
-  let hasAnyCycleCost = false;
-  for (let i = 0; i < list.length; i++) {
-    const c = Number(list[i]?.cycleWeekly?.costUsd);
-    if (Number.isFinite(c) && c >= 0 && list[i]?.cycleWeekly) {
-      sumCycleCost += c;
-      hasAnyCycleCost = true;
-    }
-  }
-  const allLabel = t('cons.cyclePoolAll');
-  const opts = [
-    {
-      value: 'all',
-      label: allLabel,
-      shortLabel: t('cons.cyclePoolAllShort'),
-      meta: !isCustomWeeklyMode && hasAnyCycleCost ? formatUsd(sumCycleCost) : '',
-      title: allLabel,
-    },
-  ];
-  for (let i = 0; i < list.length; i++) {
-    const p = list[i];
-    const key = String(p?.poolKey || p?.family || '').trim();
-    if (!key || key === 'Unknown') continue;
-    const label = String(p?.poolLabel || key).trim();
-    const shortLabel = formatCyclePoolShortLabel(key, label);
-    const metaParts = [];
-    if (
-      !isCustomWeeklyMode &&
-      p?.weeklyRemainingPct != null &&
-      Number.isFinite(Number(p.weeklyRemainingPct))
-    ) {
-      metaParts.push(
-        t('cons.cyclePoolRemMeta', {
-          pct: formatPctNumber(p.weeklyRemainingPct, { withSymbol: true }),
-        })
-      );
-    }
-    if (!isCustomWeeklyMode && p?.cycleWeekly && Number.isFinite(Number(p.cycleWeekly.costUsd))) {
-      metaParts.push(formatUsd(p.cycleWeekly.costUsd));
-    }
-    const meta = metaParts.join(' · ');
-    opts.push({
-      value: key,
-      label,
-      shortLabel,
-      meta,
-      title: meta ? `${label} (${meta})` : label,
-    });
-  }
-  return opts;
-}
-
-function formatCycleMinuteSpanTip(startMs, endMs, isFallbackWeek = false) {
-  const s = Number(startMs);
-  const e = Number(endMs);
-  if (!(s > 0 && e > 0 && Number.isFinite(s) && Number.isFinite(e))) return null;
-  const sd = new Date(s);
-  const ed = new Date(e);
-  const pad2 = (n) => String(n).padStart(2, '0');
-  const sTime = `${pad2(sd.getHours())}:${pad2(sd.getMinutes())}`;
-  const eTime = `${pad2(ed.getHours())}:${pad2(ed.getMinutes())}`;
-  const sameDay =
-    sd.getFullYear() === ed.getFullYear() &&
-    sd.getMonth() === ed.getMonth() &&
-    sd.getDate() === ed.getDate();
-  const sDate = `${sd.getMonth() + 1}/${pad2(sd.getDate())}`;
-  const eDate = `${ed.getMonth() + 1}/${pad2(ed.getDate())}`;
-  const base = sameDay ? `${sDate} ${sTime} ~ ${eTime}` : `${sDate} ${sTime} ~ ${eDate} ${eTime}`;
-  return isFallbackWeek ? `${base} · ${t('cons.cycleFallbackWeekTip')}` : base;
 }
 
 export const ConsumptionView = defineComponent({
@@ -284,16 +201,6 @@ export const ConsumptionView = defineComponent({
 
     // --- Section 1: 用量概览矩阵 (4 列核心指标 + Token 构成小字 + 底部 4 段比例条) ---
     const dateSpanBadge = h('span', { className: 'cons-badge text-mono', text: '-- ~ --' });
-    const cyclePoolSelect = CustomSelect({
-      className: 'cons-cycle-pool-select',
-      modelValue: telemetryStore.getState().selectedCyclePool || 'all',
-      options: buildCyclePoolSelectOptions([]),
-      onUpdateModelValue: (nextPool) => {
-        selectConsumptionCyclePool(nextPool || 'all');
-      },
-    });
-    patchAttr(cyclePoolSelect.el, 'hidden', true);
-    patchAttr(cyclePoolSelect.refs.triggerBtn, 'aria-label', t('cons.cyclePoolAria'));
     const heroTotalTokens = h('strong', { className: 'cons-hero-num text-mono', text: '0' });
     const heroSplitInputLabel = h('span', { text: t('cons.footInput') });
     const heroSplitInputVal = h('span', { text: '0' });
@@ -406,7 +313,6 @@ export const ConsumptionView = defineComponent({
       h('div', { className: 'panel-header cons-overview-head' }, [
         h('span', { className: 'panel-title cons-overview-title' }, [
           dateSpanBadge,
-          cyclePoolSelect.el,
         ]),
         h('div', { className: 'cons-overview-controls' }, [
           timeFilterSwitch.el,
@@ -612,7 +518,7 @@ export const ConsumptionView = defineComponent({
       const cons = slice.consumption || {};
       const rangeInfo = cons.selectedRange || {};
 
-      // 始终在 0ms 同步顶部时间段滑块、周期池选择器及自定义日期条显隐，给予即刻交互反馈
+      // 始终在 0ms 同步顶部时间段滑块及自定义日期条显隐，给予即刻交互反馈
       timeFilterSwitch.setValue(slice.range);
       patchAttr(customRangeBar, 'hidden', slice.range !== 'custom');
       if (!hasUncommittedCustomDraft) {
@@ -622,52 +528,21 @@ export const ConsumptionView = defineComponent({
         endPicker.setValue(draftEndMs);
       }
 
-      const isCustomWeeklyMode =
-        slice.weeklyLimitMode === 'custom_tokens' || slice.weeklyLimitMode === 'custom_cost';
-      const cyclePoolOptions =
-        slice.range === 'cycle'
-          ? buildCyclePoolSelectOptions(slice.quotaPools, isCustomWeeklyMode)
-          : [];
-      const activePoolFilter = slice.range === 'cycle' ? slice.cyclePool || 'all' : 'all';
-      const showCyclePoolSelect = slice.range === 'cycle' && cyclePoolOptions.length > 2;
-      if (!showCyclePoolSelect) {
-        cyclePoolSelect.close?.();
-        patchAttr(cyclePoolSelect.el, 'hidden', true);
-      } else {
-        cyclePoolSelect.setProps({
-          modelValue: activePoolFilter,
-          options: cyclePoolOptions,
-        });
-        patchAttr(cyclePoolSelect.el, 'hidden', false);
-      }
-
       // 极少数缓存未命中时（如自定义新区间或进页瞬间抢点），跳过用旧趋势/模型跑无效半更新重绘，待几毫秒后单帧原子绘制
-      const payloadPool = rangeInfo.key === 'cycle' ? rangeInfo.pool || 'all' : 'all';
-      if (
-        (rangeInfo.key && slice.range && rangeInfo.key !== slice.range) ||
-        (slice.range === 'cycle' && rangeInfo.pool && payloadPool !== activePoolFilter)
-      ) {
+      if (rangeInfo.key && slice.range && rangeInfo.key !== slice.range) {
         return;
       }
 
       const preset =
-        slice.range !== 'custom' &&
-        !(slice.range === 'cycle' && activePoolFilter !== 'all') &&
-        cons.presets?.[slice.range]
+        slice.range !== 'custom' && cons.presets?.[slice.range]
           ? cons.presets[slice.range]
           : null;
       const acct = cons.account || preset?.account || {};
       const dateSpan = formatDateSpanBadge(rangeInfo.startMs, rangeInfo.endMs);
-      const cycleOptionsSig = showCyclePoolSelect
-        ? cyclePoolOptions.map((o) => `${o.value}:${o.label}:${o.meta || ''}`).join('|')
-        : '';
       const locale = i18nStore.getState().locale;
       const renderTuple = [
         locale,
         slice.range,
-        activePoolFilter,
-        cycleOptionsSig,
-        Boolean(rangeInfo.isFallbackWeek),
         slice.customStartMs,
         slice.customEndMs,
         slice.modelDisplayMode,
@@ -715,17 +590,7 @@ export const ConsumptionView = defineComponent({
 
       // 1. 同步用量概览矩阵（4 列核心指标 + Token 构成小字 + 底部 4 段比例条）
       patchText(dateSpanBadge, dateSpan);
-      patchAttr(
-        dateSpanBadge,
-        'title',
-        slice.range === 'cycle'
-          ? formatCycleMinuteSpanTip(
-              rangeInfo.startMs,
-              rangeInfo.endMs,
-              Boolean(rangeInfo.isFallbackWeek)
-            )
-          : null
-      );
+      patchAttr(dateSpanBadge, 'title', null);
       const totalTokens = Number(acct.totalTokens || 0);
       const inputTokens = Number(acct.inputTokens || 0);
       const cacheTokens = Number(acct.cacheReadTokens || 0);
@@ -840,11 +705,8 @@ export const ConsumptionView = defineComponent({
     const unsub = telemetryStore.subscribe(
       (st) => ({
         range: st.selectedTimeRange,
-        cyclePool: st.selectedCyclePool || 'all',
         customStartMs: st.customStartMs,
         customEndMs: st.customEndMs,
-        quotaPools: st.telemetry?.quotas?.pools,
-        weeklyLimitMode: st.telemetry?.settings?.weeklyLimitMode,
         consumption: st.telemetry?.consumption,
         modelBreakdown: st.telemetry?.modelBreakdown,
         modelDisplayMode: normalizeModelDisplayMode(
@@ -896,7 +758,6 @@ export const ConsumptionView = defineComponent({
         ariaLabel: t('cons.rangeAria'),
         options: getConsumptionTimeRangeOptions(),
       });
-      patchAttr(cyclePoolSelect.refs.triggerBtn, 'aria-label', t('cons.cyclePoolAria'));
       patchText(applyCustomBtnLabel, t('cons.applyFilter'));
       patchText(rangeToSpan, t('cons.rangeTo'));
       patchText(totalTokensLabel, t('cons.totalTokens'));
@@ -947,7 +808,6 @@ export const ConsumptionView = defineComponent({
       unsubView();
       unsubI18n();
       consExportMenu.destroy();
-      cyclePoolSelect.destroy();
       heatmapModeSwitch.destroy();
       trendChart.destroy?.();
       timeFilterSwitch.destroy();
@@ -960,7 +820,6 @@ export const ConsumptionView = defineComponent({
       el: rootEl,
       refs: {
         timeFilterSwitch,
-        cyclePoolSelect,
         heatmapModeSwitch,
         trendChart,
         startPicker,

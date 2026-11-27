@@ -95,6 +95,8 @@ test('pack-release-zip ships only runtime-essential files, excludes dev bloat, a
   assert.equal(manifest.version, '1.0.0');
   assert.equal(manifest.logo, undefined);
 
+  assert.equal(relFiles.includes('sidecars/panel/backend/quota-pools.mjs'), false);
+
   // Verify zero broken syntax and clean standalone ESM load from the extracted clean tree (no src/, test/, package.json)
   for (const rel of relFiles) {
     if (rel.endsWith('.mjs') || rel === 'sidecars/panel/app.js') {

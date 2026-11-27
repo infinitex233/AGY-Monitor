@@ -95,7 +95,7 @@ function resolveEffectiveTopbarSlots(rawSlots) {
 }
 
 function resolveEffectiveHoverModules(rawModules) {
-  return normalizeClientHoverModules(rawModules).filter((key) => key !== 'quotas');
+  return normalizeClientHoverModules(rawModules);
 }
 
 

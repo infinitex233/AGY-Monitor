@@ -1,8 +1,8 @@
 /**
  * @fileoverview Decoupled Metric Registry (`metricRegistry.js`).
  * Centralizes presentation & option metadata for:
- * 1. Topbar / Composer Capsule Slots (1..5 items out of 13 metrics)
- * 2. Live Overview / Hover First-Row Metric Matrix (1..4 items out of 9 metrics)
+ * 1. Topbar / Composer Capsule Slots (1..5 items out of 8 metrics)
+ * 2. Live Overview / Hover First-Row Metric Matrix (1..4 items out of 10 metrics)
  */
 
 import {
@@ -19,33 +19,25 @@ import {
   sampleSummary,
   speedReasonText,
 } from '../core/formatters.js';
-import { isEnglishLocale, t } from '../i18n/index.js';
+import { t } from '../i18n/index.js';
 import { OVERVIEW_METRIC_KEYS, TOPBAR_SLOT_KEYS } from '../../shared/settings-normalization.mjs';
 import {
   formatCompactCapsuleCost,
   formatCompactCapsuleTtft,
-  hasArgonWeeklyQuotaPool,
-  resolveCapsuleQuotaSlotPct,
 } from '../../shared/telemetry-display-rules.mjs';
 
 export {
   OVERVIEW_METRIC_KEYS,
   formatCompactCapsuleCost,
   formatCompactCapsuleTtft,
-  hasArgonWeeklyQuotaPool,
 };
 export const CAPSULE_METRIC_KEYS = TOPBAR_SLOT_KEYS;
 
-export function getCapsuleMetricOptions({ quotas = null, selectedSlots = [] } = {}) {
-  const showArgonWeekly =
-    hasArgonWeeklyQuotaPool(quotas) ||
-    (Array.isArray(selectedSlots) && selectedSlots.includes('argon_weekly'));
-  return CAPSULE_METRIC_KEYS.filter((key) => key !== 'argon_weekly' || showArgonWeekly).map(
-    (key) => ({
-      value: key,
-      label: t(`capMetric.${key}`),
-    })
-  );
+export function getCapsuleMetricOptions() {
+  return CAPSULE_METRIC_KEYS.map((key) => ({
+    value: key,
+    label: t(`capMetric.${key}`),
+  }));
 }
 
 export function getOverviewMetricOptions() {
@@ -53,115 +45,6 @@ export function getOverviewMetricOptions() {
     value: key,
     label: t(`ovMetric.${key}`),
   }));
-}
-
-export function resolveQuotaCapsuleSummary(quotas) {
-  if (!quotas) return null;
-  const activePool = quotas.activePool;
-  const weekly = quotas.weekly;
-  const pools = Array.isArray(quotas.pools) ? quotas.pools : [];
-  const candidates = [];
-  const defaultPoolName = isEnglishLocale() ? 'Active Pool' : '当前池';
-  const wkTag = isEnglishLocale() ? 'Wk' : '周';
-
-  if (activePool && Number.isFinite(Number(activePool.remainingPct))) {
-    candidates.push({
-      pct: Number(activePool.remainingPct),
-      label: activePool.poolLabel || activePool.family || defaultPoolName,
-      windowTag: '5h',
-    });
-  }
-  if (activePool && Number.isFinite(Number(activePool.weeklyRemainingPct))) {
-    candidates.push({
-      pct: Number(activePool.weeklyRemainingPct),
-      label: activePool.poolLabel || activePool.family || defaultPoolName,
-      windowTag: wkTag,
-    });
-  }
-  if (!candidates.length && weekly && Number.isFinite(Number(weekly.remainingPct))) {
-    candidates.push({
-      pct: Number(weekly.remainingPct),
-      label: weekly.poolFamily || (isEnglishLocale() ? 'Weekly' : '周限额'),
-      windowTag: wkTag,
-    });
-  }
-  if (!candidates.length && pools.length > 0) {
-    for (const p of pools) {
-      const pLabel = p?.poolLabel || p?.family || defaultPoolName;
-      if (p && Number.isFinite(Number(p.remainingPct))) {
-        candidates.push({ pct: Number(p.remainingPct), label: pLabel, windowTag: '5h' });
-      }
-      if (p && Number.isFinite(Number(p.weeklyRemainingPct))) {
-        candidates.push({ pct: Number(p.weeklyRemainingPct), label: pLabel, windowTag: wkTag });
-      }
-    }
-  }
-  if (!candidates.length) return null;
-  candidates.sort((a, b) => a.pct - b.pct);
-  const tightest = candidates[0];
-  const runnerUp = candidates.length > 1 ? candidates[1] : null;
-  const rounded = Math.max(0, Math.min(100, Math.round(tightest.pct)));
-  const runnerPct = runnerUp ? Math.max(0, Math.min(100, Math.round(runnerUp.pct))) : null;
-  const subLabelText = runnerUp
-    ? runnerUp.label === tightest.label
-      ? `${tightest.label} ${tightest.windowTag} · ${runnerUp.windowTag} ${runnerPct}%`
-      : `${tightest.label} ${tightest.windowTag} · ${runnerUp.label} ${runnerUp.windowTag} ${runnerPct}%`
-    : `${tightest.label} · ${tightest.windowTag}`;
-  const tightestIsClaude = /claude|gpt|fable|oss|third/i.test(String(tightest.label || ''));
-  const tightestIsArgon = !tightestIsClaude && /\bargon\b/i.test(String(tightest.label || ''));
-  const tightestIsGemini =
-    !tightestIsClaude && !tightestIsArgon && /gemini|carbon|neon|flash|pro/i.test(String(tightest.label || ''));
-  const tightestWinShort = tightest.windowTag === '5h' ? '5h' : isEnglishLocale() ? 'w' : '周';
-  const poolPrefix = tightestIsClaude
-    ? `C${tightestWinShort}`
-    : tightestIsArgon
-      ? `A${tightestWinShort}`
-      : tightestIsGemini
-        ? `G${tightestWinShort}`
-        : tightest.windowTag === '5h'
-          ? '5h'
-          : isEnglishLocale()
-            ? 'Wk'
-            : '周';
-  return {
-    roundedPct: rounded,
-    shortText: t('capsule.quotaLeft', { pct: rounded }),
-    poolPrefix,
-    subLabelText,
-    detailText: candidates
-      .map((c) => {
-        const cPct = Math.max(0, Math.min(100, Math.round(c.pct)));
-        return `${c.label} ${c.windowTag} ${t('capsule.quotaLeft', { pct: cPct })}`;
-      })
-      .join(' · '),
-  };
-}
-
-function resolveQuotaCapsulePrefix(metricKey, quotaSum) {
-  const isEn = isEnglishLocale();
-  if (metricKey === 'gemini_5h') return 'G5h';
-  if (metricKey === 'gemini_weekly') return isEn ? 'Gw' : 'G周';
-  if (metricKey === 'argon_weekly') return isEn ? 'Aw' : 'A周';
-  if (metricKey === 'claude_5h') return 'C5h';
-  if (metricKey === 'claude_weekly') return isEn ? 'Cw' : 'C周';
-  if (quotaSum?.poolPrefix) return quotaSum.poolPrefix;
-  return isEn ? 'Q' : '余';
-}
-
-/**
- * 解析指定模型池（Gemini 或 Claude & GPT）与指定时间窗口（5h 或周额度）的剩余百分比摘要。
- *
- * @param {object|null|undefined} quotas
- * @param {'gemini_5h'|'gemini_weekly'|'claude_5h'|'claude_weekly'} slotKey
- * @returns {{ roundedPct: number, shortText: string } | null}
- */
-export function resolveSpecificQuotaSlotSummary(quotas, slotKey) {
-  const rounded = resolveCapsuleQuotaSlotPct(quotas, slotKey);
-  if (rounded == null) return null;
-  return {
-    roundedPct: rounded,
-    shortText: t('capsule.quotaLeft', { pct: rounded }),
-  };
 }
 
 /**
@@ -362,50 +245,18 @@ export function resolveCapsuleMetricPresentation(metricKey, slotCtx, ringCircumf
     };
   }
 
-  if (metricKey === 'argon_weekly' && slotCtx.hasTelemetry && !hasArgonWeeklyQuotaPool(slotCtx.quotas)) {
-    return {
-      hidden: true,
-      metric: 'none',
-      segClass: 'wm-cap-slot',
-      textClass: 'wm-slot-text',
-      showRing: false,
-      dashOffset: ringCircumference,
-      text: '',
-      toneClass: '',
-      running: false,
-      warn: false,
-      danger: false,
-    };
-  }
-
-  const quotaSum = !slotCtx.hasTelemetry
-    ? null
-    : metricKey === 'quota_auto'
-      ? resolveQuotaCapsuleSummary(slotCtx.quotas)
-      : resolveSpecificQuotaSlotSummary(slotCtx.quotas, metricKey);
-  const hasQuotaPct = Boolean(quotaSum && Number.isFinite(quotaSum.roundedPct));
-  const clampedPct = hasQuotaPct ? Math.max(0, Math.min(100, quotaSum.roundedPct)) : 0;
-  const quotaDashOffset = hasQuotaPct
-    ? +(ringCircumference * (1 - clampedPct / 100)).toFixed(2)
-    : ringCircumference;
-  const isDanger = Boolean(hasQuotaPct && clampedPct <= 15);
-  const isWarn = Boolean(hasQuotaPct && !isDanger && clampedPct <= 30);
-  const toneClass = isDanger ? 'tone-danger' : isWarn ? 'tone-warn' : '';
   return {
-    hidden: false,
-    metric: metricKey,
-    segClass: 'wm-cap-slot wm-seg-quota',
-    textClass: 'wm-slot-text wm-quota-text',
-    showRing: true,
-    ringKind: 'quota',
-    ringEmpty: !hasQuotaPct,
-    dashOffset: quotaDashOffset,
-    prefix: resolveQuotaCapsulePrefix(metricKey, quotaSum),
-    text: hasQuotaPct ? `${clampedPct}%` : '--%',
-    toneClass,
+    hidden: true,
+    metric: 'none',
+    segClass: 'wm-cap-slot',
+    textClass: 'wm-slot-text',
+    showRing: false,
+    dashOffset: ringCircumference,
+    text: '',
+    toneClass: '',
     running: false,
-    warn: isWarn,
-    danger: isDanger,
+    warn: false,
+    danger: false,
   };
 }
 
@@ -425,12 +276,11 @@ function resolveActiveBadgeText(active) {
  * 解析实时监控第一行矩阵单个单元格的展示数据。
  *
  * @param {string} metricKey
- * @param {{ active?: object, ctx?: object, quotas?: object, settings?: object, hasSubagents?: boolean }} cellCtx
+ * @param {{ active?: object, ctx?: object, settings?: object, hasSubagents?: boolean }} cellCtx
  */
 export function resolveOverviewMetricCell(metricKey, cellCtx = {}) {
   const active = cellCtx.active || {};
   const ctx = cellCtx.ctx || active.context || {};
-  const quotas = cellCtx.quotas || {};
   const settings = cellCtx.settings || {};
   const hasSubagents = Boolean(cellCtx.hasSubagents);
   const hasAnySteps = Number(active.stepCount || 0) > 0;
@@ -620,51 +470,28 @@ export function resolveOverviewMetricCell(metricKey, cellCtx = {}) {
     };
   }
 
-  if (metricKey === 'context_usage') {
-    const limitTokens = Number(ctx.compactionLimitTokens || ctx.limitTokens || 256000);
-    const totalTokens = Number(ctx.totalTokens || 0);
-    const usedPct =
-      limitTokens > 0 ? Math.min(100, +((totalTokens / limitTokens) * 100).toFixed(1)) : 0;
-    const toneCls =
-      usedPct >= 88
-        ? 'cell-value tone-danger'
-        : usedPct >= 70
-          ? 'cell-value tone-warn'
-          : 'cell-value';
-    return {
-      key: 'context_usage',
-      label: t('ovMetric.context_usage'),
-      icon: 'layers',
-      iconSize: 11,
-      isPulsing: false,
-      valueText: `${usedPct}%`,
-      valueClass: toneCls,
-      subText: t('ovMetric.subCtxRatio', {
-        used: formatTokens(totalTokens),
-        limit: formatTokens(limitTokens),
-      }),
-      subClass: 'cell-sub',
-    };
-  }
-
-  const quotaSum = resolveQuotaCapsuleSummary(quotas);
-  const quotaToneCls =
-    quotaSum && quotaSum.roundedPct <= 15
+  const limitTokens = Number(ctx.compactionLimitTokens || ctx.limitTokens || 256000);
+  const totalTokens = Number(ctx.totalTokens || 0);
+  const usedPct =
+    limitTokens > 0 ? Math.min(100, +((totalTokens / limitTokens) * 100).toFixed(1)) : 0;
+  const toneCls =
+    usedPct >= 88
       ? 'cell-value tone-danger'
-      : quotaSum && quotaSum.roundedPct <= 30
+      : usedPct >= 70
         ? 'cell-value tone-warn'
         : 'cell-value';
   return {
-    key: 'quota_tightest',
-    label: t('ovMetric.quota_tightest'),
-    icon: 'pulse',
+    key: 'context_usage',
+    label: t('ovMetric.context_usage'),
+    icon: 'layers',
     iconSize: 11,
     isPulsing: false,
-    valueText: quotaSum ? quotaSum.shortText : '—',
-    valueClass: quotaToneCls,
-    subText: quotaSum
-      ? t('ovMetric.subQuotaPool', { label: quotaSum.subLabelText })
-      : t('ovMetric.subQuotaPending'),
+    valueText: `${usedPct}%`,
+    valueClass: toneCls,
+    subText: t('ovMetric.subCtxRatio', {
+      used: formatTokens(totalTokens),
+      limit: formatTokens(limitTokens),
+    }),
     subClass: 'cell-sub',
   };
 }

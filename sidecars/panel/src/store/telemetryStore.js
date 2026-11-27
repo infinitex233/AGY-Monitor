@@ -42,10 +42,8 @@ import {
   OVERVIEW_MODULE_KEYS,
   STEP_TABLE_COLUMN_KEYS,
   TOPBAR_SLOT_KEYS,
-  normalizeAccountQuotaRefreshMinutes,
   normalizeCliStatusLineSlots,
   normalizeContextAgentMode,
-  normalizeExperimentalQuotaReservation,
   normalizeHoverModules,
   normalizeModelDisplayMode,
   normalizeOrchestratorIdMode,
@@ -57,7 +55,6 @@ import {
   normalizeStepTableColumns,
   normalizeStepTokenComboFormat,
   normalizeTopbarCapsuleSlots,
-  normalizeWeeklyLimitMode,
   normalizeWindowMountMode,
   parseStepTokenComboSegments,
   resolveEffectiveCliStatusLineSlots,
@@ -149,7 +146,6 @@ export const telemetryStore = createReactiveStore({
   selectedConversationId: initialConversationId,
   hostRouteConversationId: extractHostRouteCascadeId(),
   selectedTimeRange: 'today',
-  selectedCyclePool: 'all',
   customStartMs: Date.now() - 24 * 3600 * 1000,
   customEndMs: Date.now(),
   syncState: 'idle', // 'idle' | 'syncing' | 'synced' | 'error'
@@ -173,7 +169,7 @@ let lastPrefetchedUsageRevision = 0;
 let consumptionCacheScopeSig = '';
 const MAX_CONSUMPTION_RANGE_CACHE = 24;
 const MAX_CONVERSATION_VIEW_CACHE = 12;
-const CONSUMPTION_PRESET_KEYS = ['cycle', 'today', '24h', '7d', '14d', '30d', 'all'];
+const CONSUMPTION_PRESET_KEYS = ['today', '24h', '7d', '14d', '30d', 'all'];
 const consumptionRangeCache = new Map();
 const conversationViewCache = new Map();
 let lastReceivedSteps = null;
@@ -186,9 +182,6 @@ const pendingSettingsMutations = new Map();
 const recentCommittedSettings = new Map();
 
 const TELEMETRY_RECOMPUTE_SETTING_KEYS = new Set([
-  'weeklyLimitMode',
-  'weeklyTokenBudget',
-  'weeklyCostBudget',
   'windowMountMode',
   'enableWindowOverlay',
 ]);
@@ -196,15 +189,11 @@ const TELEMETRY_RECOMPUTE_SETTING_KEYS = new Set([
 function makeConsumptionRangeCacheKey(
   range,
   customStartMs = 0,
-  customEndMs = 0,
-  cyclePool = 'all'
+  customEndMs = 0
 ) {
   const key = String(range || 'all');
   if (key === 'custom') {
     return `custom:${Number(customStartMs || 0)}:${Number(customEndMs || 0)}`;
-  }
-  if (key === 'cycle' && cyclePool && cyclePool !== 'all') {
-    return `cycle:${String(cyclePool)}`;
   }
   return key;
 }
@@ -226,21 +215,8 @@ export function clearConversationViewCache() {
 function buildConsumptionScopeSig(payload) {
   if (!payload || typeof payload !== 'object') return '';
   const ep = payload.endpoint || {};
-  const acct = payload.account || {};
-  const set = payload.settings || {};
   const cloud = payload.cloudStatus || {};
-  return `${String(ep.id || LOCAL_ENDPOINT_ID)}|${String(acct.status || '')}|${String(acct.email || acct.name || '').toLowerCase()}|${String(set.weeklyLimitMode || '')}|${String(cloud.catalogVersion || '')}`;
-}
-
-function reconcileSelectedCyclePool(payload) {
-  const curPool = telemetryStore.getState().selectedCyclePool || 'all';
-  if (curPool === 'all') return;
-  const pools = payload?.quotas?.pools;
-  if (!Array.isArray(pools) || pools.length === 0) return;
-  const exists = pools.some((p) => String(p?.poolKey || p?.family || '') === curPool);
-  if (!exists) {
-    telemetryStore.setState({ selectedCyclePool: 'all' });
-  }
+  return `${String(ep.id || LOCAL_ENDPOINT_ID)}|${String(cloud.catalogVersion || '')}`;
 }
 
 function syncConsumptionCacheScope(payload) {
@@ -251,7 +227,6 @@ function syncConsumptionCacheScope(payload) {
     clearConversationViewCache();
   }
   consumptionCacheScopeSig = nextSig;
-  reconcileSelectedCyclePool(payload);
 }
 
 function recordConversationViewToCache(payload) {
@@ -261,8 +236,6 @@ function recordConversationViewToCache(payload) {
   const entry = {
     cascadeId: active.cascadeId,
     activeConversation: active,
-    activePool: payload.quotas?.activePool || null,
-    weekly: payload.quotas?.weekly || null,
     sessionConsumption: payload.consumption?.session || null,
     sessionPresets:
       payload.consumption?.sessionPresets ||
@@ -301,15 +274,6 @@ function resolveCachedConversationRootId(telemetry, effectiveConvId) {
 function applyConversationSliceToTelemetry(baseTelemetry, slice) {
   if (!baseTelemetry || !slice?.activeConversation) return baseTelemetry;
   const activeCidLower = String(slice.activeConversation.cascadeId || '').toLowerCase();
-  const prevQuotas = baseTelemetry.quotas || {};
-  const nextQuotas =
-    slice.activePool || slice.weekly
-      ? {
-          ...prevQuotas,
-          ...(slice.activePool ? { activePool: slice.activePool } : {}),
-          ...(slice.weekly ? { weekly: slice.weekly } : {}),
-        }
-      : prevQuotas;
 
   const prevCons = baseTelemetry.consumption || {};
   let nextPresets = prevCons.presets;
@@ -349,7 +313,6 @@ function applyConversationSliceToTelemetry(baseTelemetry, slice) {
     ...baseTelemetry,
     ...(slice.stepRevision ? { stepRevision: slice.stepRevision } : {}),
     activeConversation: slice.activeConversation,
-    quotas: nextQuotas,
     consumption: nextCons,
     ...(nextRunning ? { runningConversations: nextRunning } : {}),
   };
@@ -367,19 +330,14 @@ function putConsumptionRangeCacheEntry(cacheKey, entry) {
 function recordConsumptionSliceToCache(
   cons,
   modelBreakdown,
-  { customStartMs = 0, customEndMs = 0, cyclePool = 'all', usageRevision = 0 } = {}
+  { customStartMs = 0, customEndMs = 0, usageRevision = 0 } = {}
 ) {
   const rangeKey = String(cons?.selectedRange?.key || '');
   if (!rangeKey) return;
-  const resolvedPool =
-    rangeKey === 'cycle'
-      ? String(cons?.selectedRange?.pool || cyclePool || 'all')
-      : 'all';
   const cacheKey = makeConsumptionRangeCacheKey(
     rangeKey,
     rangeKey === 'custom' ? customStartMs || cons.selectedRange?.startMs || 0 : 0,
-    rangeKey === 'custom' ? customEndMs || cons.selectedRange?.endMs || 0 : 0,
-    resolvedPool
+    rangeKey === 'custom' ? customEndMs || cons.selectedRange?.endMs || 0 : 0
   );
   putConsumptionRangeCacheEntry(cacheKey, {
     revision: Number(cons.revision ?? usageRevision ?? 0),
@@ -496,8 +454,6 @@ export const normalizeClientPopoverWidth = normalizePopoverWidth;
 export const normalizeClientModelDisplayMode = normalizeModelDisplayMode;
 export const normalizeClientTopbarSlots = normalizeTopbarCapsuleSlots;
 export const normalizeClientContextAgentMode = normalizeContextAgentMode;
-export const normalizeClientExperimentalQuotaReservation = normalizeExperimentalQuotaReservation;
-export const normalizeClientAccountQuotaRefreshMinutes = normalizeAccountQuotaRefreshMinutes;
 export const normalizeClientCliStatusLineSlots = normalizeCliStatusLineSlots;
 
 /**
@@ -613,9 +569,6 @@ export function isEquivalentTelemetry(prev, next) {
   ) {
     return false;
   }
-  if (pSet?.weeklyLimitMode !== nSet?.weeklyLimitMode) return false;
-  if (pSet?.weeklyTokenBudget !== nSet?.weeklyTokenBudget) return false;
-  if (pSet?.weeklyCostBudget !== nSet?.weeklyCostBudget) return false;
   if ((pSet?.pluginUpdateMode ?? '') !== (nSet?.pluginUpdateMode ?? '')) return false;
   if (pSet?.autoUpdatePlugin !== nSet?.autoUpdatePlugin) return false;
   if (
@@ -648,21 +601,6 @@ export function isEquivalentTelemetry(prev, next) {
     return false;
   }
   if (Boolean(pSet?.showStepFilterToolbar) !== Boolean(nSet?.showStepFilterToolbar)) {
-    return false;
-  }
-  if (
-    normalizeClientExperimentalQuotaReservation(pSet?.experimentalQuotaReservation) !==
-    normalizeClientExperimentalQuotaReservation(nSet?.experimentalQuotaReservation)
-  ) {
-    return false;
-  }
-  if (
-    normalizeClientAccountQuotaRefreshMinutes(pSet?.accountQuotaRefreshMinutes) !==
-    normalizeClientAccountQuotaRefreshMinutes(nSet?.accountQuotaRefreshMinutes)
-  ) {
-    return false;
-  }
-  if (Boolean(pSet?.accountSwitchRiskAccepted) !== Boolean(nSet?.accountSwitchRiskAccepted)) {
     return false;
   }
   if (!sameArr(pSet?.topbarCapsuleSlots, nSet?.topbarCapsuleSlots)) return false;
@@ -944,10 +882,8 @@ export function isEquivalentTelemetry(prev, next) {
   const pRange = prev.consumption?.selectedRange;
   const nRange = next.consumption?.selectedRange;
   if (pRange?.key !== nRange?.key) return false;
-  if ((pRange?.pool || 'all') !== (nRange?.pool || 'all')) return false;
   if ((pRange?.label || '') !== (nRange?.label || '')) return false;
-  if (Boolean(pRange?.isFallbackWeek) !== Boolean(nRange?.isFallbackWeek)) return false;
-  if (nRange?.key === 'custom' || nRange?.key === 'cycle') {
+  if (nRange?.key === 'custom') {
     if (pRange?.startMs !== nRange?.startMs || pRange?.endMs !== nRange?.endMs) return false;
   }
 
@@ -1093,78 +1029,6 @@ export function isEquivalentTelemetry(prev, next) {
     }
   }
 
-  // 8. 比对账号订阅档位与动态多配额池
-  if (
-    prev.account?.email !== next.account?.email ||
-    prev.account?.name !== next.account?.name ||
-    prev.account?.status !== next.account?.status ||
-    prev.account?.tierId !== next.account?.tierId ||
-    prev.account?.tierName !== next.account?.tierName ||
-    prev.account?.tierMultiplier !== next.account?.tierMultiplier ||
-    prev.account?.planName !== next.account?.planName ||
-    prev.account?.aiCredits !== next.account?.aiCredits
-  ) {
-    return false;
-  }
-
-  if (
-    prev.quotas?.meta?.refreshFailed !== next.quotas?.meta?.refreshFailed ||
-    prev.quotas?.meta?.isStale !== next.quotas?.meta?.isStale
-  ) {
-    return false;
-  }
-
-  const pQuot = prev.quotas?.activePool;
-  const nQuot = next.quotas?.activePool;
-  if (pQuot?.family !== nQuot?.family) return false;
-  if (pQuot?.usedPct !== nQuot?.usedPct) return false;
-  if (pQuot?.remainingPct !== nQuot?.remainingPct) return false;
-  if (pQuot?.weeklyUsedPct !== nQuot?.weeklyUsedPct) return false;
-  if (pQuot?.weeklyRemainingPct !== nQuot?.weeklyRemainingPct) return false;
-  if (prev.quotas?.weekly?.usedPct !== next.quotas?.weekly?.usedPct) return false;
-  if (prev.quotas?.weekly?.remainingPct !== next.quotas?.weekly?.remainingPct) return false;
-  if (prev.quotas?.weekly?.tokens !== next.quotas?.weekly?.tokens) return false;
-  if (prev.quotas?.weekly?.costUsd !== next.quotas?.weekly?.costUsd) return false;
-  if (prev.quotas?.weekly?.calls !== next.quotas?.weekly?.calls) return false;
-  if (prev.quotas?.weekly?.unpricedCalls !== next.quotas?.weekly?.unpricedCalls) return false;
-  if (prev.quotas?.weekly?.resetTime !== next.quotas?.weekly?.resetTime) return false;
-
-  const pPools = prev.quotas?.pools || [];
-  const nPools = next.quotas?.pools || [];
-  if (pPools.length !== nPools.length) return false;
-  for (let i = 0; i < pPools.length; i++) {
-    if (
-      pPools[i]?.poolKey !== nPools[i]?.poolKey ||
-      pPools[i]?.poolLabel !== nPools[i]?.poolLabel ||
-      pPools[i]?.usedPct !== nPools[i]?.usedPct ||
-      pPools[i]?.remainingPct !== nPools[i]?.remainingPct ||
-      pPools[i]?.reservedPct !== nPools[i]?.reservedPct ||
-      pPools[i]?.reservedLeaseCount !== nPools[i]?.reservedLeaseCount ||
-      pPools[i]?.resetTime !== nPools[i]?.resetTime ||
-      pPools[i]?.weeklyUsedPct !== nPools[i]?.weeklyUsedPct ||
-      pPools[i]?.weeklyRemainingPct !== nPools[i]?.weeklyRemainingPct ||
-      pPools[i]?.weeklyReservedPct !== nPools[i]?.weeklyReservedPct ||
-      pPools[i]?.weeklyReservedLeaseCount !== nPools[i]?.weeklyReservedLeaseCount ||
-      pPools[i]?.weeklyResetTime !== nPools[i]?.weeklyResetTime ||
-      pPools[i]?.cycle5h?.tokens !== nPools[i]?.cycle5h?.tokens ||
-      pPools[i]?.cycle5h?.costUsd !== nPools[i]?.cycle5h?.costUsd ||
-      pPools[i]?.cycle5h?.calls !== nPools[i]?.cycle5h?.calls ||
-      pPools[i]?.cycleWeekly?.tokens !== nPools[i]?.cycleWeekly?.tokens ||
-      pPools[i]?.cycleWeekly?.costUsd !== nPools[i]?.cycleWeekly?.costUsd ||
-      pPools[i]?.cycleWeekly?.calls !== nPools[i]?.cycleWeekly?.calls ||
-      JSON.stringify(pPools[i]?.rateEstimate || null) !==
-        JSON.stringify(nPools[i]?.rateEstimate || null)
-    ) {
-      return false;
-    }
-  }
-  if (
-    JSON.stringify(prev.quotas?.weeklyCapacityEstimate || null) !==
-    JSON.stringify(next.quotas?.weeklyCapacityEstimate || null)
-  ) {
-    return false;
-  }
-
   const pConvs = prev.conversations || [];
   const nConvs = next.conversations || [];
   if (pConvs.length !== nConvs.length) return false;
@@ -1275,13 +1139,6 @@ export async function fetchTelemetry({ force = false } = {}) {
   const params = new URLSearchParams();
   if (effectiveConvId) params.set('conversationId', effectiveConvId);
   if (current.selectedTimeRange) params.set('range', current.selectedTimeRange);
-  if (
-    current.selectedTimeRange === 'cycle' &&
-    current.selectedCyclePool &&
-    current.selectedCyclePool !== 'all'
-  ) {
-    params.set('pool', current.selectedCyclePool);
-  }
   if (current.selectedTimeRange === 'custom') {
     if (current.customStartMs > 0) params.set('startMs', String(current.customStartMs));
     if (current.customEndMs > 0) params.set('endMs', String(current.customEndMs));
@@ -1329,7 +1186,6 @@ async function requestTelemetry(params, force) {
   const reqSeq = ++latestRequestSeq;
   const reqSettingsRev = settingsRevision;
   const reqRange = String(params.get('range') || '');
-  const reqPool = String(params.get('pool') || 'all');
   const reqStartMs = Number(params.get('startMs') || 0);
   const reqEndMs = Number(params.get('endMs') || 0);
   const startMs = Date.now();
@@ -1389,17 +1245,14 @@ async function requestTelemetry(params, force) {
       recordConsumptionSliceToCache(resolvedPayload.consumption, resolvedPayload.modelBreakdown, {
         customStartMs: reqStartMs,
         customEndMs: reqEndMs,
-        cyclePool: reqPool,
       });
     }
 
     const latestSt = telemetryStore.getState();
     const incomingRev = Number(resolvedPayload?.consumption?.revision || 0);
-    const activePoolPref = latestSt.selectedCyclePool || 'all';
     const matchesCurrentRange =
       !reqRange ||
       (reqRange === latestSt.selectedTimeRange &&
-        (reqRange !== 'cycle' || reqPool === activePoolPref) &&
         (reqRange !== 'custom' ||
           (reqStartMs === Number(latestSt.customStartMs || 0) &&
             reqEndMs === Number(latestSt.customEndMs || 0))));
@@ -1411,8 +1264,7 @@ async function requestTelemetry(params, force) {
       const activeKey = makeConsumptionRangeCacheKey(
         latestSt.selectedTimeRange,
         latestSt.customStartMs,
-        latestSt.customEndMs,
-        activePoolPref
+        latestSt.customEndMs
       );
       const cachedActive = consumptionRangeCache.get(activeKey);
       if (cachedActive) {
@@ -1421,9 +1273,7 @@ async function requestTelemetry(params, force) {
           needsSilentRangeRevalidate = true;
         }
       } else if (
-        latestSt.telemetry?.consumption?.selectedRange?.key === latestSt.selectedTimeRange &&
-        (latestSt.selectedTimeRange !== 'cycle' ||
-          (latestSt.telemetry?.consumption?.selectedRange?.pool || 'all') === activePoolPref)
+        latestSt.telemetry?.consumption?.selectedRange?.key === latestSt.selectedTimeRange
       ) {
         resolvedPayload = {
           ...resolvedPayload,
@@ -1475,7 +1325,6 @@ async function requestTelemetry(params, force) {
           range: latestSt.selectedTimeRange,
           customStartMs: latestSt.customStartMs,
           customEndMs: latestSt.customEndMs,
-          cyclePool: latestSt.selectedCyclePool || 'all',
         });
       }
       return resolvedPayload;
@@ -1501,20 +1350,15 @@ async function fetchConsumptionRangeSlice({
   range,
   customStartMs = 0,
   customEndMs = 0,
-  cyclePool = 'all',
 } = {}) {
   const reqEpoch = endpointSwitchEpoch;
   const reqSeq = ++latestConsumptionReqSeq;
   const targetRange = String(range || 'today');
-  const targetPool = targetRange === 'cycle' ? String(cyclePool || 'all') : 'all';
   const current = telemetryStore.getState();
   const effectiveConvId = current.selectedConversationId || current.hostRouteConversationId || '';
   const params = new URLSearchParams();
   if (effectiveConvId) params.set('conversationId', effectiveConvId);
   params.set('range', targetRange);
-  if (targetRange === 'cycle' && targetPool !== 'all') {
-    params.set('pool', targetPool);
-  }
   if (targetRange === 'custom') {
     if (customStartMs > 0) params.set('startMs', String(customStartMs));
     if (customEndMs > 0) params.set('endMs', String(customEndMs));
@@ -1533,7 +1377,6 @@ async function fetchConsumptionRangeSlice({
       recordConsumptionSliceToCache(payload.consumption, payload.modelBreakdown, {
         customStartMs,
         customEndMs,
-        cyclePool: targetPool,
         usageRevision: usageRev,
       });
       if (reqSeq !== latestConsumptionReqSeq) return payload;
@@ -1541,7 +1384,6 @@ async function fetchConsumptionRangeSlice({
       const latestSt = telemetryStore.getState();
       const stillMatches =
         latestSt.selectedTimeRange === targetRange &&
-        (targetRange !== 'cycle' || (latestSt.selectedCyclePool || 'all') === targetPool) &&
         (targetRange !== 'custom' ||
           (Number(latestSt.customStartMs || 0) === Number(customStartMs || 0) &&
             Number(latestSt.customEndMs || 0) === Number(customEndMs || 0)));
@@ -1647,13 +1489,6 @@ export async function selectConversation(
   const params = new URLSearchParams();
   if (effectiveConvId) params.set('conversationId', effectiveConvId);
   if (current.selectedTimeRange) params.set('range', current.selectedTimeRange);
-  if (
-    current.selectedTimeRange === 'cycle' &&
-    current.selectedCyclePool &&
-    current.selectedCyclePool !== 'all'
-  ) {
-    params.set('pool', current.selectedCyclePool);
-  }
   if (current.selectedTimeRange === 'custom') {
     if (current.customStartMs > 0) params.set('startMs', String(current.customStartMs));
     if (current.customEndMs > 0) params.set('endMs', String(current.customEndMs));
@@ -1701,8 +1536,6 @@ export async function selectConversation(
       if (baseTelemetry) {
         const mergedTelemetry = applyConversationSliceToTelemetry(baseTelemetry, {
           activeConversation: active,
-          activePool: payload.quotas?.activePool || null,
-          weekly: payload.quotas?.weekly || null,
           sessionConsumption: payload.consumption?.session || null,
           sessionPresets: payload.consumption?.sessionPresets || null,
           stepRevision: payload.stepRevision || '',
@@ -1760,7 +1593,7 @@ export async function selectConversation(
  */
 export function selectConsumptionTimeRange(
   nextRange,
-  { customStartMs = undefined, customEndMs = undefined, cyclePool = undefined } = {}
+  { customStartMs = undefined, customEndMs = undefined } = {}
 ) {
   const targetRange = String(nextRange || 'today');
   const prevSt = telemetryStore.getState();
@@ -1772,15 +1605,8 @@ export function selectConsumptionTimeRange(
     targetRange === 'custom'
       ? Number(customEndMs !== undefined ? customEndMs : prevSt.customEndMs || 0)
       : prevSt.customEndMs;
-  const nextCyclePool =
-    targetRange === 'cycle'
-      ? String(cyclePool !== undefined ? cyclePool || 'all' : prevSt.selectedCyclePool || 'all')
-      : prevSt.selectedCyclePool || 'all';
 
   const statePatch = { selectedTimeRange: targetRange };
-  if (cyclePool !== undefined) {
-    statePatch.selectedCyclePool = nextCyclePool;
-  }
   if (targetRange === 'custom') {
     statePatch.customStartMs = nextStartMs;
     statePatch.customEndMs = nextEndMs;
@@ -1789,8 +1615,7 @@ export function selectConsumptionTimeRange(
   const cacheKey = makeConsumptionRangeCacheKey(
     targetRange,
     nextStartMs,
-    nextEndMs,
-    targetRange === 'cycle' ? nextCyclePool : 'all'
+    nextEndMs
   );
   const cached = consumptionRangeCache.get(cacheKey);
   const prevTelemetry = prevSt.telemetry;
@@ -1810,7 +1635,6 @@ export function selectConsumptionTimeRange(
       range: targetRange,
       customStartMs: nextStartMs,
       customEndMs: nextEndMs,
-      cyclePool: nextCyclePool,
     });
   }
 
@@ -1819,16 +1643,11 @@ export function selectConsumptionTimeRange(
     range: targetRange,
     customStartMs: nextStartMs,
     customEndMs: nextEndMs,
-    cyclePool: nextCyclePool,
   });
 }
 
-export function selectConsumptionCyclePool(nextPool = 'all') {
-  return selectConsumptionTimeRange('cycle', { cyclePool: String(nextPool || 'all') });
-}
-
 /**
- * 仅在进入「用量统计」视图时触发一次静默后台预取，拉齐全部 7 个预设区间到前端缓存以实现 0ms 瞬切。
+ * 仅在进入「用量统计」视图时触发一次静默后台预取，拉齐全部 6 个预设区间到前端缓存以实现 0ms 瞬切。
  */
 export function prefetchConsumptionPresets() {
   const prevTelemetry = telemetryStore.getState().telemetry;
@@ -1899,9 +1718,6 @@ export async function saveSettingsPatch(patch) {
   } else if (Object.prototype.hasOwnProperty.call(safePatch, 'experimentalModernUi')) {
     safePatch.experimentalModernUi = normalizeClientModernUi(safePatch.experimentalModernUi);
   }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'weeklyLimitMode')) {
-    safePatch.weeklyLimitMode = normalizeWeeklyLimitMode(safePatch.weeklyLimitMode);
-  }
   if (Object.prototype.hasOwnProperty.call(safePatch, 'enableCliStatusLine')) {
     safePatch.enableCliStatusLine = Boolean(safePatch.enableCliStatusLine);
   }
@@ -1922,19 +1738,6 @@ export async function saveSettingsPatch(patch) {
   }
   if (Object.prototype.hasOwnProperty.call(safePatch, 'showStepFilterToolbar')) {
     safePatch.showStepFilterToolbar = Boolean(safePatch.showStepFilterToolbar);
-  }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'experimentalQuotaReservation')) {
-    safePatch.experimentalQuotaReservation = normalizeClientExperimentalQuotaReservation(
-      safePatch.experimentalQuotaReservation
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'accountQuotaRefreshMinutes')) {
-    safePatch.accountQuotaRefreshMinutes = normalizeClientAccountQuotaRefreshMinutes(
-      safePatch.accountQuotaRefreshMinutes
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'accountSwitchRiskAccepted')) {
-    safePatch.accountSwitchRiskAccepted = Boolean(safePatch.accountSwitchRiskAccepted);
   }
   if (Object.prototype.hasOwnProperty.call(safePatch, 'topbarCapsuleSlots')) {
     safePatch.topbarCapsuleSlots = normalizeClientTopbarSlots(safePatch.topbarCapsuleSlots);
@@ -2088,14 +1891,6 @@ export async function saveSettingsPatch(patch) {
   }
 
   const needsTelemetryRecompute = patchKeys.some((k) => TELEMETRY_RECOMPUTE_SETTING_KEYS.has(k));
-  if (
-    Object.prototype.hasOwnProperty.call(safePatch, 'weeklyLimitMode') ||
-    Object.prototype.hasOwnProperty.call(safePatch, 'weeklyTokenBudget') ||
-    Object.prototype.hasOwnProperty.call(safePatch, 'weeklyCostBudget')
-  ) {
-    clearConsumptionRangeCache();
-    clearConversationViewCache();
-  }
   if (needsTelemetryRecompute) {
     inFlightTelemetryPoll = null;
     void fetchTelemetry({ force: false });

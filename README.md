@@ -94,7 +94,7 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
 - **Version-First Compact Model Labels**: Cleaner short identifiers like `4-hydrogen-high` and `4-neon-high`.
 
 ### 3. Analytics: Trends, Full-Fit 6-Month Heatmap & Leaderboards
-- **Preset & Custom Windows**: Inspect **Cycle**, **Today**, **24h**, **7d**, **14d**, **30d**, **All**, or custom date spans.
+- **Preset & Custom Windows**: Inspect **Today**, **24h**, **7d**, **14d**, **30d**, **All**, or custom date spans.
 - **Token Composition & Breakdown Bar**: Input, cache read, and output totals paired with color-coded legend dots and a proportional segment bar.
 - **Full-Fit 6-Month Calendar Heatmap**: Selecting **All** renders a 26-week daily activity heatmap scaled cleanly to the panel width with zero edge clipping or horizontal scrolling; shorter windows display smooth cubic Bezier trend curves.
 - **Multi-Dimensional Rankings**: Compare usage, estimated USD cost, cache hit %, speed, and TTFT across models, project workspaces, and sessions, with `.xlsx` and Markdown export support.

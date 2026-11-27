@@ -277,7 +277,6 @@ export function buildCapsuleSlotContext(
         : null,
     latestPromptTokens: capActive.latestPromptTokens ?? null,
     sessionTokens,
-    quotas: data.quotas,
   };
 }
 

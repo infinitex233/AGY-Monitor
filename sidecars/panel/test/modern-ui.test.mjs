@@ -372,17 +372,14 @@ test('SegmentedControl variable-width glider snaps cleanly on reveal and glides 
   assert.equal(liveWidget.el.querySelector('.live-sub-list').hasAttribute('hidden'), false);
   liveWidget.destroy();
 
-  // 7. ConsumptionView places '周期' ('cycle') before '今天' ('today'), while defaulting active selection to 'today'
+  // 7. ConsumptionView places '今天' ('today') first and defaults active selection to 'today'
   assert.equal(telemetryStore.getState().selectedTimeRange, 'today');
   setI18nLanguage('zh-CN');
   const consView = ConsumptionView({});
   const rangeBtns = consView.el.querySelector('.cons-overview-head').querySelectorAll('.seg-btn');
-  assert.equal(rangeBtns[0].getAttribute('data-seg-value'), 'cycle');
-  assert.equal(rangeBtns[0].textContent, '周期');
-  assert.equal(rangeBtns[1].getAttribute('data-seg-value'), 'today');
-  assert.equal(rangeBtns[1].textContent, '今天');
-  assert.equal(rangeBtns[0].classList.contains('is-active'), false);
-  assert.equal(rangeBtns[1].classList.contains('is-active'), true, 'Default active range remains today');
+  assert.equal(rangeBtns[0].getAttribute('data-seg-value'), 'today');
+  assert.equal(rangeBtns[0].textContent, '今天');
+  assert.equal(rangeBtns[0].classList.contains('is-active'), true, 'Default active range remains today');
   consView.destroy();
 
   // 8. StepsDetailView inlineScopeSelect ('全部汇总') omits unnecessary leading SVG icon

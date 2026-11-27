@@ -744,17 +744,6 @@
   text-overflow: ellipsis;
 }
 
-.wm-hover-quota-pools {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.wm-hover-quota-foot {
-  font-size: var(--fs-md);
-  padding-top: 2px;
-}
-
 .wm-pin-badge {
   display: inline-flex;
   align-items: center;

@@ -5,12 +5,12 @@
  * 1. 秒级合并三路数据源：
  *    - `stdin` 实时状态（`agent_state`、`context_window.used_percentage`、`cost`、`subagents`、`cwd`）；
  *    - `~/.gemini/antigravity-cli/conversations/<cid>.db` 最新一步的纳秒级 `TPS` / `TTFT` / 缓存命中率；
- *    - `DATA_DIR/cli-status-snapshot.json` 中的官方配额池余量与跨端在线会话计数；
+ *    - `DATA_DIR/cli-status-snapshot.json` 中的跨端在线会话计数与性能快照；
  * 2. 联动用户偏好设置中的胶囊槽位顺序（`topbarCapsuleSlots`）与开关（`enableCliStatusLine`），
  *    向 `stdout` 输出单行 24-bit ANSI 状态胶囊。
  *
  * 同时支持直接在 `/statusline` 命令末尾传入定制参数，及手动管理命令：
- * - `--slots tps,ttft,cache_hit,session_cost,quota_auto,context`（支持预设名 `compact` / `balanced` / `full` / `auto`）
+ * - `--slots tps,ttft,cache_hit,session_cost,context`（支持预设名 `compact` / `balanced` / `full` / `auto`）
  * - `--preset compact|balanced|full`
  * - `--multi` / `--no-multi`（开关多会话计数指示）
  * - `--anomaly` / `--no-anomaly`（开关最近一步异常角标）
@@ -59,12 +59,10 @@ import {
   saveJson,
 } from './backend/config.mjs';
 import { computeStepCost, createStepModelResolver } from './backend/model-pricing.mjs';
-import { isThirdPartyPoolText } from './shared/telemetry-display-rules.mjs';
 import { normalizePathForWorkspaceMatch } from './shared/workspace-uri.mjs';
 
 const CLI_RUNNING_STALE_MS = 10 * 60 * 1000;
 const SNAPSHOT_LIVE_RUNNING_TTL_MS = 20 * 1000;
-const SNAPSHOT_QUOTA_TTL_MS = 6 * 3600 * 1000;
 
 function loadFreshestCliStatusSnapshot(geminiBase) {
   if (String(process.env.USAGE_MONITOR_DATA_DIR || '').trim()) {
@@ -718,79 +716,6 @@ export function resolveCliLocalSessionMetrics({
   };
 }
 
-function buildStdinFallbackQuotas(stdinData) {
-  const rawQuota = stdinData?.quota;
-  if (!rawQuota || typeof rawQuota !== 'object' || Array.isArray(rawQuota)) {
-    return null;
-  }
-  const pools = [];
-  for (const [key, bucket] of Object.entries(rawQuota)) {
-    if (!bucket || typeof bucket !== 'object' || bucket.disabled) continue;
-    const frac = Number(bucket.remaining_fraction);
-    if (!Number.isFinite(frac)) continue;
-    const remainingPct = Math.max(0, Math.min(100, Math.round(frac * 100)));
-    const isThirdParty = isThirdPartyPoolText(key);
-    pools.push({
-      poolKey: isThirdParty ? 'Claude & GPT' : 'Gemini',
-      poolLabel: key,
-      family: isThirdParty ? 'claude' : 'gemini',
-      remainingPct,
-    });
-  }
-  if (pools.length === 0) return null;
-  const modelStr = String(stdinData?.model?.id || stdinData?.model?.display_name || '');
-  const activeIsThirdParty = isThirdPartyPoolText(modelStr);
-  const matchingPools = pools.filter((p) =>
-    activeIsThirdParty ? p.poolKey === 'Claude & GPT' : p.poolKey === 'Gemini'
-  );
-  const activePool = (matchingPools.length > 0 ? matchingPools : pools).reduce((minP, cur) =>
-    cur.remainingPct < minP.remainingPct ? cur : minP
-  );
-  return {
-    activePool,
-    pools,
-  };
-}
-
-function selectCliActiveQuotaPool(quotas, modelHint = '') {
-  if (!quotas || typeof quotas !== 'object') return quotas || null;
-  const pools = Array.isArray(quotas.pools) ? quotas.pools : [];
-  const hint = String(modelHint || '').trim();
-  if (!hint || pools.length <= 1) return quotas;
-
-  const hintLower = hint.toLowerCase();
-  const baseHint = hintLower.replace(/\s*\([^)]*\)\s*$/, '').trim();
-
-  // 1. 优先按配额池内置模型清单精确/前缀匹配
-  const exactPool = pools.find((p) => {
-    const models = Array.isArray(p?.models) ? p.models : [];
-    return models.some((m) => {
-      const ml = String(m || '').trim().toLowerCase();
-      return ml === hintLower || (baseHint && ml.startsWith(baseHint));
-    });
-  });
-  if (exactPool) {
-    return { ...quotas, activePool: exactPool };
-  }
-
-  // 2. 按模型家族匹配（Claude & GPT / Carbon / Argon / Gemini）
-  const wantThirdParty = isThirdPartyPoolText(hint);
-  const familyMatched = pools.filter((p) => {
-    const pk = String(p?.poolKey || p?.poolLabel || p?.family || '').toLowerCase();
-    if (wantThirdParty) return isThirdPartyPoolText(pk);
-    if (/\bcarbon\b/i.test(hint) && pk.includes('carbon')) return true;
-    if (/\bargon\b/i.test(hint) && pk.includes('argon')) return true;
-    return !isThirdPartyPoolText(pk) && (pk.includes('gemini') || pk === 'default');
-  });
-  if (familyMatched.length > 0) {
-    const activePool = familyMatched.reduce((minP, cur) =>
-      Number(cur?.remainingPct ?? 100) < Number(minP?.remainingPct ?? 100) ? cur : minP
-    );
-    return { ...quotas, activePool };
-  }
-  return quotas;
-}
-
 /**
  * 解析通过 `/statusline` 传入 `cli-statusline.mjs` 的命令行参数。
  *
@@ -865,8 +790,8 @@ export function buildPersistableStatusLineFlags(parsed) {
 
 function formatCliStatusLineHelp() {
   return [
-    'Antigravity Usage Monitor - CLI statusLine options:',
-    '  --slots <list|auto>         Custom 1-6 slots (e.g. tps,ttft,session_cost,quota_auto,context)',
+    'AGY Monitor - CLI statusLine options:',
+    '  --slots <list|auto>         Custom 1-6 slots (e.g. tps,ttft,cache_hit,session_cost,context)',
     '  --preset compact|balanced|full',
     '                              Built-in slot presets (3 / 5 / 6 slots)',
     '  --style pill|bar|compact    Gauge style (24-bit pill / transparent bar / plain text)',
@@ -882,7 +807,7 @@ function formatCliStatusLineHelp() {
 }
 
 /**
- * 融合 `stdin` (`StatusLineData`)、本地 CLI SQLite 步骤指标及后台守护配额快照，生成胶囊上下文。
+ * 融合 `stdin` (`StatusLineData`)、本地 CLI SQLite 步骤指标及后台守护快照，生成胶囊上下文。
  */
 export function buildMergedCliCapsuleContext({
   stdinData = null,
@@ -928,7 +853,6 @@ export function buildMergedCliCapsuleContext({
       ? Math.max(0, nowMs - Number(snapshot.updatedAtMs))
       : Infinity;
   const snapLiveFresh = snapAgeMs <= SNAPSHOT_LIVE_RUNNING_TTL_MS;
-  const snapQuotaFresh = snapAgeMs <= SNAPSHOT_QUOTA_TTL_MS;
 
   const baseRunning = snapLiveFresh
     ? Math.max(0, Number(snapshot?.runningCount || 0))
@@ -1003,15 +927,8 @@ export function buildMergedCliCapsuleContext({
       ? snapshot.activeConversation
       : null;
 
-  const activeModelHint = String(
-    stdinData?.model?.display_name || stdinData?.model?.id || localMetrics?.latestModelHint || ''
-  ).trim();
-  const rawQuotas =
-    (snapQuotaFresh && snapshot?.quotas) || buildStdinFallbackQuotas(stdinData) || null;
-  const mergedQuotas = selectCliActiveQuotaPool(rawQuotas, activeModelHint);
-
   const hasTelemetry = Boolean(
-    stdinData || localMetrics?.found || snapActive || mergedQuotas
+    stdinData || localMetrics?.found || snapActive
   );
   const resolvedStepCount = localMetrics?.found
     ? Number(localMetrics.stepCount || 0)
@@ -1041,7 +958,6 @@ export function buildMergedCliCapsuleContext({
     latestAnomaly: localMetrics?.latestAnomaly ?? snapActive?.latestAnomaly ?? null,
     sessionAnomalyCount:
       localMetrics?.sessionAnomalyCount ?? snapActive?.sessionAnomalyCount ?? 0,
-    quotas: mergedQuotas,
   };
 }
 

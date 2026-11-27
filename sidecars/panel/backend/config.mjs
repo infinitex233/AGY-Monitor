@@ -52,7 +52,6 @@ export {
   createDefaultSettingsObject,
   normalizeCliStatusLineSlots,
   normalizeContextAgentMode,
-  normalizeExperimentalQuotaReservation,
   normalizeFontScale,
   normalizeFullSettings,
   normalizeHoverModules,
@@ -70,7 +69,6 @@ export {
   normalizeStepTokenComboFormat,
   normalizeThemeAccent,
   normalizeTopbarCapsuleSlots,
-  normalizeWeeklyLimitMode,
   normalizeWindowMountMode,
   parseStepTokenComboSegments,
   resolveEffectiveCliStatusLineSlots,
@@ -168,8 +166,6 @@ export const CACHE_FILE = join(DATA_DIR, 'trajectory_usage_cache.json');
 export const TRAJECTORY_DB_FILE = join(DATA_DIR, 'trajectory_store.sqlite');
 export const REMOTE_CATALOG_CACHE_FILE = join(DATA_DIR, 'remote_pricing_cache.json');
 export const CLI_STATUS_SNAPSHOT_FILE = join(DATA_DIR, 'cli-status-snapshot.json');
-export const QUOTA_RESERVATION_STATE_FILE = join(DATA_DIR, 'quota_reservation_state.json');
-export const ACCOUNT_QUOTA_HISTORY_FILE = join(DATA_DIR, 'account_quota_history.json');
 
 /**
  * 本地对话记录目录、脑图日志目录、守护发现目录与跨端深层统计缓存路径候选列表（联合覆盖 Desktop / CLI / IDE）。
@@ -496,16 +492,6 @@ export const localSummaryMemo = {
 /** 并发请求去重表（防止同一参数并发重复拉取）。 */
 export const inFlightRequests = new Map();
 
-/** 官方配额摘要 10 秒短期缓存与失败退避冷却记录。 */
-export const quotaSummaryCache = {
-  ts: 0,
-  lastAttemptTs: 0,
-  accountName: '',
-  accountGeneration: 0,
-  data: null,
-  error: null,
-};
-
 /** 云端价格与版本目录同步状态。 */
 export const cloudSyncState = {
   catalogVersion: 'builtin',
@@ -534,7 +520,7 @@ export const pluginUpdateState = {
 };
 
 /**
- * 清空内存态轨迹缓存、外部深层统计 Memo 与配额摘要短期缓存，并将磁盘缓存重置为空对象。
+ * 清空内存态轨迹缓存与外部深层统计 Memo，并将磁盘缓存重置为空对象。
  * 空缓存落盘成功后再清理内存，写入失败时可继续使用内存数据并重试。
  *
  * @returns {boolean} 是否成功写回空白缓存文件
@@ -549,11 +535,5 @@ export function clearRuntimeCaches(options = {}) {
   localSummaryMemo.summariesObj = {};
   localSummaryMemo.sideQuestionParents = {};
   localSummaryMemo.byRootsKey.clear();
-  quotaSummaryCache.ts = 0;
-  quotaSummaryCache.lastAttemptTs = 0;
-  quotaSummaryCache.accountName = '';
-  quotaSummaryCache.accountGeneration += 1;
-  quotaSummaryCache.data = null;
-  quotaSummaryCache.error = null;
   return true;
 }

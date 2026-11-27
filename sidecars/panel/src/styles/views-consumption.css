@@ -520,16 +520,14 @@
     width 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.cons-view-stage .progress-fill,
-.account-cards-stack .progress-fill {
+.cons-view-stage .progress-fill {
   transition: width 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @starting-style {
   .cons-view-stage.is-ready .progress-seg,
   .cons-view-stage.is-ready .progress-fill,
-  .models-analytics-pane .progress-seg,
-  .account-cards-stack .progress-fill {
+  .models-analytics-pane .progress-seg {
     width: 0%;
   }
 }
@@ -556,7 +554,6 @@
   .cons-view-stage .progress-seg,
   .cons-view-stage .progress-fill,
   .models-analytics-pane .progress-seg,
-  .account-cards-stack .progress-fill,
   .trend-peak-pill.is-ready,
   .trend-hm-cell,
   .trend-tooltip.is-tracking,

@@ -2,7 +2,7 @@
 'use strict';
 
 // --- shared/settings-normalization.mjs ---
-const { SUPPORTED_LANGUAGES, THEME_ACCENT_KEYS, FONT_SCALE_KEYS, TOPBAR_SLOT_KEYS, DEFAULT_TOPBAR_SLOTS, MIN_TOPBAR_SLOTS, MAX_TOPBAR_SLOTS, DEFAULT_CLI_STATUSLINE_SLOTS, MIN_CLI_STATUSLINE_SLOTS, MAX_CLI_STATUSLINE_SLOTS, CLI_STATUSLINE_PRESETS, OVERVIEW_MODULE_KEYS, DEFAULT_OVERVIEW_MODULES, DEFAULT_HOVER_MODULES, OVERVIEW_METRIC_KEYS, DEFAULT_OVERVIEW_METRICS, STEP_TABLE_COLUMN_KEYS, DEFAULT_STEP_TABLE_COLUMNS, DEFAULT_STEP_TOKEN_COMBO_FORMAT, STEP_TOKEN_SEGMENT_ALIASES, POPOVER_WIDTH_MODES, MIN_POPOVER_WIDTH, MAX_POPOVER_WIDTH, DEFAULT_POPOVER_WIDTH, normalizeLanguageSetting, normalizeThemeAccent, normalizeFontScale, normalizeModelDisplayMode, normalizeOrchestratorIdMode, normalizePopoverWidthMode, normalizePopoverWidth, parseStepTokenComboSegments, normalizeStepTokenComboFormat, normalizePluginUpdateMode, normalizeWindowMountMode, normalizeWeeklyLimitMode, normalizeTopbarCapsuleSlots, normalizeCliStatusLineSlots, resolveEffectiveCliStatusLineSlots, normalizeOverviewMetrics, normalizeOverviewModules, normalizeHoverModules, normalizeStepTableColumns, normalizeStandalonePort, normalizeModernUi, CONTEXT_AGENT_MODES, DEFAULT_CONTEXT_AGENT_MODE, ACCOUNT_QUOTA_REFRESH_MINUTES, DEFAULT_ACCOUNT_QUOTA_REFRESH_MINUTES, normalizeAccountQuotaRefreshMinutes, normalizeContextAgentMode, normalizeExperimentalQuotaReservation, normalizeExperimentalModernUi } = (() => {
+const { SUPPORTED_LANGUAGES, THEME_ACCENT_KEYS, FONT_SCALE_KEYS, TOPBAR_SLOT_KEYS, DEFAULT_TOPBAR_SLOTS, MIN_TOPBAR_SLOTS, MAX_TOPBAR_SLOTS, DEFAULT_CLI_STATUSLINE_SLOTS, MIN_CLI_STATUSLINE_SLOTS, MAX_CLI_STATUSLINE_SLOTS, CLI_STATUSLINE_PRESETS, OVERVIEW_MODULE_KEYS, DEFAULT_OVERVIEW_MODULES, DEFAULT_HOVER_MODULES, OVERVIEW_METRIC_KEYS, DEFAULT_OVERVIEW_METRICS, STEP_TABLE_COLUMN_KEYS, DEFAULT_STEP_TABLE_COLUMNS, DEFAULT_STEP_TOKEN_COMBO_FORMAT, STEP_TOKEN_SEGMENT_ALIASES, POPOVER_WIDTH_MODES, MIN_POPOVER_WIDTH, MAX_POPOVER_WIDTH, DEFAULT_POPOVER_WIDTH, normalizeLanguageSetting, normalizeThemeAccent, normalizeFontScale, normalizeModelDisplayMode, normalizeOrchestratorIdMode, normalizePopoverWidthMode, normalizePopoverWidth, parseStepTokenComboSegments, normalizeStepTokenComboFormat, normalizePluginUpdateMode, normalizeWindowMountMode, normalizeTopbarCapsuleSlots, normalizeCliStatusLineSlots, resolveEffectiveCliStatusLineSlots, normalizeOverviewMetrics, normalizeOverviewModules, normalizeHoverModules, normalizeStepTableColumns, normalizeStandalonePort, normalizeModernUi, CONTEXT_AGENT_MODES, DEFAULT_CONTEXT_AGENT_MODE, normalizeContextAgentMode, normalizeExperimentalModernUi } = (() => {
 /**
  * @fileoverview 前后端与 CLI 共用的偏好设置枚举常量、默认值与无状态纯函数归一化规则。
  */
@@ -30,12 +30,6 @@ const TOPBAR_SLOT_KEYS = Object.freeze([
   'session_cost',
   'cache_hit',
   'session_tokens',
-  'quota_auto',
-  'gemini_5h',
-  'gemini_weekly',
-  'argon_weekly',
-  'claude_5h',
-  'claude_weekly',
 ]);
 
 const DEFAULT_TOPBAR_SLOTS = Object.freeze(['tps', 'ttft', 'context']);
@@ -45,8 +39,8 @@ const MAX_TOPBAR_SLOTS = 5;
 const DEFAULT_CLI_STATUSLINE_SLOTS = Object.freeze([
   'tps',
   'ttft',
+  'cache_hit',
   'session_cost',
-  'quota_auto',
   'context',
 ]);
 const MIN_CLI_STATUSLINE_SLOTS = 1;
@@ -54,24 +48,22 @@ const MAX_CLI_STATUSLINE_SLOTS = 6;
 const CLI_STATUSLINE_PRESETS = Object.freeze({
   compact: Object.freeze(['tps', 'ttft', 'context']),
   balanced: DEFAULT_CLI_STATUSLINE_SLOTS,
-  full: Object.freeze(['tps', 'ttft', 'cache_hit', 'session_cost', 'quota_auto', 'context']),
+  full: Object.freeze(['tps', 'ttft', 'avg_tps', 'cache_hit', 'session_cost', 'context']),
 });
 
 const OVERVIEW_MODULE_KEYS = Object.freeze([
   'metrics',
   'context',
-  'quotas',
   'live_tasks',
 ]);
 
 const DEFAULT_OVERVIEW_MODULES = Object.freeze([
   'metrics',
   'context',
-  'quotas',
   'live_tasks',
 ]);
 
-const DEFAULT_HOVER_MODULES = Object.freeze(['metrics', 'context', 'quotas']);
+const DEFAULT_HOVER_MODULES = Object.freeze(['metrics', 'context']);
 
 const OVERVIEW_METRIC_KEYS = Object.freeze([
   'tps',
@@ -84,7 +76,6 @@ const OVERVIEW_METRIC_KEYS = Object.freeze([
   'cache_hit',
   'session_tokens',
   'context_usage',
-  'quota_tightest',
 ]);
 
 const DEFAULT_OVERVIEW_METRICS = Object.freeze([
@@ -319,19 +310,6 @@ function normalizeWindowMountMode(mode, legacyEnableOverlay) {
 }
 
 /**
- * 归一化每周额度统计模式枚举（`'official'` | `'custom_tokens'` | `'custom_cost'`）。
- *
- * @param {unknown} mode
- * @returns {'official'|'custom_tokens'|'custom_cost'}
- */
-function normalizeWeeklyLimitMode(mode) {
-  const m = String(mode || '').trim().toLowerCase();
-  if (m === 'custom_tokens' || m === 'tokens') return 'custom_tokens';
-  if (m === 'custom_cost' || m === 'cost') return 'custom_cost';
-  return 'official';
-}
-
-/**
  * 归一化顶栏/输入框胶囊槽位数组（1~5 项动态自添加，默认 3 项，自动清洗历史 `'none'` 与重复项）。
  *
  * @param {unknown} raw
@@ -401,7 +379,7 @@ function normalizeCliStatusLineSlots(raw) {
  * 解析当前生效的 CLI 底栏槽位列表：
  * 1. 若用户显式设置了 `cliStatusLineSlots`，优先使用；
  * 2. 若用户自定义了非默认 `topbarCapsuleSlots`，沿用其自定义顺序保持兼容；
- * 3. 否则采用面向宽终端的 5 槽默认组合（速度 / 首字 / 费用 / 配额 / 上下文）。
+ * 3. 否则采用面向宽终端的 5 槽默认组合（速度 / 首字 / 缓存 / 费用 / 上下文）。
  *
  * @param {object|null|undefined} settings
  * @returns {string[]}
@@ -552,22 +530,6 @@ function normalizeModernUi(val) {
 const CONTEXT_AGENT_MODES = Object.freeze(['main', 'auto']);
 const DEFAULT_CONTEXT_AGENT_MODE = 'main';
 
-const ACCOUNT_QUOTA_REFRESH_MINUTES = Object.freeze([10, 30, 60, 180, 360, 720, 1440]);
-const DEFAULT_ACCOUNT_QUOTA_REFRESH_MINUTES = 60;
-
-/**
- * 归一化非当前账号的后台配额刷新间隔（分钟，默认 `60` 即 1 小时）。
- *
- * @param {unknown} raw
- * @returns {10|30|60|180|360|720|1440}
- */
-function normalizeAccountQuotaRefreshMinutes(raw) {
-  const num = Number(raw);
-  return ACCOUNT_QUOTA_REFRESH_MINUTES.includes(num)
-    ? /** @type {any} */ (num)
-    : DEFAULT_ACCOUNT_QUOTA_REFRESH_MINUTES;
-}
-
 /**
  * 归一化顶栏胶囊及悬停速览浮窗的上下文代理来源（默认 `'main'` 锁定主代理，可选 `'auto'` 跟随活跃）。
  *
@@ -577,23 +539,6 @@ function normalizeAccountQuotaRefreshMinutes(raw) {
 function normalizeContextAgentMode(raw) {
   const val = String(raw || '').trim().toLowerCase();
   return val === 'auto' ? 'auto' : 'main';
-}
-
-/**
- * 归一化配额预占估算开关（默认 `true`）。
- *
- * @param {unknown} val
- * @returns {boolean}
- */
-function normalizeExperimentalQuotaReservation(val) {
-  if (val === undefined || val === null || val === '') return true;
-  if (typeof val === 'string') {
-    const lower = val.trim().toLowerCase();
-    if (lower === 'false' || lower === '0' || lower === 'off') return false;
-    if (lower === 'true' || lower === '1' || lower === 'on') return true;
-    return true;
-  }
-  return Boolean(val);
 }
 
 /**
@@ -609,27 +554,14 @@ function normalizeExperimentalModernUi(val) {
   }
   return Boolean(val);
 }
-return { SUPPORTED_LANGUAGES, THEME_ACCENT_KEYS, FONT_SCALE_KEYS, TOPBAR_SLOT_KEYS, DEFAULT_TOPBAR_SLOTS, MIN_TOPBAR_SLOTS, MAX_TOPBAR_SLOTS, DEFAULT_CLI_STATUSLINE_SLOTS, MIN_CLI_STATUSLINE_SLOTS, MAX_CLI_STATUSLINE_SLOTS, CLI_STATUSLINE_PRESETS, OVERVIEW_MODULE_KEYS, DEFAULT_OVERVIEW_MODULES, DEFAULT_HOVER_MODULES, OVERVIEW_METRIC_KEYS, DEFAULT_OVERVIEW_METRICS, STEP_TABLE_COLUMN_KEYS, DEFAULT_STEP_TABLE_COLUMNS, DEFAULT_STEP_TOKEN_COMBO_FORMAT, STEP_TOKEN_SEGMENT_ALIASES, POPOVER_WIDTH_MODES, MIN_POPOVER_WIDTH, MAX_POPOVER_WIDTH, DEFAULT_POPOVER_WIDTH, normalizeLanguageSetting, normalizeThemeAccent, normalizeFontScale, normalizeModelDisplayMode, normalizeOrchestratorIdMode, normalizePopoverWidthMode, normalizePopoverWidth, parseStepTokenComboSegments, normalizeStepTokenComboFormat, normalizePluginUpdateMode, normalizeWindowMountMode, normalizeWeeklyLimitMode, normalizeTopbarCapsuleSlots, normalizeCliStatusLineSlots, resolveEffectiveCliStatusLineSlots, normalizeOverviewMetrics, normalizeOverviewModules, normalizeHoverModules, normalizeStepTableColumns, normalizeStandalonePort, normalizeModernUi, CONTEXT_AGENT_MODES, DEFAULT_CONTEXT_AGENT_MODE, ACCOUNT_QUOTA_REFRESH_MINUTES, DEFAULT_ACCOUNT_QUOTA_REFRESH_MINUTES, normalizeAccountQuotaRefreshMinutes, normalizeContextAgentMode, normalizeExperimentalQuotaReservation, normalizeExperimentalModernUi };
+return { SUPPORTED_LANGUAGES, THEME_ACCENT_KEYS, FONT_SCALE_KEYS, TOPBAR_SLOT_KEYS, DEFAULT_TOPBAR_SLOTS, MIN_TOPBAR_SLOTS, MAX_TOPBAR_SLOTS, DEFAULT_CLI_STATUSLINE_SLOTS, MIN_CLI_STATUSLINE_SLOTS, MAX_CLI_STATUSLINE_SLOTS, CLI_STATUSLINE_PRESETS, OVERVIEW_MODULE_KEYS, DEFAULT_OVERVIEW_MODULES, DEFAULT_HOVER_MODULES, OVERVIEW_METRIC_KEYS, DEFAULT_OVERVIEW_METRICS, STEP_TABLE_COLUMN_KEYS, DEFAULT_STEP_TABLE_COLUMNS, DEFAULT_STEP_TOKEN_COMBO_FORMAT, STEP_TOKEN_SEGMENT_ALIASES, POPOVER_WIDTH_MODES, MIN_POPOVER_WIDTH, MAX_POPOVER_WIDTH, DEFAULT_POPOVER_WIDTH, normalizeLanguageSetting, normalizeThemeAccent, normalizeFontScale, normalizeModelDisplayMode, normalizeOrchestratorIdMode, normalizePopoverWidthMode, normalizePopoverWidth, parseStepTokenComboSegments, normalizeStepTokenComboFormat, normalizePluginUpdateMode, normalizeWindowMountMode, normalizeTopbarCapsuleSlots, normalizeCliStatusLineSlots, resolveEffectiveCliStatusLineSlots, normalizeOverviewMetrics, normalizeOverviewModules, normalizeHoverModules, normalizeStepTableColumns, normalizeStandalonePort, normalizeModernUi, CONTEXT_AGENT_MODES, DEFAULT_CONTEXT_AGENT_MODE, normalizeContextAgentMode, normalizeExperimentalModernUi };
 })();
 
 // --- shared/telemetry-display-rules.mjs ---
-const { THIRD_PARTY_POOL_RE, isThirdPartyPoolText, classifySpeedTier, classifyCacheTier, classifyStepCostTier, classifyTtftTier, formatCompactTokens, formatCompactCapsuleCost, formatCompactCapsuleTtft, hasArgonWeeklyQuotaPool, resolveCapsuleQuotaSlotPct, scaleBucketsExact } = (() => {
+const { classifySpeedTier, classifyCacheTier, classifyStepCostTier, classifyTtftTier, formatCompactTokens, formatCompactCapsuleCost, formatCompactCapsuleTtft, scaleBucketsExact } = (() => {
 /**
- * @fileoverview 跨 Backend / Frontend / CLI 共用的纯展示阈值、紧凑格式化、第三方配额分池与精确整数缩放规则。
+ * @fileoverview 跨 Backend / Frontend / CLI 共用的纯展示阈值、紧凑格式化与精确整数缩放规则。
  */
-
-const THIRD_PARTY_POOL_RE =
-  /3p|claude|anthropic|fable|gpt|openai|oss|sonnet|opus|haiku|third[-_\s]?party/i;
-
-/**
- * 判断模型或配额桶文本是否归属第三方模型池（Claude & GPT / OSS / 3P）。
- *
- * @param {unknown} text
- * @returns {boolean}
- */
-function isThirdPartyPoolText(text) {
-  return THIRD_PARTY_POOL_RE.test(String(text || ''));
-}
 
 /**
  * 输出速度四档语义色阶分类（`'muted'|'good'|'info'|'warn'|'danger'`）。
@@ -712,144 +644,6 @@ function formatCompactCapsuleTtft(ttftSec) {
   return `${Math.round(val)}s`;
 }
 
-function readPoolWeeklyRemainingPct(pool) {
-  if (!pool || typeof pool !== 'object') return null;
-  const raw = pool.weeklyRemainingPct ?? pool.remainingWeeklyPct;
-  return raw != null && Number.isFinite(Number(raw)) ? Number(raw) : null;
-}
-
-function isArgonPoolObject(pool) {
-  if (!pool || typeof pool !== 'object') return false;
-  if (pool.poolKey === 'Argon' || pool.family === 'Argon') return true;
-  return /\bargon\b/i.test(String(pool.poolKey || pool.poolLabel || pool.family || ''));
-}
-
-/**
- * 判断当前配额摘要中是否存在独立的 Argon 周限配额池（如 Google AI Pro 账号）。
- *
- * @param {object|null|undefined} quotas
- * @returns {boolean}
- */
-function hasArgonWeeklyQuotaPool(quotas) {
-  if (!quotas || typeof quotas !== 'object') return false;
-  const pools = Array.isArray(quotas.pools) ? quotas.pools : [];
-  const argonPool = pools.find(isArgonPoolObject);
-  if (argonPool && readPoolWeeklyRemainingPct(argonPool) != null) {
-    return true;
-  }
-  const activePool = quotas.activePool;
-  if (activePool && isArgonPoolObject(activePool) && readPoolWeeklyRemainingPct(activePool) != null) {
-    return true;
-  }
-  return false;
-}
-
-/**
- * 解析胶囊指定配额槽位（`quota_auto` / `gemini_5h` / `gemini_weekly` / `argon_weekly` / `claude_5h` / `claude_weekly`）的整数剩余百分比。
- *
- * @param {object|null|undefined} quotas
- * @param {string} slotKey
- * @returns {number|null}
- */
-function resolveCapsuleQuotaSlotPct(quotas, slotKey) {
-  if (!quotas || typeof quotas !== 'object') return null;
-  const pools = Array.isArray(quotas.pools) ? quotas.pools : [];
-  const activePool = quotas.activePool || null;
-  const weekly = quotas.weekly || null;
-
-  if (slotKey === 'quota_auto') {
-    const candidates = [];
-    if (activePool && Number.isFinite(Number(activePool.remainingPct))) {
-      candidates.push(Number(activePool.remainingPct));
-    }
-    const activeWk = readPoolWeeklyRemainingPct(activePool);
-    if (activeWk != null) {
-      candidates.push(activeWk);
-    }
-    if (!candidates.length && weekly && Number.isFinite(Number(weekly.remainingPct))) {
-      candidates.push(Number(weekly.remainingPct));
-    }
-    if (!candidates.length && pools.length > 0) {
-      for (const p of pools) {
-        if (p && Number.isFinite(Number(p.remainingPct))) candidates.push(Number(p.remainingPct));
-        const pWk = readPoolWeeklyRemainingPct(p);
-        if (pWk != null) candidates.push(pWk);
-      }
-    }
-    if (!candidates.length) return null;
-    return Math.max(0, Math.min(100, Math.round(Math.min(...candidates))));
-  }
-
-  if (slotKey === 'argon_weekly') {
-    const argonPool = pools.find(isArgonPoolObject);
-    let argonPct = readPoolWeeklyRemainingPct(argonPool);
-    if (argonPct == null && isArgonPoolObject(activePool)) {
-      argonPct = readPoolWeeklyRemainingPct(activePool);
-    }
-    if (argonPct == null || !Number.isFinite(argonPct)) return null;
-    return Math.max(0, Math.min(100, Math.round(argonPct)));
-  }
-
-  const isClaude = slotKey.startsWith('claude_');
-  const isWeekly = slotKey.endsWith('_weekly');
-  let rawPct = null;
-
-  if (isClaude) {
-    const claudePool =
-      pools.find((p) => p?.poolKey === 'Claude & GPT') ||
-      pools.find((p) => isThirdPartyPoolText(p?.poolKey || p?.poolLabel || ''));
-    const cand = isWeekly ? readPoolWeeklyRemainingPct(claudePool) : claudePool?.remainingPct;
-    if (cand != null && Number.isFinite(Number(cand))) {
-      rawPct = Number(cand);
-    } else if (activePool && isThirdPartyPoolText(activePool.family || activePool.poolLabel || '')) {
-      const fb = isWeekly ? readPoolWeeklyRemainingPct(activePool) : activePool.remainingPct;
-      if (fb != null && Number.isFinite(Number(fb))) rawPct = Number(fb);
-    }
-  } else {
-    const stdGemini =
-      pools.find((p) => p?.poolKey === 'Gemini') ||
-      pools.find(
-        (p) =>
-          /gemini/i.test(String(p?.poolKey || p?.poolLabel || '')) &&
-          !/carbon|argon/i.test(String(p?.poolKey || ''))
-      );
-    const geminiFamilyPools = pools.filter((p) =>
-      /gemini|carbon|argon/i.test(String(p?.poolKey || p?.poolLabel || ''))
-    );
-    const primaryCand = isWeekly ? readPoolWeeklyRemainingPct(stdGemini) : stdGemini?.remainingPct;
-    if (primaryCand != null && Number.isFinite(Number(primaryCand))) {
-      rawPct = Number(primaryCand);
-    } else {
-      const familyVals = geminiFamilyPools
-        .map((p) => (isWeekly ? readPoolWeeklyRemainingPct(p) : p?.remainingPct))
-        .filter((v) => v != null && Number.isFinite(Number(v)))
-        .map(Number);
-      if (familyVals.length > 0) {
-        rawPct = Math.min(...familyVals);
-      } else if (
-        activePool &&
-        !isThirdPartyPoolText(activePool.family || activePool.poolLabel || '')
-      ) {
-        const fb = isWeekly ? readPoolWeeklyRemainingPct(activePool) : activePool.remainingPct;
-        if (fb != null && Number.isFinite(Number(fb))) rawPct = Number(fb);
-      }
-      if (
-        rawPct == null &&
-        isWeekly &&
-        weekly &&
-        !isThirdPartyPoolText(weekly.poolFamily || '') &&
-        weekly.remainingPct != null &&
-        Number.isFinite(Number(weekly.remainingPct))
-      ) {
-        rawPct = Number(weekly.remainingPct);
-      }
-    }
-  }
-
-  if (rawPct == null || !Number.isFinite(rawPct)) return null;
-  return Math.max(0, Math.min(100, Math.round(rawPct)));
-}
-
 /**
  * 使用最大余数法（Hamilton 方法）将各非零分桶等比缩放至目标整数总和，
  * 保证 0 值通道绝不被凭空分配余数，且缩放后各分桶之和精确等于 `targetTotal`。
@@ -899,7 +693,7 @@ function scaleBucketsExact(buckets, keys, targetTotal) {
   }
   return out;
 }
-return { THIRD_PARTY_POOL_RE, isThirdPartyPoolText, classifySpeedTier, classifyCacheTier, classifyStepCostTier, classifyTtftTier, formatCompactTokens, formatCompactCapsuleCost, formatCompactCapsuleTtft, hasArgonWeeklyQuotaPool, resolveCapsuleQuotaSlotPct, scaleBucketsExact };
+return { classifySpeedTier, classifyCacheTier, classifyStepCostTier, classifyTtftTier, formatCompactTokens, formatCompactCapsuleCost, formatCompactCapsuleTtft, scaleBucketsExact };
 })();
 
 // --- shared/window-bridge-protocol.mjs ---
@@ -1307,8 +1101,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'header.statusSynced': '已刷新',
   'header.statusRetrying': '重试中',
   'header.statusGenerating': '生成中{suffix}',
-  'header.statusQuotaCached': '额度缓存',
-  'header.statusQuotaOffline': '额度离线',
   'header.statusLive': '监控中',
   'header.scopeAll': '全部代理',
   'header.scopeAllShort': '全',
@@ -1364,8 +1156,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'capsule.multiRunningWithSwarm': '{count} 运行 · {subs} 蜂',
   'capsule.tpsRunning': '生成中',
   'capsule.tpsIdle': '待命',
-  'capsule.quotaLeft': '余 {pct}%',
-  'capsule.quotaUnknown': '余 --%',
   'capsule.newVersion': '新版本',
   'capsule.updating': '更新中…',
   'capsule.ariaUpdateTitle': '发现新版本，点击立即更新',
@@ -1390,7 +1180,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   // Live Overview & Widgets
   'module.metrics': '实时指标',
   'module.context': '上下文窗口',
-  'module.quotas': '可用额度',
   'module.live_tasks': '实时运行任务',
 
   // Capsule Slot Metric Options
@@ -1402,12 +1191,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'capMetric.session_cost': '会话累计费用 ($)',
   'capMetric.cache_hit': '缓存命中率 (%)',
   'capMetric.session_tokens': '会话总 Token',
-  'capMetric.quota_auto': '自动紧俏额度',
-  'capMetric.gemini_5h': 'Gemini 5h 额度',
-  'capMetric.gemini_weekly': 'Gemini 周额度',
-  'capMetric.argon_weekly': 'Argon 周额度',
-  'capMetric.claude_5h': 'Claude 5h 额度',
-  'capMetric.claude_weekly': 'Claude 周额度',
 
   // Overview Matrix Metric Options & Cells
   'ovMetric.tps': '实时速度',
@@ -1420,7 +1203,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'ovMetric.cache_hit': '缓存命中率',
   'ovMetric.session_tokens': '会话 Token',
   'ovMetric.context_usage': '上下文占用',
-  'ovMetric.quota_tightest': '紧俏额度',
   'ovSummary.title': '会话总览',
   'ovSummary.avg_tps': '速度',
   'ovSummary.avg_ttft': '首字',
@@ -1434,8 +1216,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'ovMetric.subStepCost': '本次 {cost}',
   'ovMetric.subInOutTokens': '入 {inTok} · 出 {outTok}',
   'ovMetric.subCtxRatio': '{used} / {limit}',
-  'ovMetric.subQuotaPool': '{label}',
-  'ovMetric.subQuotaPending': '等待配额同步',
 
   // Context Window Widget
   'ctx.followActive': '跟随活跃 ({badge})',
@@ -1467,47 +1247,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'ctx.ch.userRules': '用户规则',
   'ctx.ch.userRulesTitle': '全局与工作区自定义规则 (user_rules)',
 
-  // Quota Pools Widget
-  'quota.weeklyShort': '周限',
-  'quota.weeklyPool': '周限 ({pool})',
-  'quota.loading': '读取中...',
-  'quota.failed': '获取失败 (--%)',
-  'quota.usedAndLeft': '{reset} · {used}%',
-  'quota.remainingAndReset': '{reset} · {remaining}%',
-  'quota.reservedTip': '预占估算（试验性）：约 {rsv}%（实际已用约 {actual}%），静默约 10 分钟后未用差额自动退还',
-  'quota.reservedTipMulti': '预占估算（试验性）：约 {rsv}%（检测到 {leases} 笔叠加租约，实际已用约 {actual}%），静默约 10 分钟后未用差额自动退还',
-  'quota.legendActual': '实占',
-  'quota.legendReserved': '预占',
-  'quota.cycle5hTitle': '当前 5h 周期累计 ({pool})：{tok} Tokens · {cost} · {calls} 次调用',
-  'quota.cycleWkCustomTitle': '本周自然周累计：{tok} Tokens · {cost} · {calls} 次调用',
-  'quota.cycleWkPoolTitle': '当前周限周期累计 ({pool})：{tok} Tokens · {cost} · {calls} 次调用',
-  'quota.cycleFullSuffix': '满池约 {full}',
-  'quota.footTokensCustom': '本周累计: {tok} ({cost})',
-  'quota.footTokensCycle': '周期累计: {tok} ({cost})',
-  'quota.footCredits': 'AI 积分: {credits}',
-  'quota.footCallsCustom': '本周调用: {calls} 次',
-  'quota.footCallsCycle': '周期调用: {calls} 次',
-  'quota.footTipCustom': '按本机自然周（周一 00:00 起）统计',
-  'quota.footTipCycle': '按各配额池独立周限重置周期分别统计并汇总',
-  'quota.rateHelpAria': '查看当前账号实测倍率预估',
-  'quota.ratePopTitle': '实测倍率预估',
-  'quota.ratePopAccountScope': '{account}',
-  'quota.ratePopAccountCurrent': '当前账号',
-  'quota.ratePopPoolFallback': '池综合均值',
-  'quota.ratePopEq5hLabel': '5h 满池',
-  'quota.ratePopEqWkLabel': '周限满池',
-  'quota.ratePopPerUsd': '{win} {rate}%/$',
-  'quota.ratePopSamples': '{n} 样本',
-  'quota.ratePopPrelimSlope': '斜率初估',
-  'quota.ratePopPrelimCycle': '周期初估',
-  'quota.ratePopEmpty': '暂未采集到足够的单模型干净样本（周限满 2% 或单模型满 3 次无抖动扣费后自动生成）。',
-  'quota.ratePopSharedBadge': '共享活跃',
-  'quota.ratePopSharedBadgeTip': '最近 15 分钟内检测到同池外部消耗，新增预占将在二次验证后展示',
-  'quota.ratePopExternalDetail': '检测到家庭组 / 其他设备消耗（已排除约 {detail}），不计入预占',
-  'quota.ratePopExternalBaseline': '检测到本周期存在家庭组 / 其他设备消耗，预占和费率仅按本机实测校准',
-  'quota.ratePopExt5h': '5h {pct}%',
-  'quota.ratePopExtWk': '周限 {pct}%',
-
   // Live Activity Widget
   'live.currentSession': '当前会话',
   'live.switchSessionTitle': '点击切换查看会话：{title}',
@@ -1528,14 +1267,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'live.subExpandTitle': '点击展开查看子代理缩略状态',
 
   // Consumption View
-  'cons.rangeCycle': '周期',
-  'cons.cyclePoolAll': '全部池',
-  'cons.cyclePoolAllShort': '全部',
-  'cons.cyclePoolAria': '当前周期配额池筛选',
-  'cons.cyclePoolRemMeta': '剩 {pct}',
-  'cons.currentCycle': '当前周期',
-  'cons.cycleFallbackWeek': '本周',
-  'cons.cycleFallbackWeekTip': '未获取官方周限重置时间，暂按自然本周一统计',
   'cons.rangeToday': '今天',
   'cons.range24h': '24小时',
   'cons.range7d': '7天',
@@ -1788,129 +1519,11 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   // Preferences (3-Tab Modular Settings)
   'settings.subTab.general': '常规',
   'settings.subTab.structure': '结构',
-  'settings.subTab.account': '账号',
   'settings.subTab.other': '其他',
   'settings.subTab.aria': '偏好设置分类切换',
   'settings.simple.appearanceTitle': '外观与显示',
   'settings.simple.maintTitle': '数据与维护',
   'settings.simple.versionRow': '版本与价格',
-  'settings.account.current': '当前账号',
-  'settings.account.signedOut': '未登录',
-  'settings.account.unknown': '暂未获取账号状态',
-  'settings.account.email': '账号邮箱',
-  'settings.account.googleLogin': '使用 Google 登录',
-  'settings.account.loginHint': '通过浏览器登录 Google，完成后账号会自动添加到列表。',
-  'settings.account.loginWaiting': '请在浏览器中选择 Google 账号并完成授权，完成后这里会自动更新。',
-  'settings.account.loginFinishing': '授权已收到，正在保存账号…',
-  'settings.account.loginSuccess': '登录成功，账号已添加。',
-  'settings.account.loginCancelled': '已取消本次登录。',
-  'settings.account.loginExpired': '登录已超时，请重新点击「使用 Google 登录」。',
-  'settings.account.loginDenied': 'Google 授权已取消，请重新登录。',
-  'settings.account.loginStartFailed': '未能开始登录，请重试。',
-  'settings.account.loginExchangeFailed': '未能完成登录，请检查网络后重新授权。',
-  'settings.account.openLoginPage': '重新打开 Google 授权页面',
-  'settings.account.cancelLogin': '取消登录',
-  'settings.account.importExisting': '导入已有凭证',
-  'settings.account.credential': 'OAuth 凭证',
-  'settings.account.credentialPlaceholder': '粘贴 1// 刷新令牌或 OAuth JSON…',
-  'settings.account.importHint': '粘贴 Antigravity 的刷新令牌或含 refresh_token 的 OAuth JSON。插件会验证账号邮箱，并在本机加密保存。',
-  'settings.account.save': '导入凭证',
-  'settings.account.capture': '保存当前凭证',
-  'settings.account.reload': '刷新列表',
-  'settings.account.switch': '切换并重启',
-  'settings.account.switchHint': '切换会关闭并重新打开 Antigravity App 和共享登录的 IDE，请先保存工作。',
-  'settings.account.restarting': '正在重启 Antigravity 并应用所选账号…',
-  'settings.account.switchStartFailed': '未能启动切号，请刷新列表后重试。',
-  'settings.account.clientCloseFailed': 'Antigravity 未能完全退出，切换未完成。',
-  'settings.account.clientRestartFailed': '凭证已更新，但自动重新打开失败，请手动打开 Antigravity。',
-  'settings.account.remove': '移除',
-  'settings.account.active': '当前使用',
-  'settings.account.savedBadge': '已备份',
-  'settings.account.written': '凭证已写入',
-  'settings.account.pending': '已写入 {email} 的凭证，等待宿主更新。如果一直未更新，请重开当前 Antigravity。',
-  'settings.account.savedCredentials': '已保存的账号',
-  'settings.account.empty': '暂无已保存的凭证。',
-  'settings.account.loading': '正在读取已保存的凭证…',
-  'settings.account.saved': '凭证已保存。',
-  'settings.account.removed': '已移除保存的凭证。',
-  'settings.account.switched': '已切换账号，正在刷新当前额度。',
-  'settings.account.switching': '正在验证凭证并准备重启…',
-  'settings.account.verifying': '正在验证凭证所属账号…',
-  'settings.account.loadQuota': '查额度',
-  'settings.account.loadingQuota': '查询中…',
-  'settings.account.refreshFreqAria': '非当前账号配额刷新间隔',
-  'settings.account.refresh10m': '10 分钟',
-  'settings.account.refresh30m': '30 分钟',
-  'settings.account.refresh1h': '1 小时',
-  'settings.account.refresh3h': '3 小时',
-  'settings.account.refresh6h': '6 小时',
-  'settings.account.refresh12h': '12 小时',
-  'settings.account.refresh24h': '24 小时',
-  'settings.account.emptyCredentialQuota': '这个账号暂无可显示的额度池。',
-  'settings.account.quota': '额度池剩余',
-  'settings.account.quota5h': '5 小时 {percent}%',
-  'settings.account.quotaWeekly': '每周 {percent}%',
-  'settings.account.noQuota': '暂未获取当前账号的额度池。',
-  'settings.account.quotaStale': '额度刷新失败，显示的是当前账号上次获取的数据。',
-  'settings.account.unsupported': '凭证切换目前支持 Windows 上的 Antigravity 共享登录。',
-  'settings.account.invalidEmail': '请先选择一个已保存的账号。',
-  'settings.account.invalidCredential': '请输入有效的 Antigravity 个人账号 OAuth 凭证。',
-  'settings.account.credentialTooLarge': '凭证超过 Windows 凭据管理器的 2560 字节上限。',
-  'settings.account.notFound': '该凭证已移除，请刷新列表。',
-  'settings.account.noCurrentCredential': '暂时无法读取当前账号的共享凭证。',
-  'settings.account.busy': '另一个窗口正在操作凭证，请稍后重试。',
-  'settings.account.storeFailed': '凭证操作失败，请重试。',
-  'settings.account.rollbackFailed': '凭证写入和回滚均失败。请在 Antigravity 中确认当前账号后再继续。',
-  'settings.account.credentialAccessDenied': 'Windows 拒绝访问凭据管理器。请在当前 Windows 用户会话中打开 Antigravity 后重试。',
-  'settings.account.credentialChanged': '这份凭证已在其他窗口更新，请刷新列表后重试。',
-  'settings.account.credentialRejected': 'Google 未接受此凭证。请检查令牌是否属于 Antigravity 且仍然有效。',
-  'settings.account.identityMismatch': '凭证所属账号跟宿主或保存的账号不一致，请重新导入该凭证。',
-  'settings.account.oauthClientUnavailable': '未能从本机 Antigravity 读取 OAuth 客户端配置。',
-  'settings.account.oauthUnavailable': '暂时无法完成 Google OAuth 验证，请检查网络后重试。',
-  'settings.account.quotaUnavailable': '暂时无法取得此账号的额度，请稍候重试。',
-  'settings.account.switchConfirm': '确认切换',
-  'settings.account.removeConfirm': '确认移除',
-  'settings.account.pwdBtnSet': '二级密码',
-  'settings.account.pwdBtnManage': '密码设置',
-  'settings.account.lockNow': '锁定',
-  'settings.account.lockNowTip': '立即锁定凭证库',
-  'settings.account.unlockBtn': '解锁',
-  'settings.account.unlockPlaceholder': '输入二级密码解锁…',
-  'settings.account.vaultLockedHint': '凭证库已加密锁定，输入二级密码后可切换账号、管理凭证和刷新后台配额。',
-  'settings.account.forgotPwdToggle': '忘记密码？',
-  'settings.account.resetVaultHint': '二级密码采用真实密钥派生加密，遗忘后无法解密旧备份（不影响当前正在使用的账号），可清空凭证库后重新添加。',
-  'settings.account.resetVaultBtn': '清空凭证库',
-  'settings.account.resetVaultConfirm': '确认清空重置',
-  'settings.account.pwdTabChange': '修改密码',
-  'settings.account.pwdTabDisable': '关闭密码',
-  'settings.account.pwdCurrentPlaceholder': '当前二级密码…',
-  'settings.account.pwdNewPlaceholder': '设置二级密码（4~128 位）…',
-  'settings.account.pwdConfirmPlaceholder': '再次确认密码…',
-  'settings.account.pwdEnableSubmit': '启用加密',
-  'settings.account.pwdChangeSubmit': '更新密码',
-  'settings.account.pwdDisableSubmit': '关闭保护',
-  'settings.account.pwdSetHint': '使用二级密码对所有已存刷新令牌追加一层加密，每次启动首次操作时解锁一次；请牢记密码，遗忘后无法找回备份。',
-  'settings.account.pwdManageHint': '验证当前二级密码后可更换新密码，或退回系统默认加密。',
-  'settings.account.pwdEnabledToast': '已启用二级密码加密。',
-  'settings.account.pwdChangedToast': '二级密码已更新。',
-  'settings.account.pwdDisabledToast': '已关闭二级密码保护。',
-  'settings.account.vaultUnlockedToast': '凭证库已解锁。',
-  'settings.account.vaultLockedToast': '凭证库已锁定。',
-  'settings.account.vaultResetToast': '凭证库已清空重置。',
-  'settings.account.vaultLocked': '请先输入二级密码解锁凭证库。',
-  'settings.account.wrongPassword': '二级密码不正确，请核对后重试。',
-  'settings.account.invalidPassword': '密码长度需在 4 到 128 个字符之间且不能全为空格。',
-  'settings.account.passwordMismatch': '两次输入的密码不一致。',
-  'settings.account.passwordRateLimited': '密码连续输错次数过多，请稍候再试。',
-  'settings.account.vaultDecryptFailed': '凭证解密校验失败，请确认密码或重置凭证库。',
-  'settings.account.invalidActionNonce': '安全校验令牌已过期，请重试。',
-  'settings.account.riskNotAccepted': '请先确认并接受非官方能力风险提示。',
-  'settings.account.riskBody': 'Google 官方并未授权在 Antigravity App / IDE 中通过第三方插件导入、保存、切换账号凭证或后台查询多账号配额。擅自启用可能导致 Antigravity 或 GCP 服务被禁用，甚至触发账号封禁；启用该功能即默认由你自行承担全部风险。你最好清楚自己在做什么！',
-  'settings.account.trendTitle': '额度变化',
-  'settings.account.trendWinAria': '配额窗口切换',
-  'settings.account.win5h': '5 小时',
-  'settings.account.winWeekly': '每周',
-  'settings.account.trendEmpty': '当前时间范围内暂无配额记录。',
   'settings.saving': '保存中…',
   'settings.saved': '已保存',
   'settings.saveFailed': '保存失败',
@@ -2117,16 +1730,6 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'settings.oth.orchFormat': 'Orchestrator 系列 ID',
   'settings.oth.orchCompact': '精简代号 (如 orchestrator-argon)',
   'settings.oth.orchFull': '原始完整 ID (如 gemini-pro-orchestrator)',
-  'settings.oth.expTitle': '试验性功能',
-  'settings.oth.expBadge': '试验性',
-  'settings.oth.quotaReserveLabel': '配额预占估算',
-  'settings.oth.quotaReserveDesc': '在可用额度中估算 5h / 周限的 0.5% / 1% 租约预占，并用紫色标注占比及进度条段',
-  'settings.oth.quotaReserveLogLabel': '预占观测日志',
-  'settings.oth.quotaReserveLogDesc': '将配额跳变及退还观测记录复制到剪贴板，重启后自动保留，便于分析触发阈值',
-  'settings.oth.exportReserveLogBtn': '导出预占日志',
-  'settings.oth.exportReserveLogCopied': '已复制 {count} 条观测日志到剪贴板',
-  'settings.oth.exportReserveLogEmpty': '暂无跳变记录，已复制当前摘要到剪贴板',
-  'settings.oth.exportReserveLogFailed': '获取或复制预占日志失败',
   'settings.oth.baselineTitle': '模型上下文设置',
   'settings.oth.ctxRiskTitle': '非官方能力风险提示',
   'settings.oth.ctxRiskBody': 'Google 官方并未授权在 Antigravity App / IDE 中修改模型上下文上限。擅自修改可能导致 Antigravity 或 GCP 服务被禁用，甚至触发账号封禁；启用该功能即默认由你自行承担全部风险。你最好清楚自己在做什么！',
@@ -2365,8 +1968,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'header.statusSynced': 'Synced',
   'header.statusRetrying': 'Retrying',
   'header.statusGenerating': 'Running{suffix}',
-  'header.statusQuotaCached': 'Quota Cached',
-  'header.statusQuotaOffline': 'Quota Offline',
   'header.statusLive': 'Monitoring',
   'header.scopeAll': 'All Agents',
   'header.scopeAllShort': 'All',
@@ -2422,8 +2023,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'capsule.multiRunningWithSwarm': '{count} active · {subs} swarm',
   'capsule.tpsRunning': 'Running',
   'capsule.tpsIdle': 'Idle',
-  'capsule.quotaLeft': '{pct}% left',
-  'capsule.quotaUnknown': '--% left',
   'capsule.newVersion': 'Update',
   'capsule.updating': 'Updating…',
   'capsule.ariaUpdateTitle': 'New version available, click to update',
@@ -2448,7 +2047,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   // Live Overview & Widgets
   'module.metrics': 'Live Metrics',
   'module.context': 'Context Window',
-  'module.quotas': 'Available Quotas',
   'module.live_tasks': 'Live Running Tasks',
 
   // Capsule Slot Metric Options
@@ -2460,12 +2058,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'capMetric.session_cost': 'Session Cost ($)',
   'capMetric.cache_hit': 'Cache Hit Rate (%)',
   'capMetric.session_tokens': 'Session Tokens',
-  'capMetric.quota_auto': 'Auto Tightest Quota',
-  'capMetric.gemini_5h': 'Gemini 5h Quota',
-  'capMetric.gemini_weekly': 'Gemini Weekly Quota',
-  'capMetric.argon_weekly': 'Argon Weekly Quota',
-  'capMetric.claude_5h': 'Claude 5h Quota',
-  'capMetric.claude_weekly': 'Claude Weekly Quota',
 
   // Overview Matrix Metric Options & Cells
   'ovMetric.tps': 'Live Speed',
@@ -2478,7 +2070,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'ovMetric.cache_hit': 'Cache Hit',
   'ovMetric.session_tokens': 'Session Tokens',
   'ovMetric.context_usage': 'Context Usage',
-  'ovMetric.quota_tightest': 'Tightest Quota',
   'ovSummary.title': 'Session Summary',
   'ovSummary.avg_tps': 'Speed',
   'ovSummary.avg_ttft': 'TTFT',
@@ -2492,8 +2083,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'ovMetric.subStepCost': 'Step {cost}',
   'ovMetric.subInOutTokens': 'In {inTok} · Out {outTok}',
   'ovMetric.subCtxRatio': '{used} / {limit}',
-  'ovMetric.subQuotaPool': '{label}',
-  'ovMetric.subQuotaPending': 'Waiting for quota sync',
 
   // Context Window Widget
   'ctx.followActive': 'Follow Active ({badge})',
@@ -2525,47 +2114,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'ctx.ch.userRules': 'User Rules',
   'ctx.ch.userRulesTitle': 'Global and workspace custom user_rules',
 
-  // Quota Pools Widget
-  'quota.weeklyShort': 'Weekly',
-  'quota.weeklyPool': 'Weekly ({pool})',
-  'quota.loading': 'Loading...',
-  'quota.failed': 'Unavailable (--%)',
-  'quota.usedAndLeft': '{reset} · {used}%',
-  'quota.remainingAndReset': '{reset} · {remaining}%',
-  'quota.reservedTip': 'Estimated lease reservation (Experimental): ~{rsv}% (~{actual}% actual used); unused share refunds after ~10 min idle',
-  'quota.reservedTipMulti': 'Estimated lease reservation (Experimental): ~{rsv}% ({leases} stacked leases, ~{actual}% actual used); unused share refunds after ~10 min idle',
-  'quota.legendActual': 'Actual',
-  'quota.legendReserved': 'Reserved',
-  'quota.cycle5hTitle': 'Current 5h cycle ({pool}): {tok} Tokens · {cost} · {calls} calls',
-  'quota.cycleWkCustomTitle': 'Current calendar week: {tok} Tokens · {cost} · {calls} calls',
-  'quota.cycleWkPoolTitle': 'Current weekly cycle ({pool}): {tok} Tokens · {cost} · {calls} calls',
-  'quota.cycleFullSuffix': 'Full ~{full}',
-  'quota.footTokensCustom': 'Week Total: {tok} ({cost})',
-  'quota.footTokensCycle': 'Cycle Total: {tok} ({cost})',
-  'quota.footCredits': 'AI Credits: {credits}',
-  'quota.footCallsCustom': 'Week Calls: {calls}',
-  'quota.footCallsCycle': 'Cycle Calls: {calls}',
-  'quota.footTipCustom': 'Counted since Monday 00:00 local time',
-  'quota.footTipCycle': 'Summed across each quota pool weekly reset window',
-  'quota.rateHelpAria': 'View empirical burn-rate estimates for this account',
-  'quota.ratePopTitle': 'Estimated Burn Rates',
-  'quota.ratePopAccountScope': '{account}',
-  'quota.ratePopAccountCurrent': 'Current account',
-  'quota.ratePopPoolFallback': 'Pool average',
-  'quota.ratePopEq5hLabel': '5h full',
-  'quota.ratePopEqWkLabel': 'Weekly full',
-  'quota.ratePopPerUsd': '{win} {rate}%/$',
-  'quota.ratePopSamples': '{n} samples',
-  'quota.ratePopPrelimSlope': 'slope est.',
-  'quota.ratePopPrelimCycle': 'cycle est.',
-  'quota.ratePopEmpty': 'Not enough clean samples yet (unlocks at 2% weekly burn or 3 clean single-model steps).',
-  'quota.ratePopSharedBadge': 'Shared active',
-  'quota.ratePopSharedBadgeTip': 'External pool usage seen within 15 min; new reservations display after verification',
-  'quota.ratePopExternalDetail': 'Family group / other-device usage detected (~{detail} excluded from reservations)',
-  'quota.ratePopExternalBaseline': 'Family group / other-device usage detected this cycle; reservations & rates calibrate on local steps only',
-  'quota.ratePopExt5h': '5h {pct}%',
-  'quota.ratePopExtWk': 'Weekly {pct}%',
-
   // Live Activity Widget
   'live.currentSession': 'Current Session',
   'live.switchSessionTitle': 'Switch monitor to session: {title}',
@@ -2586,14 +2134,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'live.subExpandTitle': 'Expand subagent activity list',
 
   // Consumption View
-  'cons.rangeCycle': 'Cycle',
-  'cons.cyclePoolAll': 'All Pools',
-  'cons.cyclePoolAllShort': 'All',
-  'cons.cyclePoolAria': 'Filter current cycle by quota pool',
-  'cons.cyclePoolRemMeta': '{pct} left',
-  'cons.currentCycle': 'Current Cycle',
-  'cons.cycleFallbackWeek': 'This Week',
-  'cons.cycleFallbackWeekTip': 'Official weekly reset time unavailable; using calendar week from Monday',
   'cons.rangeToday': 'Today',
   'cons.range24h': '24h',
   'cons.range7d': '7d',
@@ -2846,125 +2386,7 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   // Preferences (3-Tab Modular Settings)
   'settings.subTab.general': 'General',
   'settings.subTab.structure': 'Structure',
-  'settings.subTab.account': 'Account',
   'settings.subTab.other': 'Other',
-  'settings.account.current': 'Current account',
-  'settings.account.signedOut': 'Signed out',
-  'settings.account.unknown': 'Account status unavailable',
-  'settings.account.email': 'Account email',
-  'settings.account.googleLogin': 'Sign in with Google',
-  'settings.account.loginHint': 'Sign in with Google in your browser. The account will appear in this list automatically.',
-  'settings.account.loginWaiting': 'Choose a Google account and complete authorization in your browser. This list will update automatically.',
-  'settings.account.loginFinishing': 'Authorization received. Saving the account…',
-  'settings.account.loginSuccess': 'Signed in. The account has been added.',
-  'settings.account.loginCancelled': 'Sign-in cancelled.',
-  'settings.account.loginExpired': 'Sign-in expired. Click Sign in with Google to try again.',
-  'settings.account.loginDenied': 'Google authorization was cancelled. Try signing in again.',
-  'settings.account.loginStartFailed': 'Sign-in could not start. Try again.',
-  'settings.account.loginExchangeFailed': 'Sign-in could not finish. Check your connection and authorize again.',
-  'settings.account.openLoginPage': 'Reopen Google authorization',
-  'settings.account.cancelLogin': 'Cancel sign-in',
-  'settings.account.importExisting': 'Import existing credentials',
-  'settings.account.credential': 'OAuth credential',
-  'settings.account.credentialPlaceholder': 'Paste 1// refresh token or OAuth JSON…',
-  'settings.account.importHint': 'Paste an Antigravity refresh token or OAuth JSON containing a refresh_token. The account email is verified and the credential is encrypted on this device.',
-  'settings.account.save': 'Import credential',
-  'settings.account.capture': 'Save current credential',
-  'settings.account.reload': 'Refresh list',
-  'settings.account.switch': 'Switch and restart',
-  'settings.account.switchHint': 'Switching closes and reopens Antigravity App and the IDE sharing its sign-in. Save your work first.',
-  'settings.account.restarting': 'Restarting Antigravity with the selected account…',
-  'settings.account.switchStartFailed': 'The account switch could not start. Refresh the list and try again.',
-  'settings.account.clientCloseFailed': 'Antigravity could not fully exit. The switch is incomplete.',
-  'settings.account.clientRestartFailed': 'The credential was updated. Open Antigravity manually to finish switching.',
-  'settings.account.remove': 'Remove',
-  'settings.account.active': 'In use',
-  'settings.account.savedBadge': 'Backed up',
-  'settings.account.written': 'Credential written',
-  'settings.account.pending': 'The credential for {email} was written. If Antigravity stays on the previous account, reopen it.',
-  'settings.account.savedCredentials': 'Saved accounts',
-  'settings.account.empty': 'No saved credentials.',
-  'settings.account.loading': 'Loading saved credentials…',
-  'settings.account.saved': 'Credential saved.',
-  'settings.account.removed': 'Saved credential removed.',
-  'settings.account.switched': 'Account switched. Refreshing the current quota.',
-  'settings.account.switching': 'Verifying the credential and preparing to restart…',
-  'settings.account.verifying': 'Verifying the credential owner…',
-  'settings.account.loadQuota': 'Check quota',
-  'settings.account.loadingQuota': 'Checking…',
-  'settings.account.refreshFreqAria': 'Background account quota refresh interval',
-  'settings.account.refresh10m': '10 min',
-  'settings.account.refresh30m': '30 min',
-  'settings.account.refresh1h': '1 hr',
-  'settings.account.refresh3h': '3 hr',
-  'settings.account.refresh6h': '6 hr',
-  'settings.account.refresh12h': '12 hr',
-  'settings.account.refresh24h': '24 hr',
-  'settings.account.emptyCredentialQuota': 'There are no quota pools to display for this account.',
-  'settings.account.quota': 'Quota remaining by pool',
-  'settings.account.quota5h': '5 hours {percent}%',
-  'settings.account.quotaWeekly': 'Weekly {percent}%',
-  'settings.account.noQuota': 'Quota pools are unavailable for the current account.',
-  'settings.account.quotaStale': 'Quota refresh failed. Showing the last data for the current account.',
-  'settings.account.unsupported': 'Credential switching currently supports Antigravity shared sign-in on Windows.',
-  'settings.account.invalidEmail': 'Select a saved account first.',
-  'settings.account.invalidCredential': 'Enter a valid Antigravity OAuth credential for a personal account.',
-  'settings.account.credentialTooLarge': 'The credential exceeds the Windows Credential Manager limit of 2560 bytes.',
-  'settings.account.notFound': 'This credential was removed. Refresh the list.',
-  'settings.account.noCurrentCredential': 'The shared credential for the current account is unavailable.',
-  'settings.account.busy': 'Another window is updating credentials. Try again shortly.',
-  'settings.account.storeFailed': 'The credential operation failed. Try again.',
-  'settings.account.rollbackFailed': 'Writing and restoring the credential both failed. Check the active account in Antigravity before continuing.',
-  'settings.account.credentialAccessDenied': 'Windows denied access to Credential Manager. Open Antigravity in your Windows user session and try again.',
-  'settings.account.credentialChanged': 'This credential was updated in another window. Refresh the list and try again.',
-  'settings.account.credentialRejected': 'Google rejected this credential. Check that the Antigravity refresh token is still valid.',
-  'settings.account.identityMismatch': 'The credential belongs to a different account. Import the credential again.',
-  'settings.account.oauthClientUnavailable': 'The local Antigravity OAuth client configuration could not be read.',
-  'settings.account.oauthUnavailable': 'Google OAuth verification is unavailable. Check your network and try again.',
-  'settings.account.quotaUnavailable': 'Quota for this account is unavailable. Try again shortly.',
-  'settings.account.switchConfirm': 'Confirm switch',
-  'settings.account.removeConfirm': 'Confirm remove',
-  'settings.account.pwdBtnSet': 'Passphrase',
-  'settings.account.pwdBtnManage': 'Passphrase',
-  'settings.account.lockNow': 'Lock',
-  'settings.account.lockNowTip': 'Lock credential vault now',
-  'settings.account.unlockBtn': 'Unlock',
-  'settings.account.unlockPlaceholder': 'Enter passphrase to unlock…',
-  'settings.account.vaultLockedHint': 'Credential vault is locked. Enter your passphrase to switch accounts, manage credentials, or refresh quotas.',
-  'settings.account.forgotPwdToggle': 'Forgot?',
-  'settings.account.resetVaultHint': 'Encrypted backups cannot be recovered without the passphrase (your active IDE sign-in is unaffected). You can clear and reset the vault.',
-  'settings.account.resetVaultBtn': 'Reset vault',
-  'settings.account.resetVaultConfirm': 'Confirm reset',
-  'settings.account.pwdTabChange': 'Change passphrase',
-  'settings.account.pwdTabDisable': 'Remove passphrase',
-  'settings.account.pwdCurrentPlaceholder': 'Current passphrase…',
-  'settings.account.pwdNewPlaceholder': 'New passphrase (4–128 chars)…',
-  'settings.account.pwdConfirmPlaceholder': 'Confirm passphrase…',
-  'settings.account.pwdEnableSubmit': 'Enable',
-  'settings.account.pwdChangeSubmit': 'Update',
-  'settings.account.pwdDisableSubmit': 'Disable',
-  'settings.account.pwdSetHint': 'Adds passphrase encryption to all saved refresh tokens. Asked once per session when managing accounts; cannot be recovered if forgotten.',
-  'settings.account.pwdManageHint': 'Verify your current passphrase to set a new one or return to default OS encryption.',
-  'settings.account.pwdEnabledToast': 'Passphrase encryption enabled.',
-  'settings.account.pwdChangedToast': 'Passphrase updated.',
-  'settings.account.pwdDisabledToast': 'Passphrase protection disabled.',
-  'settings.account.vaultUnlockedToast': 'Credential vault unlocked.',
-  'settings.account.vaultLockedToast': 'Credential vault locked.',
-  'settings.account.vaultResetToast': 'Credential vault cleared and reset.',
-  'settings.account.vaultLocked': 'Enter your passphrase to unlock the vault first.',
-  'settings.account.wrongPassword': 'Incorrect passphrase. Try again.',
-  'settings.account.invalidPassword': 'Passphrase must be 4–128 characters and not blank.',
-  'settings.account.passwordMismatch': 'Passphrases do not match.',
-  'settings.account.passwordRateLimited': 'Too many failed attempts. Wait a moment and try again.',
-  'settings.account.vaultDecryptFailed': 'Vault decryption check failed.',
-  'settings.account.invalidActionNonce': 'Security token expired. Please try again.',
-  'settings.account.riskNotAccepted': 'Acknowledge the unofficial feature risk warning first.',
-  'settings.account.riskBody': 'Google has not authorized importing, storing, or switching Antigravity credentials or polling multi-account quotas in Antigravity App / IDE. Enabling multi-account management may get your Antigravity access, GCP services, or Google account disabled or banned; enabling this feature means you assume all associated risks. Make sure you know what you are doing!',
-  'settings.account.trendTitle': 'Quota Trend',
-  'settings.account.trendWinAria': 'Quota window selector',
-  'settings.account.win5h': '5 Hours',
-  'settings.account.winWeekly': 'Weekly',
-  'settings.account.trendEmpty': 'No quota history recorded in the selected time range.',
   'settings.subTab.aria': 'Preferences category tabs',
   'settings.simple.appearanceTitle': 'Appearance & Display',
   'settings.simple.maintTitle': 'Data & Maintenance',
@@ -3175,16 +2597,6 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'settings.oth.orchFormat': 'Orchestrator Series ID',
   'settings.oth.orchCompact': 'Compact Alias (e.g. orchestrator-argon)',
   'settings.oth.orchFull': 'Full Upstream ID (e.g. gemini-pro-orchestrator)',
-  'settings.oth.expTitle': 'Experimental',
-  'settings.oth.expBadge': 'Experimental',
-  'settings.oth.quotaReserveLabel': 'Quota Reservation Estimate',
-  'settings.oth.quotaReserveDesc': 'Estimate 0.5% / 1% 5h & weekly lease holds in Available Quotas and highlight the reserved share in violet',
-  'settings.oth.quotaReserveLogLabel': 'Reservation Observation Log',
-  'settings.oth.quotaReserveLogDesc': 'Copy persisted quota jump & refund observations to clipboard (retained across restarts)',
-  'settings.oth.exportReserveLogBtn': 'Export Reserve Log',
-  'settings.oth.exportReserveLogCopied': 'Copied {count} log entries to clipboard',
-  'settings.oth.exportReserveLogEmpty': 'No events yet; copied current summary to clipboard',
-  'settings.oth.exportReserveLogFailed': 'Failed to copy reservation log',
   'settings.oth.baselineTitle': 'Model Context Settings',
   'settings.oth.ctxRiskTitle': 'Unofficial Override Risk Warning',
   'settings.oth.ctxRiskBody': 'Google has not authorized modifying model context limits in Antigravity App / IDE. Altering context limits may get your Antigravity access, GCP services, or Google account disabled or banned; enabling this feature means you assume all associated risks. Make sure you know what you are doing!',
@@ -9127,7 +8539,7 @@ return { revealExportedFile, exportTextFileWithFeedback, exportBinaryFileWithFee
 })();
 
 // --- src/store/telemetryStore.js ---
-const { extractHostRouteCascadeId, telemetryStore, clearConsumptionRangeCache, clearConversationViewCache, CLIENT_TOPBAR_SLOT_KEYS, DEFAULT_CLIENT_TOPBAR_SLOTS, DEFAULT_CLIENT_CONTEXT_AGENT_MODE, CLIENT_CLI_STATUSLINE_PRESETS, DEFAULT_CLIENT_CLI_STATUSLINE_SLOTS, CLIENT_OVERVIEW_MODULE_KEYS, DEFAULT_CLIENT_OVERVIEW_MODULES, DEFAULT_CLIENT_HOVER_MODULES, CLIENT_OVERVIEW_METRIC_KEYS, DEFAULT_CLIENT_OVERVIEW_METRICS, CLIENT_STEP_COLUMN_KEYS, DEFAULT_CLIENT_STEP_COLUMNS, DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT, MIN_CLIENT_POPOVER_WIDTH, MAX_CLIENT_POPOVER_WIDTH, DEFAULT_CLIENT_POPOVER_WIDTH, parseClientStepTokenComboSegments, normalizeClientStepTokenComboFormat, normalizeClientPopoverWidthMode, normalizeClientPopoverWidth, normalizeClientModelDisplayMode, normalizeClientTopbarSlots, normalizeClientContextAgentMode, normalizeClientExperimentalQuotaReservation, normalizeClientAccountQuotaRefreshMinutes, normalizeClientCliStatusLineSlots, getDefaultCtxInspectorAgentId, resolveOverlayCtxInspectorAgentId, resolveEffectiveClientCliStatusLineSlots, normalizeClientHoverModules, normalizeClientOverviewModules, normalizeClientOverviewMetrics, normalizeClientStepColumns, normalizeClientUpdateMode, normalizeClientOrchestratorIdMode, normalizeClientWindowMountMode, isEquivalentTelemetry, resetTelemetryForEndpointSwitch, fetchTelemetry, selectConversation, selectConsumptionTimeRange, selectConsumptionCyclePool, prefetchConsumptionPresets, saveSettingsPatch, saveModelContextWindow, resetAllSettings, rebuildTrajectoryCache, triggerCloudSync, triggerBridgeHostRelaunch, triggerCliStatusLineAction, triggerPluginUpdate, startAsyncTelemetryLoop, stopAsyncTelemetryLoop, resolveHostRouteMatch, resolveScopedConversation, isMacHostPlatform } = (() => {
+const { extractHostRouteCascadeId, telemetryStore, clearConsumptionRangeCache, clearConversationViewCache, CLIENT_TOPBAR_SLOT_KEYS, DEFAULT_CLIENT_TOPBAR_SLOTS, DEFAULT_CLIENT_CONTEXT_AGENT_MODE, CLIENT_CLI_STATUSLINE_PRESETS, DEFAULT_CLIENT_CLI_STATUSLINE_SLOTS, CLIENT_OVERVIEW_MODULE_KEYS, DEFAULT_CLIENT_OVERVIEW_MODULES, DEFAULT_CLIENT_HOVER_MODULES, CLIENT_OVERVIEW_METRIC_KEYS, DEFAULT_CLIENT_OVERVIEW_METRICS, CLIENT_STEP_COLUMN_KEYS, DEFAULT_CLIENT_STEP_COLUMNS, DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT, MIN_CLIENT_POPOVER_WIDTH, MAX_CLIENT_POPOVER_WIDTH, DEFAULT_CLIENT_POPOVER_WIDTH, parseClientStepTokenComboSegments, normalizeClientStepTokenComboFormat, normalizeClientPopoverWidthMode, normalizeClientPopoverWidth, normalizeClientModelDisplayMode, normalizeClientTopbarSlots, normalizeClientContextAgentMode, normalizeClientCliStatusLineSlots, getDefaultCtxInspectorAgentId, resolveOverlayCtxInspectorAgentId, resolveEffectiveClientCliStatusLineSlots, normalizeClientHoverModules, normalizeClientOverviewModules, normalizeClientOverviewMetrics, normalizeClientStepColumns, normalizeClientUpdateMode, normalizeClientOrchestratorIdMode, normalizeClientWindowMountMode, isEquivalentTelemetry, resetTelemetryForEndpointSwitch, fetchTelemetry, selectConversation, selectConsumptionTimeRange, prefetchConsumptionPresets, saveSettingsPatch, saveModelContextWindow, resetAllSettings, rebuildTrajectoryCache, triggerCloudSync, triggerBridgeHostRelaunch, triggerCliStatusLineAction, triggerPluginUpdate, startAsyncTelemetryLoop, stopAsyncTelemetryLoop, resolveHostRouteMatch, resolveScopedConversation, isMacHostPlatform } = (() => {
 /**
  * @fileoverview Reactive telemetry store with async non-overlapping poll scheduler
  * and granular slice updates.
@@ -9214,7 +8626,6 @@ const telemetryStore = createReactiveStore({
   selectedConversationId: initialConversationId,
   hostRouteConversationId: extractHostRouteCascadeId(),
   selectedTimeRange: 'today',
-  selectedCyclePool: 'all',
   customStartMs: Date.now() - 24 * 3600 * 1000,
   customEndMs: Date.now(),
   syncState: 'idle', // 'idle' | 'syncing' | 'synced' | 'error'
@@ -9238,7 +8649,7 @@ let lastPrefetchedUsageRevision = 0;
 let consumptionCacheScopeSig = '';
 const MAX_CONSUMPTION_RANGE_CACHE = 24;
 const MAX_CONVERSATION_VIEW_CACHE = 12;
-const CONSUMPTION_PRESET_KEYS = ['cycle', 'today', '24h', '7d', '14d', '30d', 'all'];
+const CONSUMPTION_PRESET_KEYS = ['today', '24h', '7d', '14d', '30d', 'all'];
 const consumptionRangeCache = new Map();
 const conversationViewCache = new Map();
 let lastReceivedSteps = null;
@@ -9251,9 +8662,6 @@ const pendingSettingsMutations = new Map();
 const recentCommittedSettings = new Map();
 
 const TELEMETRY_RECOMPUTE_SETTING_KEYS = new Set([
-  'weeklyLimitMode',
-  'weeklyTokenBudget',
-  'weeklyCostBudget',
   'windowMountMode',
   'enableWindowOverlay',
 ]);
@@ -9261,15 +8669,11 @@ const TELEMETRY_RECOMPUTE_SETTING_KEYS = new Set([
 function makeConsumptionRangeCacheKey(
   range,
   customStartMs = 0,
-  customEndMs = 0,
-  cyclePool = 'all'
+  customEndMs = 0
 ) {
   const key = String(range || 'all');
   if (key === 'custom') {
     return `custom:${Number(customStartMs || 0)}:${Number(customEndMs || 0)}`;
-  }
-  if (key === 'cycle' && cyclePool && cyclePool !== 'all') {
-    return `cycle:${String(cyclePool)}`;
   }
   return key;
 }
@@ -9291,21 +8695,8 @@ function clearConversationViewCache() {
 function buildConsumptionScopeSig(payload) {
   if (!payload || typeof payload !== 'object') return '';
   const ep = payload.endpoint || {};
-  const acct = payload.account || {};
-  const set = payload.settings || {};
   const cloud = payload.cloudStatus || {};
-  return `${String(ep.id || LOCAL_ENDPOINT_ID)}|${String(acct.status || '')}|${String(acct.email || acct.name || '').toLowerCase()}|${String(set.weeklyLimitMode || '')}|${String(cloud.catalogVersion || '')}`;
-}
-
-function reconcileSelectedCyclePool(payload) {
-  const curPool = telemetryStore.getState().selectedCyclePool || 'all';
-  if (curPool === 'all') return;
-  const pools = payload?.quotas?.pools;
-  if (!Array.isArray(pools) || pools.length === 0) return;
-  const exists = pools.some((p) => String(p?.poolKey || p?.family || '') === curPool);
-  if (!exists) {
-    telemetryStore.setState({ selectedCyclePool: 'all' });
-  }
+  return `${String(ep.id || LOCAL_ENDPOINT_ID)}|${String(cloud.catalogVersion || '')}`;
 }
 
 function syncConsumptionCacheScope(payload) {
@@ -9316,7 +8707,6 @@ function syncConsumptionCacheScope(payload) {
     clearConversationViewCache();
   }
   consumptionCacheScopeSig = nextSig;
-  reconcileSelectedCyclePool(payload);
 }
 
 function recordConversationViewToCache(payload) {
@@ -9326,8 +8716,6 @@ function recordConversationViewToCache(payload) {
   const entry = {
     cascadeId: active.cascadeId,
     activeConversation: active,
-    activePool: payload.quotas?.activePool || null,
-    weekly: payload.quotas?.weekly || null,
     sessionConsumption: payload.consumption?.session || null,
     sessionPresets:
       payload.consumption?.sessionPresets ||
@@ -9366,15 +8754,6 @@ function resolveCachedConversationRootId(telemetry, effectiveConvId) {
 function applyConversationSliceToTelemetry(baseTelemetry, slice) {
   if (!baseTelemetry || !slice?.activeConversation) return baseTelemetry;
   const activeCidLower = String(slice.activeConversation.cascadeId || '').toLowerCase();
-  const prevQuotas = baseTelemetry.quotas || {};
-  const nextQuotas =
-    slice.activePool || slice.weekly
-      ? {
-          ...prevQuotas,
-          ...(slice.activePool ? { activePool: slice.activePool } : {}),
-          ...(slice.weekly ? { weekly: slice.weekly } : {}),
-        }
-      : prevQuotas;
 
   const prevCons = baseTelemetry.consumption || {};
   let nextPresets = prevCons.presets;
@@ -9414,7 +8793,6 @@ function applyConversationSliceToTelemetry(baseTelemetry, slice) {
     ...baseTelemetry,
     ...(slice.stepRevision ? { stepRevision: slice.stepRevision } : {}),
     activeConversation: slice.activeConversation,
-    quotas: nextQuotas,
     consumption: nextCons,
     ...(nextRunning ? { runningConversations: nextRunning } : {}),
   };
@@ -9432,19 +8810,14 @@ function putConsumptionRangeCacheEntry(cacheKey, entry) {
 function recordConsumptionSliceToCache(
   cons,
   modelBreakdown,
-  { customStartMs = 0, customEndMs = 0, cyclePool = 'all', usageRevision = 0 } = {}
+  { customStartMs = 0, customEndMs = 0, usageRevision = 0 } = {}
 ) {
   const rangeKey = String(cons?.selectedRange?.key || '');
   if (!rangeKey) return;
-  const resolvedPool =
-    rangeKey === 'cycle'
-      ? String(cons?.selectedRange?.pool || cyclePool || 'all')
-      : 'all';
   const cacheKey = makeConsumptionRangeCacheKey(
     rangeKey,
     rangeKey === 'custom' ? customStartMs || cons.selectedRange?.startMs || 0 : 0,
-    rangeKey === 'custom' ? customEndMs || cons.selectedRange?.endMs || 0 : 0,
-    resolvedPool
+    rangeKey === 'custom' ? customEndMs || cons.selectedRange?.endMs || 0 : 0
   );
   putConsumptionRangeCacheEntry(cacheKey, {
     revision: Number(cons.revision ?? usageRevision ?? 0),
@@ -9561,8 +8934,6 @@ const normalizeClientPopoverWidth = normalizePopoverWidth;
 const normalizeClientModelDisplayMode = normalizeModelDisplayMode;
 const normalizeClientTopbarSlots = normalizeTopbarCapsuleSlots;
 const normalizeClientContextAgentMode = normalizeContextAgentMode;
-const normalizeClientExperimentalQuotaReservation = normalizeExperimentalQuotaReservation;
-const normalizeClientAccountQuotaRefreshMinutes = normalizeAccountQuotaRefreshMinutes;
 const normalizeClientCliStatusLineSlots = normalizeCliStatusLineSlots;
 
 /**
@@ -9678,9 +9049,6 @@ function isEquivalentTelemetry(prev, next) {
   ) {
     return false;
   }
-  if (pSet?.weeklyLimitMode !== nSet?.weeklyLimitMode) return false;
-  if (pSet?.weeklyTokenBudget !== nSet?.weeklyTokenBudget) return false;
-  if (pSet?.weeklyCostBudget !== nSet?.weeklyCostBudget) return false;
   if ((pSet?.pluginUpdateMode ?? '') !== (nSet?.pluginUpdateMode ?? '')) return false;
   if (pSet?.autoUpdatePlugin !== nSet?.autoUpdatePlugin) return false;
   if (
@@ -9713,21 +9081,6 @@ function isEquivalentTelemetry(prev, next) {
     return false;
   }
   if (Boolean(pSet?.showStepFilterToolbar) !== Boolean(nSet?.showStepFilterToolbar)) {
-    return false;
-  }
-  if (
-    normalizeClientExperimentalQuotaReservation(pSet?.experimentalQuotaReservation) !==
-    normalizeClientExperimentalQuotaReservation(nSet?.experimentalQuotaReservation)
-  ) {
-    return false;
-  }
-  if (
-    normalizeClientAccountQuotaRefreshMinutes(pSet?.accountQuotaRefreshMinutes) !==
-    normalizeClientAccountQuotaRefreshMinutes(nSet?.accountQuotaRefreshMinutes)
-  ) {
-    return false;
-  }
-  if (Boolean(pSet?.accountSwitchRiskAccepted) !== Boolean(nSet?.accountSwitchRiskAccepted)) {
     return false;
   }
   if (!sameArr(pSet?.topbarCapsuleSlots, nSet?.topbarCapsuleSlots)) return false;
@@ -10009,10 +9362,8 @@ function isEquivalentTelemetry(prev, next) {
   const pRange = prev.consumption?.selectedRange;
   const nRange = next.consumption?.selectedRange;
   if (pRange?.key !== nRange?.key) return false;
-  if ((pRange?.pool || 'all') !== (nRange?.pool || 'all')) return false;
   if ((pRange?.label || '') !== (nRange?.label || '')) return false;
-  if (Boolean(pRange?.isFallbackWeek) !== Boolean(nRange?.isFallbackWeek)) return false;
-  if (nRange?.key === 'custom' || nRange?.key === 'cycle') {
+  if (nRange?.key === 'custom') {
     if (pRange?.startMs !== nRange?.startMs || pRange?.endMs !== nRange?.endMs) return false;
   }
 
@@ -10158,78 +9509,6 @@ function isEquivalentTelemetry(prev, next) {
     }
   }
 
-  // 8. 比对账号订阅档位与动态多配额池
-  if (
-    prev.account?.email !== next.account?.email ||
-    prev.account?.name !== next.account?.name ||
-    prev.account?.status !== next.account?.status ||
-    prev.account?.tierId !== next.account?.tierId ||
-    prev.account?.tierName !== next.account?.tierName ||
-    prev.account?.tierMultiplier !== next.account?.tierMultiplier ||
-    prev.account?.planName !== next.account?.planName ||
-    prev.account?.aiCredits !== next.account?.aiCredits
-  ) {
-    return false;
-  }
-
-  if (
-    prev.quotas?.meta?.refreshFailed !== next.quotas?.meta?.refreshFailed ||
-    prev.quotas?.meta?.isStale !== next.quotas?.meta?.isStale
-  ) {
-    return false;
-  }
-
-  const pQuot = prev.quotas?.activePool;
-  const nQuot = next.quotas?.activePool;
-  if (pQuot?.family !== nQuot?.family) return false;
-  if (pQuot?.usedPct !== nQuot?.usedPct) return false;
-  if (pQuot?.remainingPct !== nQuot?.remainingPct) return false;
-  if (pQuot?.weeklyUsedPct !== nQuot?.weeklyUsedPct) return false;
-  if (pQuot?.weeklyRemainingPct !== nQuot?.weeklyRemainingPct) return false;
-  if (prev.quotas?.weekly?.usedPct !== next.quotas?.weekly?.usedPct) return false;
-  if (prev.quotas?.weekly?.remainingPct !== next.quotas?.weekly?.remainingPct) return false;
-  if (prev.quotas?.weekly?.tokens !== next.quotas?.weekly?.tokens) return false;
-  if (prev.quotas?.weekly?.costUsd !== next.quotas?.weekly?.costUsd) return false;
-  if (prev.quotas?.weekly?.calls !== next.quotas?.weekly?.calls) return false;
-  if (prev.quotas?.weekly?.unpricedCalls !== next.quotas?.weekly?.unpricedCalls) return false;
-  if (prev.quotas?.weekly?.resetTime !== next.quotas?.weekly?.resetTime) return false;
-
-  const pPools = prev.quotas?.pools || [];
-  const nPools = next.quotas?.pools || [];
-  if (pPools.length !== nPools.length) return false;
-  for (let i = 0; i < pPools.length; i++) {
-    if (
-      pPools[i]?.poolKey !== nPools[i]?.poolKey ||
-      pPools[i]?.poolLabel !== nPools[i]?.poolLabel ||
-      pPools[i]?.usedPct !== nPools[i]?.usedPct ||
-      pPools[i]?.remainingPct !== nPools[i]?.remainingPct ||
-      pPools[i]?.reservedPct !== nPools[i]?.reservedPct ||
-      pPools[i]?.reservedLeaseCount !== nPools[i]?.reservedLeaseCount ||
-      pPools[i]?.resetTime !== nPools[i]?.resetTime ||
-      pPools[i]?.weeklyUsedPct !== nPools[i]?.weeklyUsedPct ||
-      pPools[i]?.weeklyRemainingPct !== nPools[i]?.weeklyRemainingPct ||
-      pPools[i]?.weeklyReservedPct !== nPools[i]?.weeklyReservedPct ||
-      pPools[i]?.weeklyReservedLeaseCount !== nPools[i]?.weeklyReservedLeaseCount ||
-      pPools[i]?.weeklyResetTime !== nPools[i]?.weeklyResetTime ||
-      pPools[i]?.cycle5h?.tokens !== nPools[i]?.cycle5h?.tokens ||
-      pPools[i]?.cycle5h?.costUsd !== nPools[i]?.cycle5h?.costUsd ||
-      pPools[i]?.cycle5h?.calls !== nPools[i]?.cycle5h?.calls ||
-      pPools[i]?.cycleWeekly?.tokens !== nPools[i]?.cycleWeekly?.tokens ||
-      pPools[i]?.cycleWeekly?.costUsd !== nPools[i]?.cycleWeekly?.costUsd ||
-      pPools[i]?.cycleWeekly?.calls !== nPools[i]?.cycleWeekly?.calls ||
-      JSON.stringify(pPools[i]?.rateEstimate || null) !==
-        JSON.stringify(nPools[i]?.rateEstimate || null)
-    ) {
-      return false;
-    }
-  }
-  if (
-    JSON.stringify(prev.quotas?.weeklyCapacityEstimate || null) !==
-    JSON.stringify(next.quotas?.weeklyCapacityEstimate || null)
-  ) {
-    return false;
-  }
-
   const pConvs = prev.conversations || [];
   const nConvs = next.conversations || [];
   if (pConvs.length !== nConvs.length) return false;
@@ -10340,13 +9619,6 @@ async function fetchTelemetry({ force = false } = {}) {
   const params = new URLSearchParams();
   if (effectiveConvId) params.set('conversationId', effectiveConvId);
   if (current.selectedTimeRange) params.set('range', current.selectedTimeRange);
-  if (
-    current.selectedTimeRange === 'cycle' &&
-    current.selectedCyclePool &&
-    current.selectedCyclePool !== 'all'
-  ) {
-    params.set('pool', current.selectedCyclePool);
-  }
   if (current.selectedTimeRange === 'custom') {
     if (current.customStartMs > 0) params.set('startMs', String(current.customStartMs));
     if (current.customEndMs > 0) params.set('endMs', String(current.customEndMs));
@@ -10394,7 +9666,6 @@ async function requestTelemetry(params, force) {
   const reqSeq = ++latestRequestSeq;
   const reqSettingsRev = settingsRevision;
   const reqRange = String(params.get('range') || '');
-  const reqPool = String(params.get('pool') || 'all');
   const reqStartMs = Number(params.get('startMs') || 0);
   const reqEndMs = Number(params.get('endMs') || 0);
   const startMs = Date.now();
@@ -10454,17 +9725,14 @@ async function requestTelemetry(params, force) {
       recordConsumptionSliceToCache(resolvedPayload.consumption, resolvedPayload.modelBreakdown, {
         customStartMs: reqStartMs,
         customEndMs: reqEndMs,
-        cyclePool: reqPool,
       });
     }
 
     const latestSt = telemetryStore.getState();
     const incomingRev = Number(resolvedPayload?.consumption?.revision || 0);
-    const activePoolPref = latestSt.selectedCyclePool || 'all';
     const matchesCurrentRange =
       !reqRange ||
       (reqRange === latestSt.selectedTimeRange &&
-        (reqRange !== 'cycle' || reqPool === activePoolPref) &&
         (reqRange !== 'custom' ||
           (reqStartMs === Number(latestSt.customStartMs || 0) &&
             reqEndMs === Number(latestSt.customEndMs || 0))));
@@ -10476,8 +9744,7 @@ async function requestTelemetry(params, force) {
       const activeKey = makeConsumptionRangeCacheKey(
         latestSt.selectedTimeRange,
         latestSt.customStartMs,
-        latestSt.customEndMs,
-        activePoolPref
+        latestSt.customEndMs
       );
       const cachedActive = consumptionRangeCache.get(activeKey);
       if (cachedActive) {
@@ -10486,9 +9753,7 @@ async function requestTelemetry(params, force) {
           needsSilentRangeRevalidate = true;
         }
       } else if (
-        latestSt.telemetry?.consumption?.selectedRange?.key === latestSt.selectedTimeRange &&
-        (latestSt.selectedTimeRange !== 'cycle' ||
-          (latestSt.telemetry?.consumption?.selectedRange?.pool || 'all') === activePoolPref)
+        latestSt.telemetry?.consumption?.selectedRange?.key === latestSt.selectedTimeRange
       ) {
         resolvedPayload = {
           ...resolvedPayload,
@@ -10540,7 +9805,6 @@ async function requestTelemetry(params, force) {
           range: latestSt.selectedTimeRange,
           customStartMs: latestSt.customStartMs,
           customEndMs: latestSt.customEndMs,
-          cyclePool: latestSt.selectedCyclePool || 'all',
         });
       }
       return resolvedPayload;
@@ -10566,20 +9830,15 @@ async function fetchConsumptionRangeSlice({
   range,
   customStartMs = 0,
   customEndMs = 0,
-  cyclePool = 'all',
 } = {}) {
   const reqEpoch = endpointSwitchEpoch;
   const reqSeq = ++latestConsumptionReqSeq;
   const targetRange = String(range || 'today');
-  const targetPool = targetRange === 'cycle' ? String(cyclePool || 'all') : 'all';
   const current = telemetryStore.getState();
   const effectiveConvId = current.selectedConversationId || current.hostRouteConversationId || '';
   const params = new URLSearchParams();
   if (effectiveConvId) params.set('conversationId', effectiveConvId);
   params.set('range', targetRange);
-  if (targetRange === 'cycle' && targetPool !== 'all') {
-    params.set('pool', targetPool);
-  }
   if (targetRange === 'custom') {
     if (customStartMs > 0) params.set('startMs', String(customStartMs));
     if (customEndMs > 0) params.set('endMs', String(customEndMs));
@@ -10598,7 +9857,6 @@ async function fetchConsumptionRangeSlice({
       recordConsumptionSliceToCache(payload.consumption, payload.modelBreakdown, {
         customStartMs,
         customEndMs,
-        cyclePool: targetPool,
         usageRevision: usageRev,
       });
       if (reqSeq !== latestConsumptionReqSeq) return payload;
@@ -10606,7 +9864,6 @@ async function fetchConsumptionRangeSlice({
       const latestSt = telemetryStore.getState();
       const stillMatches =
         latestSt.selectedTimeRange === targetRange &&
-        (targetRange !== 'cycle' || (latestSt.selectedCyclePool || 'all') === targetPool) &&
         (targetRange !== 'custom' ||
           (Number(latestSt.customStartMs || 0) === Number(customStartMs || 0) &&
             Number(latestSt.customEndMs || 0) === Number(customEndMs || 0)));
@@ -10712,13 +9969,6 @@ async function selectConversation(
   const params = new URLSearchParams();
   if (effectiveConvId) params.set('conversationId', effectiveConvId);
   if (current.selectedTimeRange) params.set('range', current.selectedTimeRange);
-  if (
-    current.selectedTimeRange === 'cycle' &&
-    current.selectedCyclePool &&
-    current.selectedCyclePool !== 'all'
-  ) {
-    params.set('pool', current.selectedCyclePool);
-  }
   if (current.selectedTimeRange === 'custom') {
     if (current.customStartMs > 0) params.set('startMs', String(current.customStartMs));
     if (current.customEndMs > 0) params.set('endMs', String(current.customEndMs));
@@ -10766,8 +10016,6 @@ async function selectConversation(
       if (baseTelemetry) {
         const mergedTelemetry = applyConversationSliceToTelemetry(baseTelemetry, {
           activeConversation: active,
-          activePool: payload.quotas?.activePool || null,
-          weekly: payload.quotas?.weekly || null,
           sessionConsumption: payload.consumption?.session || null,
           sessionPresets: payload.consumption?.sessionPresets || null,
           stepRevision: payload.stepRevision || '',
@@ -10825,7 +10073,7 @@ async function selectConversation(
  */
 function selectConsumptionTimeRange(
   nextRange,
-  { customStartMs = undefined, customEndMs = undefined, cyclePool = undefined } = {}
+  { customStartMs = undefined, customEndMs = undefined } = {}
 ) {
   const targetRange = String(nextRange || 'today');
   const prevSt = telemetryStore.getState();
@@ -10837,15 +10085,8 @@ function selectConsumptionTimeRange(
     targetRange === 'custom'
       ? Number(customEndMs !== undefined ? customEndMs : prevSt.customEndMs || 0)
       : prevSt.customEndMs;
-  const nextCyclePool =
-    targetRange === 'cycle'
-      ? String(cyclePool !== undefined ? cyclePool || 'all' : prevSt.selectedCyclePool || 'all')
-      : prevSt.selectedCyclePool || 'all';
 
   const statePatch = { selectedTimeRange: targetRange };
-  if (cyclePool !== undefined) {
-    statePatch.selectedCyclePool = nextCyclePool;
-  }
   if (targetRange === 'custom') {
     statePatch.customStartMs = nextStartMs;
     statePatch.customEndMs = nextEndMs;
@@ -10854,8 +10095,7 @@ function selectConsumptionTimeRange(
   const cacheKey = makeConsumptionRangeCacheKey(
     targetRange,
     nextStartMs,
-    nextEndMs,
-    targetRange === 'cycle' ? nextCyclePool : 'all'
+    nextEndMs
   );
   const cached = consumptionRangeCache.get(cacheKey);
   const prevTelemetry = prevSt.telemetry;
@@ -10875,7 +10115,6 @@ function selectConsumptionTimeRange(
       range: targetRange,
       customStartMs: nextStartMs,
       customEndMs: nextEndMs,
-      cyclePool: nextCyclePool,
     });
   }
 
@@ -10884,16 +10123,11 @@ function selectConsumptionTimeRange(
     range: targetRange,
     customStartMs: nextStartMs,
     customEndMs: nextEndMs,
-    cyclePool: nextCyclePool,
   });
 }
 
-function selectConsumptionCyclePool(nextPool = 'all') {
-  return selectConsumptionTimeRange('cycle', { cyclePool: String(nextPool || 'all') });
-}
-
 /**
- * 仅在进入「用量统计」视图时触发一次静默后台预取，拉齐全部 7 个预设区间到前端缓存以实现 0ms 瞬切。
+ * 仅在进入「用量统计」视图时触发一次静默后台预取，拉齐全部 6 个预设区间到前端缓存以实现 0ms 瞬切。
  */
 function prefetchConsumptionPresets() {
   const prevTelemetry = telemetryStore.getState().telemetry;
@@ -10964,9 +10198,6 @@ async function saveSettingsPatch(patch) {
   } else if (Object.prototype.hasOwnProperty.call(safePatch, 'experimentalModernUi')) {
     safePatch.experimentalModernUi = normalizeClientModernUi(safePatch.experimentalModernUi);
   }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'weeklyLimitMode')) {
-    safePatch.weeklyLimitMode = normalizeWeeklyLimitMode(safePatch.weeklyLimitMode);
-  }
   if (Object.prototype.hasOwnProperty.call(safePatch, 'enableCliStatusLine')) {
     safePatch.enableCliStatusLine = Boolean(safePatch.enableCliStatusLine);
   }
@@ -10987,19 +10218,6 @@ async function saveSettingsPatch(patch) {
   }
   if (Object.prototype.hasOwnProperty.call(safePatch, 'showStepFilterToolbar')) {
     safePatch.showStepFilterToolbar = Boolean(safePatch.showStepFilterToolbar);
-  }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'experimentalQuotaReservation')) {
-    safePatch.experimentalQuotaReservation = normalizeClientExperimentalQuotaReservation(
-      safePatch.experimentalQuotaReservation
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'accountQuotaRefreshMinutes')) {
-    safePatch.accountQuotaRefreshMinutes = normalizeClientAccountQuotaRefreshMinutes(
-      safePatch.accountQuotaRefreshMinutes
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'accountSwitchRiskAccepted')) {
-    safePatch.accountSwitchRiskAccepted = Boolean(safePatch.accountSwitchRiskAccepted);
   }
   if (Object.prototype.hasOwnProperty.call(safePatch, 'topbarCapsuleSlots')) {
     safePatch.topbarCapsuleSlots = normalizeClientTopbarSlots(safePatch.topbarCapsuleSlots);
@@ -11153,14 +10371,6 @@ async function saveSettingsPatch(patch) {
   }
 
   const needsTelemetryRecompute = patchKeys.some((k) => TELEMETRY_RECOMPUTE_SETTING_KEYS.has(k));
-  if (
-    Object.prototype.hasOwnProperty.call(safePatch, 'weeklyLimitMode') ||
-    Object.prototype.hasOwnProperty.call(safePatch, 'weeklyTokenBudget') ||
-    Object.prototype.hasOwnProperty.call(safePatch, 'weeklyCostBudget')
-  ) {
-    clearConsumptionRangeCache();
-    clearConversationViewCache();
-  }
   if (needsTelemetryRecompute) {
     inFlightTelemetryPoll = null;
     void fetchTelemetry({ force: false });
@@ -11533,7 +10743,7 @@ function isMacHostPlatform(telemetry) {
   }
   return false;
 }
-return { extractHostRouteCascadeId, telemetryStore, clearConsumptionRangeCache, clearConversationViewCache, CLIENT_TOPBAR_SLOT_KEYS, DEFAULT_CLIENT_TOPBAR_SLOTS, DEFAULT_CLIENT_CONTEXT_AGENT_MODE, CLIENT_CLI_STATUSLINE_PRESETS, DEFAULT_CLIENT_CLI_STATUSLINE_SLOTS, CLIENT_OVERVIEW_MODULE_KEYS, DEFAULT_CLIENT_OVERVIEW_MODULES, DEFAULT_CLIENT_HOVER_MODULES, CLIENT_OVERVIEW_METRIC_KEYS, DEFAULT_CLIENT_OVERVIEW_METRICS, CLIENT_STEP_COLUMN_KEYS, DEFAULT_CLIENT_STEP_COLUMNS, DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT, MIN_CLIENT_POPOVER_WIDTH, MAX_CLIENT_POPOVER_WIDTH, DEFAULT_CLIENT_POPOVER_WIDTH, parseClientStepTokenComboSegments, normalizeClientStepTokenComboFormat, normalizeClientPopoverWidthMode, normalizeClientPopoverWidth, normalizeClientModelDisplayMode, normalizeClientTopbarSlots, normalizeClientContextAgentMode, normalizeClientExperimentalQuotaReservation, normalizeClientAccountQuotaRefreshMinutes, normalizeClientCliStatusLineSlots, getDefaultCtxInspectorAgentId, resolveOverlayCtxInspectorAgentId, resolveEffectiveClientCliStatusLineSlots, normalizeClientHoverModules, normalizeClientOverviewModules, normalizeClientOverviewMetrics, normalizeClientStepColumns, normalizeClientUpdateMode, normalizeClientOrchestratorIdMode, normalizeClientWindowMountMode, isEquivalentTelemetry, resetTelemetryForEndpointSwitch, fetchTelemetry, selectConversation, selectConsumptionTimeRange, selectConsumptionCyclePool, prefetchConsumptionPresets, saveSettingsPatch, saveModelContextWindow, resetAllSettings, rebuildTrajectoryCache, triggerCloudSync, triggerBridgeHostRelaunch, triggerCliStatusLineAction, triggerPluginUpdate, startAsyncTelemetryLoop, stopAsyncTelemetryLoop, resolveHostRouteMatch, resolveScopedConversation, isMacHostPlatform };
+return { extractHostRouteCascadeId, telemetryStore, clearConsumptionRangeCache, clearConversationViewCache, CLIENT_TOPBAR_SLOT_KEYS, DEFAULT_CLIENT_TOPBAR_SLOTS, DEFAULT_CLIENT_CONTEXT_AGENT_MODE, CLIENT_CLI_STATUSLINE_PRESETS, DEFAULT_CLIENT_CLI_STATUSLINE_SLOTS, CLIENT_OVERVIEW_MODULE_KEYS, DEFAULT_CLIENT_OVERVIEW_MODULES, DEFAULT_CLIENT_HOVER_MODULES, CLIENT_OVERVIEW_METRIC_KEYS, DEFAULT_CLIENT_OVERVIEW_METRICS, CLIENT_STEP_COLUMN_KEYS, DEFAULT_CLIENT_STEP_COLUMNS, DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT, MIN_CLIENT_POPOVER_WIDTH, MAX_CLIENT_POPOVER_WIDTH, DEFAULT_CLIENT_POPOVER_WIDTH, parseClientStepTokenComboSegments, normalizeClientStepTokenComboFormat, normalizeClientPopoverWidthMode, normalizeClientPopoverWidth, normalizeClientModelDisplayMode, normalizeClientTopbarSlots, normalizeClientContextAgentMode, normalizeClientCliStatusLineSlots, getDefaultCtxInspectorAgentId, resolveOverlayCtxInspectorAgentId, resolveEffectiveClientCliStatusLineSlots, normalizeClientHoverModules, normalizeClientOverviewModules, normalizeClientOverviewMetrics, normalizeClientStepColumns, normalizeClientUpdateMode, normalizeClientOrchestratorIdMode, normalizeClientWindowMountMode, isEquivalentTelemetry, resetTelemetryForEndpointSwitch, fetchTelemetry, selectConversation, selectConsumptionTimeRange, prefetchConsumptionPresets, saveSettingsPatch, saveModelContextWindow, resetAllSettings, rebuildTrajectoryCache, triggerCloudSync, triggerBridgeHostRelaunch, triggerCliStatusLineAction, triggerPluginUpdate, startAsyncTelemetryLoop, stopAsyncTelemetryLoop, resolveHostRouteMatch, resolveScopedConversation, isMacHostPlatform };
 })();
 
 // --- src/components/ui/TopLongPillNav.js ---
@@ -16794,27 +16004,22 @@ return { HEATMAP_DAYS_THRESHOLD, createTrendAreaChart };
 })();
 
 // --- src/registries/metricRegistry.js ---
-const { CAPSULE_METRIC_KEYS, getCapsuleMetricOptions, getOverviewMetricOptions, resolveQuotaCapsuleSummary, resolveSpecificQuotaSlotSummary, resolveCapsuleMetricPresentation, resolveOverviewMetricCell } = (() => {
+const { CAPSULE_METRIC_KEYS, getCapsuleMetricOptions, getOverviewMetricOptions, resolveCapsuleMetricPresentation, resolveOverviewMetricCell } = (() => {
 /**
  * @fileoverview Decoupled Metric Registry (`metricRegistry.js`).
  * Centralizes presentation & option metadata for:
- * 1. Topbar / Composer Capsule Slots (1..5 items out of 13 metrics)
- * 2. Live Overview / Hover First-Row Metric Matrix (1..4 items out of 9 metrics)
+ * 1. Topbar / Composer Capsule Slots (1..5 items out of 8 metrics)
+ * 2. Live Overview / Hover First-Row Metric Matrix (1..4 items out of 10 metrics)
  */
 
 
 const CAPSULE_METRIC_KEYS = TOPBAR_SLOT_KEYS;
 
-function getCapsuleMetricOptions({ quotas = null, selectedSlots = [] } = {}) {
-  const showArgonWeekly =
-    hasArgonWeeklyQuotaPool(quotas) ||
-    (Array.isArray(selectedSlots) && selectedSlots.includes('argon_weekly'));
-  return CAPSULE_METRIC_KEYS.filter((key) => key !== 'argon_weekly' || showArgonWeekly).map(
-    (key) => ({
-      value: key,
-      label: t(`capMetric.${key}`),
-    })
-  );
+function getCapsuleMetricOptions() {
+  return CAPSULE_METRIC_KEYS.map((key) => ({
+    value: key,
+    label: t(`capMetric.${key}`),
+  }));
 }
 
 function getOverviewMetricOptions() {
@@ -16822,115 +16027,6 @@ function getOverviewMetricOptions() {
     value: key,
     label: t(`ovMetric.${key}`),
   }));
-}
-
-function resolveQuotaCapsuleSummary(quotas) {
-  if (!quotas) return null;
-  const activePool = quotas.activePool;
-  const weekly = quotas.weekly;
-  const pools = Array.isArray(quotas.pools) ? quotas.pools : [];
-  const candidates = [];
-  const defaultPoolName = isEnglishLocale() ? 'Active Pool' : '当前池';
-  const wkTag = isEnglishLocale() ? 'Wk' : '周';
-
-  if (activePool && Number.isFinite(Number(activePool.remainingPct))) {
-    candidates.push({
-      pct: Number(activePool.remainingPct),
-      label: activePool.poolLabel || activePool.family || defaultPoolName,
-      windowTag: '5h',
-    });
-  }
-  if (activePool && Number.isFinite(Number(activePool.weeklyRemainingPct))) {
-    candidates.push({
-      pct: Number(activePool.weeklyRemainingPct),
-      label: activePool.poolLabel || activePool.family || defaultPoolName,
-      windowTag: wkTag,
-    });
-  }
-  if (!candidates.length && weekly && Number.isFinite(Number(weekly.remainingPct))) {
-    candidates.push({
-      pct: Number(weekly.remainingPct),
-      label: weekly.poolFamily || (isEnglishLocale() ? 'Weekly' : '周限额'),
-      windowTag: wkTag,
-    });
-  }
-  if (!candidates.length && pools.length > 0) {
-    for (const p of pools) {
-      const pLabel = p?.poolLabel || p?.family || defaultPoolName;
-      if (p && Number.isFinite(Number(p.remainingPct))) {
-        candidates.push({ pct: Number(p.remainingPct), label: pLabel, windowTag: '5h' });
-      }
-      if (p && Number.isFinite(Number(p.weeklyRemainingPct))) {
-        candidates.push({ pct: Number(p.weeklyRemainingPct), label: pLabel, windowTag: wkTag });
-      }
-    }
-  }
-  if (!candidates.length) return null;
-  candidates.sort((a, b) => a.pct - b.pct);
-  const tightest = candidates[0];
-  const runnerUp = candidates.length > 1 ? candidates[1] : null;
-  const rounded = Math.max(0, Math.min(100, Math.round(tightest.pct)));
-  const runnerPct = runnerUp ? Math.max(0, Math.min(100, Math.round(runnerUp.pct))) : null;
-  const subLabelText = runnerUp
-    ? runnerUp.label === tightest.label
-      ? `${tightest.label} ${tightest.windowTag} · ${runnerUp.windowTag} ${runnerPct}%`
-      : `${tightest.label} ${tightest.windowTag} · ${runnerUp.label} ${runnerUp.windowTag} ${runnerPct}%`
-    : `${tightest.label} · ${tightest.windowTag}`;
-  const tightestIsClaude = /claude|gpt|fable|oss|third/i.test(String(tightest.label || ''));
-  const tightestIsArgon = !tightestIsClaude && /\bargon\b/i.test(String(tightest.label || ''));
-  const tightestIsGemini =
-    !tightestIsClaude && !tightestIsArgon && /gemini|carbon|neon|flash|pro/i.test(String(tightest.label || ''));
-  const tightestWinShort = tightest.windowTag === '5h' ? '5h' : isEnglishLocale() ? 'w' : '周';
-  const poolPrefix = tightestIsClaude
-    ? `C${tightestWinShort}`
-    : tightestIsArgon
-      ? `A${tightestWinShort}`
-      : tightestIsGemini
-        ? `G${tightestWinShort}`
-        : tightest.windowTag === '5h'
-          ? '5h'
-          : isEnglishLocale()
-            ? 'Wk'
-            : '周';
-  return {
-    roundedPct: rounded,
-    shortText: t('capsule.quotaLeft', { pct: rounded }),
-    poolPrefix,
-    subLabelText,
-    detailText: candidates
-      .map((c) => {
-        const cPct = Math.max(0, Math.min(100, Math.round(c.pct)));
-        return `${c.label} ${c.windowTag} ${t('capsule.quotaLeft', { pct: cPct })}`;
-      })
-      .join(' · '),
-  };
-}
-
-function resolveQuotaCapsulePrefix(metricKey, quotaSum) {
-  const isEn = isEnglishLocale();
-  if (metricKey === 'gemini_5h') return 'G5h';
-  if (metricKey === 'gemini_weekly') return isEn ? 'Gw' : 'G周';
-  if (metricKey === 'argon_weekly') return isEn ? 'Aw' : 'A周';
-  if (metricKey === 'claude_5h') return 'C5h';
-  if (metricKey === 'claude_weekly') return isEn ? 'Cw' : 'C周';
-  if (quotaSum?.poolPrefix) return quotaSum.poolPrefix;
-  return isEn ? 'Q' : '余';
-}
-
-/**
- * 解析指定模型池（Gemini 或 Claude & GPT）与指定时间窗口（5h 或周额度）的剩余百分比摘要。
- *
- * @param {object|null|undefined} quotas
- * @param {'gemini_5h'|'gemini_weekly'|'claude_5h'|'claude_weekly'} slotKey
- * @returns {{ roundedPct: number, shortText: string } | null}
- */
-function resolveSpecificQuotaSlotSummary(quotas, slotKey) {
-  const rounded = resolveCapsuleQuotaSlotPct(quotas, slotKey);
-  if (rounded == null) return null;
-  return {
-    roundedPct: rounded,
-    shortText: t('capsule.quotaLeft', { pct: rounded }),
-  };
 }
 
 /**
@@ -17131,50 +16227,18 @@ function resolveCapsuleMetricPresentation(metricKey, slotCtx, ringCircumference)
     };
   }
 
-  if (metricKey === 'argon_weekly' && slotCtx.hasTelemetry && !hasArgonWeeklyQuotaPool(slotCtx.quotas)) {
-    return {
-      hidden: true,
-      metric: 'none',
-      segClass: 'wm-cap-slot',
-      textClass: 'wm-slot-text',
-      showRing: false,
-      dashOffset: ringCircumference,
-      text: '',
-      toneClass: '',
-      running: false,
-      warn: false,
-      danger: false,
-    };
-  }
-
-  const quotaSum = !slotCtx.hasTelemetry
-    ? null
-    : metricKey === 'quota_auto'
-      ? resolveQuotaCapsuleSummary(slotCtx.quotas)
-      : resolveSpecificQuotaSlotSummary(slotCtx.quotas, metricKey);
-  const hasQuotaPct = Boolean(quotaSum && Number.isFinite(quotaSum.roundedPct));
-  const clampedPct = hasQuotaPct ? Math.max(0, Math.min(100, quotaSum.roundedPct)) : 0;
-  const quotaDashOffset = hasQuotaPct
-    ? +(ringCircumference * (1 - clampedPct / 100)).toFixed(2)
-    : ringCircumference;
-  const isDanger = Boolean(hasQuotaPct && clampedPct <= 15);
-  const isWarn = Boolean(hasQuotaPct && !isDanger && clampedPct <= 30);
-  const toneClass = isDanger ? 'tone-danger' : isWarn ? 'tone-warn' : '';
   return {
-    hidden: false,
-    metric: metricKey,
-    segClass: 'wm-cap-slot wm-seg-quota',
-    textClass: 'wm-slot-text wm-quota-text',
-    showRing: true,
-    ringKind: 'quota',
-    ringEmpty: !hasQuotaPct,
-    dashOffset: quotaDashOffset,
-    prefix: resolveQuotaCapsulePrefix(metricKey, quotaSum),
-    text: hasQuotaPct ? `${clampedPct}%` : '--%',
-    toneClass,
+    hidden: true,
+    metric: 'none',
+    segClass: 'wm-cap-slot',
+    textClass: 'wm-slot-text',
+    showRing: false,
+    dashOffset: ringCircumference,
+    text: '',
+    toneClass: '',
     running: false,
-    warn: isWarn,
-    danger: isDanger,
+    warn: false,
+    danger: false,
   };
 }
 
@@ -17194,12 +16258,11 @@ function resolveActiveBadgeText(active) {
  * 解析实时监控第一行矩阵单个单元格的展示数据。
  *
  * @param {string} metricKey
- * @param {{ active?: object, ctx?: object, quotas?: object, settings?: object, hasSubagents?: boolean }} cellCtx
+ * @param {{ active?: object, ctx?: object, settings?: object, hasSubagents?: boolean }} cellCtx
  */
 function resolveOverviewMetricCell(metricKey, cellCtx = {}) {
   const active = cellCtx.active || {};
   const ctx = cellCtx.ctx || active.context || {};
-  const quotas = cellCtx.quotas || {};
   const settings = cellCtx.settings || {};
   const hasSubagents = Boolean(cellCtx.hasSubagents);
   const hasAnySteps = Number(active.stepCount || 0) > 0;
@@ -17389,55 +16452,32 @@ function resolveOverviewMetricCell(metricKey, cellCtx = {}) {
     };
   }
 
-  if (metricKey === 'context_usage') {
-    const limitTokens = Number(ctx.compactionLimitTokens || ctx.limitTokens || 256000);
-    const totalTokens = Number(ctx.totalTokens || 0);
-    const usedPct =
-      limitTokens > 0 ? Math.min(100, +((totalTokens / limitTokens) * 100).toFixed(1)) : 0;
-    const toneCls =
-      usedPct >= 88
-        ? 'cell-value tone-danger'
-        : usedPct >= 70
-          ? 'cell-value tone-warn'
-          : 'cell-value';
-    return {
-      key: 'context_usage',
-      label: t('ovMetric.context_usage'),
-      icon: 'layers',
-      iconSize: 11,
-      isPulsing: false,
-      valueText: `${usedPct}%`,
-      valueClass: toneCls,
-      subText: t('ovMetric.subCtxRatio', {
-        used: formatTokens(totalTokens),
-        limit: formatTokens(limitTokens),
-      }),
-      subClass: 'cell-sub',
-    };
-  }
-
-  const quotaSum = resolveQuotaCapsuleSummary(quotas);
-  const quotaToneCls =
-    quotaSum && quotaSum.roundedPct <= 15
+  const limitTokens = Number(ctx.compactionLimitTokens || ctx.limitTokens || 256000);
+  const totalTokens = Number(ctx.totalTokens || 0);
+  const usedPct =
+    limitTokens > 0 ? Math.min(100, +((totalTokens / limitTokens) * 100).toFixed(1)) : 0;
+  const toneCls =
+    usedPct >= 88
       ? 'cell-value tone-danger'
-      : quotaSum && quotaSum.roundedPct <= 30
+      : usedPct >= 70
         ? 'cell-value tone-warn'
         : 'cell-value';
   return {
-    key: 'quota_tightest',
-    label: t('ovMetric.quota_tightest'),
-    icon: 'pulse',
+    key: 'context_usage',
+    label: t('ovMetric.context_usage'),
+    icon: 'layers',
     iconSize: 11,
     isPulsing: false,
-    valueText: quotaSum ? quotaSum.shortText : '—',
-    valueClass: quotaToneCls,
-    subText: quotaSum
-      ? t('ovMetric.subQuotaPool', { label: quotaSum.subLabelText })
-      : t('ovMetric.subQuotaPending'),
+    valueText: `${usedPct}%`,
+    valueClass: toneCls,
+    subText: t('ovMetric.subCtxRatio', {
+      used: formatTokens(totalTokens),
+      limit: formatTokens(limitTokens),
+    }),
     subClass: 'cell-sub',
   };
 }
-return { CAPSULE_METRIC_KEYS, getCapsuleMetricOptions, getOverviewMetricOptions, resolveQuotaCapsuleSummary, resolveSpecificQuotaSlotSummary, resolveCapsuleMetricPresentation, resolveOverviewMetricCell };
+return { CAPSULE_METRIC_KEYS, getCapsuleMetricOptions, getOverviewMetricOptions, resolveCapsuleMetricPresentation, resolveOverviewMetricCell };
 })();
 
 // --- src/components/widgets/MetricMatrixWidget.js ---
@@ -17539,7 +16579,6 @@ const MetricMatrixWidget = defineComponent({
       );
       const active = scopedConv || data?.activeConversation || {};
       const ctx = ctxAgent?.context || active.context || {};
-      const quotas = data?.quotas || {};
       const settings = data?.settings || {};
       const locale = getEffectiveLocale();
 
@@ -17547,7 +16586,6 @@ const MetricMatrixWidget = defineComponent({
         const cell = resolveOverviewMetricCell(key, {
           active,
           ctx,
-          quotas,
           settings,
           hasSubagents,
         });
@@ -19099,7 +18137,7 @@ return { buildFallbackRunningConversations, LiveActivityWidget };
 const { OVERVIEW_WIDGET_KEYS, OVERVIEW_WIDGET_REGISTRY, getOverviewModuleOptions, createDynamicWidgetHost } = (() => {
 /**
  * @fileoverview Decoupled Overview & Hover Widget Registry (`widgetRegistry.js`).
- * Maps module keys (`metrics`, `context`, `quotas`, `live_tasks`) to standalone
+ * Maps module keys (`metrics`, `context`, `live_tasks`) to standalone
  * widget components and provides `createDynamicWidgetHost` for zero-hardcode mounting,
  * live reordering, and clean instance disposal.
  */
@@ -20065,7 +19103,6 @@ function buildCapsuleSlotContext(
         : null,
     latestPromptTokens: capActive.latestPromptTokens ?? null,
     sessionTokens,
-    quotas: data.quotas,
   };
 }
 
@@ -23159,8 +22196,6 @@ const TopSessionHeader = defineComponent({
       const isSynced = telSt.syncState === 'synced';
       const isError = telSt.syncState === 'error';
       const isRunning = Boolean(aggregated?.isRunning || telemetry?.activeConversation?.isRunning);
-      const quotaMeta = telemetry?.quotas?.meta;
-      const quotaStale = Boolean(quotaMeta?.refreshFailed || quotaMeta?.isStale);
 
       patchClasses(refreshBtn, { 'is-spinning': isSyncing });
       patchAttr(refreshBtn, 'disabled', isSyncing);
@@ -23199,17 +22234,6 @@ const TopSessionHeader = defineComponent({
           'state-running': true,
           'state-synced': false,
           'state-warn': false,
-        });
-      } else if (quotaStale) {
-        patchSvgIcon(statusIcon, 'warning');
-        patchText(
-          statusText,
-          quotaMeta?.hasOfficialData ? t('header.statusQuotaCached') : t('header.statusQuotaOffline')
-        );
-        patchClasses(statusTag, {
-          'state-running': false,
-          'state-synced': false,
-          'state-warn': true,
         });
       } else {
         patchSvgIcon(statusIcon, 'pulse');
@@ -24226,15 +23250,15 @@ const { LiveOverviewView } = (() => {
 /**
  * @fileoverview View 1: Decoupled `LiveOverviewView.js` (实时监控视图).
  * Acts as a lightweight host container delegating all telemetry cards
- * (`metrics`, `context`, `quotas`, `live_tasks`) to `widgetRegistry.js` (`a` calls `b`),
+ * (`metrics`, `context`, `live_tasks`) to `widgetRegistry.js` (`a` calls `b`),
  * allowing users to freely reorder or remove any module down to 1 item.
  */
 
 
 
 function resolveOverviewModules(raw) {
-  const filtered = normalizeClientOverviewModules(raw).filter((k) => k !== 'quotas');
-  return filtered.length > 0 ? filtered : ['metrics', 'context', 'live_tasks'];
+  const normalized = normalizeClientOverviewModules(raw);
+  return normalized.length > 0 ? normalized : ['metrics', 'context', 'live_tasks'];
 }
 
 const LiveOverviewView = defineComponent({
@@ -24415,7 +23439,6 @@ const { ConsumptionView } = (() => {
 /** 消耗统计顶栏支持的时间范围预设项 */
 function getConsumptionTimeRangeOptions() {
   return [
-    { value: 'cycle', label: t('cons.rangeCycle') },
     { value: 'today', label: t('cons.rangeToday') },
     { value: '24h', label: t('cons.range24h') },
     { value: '7d', label: t('cons.range7d') },
@@ -24450,86 +23473,6 @@ function ceilToEndOfMinuteMs(ms) {
   const d = new Date(n);
   d.setSeconds(59, 999);
   return d.getTime();
-}
-
-function formatCyclePoolShortLabel(poolKey, poolLabel) {
-  if (poolKey === 'Argon') return 'Argon';
-  if (poolKey === 'Carbon') return 'Carbon';
-  if (poolKey === 'Claude & GPT') return 'Claude/GPT';
-  return poolLabel || poolKey;
-}
-
-function buildCyclePoolSelectOptions(pools, isCustomWeeklyMode = false) {
-  const list = Array.isArray(pools) ? pools : [];
-  let sumCycleCost = 0;
-  let hasAnyCycleCost = false;
-  for (let i = 0; i < list.length; i++) {
-    const c = Number(list[i]?.cycleWeekly?.costUsd);
-    if (Number.isFinite(c) && c >= 0 && list[i]?.cycleWeekly) {
-      sumCycleCost += c;
-      hasAnyCycleCost = true;
-    }
-  }
-  const allLabel = t('cons.cyclePoolAll');
-  const opts = [
-    {
-      value: 'all',
-      label: allLabel,
-      shortLabel: t('cons.cyclePoolAllShort'),
-      meta: !isCustomWeeklyMode && hasAnyCycleCost ? formatUsd(sumCycleCost) : '',
-      title: allLabel,
-    },
-  ];
-  for (let i = 0; i < list.length; i++) {
-    const p = list[i];
-    const key = String(p?.poolKey || p?.family || '').trim();
-    if (!key || key === 'Unknown') continue;
-    const label = String(p?.poolLabel || key).trim();
-    const shortLabel = formatCyclePoolShortLabel(key, label);
-    const metaParts = [];
-    if (
-      !isCustomWeeklyMode &&
-      p?.weeklyRemainingPct != null &&
-      Number.isFinite(Number(p.weeklyRemainingPct))
-    ) {
-      metaParts.push(
-        t('cons.cyclePoolRemMeta', {
-          pct: formatPctNumber(p.weeklyRemainingPct, { withSymbol: true }),
-        })
-      );
-    }
-    if (!isCustomWeeklyMode && p?.cycleWeekly && Number.isFinite(Number(p.cycleWeekly.costUsd))) {
-      metaParts.push(formatUsd(p.cycleWeekly.costUsd));
-    }
-    const meta = metaParts.join(' · ');
-    opts.push({
-      value: key,
-      label,
-      shortLabel,
-      meta,
-      title: meta ? `${label} (${meta})` : label,
-    });
-  }
-  return opts;
-}
-
-function formatCycleMinuteSpanTip(startMs, endMs, isFallbackWeek = false) {
-  const s = Number(startMs);
-  const e = Number(endMs);
-  if (!(s > 0 && e > 0 && Number.isFinite(s) && Number.isFinite(e))) return null;
-  const sd = new Date(s);
-  const ed = new Date(e);
-  const pad2 = (n) => String(n).padStart(2, '0');
-  const sTime = `${pad2(sd.getHours())}:${pad2(sd.getMinutes())}`;
-  const eTime = `${pad2(ed.getHours())}:${pad2(ed.getMinutes())}`;
-  const sameDay =
-    sd.getFullYear() === ed.getFullYear() &&
-    sd.getMonth() === ed.getMonth() &&
-    sd.getDate() === ed.getDate();
-  const sDate = `${sd.getMonth() + 1}/${pad2(sd.getDate())}`;
-  const eDate = `${ed.getMonth() + 1}/${pad2(ed.getDate())}`;
-  const base = sameDay ? `${sDate} ${sTime} ~ ${eTime}` : `${sDate} ${sTime} ~ ${eDate} ${eTime}`;
-  return isFallbackWeek ? `${base} · ${t('cons.cycleFallbackWeekTip')}` : base;
 }
 
 const ConsumptionView = defineComponent({
@@ -24637,16 +23580,6 @@ const ConsumptionView = defineComponent({
 
     // --- Section 1: 用量概览矩阵 (4 列核心指标 + Token 构成小字 + 底部 4 段比例条) ---
     const dateSpanBadge = h('span', { className: 'cons-badge text-mono', text: '-- ~ --' });
-    const cyclePoolSelect = CustomSelect({
-      className: 'cons-cycle-pool-select',
-      modelValue: telemetryStore.getState().selectedCyclePool || 'all',
-      options: buildCyclePoolSelectOptions([]),
-      onUpdateModelValue: (nextPool) => {
-        selectConsumptionCyclePool(nextPool || 'all');
-      },
-    });
-    patchAttr(cyclePoolSelect.el, 'hidden', true);
-    patchAttr(cyclePoolSelect.refs.triggerBtn, 'aria-label', t('cons.cyclePoolAria'));
     const heroTotalTokens = h('strong', { className: 'cons-hero-num text-mono', text: '0' });
     const heroSplitInputLabel = h('span', { text: t('cons.footInput') });
     const heroSplitInputVal = h('span', { text: '0' });
@@ -24759,7 +23692,6 @@ const ConsumptionView = defineComponent({
       h('div', { className: 'panel-header cons-overview-head' }, [
         h('span', { className: 'panel-title cons-overview-title' }, [
           dateSpanBadge,
-          cyclePoolSelect.el,
         ]),
         h('div', { className: 'cons-overview-controls' }, [
           timeFilterSwitch.el,
@@ -24965,7 +23897,7 @@ const ConsumptionView = defineComponent({
       const cons = slice.consumption || {};
       const rangeInfo = cons.selectedRange || {};
 
-      // 始终在 0ms 同步顶部时间段滑块、周期池选择器及自定义日期条显隐，给予即刻交互反馈
+      // 始终在 0ms 同步顶部时间段滑块及自定义日期条显隐，给予即刻交互反馈
       timeFilterSwitch.setValue(slice.range);
       patchAttr(customRangeBar, 'hidden', slice.range !== 'custom');
       if (!hasUncommittedCustomDraft) {
@@ -24975,52 +23907,21 @@ const ConsumptionView = defineComponent({
         endPicker.setValue(draftEndMs);
       }
 
-      const isCustomWeeklyMode =
-        slice.weeklyLimitMode === 'custom_tokens' || slice.weeklyLimitMode === 'custom_cost';
-      const cyclePoolOptions =
-        slice.range === 'cycle'
-          ? buildCyclePoolSelectOptions(slice.quotaPools, isCustomWeeklyMode)
-          : [];
-      const activePoolFilter = slice.range === 'cycle' ? slice.cyclePool || 'all' : 'all';
-      const showCyclePoolSelect = slice.range === 'cycle' && cyclePoolOptions.length > 2;
-      if (!showCyclePoolSelect) {
-        cyclePoolSelect.close?.();
-        patchAttr(cyclePoolSelect.el, 'hidden', true);
-      } else {
-        cyclePoolSelect.setProps({
-          modelValue: activePoolFilter,
-          options: cyclePoolOptions,
-        });
-        patchAttr(cyclePoolSelect.el, 'hidden', false);
-      }
-
       // 极少数缓存未命中时（如自定义新区间或进页瞬间抢点），跳过用旧趋势/模型跑无效半更新重绘，待几毫秒后单帧原子绘制
-      const payloadPool = rangeInfo.key === 'cycle' ? rangeInfo.pool || 'all' : 'all';
-      if (
-        (rangeInfo.key && slice.range && rangeInfo.key !== slice.range) ||
-        (slice.range === 'cycle' && rangeInfo.pool && payloadPool !== activePoolFilter)
-      ) {
+      if (rangeInfo.key && slice.range && rangeInfo.key !== slice.range) {
         return;
       }
 
       const preset =
-        slice.range !== 'custom' &&
-        !(slice.range === 'cycle' && activePoolFilter !== 'all') &&
-        cons.presets?.[slice.range]
+        slice.range !== 'custom' && cons.presets?.[slice.range]
           ? cons.presets[slice.range]
           : null;
       const acct = cons.account || preset?.account || {};
       const dateSpan = formatDateSpanBadge(rangeInfo.startMs, rangeInfo.endMs);
-      const cycleOptionsSig = showCyclePoolSelect
-        ? cyclePoolOptions.map((o) => `${o.value}:${o.label}:${o.meta || ''}`).join('|')
-        : '';
       const locale = i18nStore.getState().locale;
       const renderTuple = [
         locale,
         slice.range,
-        activePoolFilter,
-        cycleOptionsSig,
-        Boolean(rangeInfo.isFallbackWeek),
         slice.customStartMs,
         slice.customEndMs,
         slice.modelDisplayMode,
@@ -25068,17 +23969,7 @@ const ConsumptionView = defineComponent({
 
       // 1. 同步用量概览矩阵（4 列核心指标 + Token 构成小字 + 底部 4 段比例条）
       patchText(dateSpanBadge, dateSpan);
-      patchAttr(
-        dateSpanBadge,
-        'title',
-        slice.range === 'cycle'
-          ? formatCycleMinuteSpanTip(
-              rangeInfo.startMs,
-              rangeInfo.endMs,
-              Boolean(rangeInfo.isFallbackWeek)
-            )
-          : null
-      );
+      patchAttr(dateSpanBadge, 'title', null);
       const totalTokens = Number(acct.totalTokens || 0);
       const inputTokens = Number(acct.inputTokens || 0);
       const cacheTokens = Number(acct.cacheReadTokens || 0);
@@ -25193,11 +24084,8 @@ const ConsumptionView = defineComponent({
     const unsub = telemetryStore.subscribe(
       (st) => ({
         range: st.selectedTimeRange,
-        cyclePool: st.selectedCyclePool || 'all',
         customStartMs: st.customStartMs,
         customEndMs: st.customEndMs,
-        quotaPools: st.telemetry?.quotas?.pools,
-        weeklyLimitMode: st.telemetry?.settings?.weeklyLimitMode,
         consumption: st.telemetry?.consumption,
         modelBreakdown: st.telemetry?.modelBreakdown,
         modelDisplayMode: normalizeModelDisplayMode(
@@ -25249,7 +24137,6 @@ const ConsumptionView = defineComponent({
         ariaLabel: t('cons.rangeAria'),
         options: getConsumptionTimeRangeOptions(),
       });
-      patchAttr(cyclePoolSelect.refs.triggerBtn, 'aria-label', t('cons.cyclePoolAria'));
       patchText(applyCustomBtnLabel, t('cons.applyFilter'));
       patchText(rangeToSpan, t('cons.rangeTo'));
       patchText(totalTokensLabel, t('cons.totalTokens'));
@@ -25300,7 +24187,6 @@ const ConsumptionView = defineComponent({
       unsubView();
       unsubI18n();
       consExportMenu.destroy();
-      cyclePoolSelect.destroy();
       heatmapModeSwitch.destroy();
       trendChart.destroy?.();
       timeFilterSwitch.destroy();
@@ -25313,7 +24199,6 @@ const ConsumptionView = defineComponent({
       el: rootEl,
       refs: {
         timeFilterSwitch,
-        cyclePoolSelect,
         heatmapModeSwitch,
         trendChart,
         startPicker,
@@ -27205,7 +26090,7 @@ function resolveEffectiveTopbarSlots(rawSlots) {
 }
 
 function resolveEffectiveHoverModules(rawModules) {
-  return normalizeClientHoverModules(rawModules).filter((key) => key !== 'quotas');
+  return normalizeClientHoverModules(rawModules);
 }
 
 

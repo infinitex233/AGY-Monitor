@@ -582,8 +582,8 @@ test('supports Gemini 4 Carbon pricing/pool and resolves all newly added languag
   // Total = 0.75 + 4.00 + 3.10 + 12.20 + 1.55 + 0.001 = $21.601 -> $21.60
   assert.equal(p.activeConversation.sessionCostUsd, 21.6);
   assert.equal(p.activeConversation.activeModelShort, 'carbon-4-high');
-  assert.equal(p.quotas.activePool.poolKey, 'Carbon');
-  assert.equal(p.quotas.activePool.weeklyRemainingIntPct, 65);
+  assert.equal(p.quotas, undefined);
+  assert.equal(p.account, undefined);
 });
 
 test('trendSeries preserves 1-day-per-slot granularity for >90 day spans and recentSteps separates thinking vs response tokens', async () => {
@@ -965,22 +965,19 @@ test('saving preferences sends the same legacy values normalized by the backend'
     windowMountMode: 'sidebar_only',
     topbarCapsuleSlots: ['step_cost', 'cost', 'none'],
     overviewMetrics: ['cost', 'tps'],
-    weeklyLimitMode: 'tokens',
   });
   assert.deepEqual(patches[0], {
     windowMountMode: 'sidebar',
     enableWindowOverlay: false,
     topbarCapsuleSlots: ['cost'],
     overviewMetrics: ['step_cost', 'tps'],
-    weeklyLimitMode: 'custom_tokens',
   });
   assert.deepEqual(telemetryStore.getState().telemetry.settings, savedSettings);
   assert.equal(savedSettings.themeAccent, 'blue');
 
-  await saveSettingsPatch({ topbarCapsuleSlots: [], weeklyLimitMode: 'cost' });
+  await saveSettingsPatch({ topbarCapsuleSlots: [] });
   assert.deepEqual(patches[1], {
     topbarCapsuleSlots: ['context'],
-    weeklyLimitMode: 'custom_cost',
   });
 
   const telemetryBeforeFailure = telemetryStore.getState().telemetry;
@@ -1015,9 +1012,15 @@ test('preferences schema defaults match pre-refactor UI, migrate legacy none slo
   assert.equal(def.contextAgentMode, 'main');
   assert.equal(def.enableCliStatusLine, true);
   assert.deepEqual([...def.topbarCapsuleSlots], ['tps', 'ttft', 'context']);
-  assert.deepEqual([...def.hoverModules], ['metrics', 'context', 'quotas']);
-  assert.deepEqual([...def.overviewModules], ['metrics', 'context', 'quotas', 'live_tasks']);
+  assert.deepEqual([...def.hoverModules], ['metrics', 'context']);
+  assert.deepEqual([...def.overviewModules], ['metrics', 'context', 'live_tasks']);
   assert.deepEqual([...def.overviewMetrics], ['tps', 'ttft', 'avg_tps', 'step_cost']);
+  assert.equal(def.weeklyLimitMode, undefined);
+  assert.equal(def.weeklyTokenBudget, undefined);
+  assert.equal(def.weeklyCostBudget, undefined);
+  assert.equal(def.experimentalQuotaReservation, undefined);
+  assert.equal(def.accountQuotaRefreshMinutes, undefined);
+  assert.equal(def.accountSwitchRiskAccepted, undefined);
   assert.equal(def.showStepTurnRail, false);
   assert.equal(def.showStepAgentBadge, true);
   assert.equal(def.showStepSpeedColor, false);
@@ -1025,12 +1028,12 @@ test('preferences schema defaults match pre-refactor UI, migrate legacy none slo
   assert.deepEqual([...def.stepTableColumns], ['step', 'model', 'tps', 'ttft', 'cache', 'cost']);
   assert.deepEqual({ ...def.modelContextWindows }, {});
 
-  // 2. Legacy 3-slot ['context', 'none', 'quota_auto'] migrates cleanly to 2-item ['context', 'quota_auto']
+  // 2. Legacy 3-slot ['context', 'none', 'quota_auto'] strips removed quota & none slots to ['context']
   assert.deepEqual(
     [...hDefault.normalizeTopbarCapsuleSlots(['context', 'none', 'quota_auto'])],
-    ['context', 'quota_auto']
+    ['context']
   );
-  // Up to 5 unique items supported, duplicates stripped, empty falls back to ['context']
+  // Up to 5 unique items supported, duplicates stripped, invalid quota slots skipped, empty falls back to ['context']
   assert.deepEqual(
     [...hDefault.normalizeTopbarCapsuleSlots(['tps', 'ttft', 'cost', 'cache_hit', 'session_tokens', 'gemini_5h'])],
     ['tps', 'ttft', 'cost', 'cache_hit', 'session_tokens']
@@ -1054,7 +1057,7 @@ test('preferences schema defaults match pre-refactor UI, migrate legacy none slo
     contextAgentMode: 'auto',
     topbarCapsuleSlots: ['context', 'tps', 'ttft', 'cost'],
     hoverModules: ['metrics', 'context'],
-    overviewModules: ['quotas', 'metrics'],
+    overviewModules: ['context', 'metrics'],
     overviewMetrics: ['avg_tps', 'cache_hit'],
     enableCliStatusLine: false,
     showStepTurnRail: true,
@@ -1072,7 +1075,7 @@ test('preferences schema defaults match pre-refactor UI, migrate legacy none slo
   assert.equal(saveRes.updated.contextAgentMode, 'auto');
   assert.equal(saveRes.updated.topbarCapsuleSlots.length, 4);
   assert.deepEqual([...saveRes.updated.hoverModules], ['metrics', 'context']);
-  assert.deepEqual([...saveRes.updated.overviewModules], ['quotas', 'metrics']);
+  assert.deepEqual([...saveRes.updated.overviewModules], ['context', 'metrics']);
   assert.deepEqual([...saveRes.updated.overviewMetrics], ['avg_tps', 'cache_hit']);
   assert.equal(saveRes.updated.enableCliStatusLine, false);
   assert.equal(saveRes.updated.showStepTurnRail, true);
@@ -1904,16 +1907,15 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
       ttft: 11.8,
       tps: 38.1,
       usedPct: 17,
-      quotas: { activePool: { remainingPct: 57 } },
     },
     {
-      slots: ['ttft', 'tps', 'quota_auto', 'context'],
+      slots: ['ttft', 'tps', 'context'],
       showMultiSession: true,
       language: 'zh-CN',
       color: false,
     }
   );
-  assert.equal(plainCapsule, '● 0 运行中   11.8s | 38.1 t/s | 余 57% | 上下文 17%');
+  assert.equal(plainCapsule, '● 0 运行中   11.8s | 38.1 t/s | 上下文 17%');
 
   const ansiCapsule = h.formatCliStatusLineCapsule(
     {
@@ -1923,21 +1925,20 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
       ttft: 1.25,
       tps: 68.4,
       usedPct: 75,
-      quotas: { activePool: { remainingPct: 22 } },
     },
     {
-      slots: ['ttft', 'tps', 'quota_auto', 'context'],
+      slots: ['ttft', 'tps', 'context'],
       showMultiSession: true,
       language: 'zh-CN',
       color: true,
     }
   );
-  assert.equal(/\x1b\[48;2;116;84;22m/.test(ansiCapsule), true, 'Emits warm amber 24-bit pill fill for warn quota/context');
+  assert.equal(/\x1b\[48;2;116;84;22m/.test(ansiCapsule), true, 'Emits warm amber 24-bit pill fill for warn context');
   assert.equal(/\x1b\[48;2;36;40;50m/.test(ansiCapsule), true, 'Emits dark slate unfilled pill track');
   assert.equal(/\x1b\]/.test(ansiCapsule), false, 'Contains zero OSC sequences so Bubble Tea width never breaks');
   assert.equal(
     ansiCapsule.replace(/\x1b\[[0-9;]*m/g, ''),
-    '● 2 运行中 · 1 子   1.3s | 68.4 t/s |  余 22%  |  上下文 75% '
+    '● 2 运行中 · 1 子   1.3s | 68.4 t/s |  上下文 75% '
   );
 
   // Full 3-column single-line bar with left shortcuts, centered pill metrics, and right mode/model/effort
@@ -1949,10 +1950,9 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
       ttft: 5.6,
       tps: 22.0,
       usedPct: 2,
-      quotas: { activePool: { remainingPct: 54 } },
     },
     {
-      slots: ['ttft', 'tps', 'quota_auto', 'context'],
+      slots: ['ttft', 'tps', 'context'],
       showMultiSession: true,
       language: 'zh-CN',
       color: true,
@@ -1962,18 +1962,17 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
       modelEffort: 'medium',
     }
   );
-  assert.equal(/\x1b\[48;2;24;96;68m/.test(inlineBar120), true, 'Quota normal pill uses deep emerald fill');
   assert.equal(/\x1b\[48;2;36;72;128m/.test(inlineBar120), true, 'Context normal pill uses slate-blue fill');
   const plainBar120 = inlineBar120.replace(/\x1b\[[0-9;]*m/g, '');
   assert.ok(plainBar120.startsWith('? for shortcuts  '), 'Keeps ? for shortcuts on the left');
   assert.ok(
-    plainBar120.includes('● 2 运行中   5.6s | 22.0 t/s |  余 54%  |  上下文  2% '),
+    plainBar120.includes('● 2 运行中   5.6s | 22.0 t/s |  上下文  2% '),
     'Keeps compact pill gauges with right-aligned percentage and full chrome in 120 columns'
   );
   assert.ok(plainBar120.endsWith('  auto · Gemini 4 Hydrogen · medium'), 'Renders deduplicated mode · model · effort on the right');
   assert.equal(h.cliDisplayWidth(inlineBar120), 119, 'Fits cleanly within terminalWidth - 1 without wrapping');
 
-  // Compact 108-column terminal still fits full 3-column chrome AND pill gauges cleanly (saves ~12 cols over Braille bars)
+  // Compact 108-column terminal still fits full 3-column chrome AND pill gauges cleanly
   const inlineBar108 = h.formatCliStatusLineCapsule(
     {
       hasTelemetry: true,
@@ -1982,10 +1981,9 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
       ttft: 5.6,
       tps: 22.0,
       usedPct: 2,
-      quotas: { activePool: { remainingPct: 54 } },
     },
     {
-      slots: ['ttft', 'tps', 'quota_auto', 'context'],
+      slots: ['ttft', 'tps', 'context'],
       showMultiSession: true,
       language: 'zh-CN',
       color: true,
@@ -1998,7 +1996,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
   const plainBar108 = inlineBar108.replace(/\x1b\[[0-9;]*m/g, '');
   assert.ok(plainBar108.startsWith('? for shortcuts  '), 'Keeps ? for shortcuts at 108 columns');
   assert.ok(
-    plainBar108.includes('● 2 运行中   5.6s | 22.0 t/s |  余 54%  |  上下文  2% '),
+    plainBar108.includes('● 2 运行中   5.6s | 22.0 t/s |  上下文  2% '),
     'Fits compact pill gauges and full chrome even at 108 columns'
   );
   assert.ok(plainBar108.endsWith('  auto · Gemini 4 Hydrogen · medium'), 'Keeps full right chrome at 108 columns');
@@ -2013,10 +2011,9 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
       ttft: 5.6,
       tps: 22.0,
       usedPct: 2,
-      quotas: { activePool: { remainingPct: 54 } },
     },
     {
-      slots: ['ttft', 'tps', 'quota_auto', 'context'],
+      slots: ['ttft', 'tps', 'context'],
       showMultiSession: true,
       language: 'zh-CN',
       color: false,
@@ -2027,7 +2024,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
     }
   );
   assert.ok(h.cliDisplayWidth(inlineBar80) <= 79, 'Narrow 80-col bar never overflows terminalWidth - 1');
-  assert.ok(inlineBar80.includes('5.6s | 22.0 t/s | 余 54% | 上下文 2%'));
+  assert.ok(inlineBar80.includes('5.6s | 22.0 t/s | 上下文 2%'));
 
   // End-to-end filesystem + subprocess verification
   const tempRoot = mkdtempSync(fileURLToPath(new URL('./.cli-statusline-', import.meta.url)));
@@ -2145,7 +2142,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
         language: 'zh-CN',
         showTopbarMultiSession: true,
         enableCliStatusLine: true,
-        topbarCapsuleSlots: ['ttft', 'tps', 'quota_auto', 'context'],
+        topbarCapsuleSlots: ['ttft', 'tps', 'context'],
       }),
       'utf8'
     );
@@ -2156,10 +2153,6 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
         runningCount: 0,
         runningSubCount: 0,
         hasWaiting: false,
-        quotas: {
-          activePool: { poolLabel: 'Gemini', remainingPct: 57 },
-          pools: [{ poolKey: 'Gemini', poolLabel: 'Gemini', remainingPct: 57 }],
-        },
       }),
       'utf8'
     );
@@ -2176,9 +2169,9 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
       input: stdinPayload,
       encoding: 'utf8',
     }).trim();
-    assert.equal(capsuleOut, '● 0 运行中   1.8s | 38.1 t/s | 余 57% | 上下文 17%');
+    assert.equal(capsuleOut, '● 0 运行中   1.8s | 38.1 t/s | 上下文 17%');
 
-    // Full 3-column single-line E2E with terminal_width + cycle_mode + model + native stdin quota fallback
+    // Full 3-column single-line E2E with terminal_width + cycle_mode + model
     const emptySnapDir = join(tempRoot, 'empty-data');
     mkdirSync(emptySnapDir, { recursive: true });
     writeFileSync(
@@ -2187,7 +2180,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
         language: 'zh-CN',
         showTopbarMultiSession: true,
         enableCliStatusLine: true,
-        topbarCapsuleSlots: ['ttft', 'tps', 'quota_auto', 'context'],
+        topbarCapsuleSlots: ['ttft', 'tps', 'context'],
       }),
       'utf8'
     );
@@ -2201,9 +2194,6 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
         display_name: 'Gemini 4 Hydrogen (Medium)',
         effort: 'medium',
       },
-      quota: {
-        Gemini: { remaining_fraction: 0.54 },
-      },
       context_window: { used_percentage: 2, total_input_tokens: 15000, total_output_tokens: 381 },
     });
     const fullLineOut = execFileSync(process.execPath, [statusLineScript], {
@@ -2214,7 +2204,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
     assert.equal(/\x1b\[48;2;/.test(fullLineOut), true, 'E2E ANSI output renders 24-bit pill background fill');
     const plainFullLine = fullLineOut.replace(/\x1b\[[0-9;]*m/g, '');
     assert.ok(plainFullLine.startsWith('? for shortcuts  '));
-    assert.ok(plainFullLine.includes('● 1 运行中   1.8s | 38.1 t/s |  余 54%  |  上下文  2% '));
+    assert.ok(plainFullLine.includes('● 1 运行中   1.8s | 38.1 t/s |  上下文  2% '));
     assert.ok(plainFullLine.endsWith('  auto · Gemini 4 Hydrogen · medium'));
     assert.equal(h.cliDisplayWidth(fullLineOut), 129);
 
@@ -2225,7 +2215,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
         input: stdinPayload,
         encoding: 'utf8',
       }).trim();
-      assert.equal(cmdCapsuleOut, '● 0 运行中   1.8s | 38.1 t/s | 余 57% | 上下文 17%');
+      assert.equal(cmdCapsuleOut, '● 0 运行中   1.8s | 38.1 t/s | 上下文 17%');
 
       const spaceDir = join(tempRoot, 'Dir With Spaces');
       mkdirSync(spaceDir, { recursive: true });
@@ -2241,7 +2231,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
         input: stdinPayload,
         encoding: 'utf8',
       }).trim();
-      assert.equal(autorunOut, '● 0 运行中   1.8s | 38.1 t/s | 余 57% | 上下文 17%');
+      assert.equal(autorunOut, '● 0 运行中   1.8s | 38.1 t/s | 上下文 17%');
     }
 
     // Verify compaction-line precedence: when local trajectory reports maxContextTokens (e.g. 512k),
@@ -2367,14 +2357,14 @@ test('CLI statusLine v1.5.4 upgrades: /statusline inline flags, preserved manage
   // 1. Slot presets, comma lists (1-6 slots), and backwards-compatible fallback
   assert.deepEqual(
     [...h.resolveEffectiveCliStatusLineSlots({ topbarCapsuleSlots: ['tps', 'ttft', 'context'], cliStatusLineSlots: null })],
-    ['tps', 'ttft', 'session_cost', 'quota_auto', 'context']
+    ['tps', 'ttft', 'cache_hit', 'session_cost', 'context']
   );
   assert.deepEqual(
-    [...h.resolveEffectiveCliStatusLineSlots({ topbarCapsuleSlots: ['ttft', 'tps', 'quota_auto', 'context'], cliStatusLineSlots: null })],
-    ['ttft', 'tps', 'quota_auto', 'context']
+    [...h.resolveEffectiveCliStatusLineSlots({ topbarCapsuleSlots: ['ttft', 'tps', 'context'], cliStatusLineSlots: null })],
+    ['ttft', 'tps', 'context']
   );
   assert.deepEqual([...h.normalizeCliStatusLineSlots('full')], [
-    'tps', 'ttft', 'cache_hit', 'session_cost', 'quota_auto', 'context',
+    'tps', 'ttft', 'avg_tps', 'cache_hit', 'session_cost', 'context',
   ]);
   assert.deepEqual([...h.normalizeCliStatusLineSlots('compact')], ['tps', 'ttft', 'context']);
   assert.equal(h.normalizeCliStatusLineSlots('auto'), null);
@@ -2421,7 +2411,7 @@ test('CLI statusLine v1.5.4 upgrades: /statusline inline flags, preserved manage
   assert.equal(parsedFlags.language, 'en-US');
   assert.equal(parsedFlags.noColor, true);
 
-  // 4. Model-aware active quota pool & expanded agent_state detection (working / tool_use)
+  // 4. Expanded agent_state detection (working / tool_use) with zero quota pools
   const mergedClaudeCtx = buildMergedCliCapsuleContext({
     stdinData: {
       agent_state: 'tool_use',
@@ -2431,21 +2421,13 @@ test('CLI statusLine v1.5.4 upgrades: /statusline inline flags, preserved manage
     snapshot: {
       updatedAtMs: Date.now(),
       runningCount: 0,
-      quotas: {
-        activePool: { poolKey: 'Gemini', poolLabel: 'Gemini', remainingPct: 25 },
-        pools: [
-          { poolKey: 'Gemini', poolLabel: 'Gemini', remainingPct: 25, models: ['Gemini 4 Neon (XHigh)'] },
-          { poolKey: 'Claude & GPT', poolLabel: 'Claude & GPT', remainingPct: 100, models: ['Claude Opus 4.6 (Thinking)'] },
-        ],
-      },
     },
   });
   assert.equal(mergedClaudeCtx.isRunning, true);
   assert.equal(mergedClaudeCtx.runningCount, 1);
-  assert.equal(mergedClaudeCtx.quotas.activePool.poolKey, 'Claude & GPT');
-  assert.equal(mergedClaudeCtx.quotas.activePool.remainingPct, 100);
+  assert.equal(mergedClaudeCtx.quotas, undefined);
 
-  // 5. Fresh session (stepCount: 0) hides empty --s / -- placeholders while keeping status, quota, and context
+  // 5. Fresh session (stepCount: 0) hides empty --s / -- placeholders while keeping status and context
   const freshBar = h.formatCliStatusLineCapsule(
     {
       hasTelemetry: true,
@@ -2456,58 +2438,51 @@ test('CLI statusLine v1.5.4 upgrades: /statusline inline flags, preserved manage
       ttft: null,
       sessionCost: null,
       usedPct: 16,
-      quotas: { activePool: { remainingPct: 98 } },
     },
     {
-      slots: ['tps', 'ttft', 'session_cost', 'quota_auto', 'context'],
+      slots: ['tps', 'ttft', 'session_cost', 'context'],
       language: 'zh-CN',
       color: false,
     }
   );
-  assert.equal(freshBar, '● 0 运行中   空闲 | 余 98% | 上下文 16%');
+  assert.equal(freshBar, '● 0 运行中   空闲 | 上下文 16%');
 
-  // 5b. Dedicated 5h / weekly / context slots in NO_COLOR and pill ANSI modes (zh-CN & en-US)
-  const quotaBarCtx = {
+  // 5b. Speed / cache / context slots in NO_COLOR and pill ANSI modes (zh-CN & en-US)
+  const metricBarCtx = {
     hasTelemetry: true,
     stepCount: 3,
+    tps: 68.4,
+    cacheHitPct: 88.0,
     usedPct: 56,
-    quotas: {
-      pools: [
-        { poolKey: 'Gemini', family: 'Gemini', remainingPct: 64, weeklyRemainingPct: 88 },
-        { poolKey: 'Claude & GPT', family: 'Claude & GPT', remainingPct: 96, weeklyRemainingPct: 14 },
-      ],
-    },
   };
   assert.equal(
-    h.formatCliStatusLineCapsule(quotaBarCtx, {
-      slots: ['gemini_5h', 'gemini_weekly', 'claude_5h', 'claude_weekly', 'context'],
+    h.formatCliStatusLineCapsule(metricBarCtx, {
+      slots: ['tps', 'cache_hit', 'context'],
       showMultiSession: false,
       language: 'zh-CN',
       color: false,
     }),
-    'G5h 64% | G周 88% | C5h 96% | C周 14% | 上下文 56%'
+    '68.4 t/s | 缓 88% | 上下文 56%'
   );
-  const quotaPillAnsi = h.formatCliStatusLineCapsule(quotaBarCtx, {
-    slots: ['gemini_5h', 'claude_weekly', 'context'],
+  const metricPillAnsi = h.formatCliStatusLineCapsule(metricBarCtx, {
+    slots: ['tps', 'cache_hit', 'context'],
     showMultiSession: false,
     language: 'zh-CN',
     color: true,
   });
-  assert.equal(/\x1b\[48;2;24;96;68m/.test(quotaPillAnsi), true, '64% quota uses green pill fill');
-  assert.equal(/\x1b\[48;2;124;42;48m/.test(quotaPillAnsi), true, '14% quota uses danger red pill fill');
-  assert.equal(/\x1b\[48;2;36;72;128m/.test(quotaPillAnsi), true, '56% context uses blue pill fill');
+  assert.equal(/\x1b\[48;2;36;72;128m/.test(metricPillAnsi), true, '56% context uses blue pill fill');
   assert.equal(
-    quotaPillAnsi.replace(/\x1b\[[0-9;]*m/g, ''),
-    ' G5h 64%  |  C周 14%  |  上下文 56% '
+    metricPillAnsi.replace(/\x1b\[[0-9;]*m/g, ''),
+    '68.4 t/s | 缓 88% |  上下文 56% '
   );
   assert.equal(
-    h.formatCliStatusLineCapsule(quotaBarCtx, {
-      slots: ['gemini_weekly', 'claude_weekly', 'context'],
+    h.formatCliStatusLineCapsule(metricBarCtx, {
+      slots: ['cache_hit', 'context'],
       showMultiSession: false,
       language: 'en-US',
       color: false,
     }),
-    'Gw 88% | Cw 14% | Ctx 56%'
+    'cache 88% | Ctx 56%'
   );
 
   // 5c. Local SQLite WAITING step immediately turns CLI dot amber even while Desktop snapshot is still false
@@ -2612,10 +2587,9 @@ test('CLI statusLine v1.5.4 upgrades: /statusline inline flags, preserved manage
       cacheHitPct: 95,
       sessionCost: 1.25,
       usedPct: 34,
-      quotas: { activePool: { remainingPct: 88 } },
     },
     {
-      slots: ['tps', 'ttft', 'cache_hit', 'session_cost', 'quota_auto', 'context'],
+      slots: ['tps', 'ttft', 'cache_hit', 'session_cost', 'context'],
       language: 'zh-CN',
       color: false,
       terminalWidth: 72,
@@ -2665,18 +2639,17 @@ test('CLI statusLine v1.5.4 upgrades: /statusline inline flags, preserved manage
 
     const inlineOut = execFileSync(
       process.execPath,
-      [statusLineScript, '--slots', 'tps,quota_auto,context', '--no-multi', '--lang', 'en-US'],
+      [statusLineScript, '--slots', 'tps,cache_hit,context', '--no-multi', '--lang', 'en-US'],
       {
         env,
         input: JSON.stringify({
           agent_state: 'idle',
           context_window: { used_percentage: 19 },
-          quota: { Gemini: { remaining_fraction: 0.91 } },
         }),
         encoding: 'utf8',
       }
     ).trim();
-    assert.equal(inlineOut, 'Idle | 5h 91% | Ctx 19%');
+    assert.equal(inlineOut, 'Idle | Ctx 19%');
 
     // 9. Runtime CLI installation & status detection (strictly gated on antigravity-cli dir) + forceReplaceCustom recovery
     const { ensureCliStatusLineConfigured, getCliStatusLineRuntimeStatus } = await import(
@@ -3000,17 +2973,17 @@ test('scope=consumption and scope=consumption-presets bypass matchesConv, >30s i
     'scope=consumption / presets must skip LS RPCs across pane mismatch, >30s idle, and visual settings changes'
   );
 
-  // Changing weeklyLimitMode DOES invalidate snapshot and trigger fresh full build
-  h.executeSettingsAction({ weeklyLimitMode: 'custom_tokens' });
+  // Changing windowMountMode DOES invalidate snapshot and trigger fresh full build
+  h.executeSettingsAction({ windowMountMode: 'composer' });
   await h.executeTelemetryAction({
     conversationId: 'conv-recent',
     range: '7d',
     scope: 'consumption',
   });
-  const rpcCallsAfterWeeklyChange = h.state.calls.length;
+  const rpcCallsAfterMountChange = h.state.calls.length;
   assert.ok(
-    rpcCallsAfterWeeklyChange > rpcCallsAfterInit,
-    'Changing weeklyLimitMode must invalidate cached fast consumption snapshot'
+    rpcCallsAfterMountChange > rpcCallsAfterInit,
+    'Changing windowMountMode must invalidate cached fast consumption snapshot'
   );
 
   // Cache rebuild also invalidates snapshot and falls back to full RPC sync
@@ -3021,7 +2994,7 @@ test('scope=consumption and scope=consumption-presets bypass matchesConv, >30s i
     scope: 'consumption',
   });
   assert.ok(
-    h.state.calls.length > rpcCallsAfterWeeklyChange,
+    h.state.calls.length > rpcCallsAfterMountChange,
     'Cache rebuild must invalidate cached fast consumption snapshot'
   );
 
@@ -3073,20 +3046,6 @@ test('scope=conversation switches sessions with zero LS RPCs, preserves usageRev
 
   const h = backendHarness({
     clock: () => clockMs,
-    quotaSummary: {
-      groups: [
-        {
-          displayName: 'Gemini',
-          remainingFraction: 0.85,
-          resetTime: new Date(clockMs + 3 * 3600_000).toISOString(),
-        },
-        {
-          displayName: 'Claude & GPT',
-          remainingFraction: 0.42,
-          resetTime: new Date(clockMs + 4 * 3600_000).toISOString(),
-        },
-      ],
-    },
     trajectories: {
       'conv-claude': {
         trajectory: {
@@ -3155,7 +3114,8 @@ test('scope=conversation switches sessions with zero LS RPCs, preserves usageRev
   );
   assert.equal(initRes.activeConversation.cascadeId, 'conv-gemini');
   assert.equal(initRes.activeConversation.subagentCount, 1);
-  assert.equal(initRes.quotas.activePool.family, 'Gemini');
+  assert.equal(initRes.quotas, undefined);
+  assert.equal(initRes.account, undefined);
   const initialUsageRev = Number(initRes.consumption.revision);
   const rpcAfterInit = h.state.calls.length;
 
@@ -3176,7 +3136,8 @@ test('scope=conversation switches sessions with zero LS RPCs, preserves usageRev
   assert.equal(switchClaude.activeConversation.cascadeId, 'conv-claude');
   assert.equal(switchClaude.activeConversation.stepCount, 2);
   assert.equal(switchClaude.activeConversation.recentSteps.length, 2);
-  assert.equal(switchClaude.quotas.activePool.family, 'Claude & GPT');
+  assert.equal(switchClaude.quotas, undefined);
+  assert.equal(switchClaude.account, undefined);
   assert.equal(switchClaude.consumption.session.calls, 2);
   assert.equal(switchClaude.needsBackgroundSync, false);
   assert.ok(switchClaude.stepRevision);
@@ -3197,7 +3158,7 @@ test('scope=conversation switches sessions with zero LS RPCs, preserves usageRev
   assert.equal(switchBackGemini.scope, 'conversation');
   assert.equal(switchBackGemini.stepsUnchanged, true);
   assert.equal(switchBackGemini.activeConversation.recentSteps, undefined);
-  assert.equal(switchBackGemini.quotas.activePool.family, 'Gemini');
+  assert.equal(switchBackGemini.quotas, undefined);
 
   // 4. Subsequent full poll on conv-claude keeps usageRevision identical (decoupled from isCurrentConv!)
   const fullClaude = JSON.parse(
@@ -3249,7 +3210,7 @@ test('scope=conversation switches sessions with zero LS RPCs, preserves usageRev
   assert.match(fetchedUrls[0], /scope=conversation/);
   assert.match(fetchedUrls[0], /conversationId=conv-claude/);
   assert.equal(telemetryStore.getState().telemetry.activeConversation.cascadeId, 'conv-claude');
-  assert.equal(telemetryStore.getState().telemetry.quotas.activePool.family, 'Claude & GPT');
+  assert.equal(telemetryStore.getState().telemetry.quotas, undefined);
 
   // Visit conv-gemini (cached from initRes? Let's visit once to cache, then toggle back to conv-claude for 0ms hit!)
   await selectConversation('conv-gemini');
@@ -3297,7 +3258,7 @@ test('CLI statusLine supports --style pill|bar|compact switching, flag persisten
 
   const parsedArgs = parseCliStatusLineArgs([
     '--slots',
-    'tps,context,gemini_5h',
+    'tps,cache_hit,context',
     '--style',
     'bar',
     '--json',
@@ -3325,26 +3286,11 @@ test('CLI statusLine supports --style pill|bar|compact switching, flag persisten
     latestPromptTokens: 80_000,
     sessionTokens: 320_000,
     usedPct: 42,
-    quotas: {
-      activePool: { poolKey: 'Gemini', remainingPct: 40, weeklyRemainingPct: 80 },
-      pools: [
-        {
-          poolKey: 'Gemini',
-          family: 'Gemini',
-          usedPct: 60,
-          remainingPct: 40,
-          resetTime: new Date(nowMs + 3 * 3_600_000).toISOString(),
-          weeklyUsedPct: 20,
-          weeklyRemainingPct: 80,
-          weeklyResetTime: new Date(nowMs + 3.5 * 24 * 3_600_000).toISOString(),
-        },
-      ],
-    },
   };
 
   // 1. Pill style emits 24-bit background fill (48;2;)
   const pillOut = formatCliStatusLineCapsule(slotCtx, {
-    slots: ['tps', 'context', 'gemini_5h'],
+    slots: ['tps', 'cache_hit', 'context'],
     gaugeStyle: 'pill',
     language: 'zh-CN',
     color: true,
@@ -3353,18 +3299,17 @@ test('CLI statusLine supports --style pill|bar|compact switching, flag persisten
 
   // 2. Bar style emits transparent Braille/block bar without 48;2; background codes
   const barOut = formatCliStatusLineCapsule(slotCtx, {
-    slots: ['tps', 'context', 'gemini_5h'],
+    slots: ['tps', 'cache_hit', 'context'],
     gaugeStyle: 'bar',
     language: 'zh-CN',
     color: true,
   });
   assert.doesNotMatch(barOut, /\x1b\[48;2;/);
   assert.match(barOut, /[█▏▎▍▌▋▊▉]/);
-  assert.match(barOut, /⢕/);
 
   // 3. Compact style emits clean text-only gauges without 48;2; or bar glyphs
   const compactOut = formatCliStatusLineCapsule(slotCtx, {
-    slots: ['tps', 'context', 'gemini_5h'],
+    slots: ['tps', 'cache_hit', 'context'],
     gaugeStyle: 'compact',
     language: 'zh-CN',
     color: true,
@@ -3372,9 +3317,9 @@ test('CLI statusLine supports --style pill|bar|compact switching, flag persisten
   assert.doesNotMatch(compactOut, /\x1b\[48;2;/);
   assert.doesNotMatch(compactOut, /[█⢕]/);
   assert.match(compactOut, /上下文.*42%/);
-  assert.match(compactOut, /G5h.*40%/);
+  assert.match(compactOut, /缓.*89%/);
 
-  // 4. Structured JSON output includes model, speed, context, and quota pool snapshots
+  // 4. Structured JSON output includes model, speed, and context without quotas
   const jsonSnap = buildCliJsonStatusOutput(slotCtx, {
     modelDisplayName: 'Gemini 4 Neon',
     modelEffort: 'xhigh',
@@ -3385,11 +3330,7 @@ test('CLI statusLine supports --style pill|bar|compact switching, flag persisten
   assert.equal(jsonSnap.model.effort, 'xhigh');
   assert.equal(jsonSnap.speed.tps, 52.3);
   assert.equal(jsonSnap.context.usedPct, 42);
-  assert.equal(jsonSnap.quotas.autoRemainingPct, 40);
-  assert.equal(jsonSnap.quotas.pools.length, 1);
-  assert.equal(jsonSnap.quotas.pools[0].poolKey, 'Gemini');
-  assert.equal(jsonSnap.quotas.pools[0].remaining5hPct, 40);
-  assert.equal(jsonSnap.quotas.pools[0].remainingWeeklyPct, 80);
+  assert.equal(jsonSnap.quotas, undefined);
 });
 
 test('conversation undo preserves 10-channel context breakdown across unindexed tail gen_metadata, stripped history, and cold fallback', async () => {
@@ -3792,15 +3733,19 @@ test('trendSeries respects strict window bounds without 6h out-of-window padding
   assert.equal(pToday.consumption.trendSeries[2].tokens, 30_000);
   assert.equal(pToday.consumption.trendSeries[3].tokens, 5_000);
 
-  // 2. 'cycle' 27m after reset (< 1h): 6 five-minute slots (03:00..03:25), never reaching back to 22:00..02:00
-  const pCycle = await h.buildTelemetryPayloadInternal('cTrend', false, { range: 'cycle' });
+  // 2. 'custom' 27m span (< 1h): 6 five-minute slots (03:00..03:25), never reaching back to 00:00..02:00
+  const pCustom5m = await h.buildTelemetryPayloadInternal('cTrend', false, {
+    range: 'custom',
+    startMs: cycleStartMs,
+    endMs: fakeNowMs,
+  });
   assert.deepEqual(
-    Array.from(pCycle.consumption.trendSeries, (s) => s.label),
+    Array.from(pCustom5m.consumption.trendSeries, (s) => s.label),
     ['03:00', '03:05', '03:10', '03:15', '03:20', '03:25']
   );
-  assert.equal(pCycle.consumption.trendSeries[0].granularity, 'minute');
-  assert.equal(pCycle.consumption.trendSeries[0].stepMinutes, 5);
-  assert.equal(pCycle.consumption.trendSeries[3].tokens, 5_000); // 03:18 falls in 03:15 - 03:20
+  assert.equal(pCustom5m.consumption.trendSeries[0].granularity, 'minute');
+  assert.equal(pCustom5m.consumption.trendSeries[0].stepMinutes, 5);
+  assert.equal(pCustom5m.consumption.trendSeries[3].tokens, 5_000); // 03:18 falls in 03:15 - 03:20
 
   // 3. Rewind to 01:20 (< 2h) on a fresh harness and verify 15m -> 1h cache invalidation across the 2h boundary
   fakeNowMs = dayStart + 1 * 3600_000 + 20 * 60_000;

@@ -115,7 +115,7 @@ test('BUG-01 & INCON-01: Google-proxied Claude/GPT/o-series never misclassify as
   assert.equal(helixCodename.label, 'Gemini Helix');
   assert.equal(helixCodename.pricing?.output, 2.5);
 
-  const { quotaPoolsMap } = h.buildOfficialQuotaPools(null, [
+  const dynMap = h.buildDynamicModelMap([
     {
       modelOrAlias: { model: 'MODEL_PLACEHOLDER_M480' },
       label: 'Gemini 4 Hydrogen (High)',
@@ -127,9 +127,10 @@ test('BUG-01 & INCON-01: Google-proxied Claude/GPT/o-series never misclassify as
       quotaInfo: { remainingFraction: 0.8, resetTime: new Date(nowMs + 3600_000).toISOString() },
     },
   ]);
-  assert.equal(quotaPoolsMap.has('Hydrogen'), false, 'Hydrogen has no dedicated quota pool');
-  assert.equal(quotaPoolsMap.has('Helix'), false, 'Helix has no dedicated quota pool');
-  assert.equal(quotaPoolsMap.get('Gemini')?.isAvailable, true);
+  assert.equal(dynMap.get('MODEL_PLACEHOLDER_M480')?.label, 'Gemini 4 Hydrogen (High)');
+  assert.equal(dynMap.get('MODEL_PLACEHOLDER_M480')?.quotaInfo, undefined);
+  assert.equal(h.resolveModelInfo('MODEL_PLACEHOLDER_M480', dynMap).family, 'Gemini');
+  assert.equal(h.resolveModelInfo('MODEL_PLACEHOLDER_M482', dynMap).family, 'Gemini');
 });
 
 test('BUG-02 & BUG-11: ide:<uuid> external sessions do not double-count live conversations, only quota pools isolate cross-account entries, and orphan subagents never leak to top-level list', async () => {
@@ -206,14 +207,8 @@ test('BUG-02 & BUG-11: ide:<uuid> external sessions do not double-count live con
   assert.equal(p.consumption.account.conversationsCount, 3);
   assert.equal(p.consumption.account.calls, 4);
   assert.equal(p.consumption.account.totalTokens, 205_000);
-  // Quota pools & weekly cycle strictly isolate to alice@example.com (2 calls = 70,000 tokens)
-  const geminiPool = p.quotas.pools.find((pool) => pool.poolKey === 'Gemini');
-  assert.equal(geminiPool.cycle5h.calls, 2);
-  assert.equal(geminiPool.cycle5h.tokens, 70_000);
-  assert.equal(geminiPool.cycleWeekly.calls, 2);
-  assert.equal(geminiPool.cycleWeekly.tokens, 70_000);
-  assert.equal(p.quotas.weekly.calls, 2);
-  assert.equal(p.quotas.weekly.tokens, 70_000);
+  assert.equal(p.quotas, undefined);
+  assert.equal(p.account, undefined);
   assert.equal(
     p.conversations.some((c) => c.cascadeId === 'orphan-sub'),
     false,
@@ -279,20 +274,19 @@ test('account switch preserves conversation list, locked session steps, and cons
     },
   });
 
-  // 1. Initial state under Alice: 3 calls = 100,000 tokens in both consumption and Alice's quota pools
+  // 1. Initial state: 3 calls = 100,000 tokens in local consumption (zero quotas or account telemetry)
   const pAlice = await h.buildTelemetryPayloadInternal('conv-shared', false, { range: 'all' });
   assert.equal(pAlice.conversations.length, 2);
   assert.equal(pAlice.activeConversation.cascadeId, 'conv-shared');
   assert.equal(pAlice.activeConversation.stepCount, 2);
   assert.equal(pAlice.consumption.account.calls, 3);
   assert.equal(pAlice.consumption.account.totalTokens, 100_000);
-  assert.equal(pAlice.quotas.weekly.calls, 3);
-  assert.equal(pAlice.quotas.weekly.tokens, 100_000);
+  assert.equal(pAlice.quotas, undefined);
+  assert.equal(pAlice.account, undefined);
 
-  // 2. Switch to Bob and create 1 new step (15,900 tokens) in conv-bob while keeping conv-shared locked
+  // 2. Add conv-bob while keeping conv-shared locked
   const bobStep1 = makeStepAt(1, 15_552, 348, 10_000); // 15,900
   h.state.userStatus = { email: 'bob@example.com', userTier: { name: 'Google AI Ultra' } };
-  h.state.quotaSummary = makeQuota(0.977, 0.994);
   h.state.summaries['conv-bob'] = {
     stepCount: 1,
     lastModifiedTime: new Date(baseMs + 11_000).toISOString(),
@@ -302,19 +296,15 @@ test('account switch preserves conversation list, locked session steps, and cons
   h.state.trajectories['conv-bob'] = { trajectory: { steps: [bobStep1] } };
 
   const pBob = await h.buildTelemetryPayloadInternal('conv-shared', false, { range: 'all' });
-  assert.equal(pBob.conversations.length, 3, 'All historical conversations remain visible after account switch');
+  assert.equal(pBob.conversations.length, 3, 'All historical conversations remain visible');
   assert.equal(pBob.activeConversation.cascadeId, 'conv-shared', 'Locked conversation stays selected');
   assert.equal(pBob.activeConversation.stepCount, 2, 'Step details of locked conversation are preserved');
-  assert.equal(pBob.consumption.account.calls, 4, 'Global consumption retains all 4 calls across accounts');
+  assert.equal(pBob.consumption.account.calls, 4, 'Global consumption retains all 4 calls');
   assert.equal(pBob.consumption.account.totalTokens, 115_900);
-  const bobGemini = pBob.quotas.pools.find((pool) => pool.poolKey === 'Gemini');
-  assert.equal(bobGemini.cycle5h.calls, 1, 'Quota 5h isolates strictly to Bob');
-  assert.equal(bobGemini.cycle5h.tokens, 15_900);
-  assert.equal(bobGemini.cycleWeekly.tokens, 15_900);
-  assert.equal(pBob.quotas.weekly.calls, 1);
-  assert.equal(pBob.quotas.weekly.tokens, 15_900);
+  assert.equal(pBob.quotas, undefined);
+  assert.equal(pBob.account, undefined);
 
-  // 3. Continue chatting inside conv-shared while logged in as Bob (step #3 = 25,000 tokens)
+  // 3. Continue chatting inside conv-shared (step #3 = 25,000 tokens)
   const sharedStep3ByBob = makeStepAt(3, 24_000, 1_000, 20_000); // 25,000
   h.state.summaries['conv-shared'] = {
     ...h.state.summaries['conv-shared'],
@@ -329,20 +319,16 @@ test('account switch preserves conversation list, locked session steps, and cons
   assert.equal(pBobContinued.activeConversation.stepCount, 3);
   assert.equal(pBobContinued.consumption.account.calls, 5);
   assert.equal(pBobContinued.consumption.account.totalTokens, 140_900);
-  const bobGeminiAfter = pBobContinued.quotas.pools.find((pool) => pool.poolKey === 'Gemini');
-  assert.equal(bobGeminiAfter.cycle5h.calls, 2, 'Bob quota includes conv-bob + his new step #3 in conv-shared');
-  assert.equal(bobGeminiAfter.cycle5h.tokens, 40_900);
-  assert.equal(pBobContinued.quotas.weekly.calls, 2);
-  assert.equal(pBobContinued.quotas.weekly.tokens, 40_900);
+  assert.equal(pBobContinued.quotas, undefined);
+  assert.equal(pBobContinued.account, undefined);
 
-  // 4. Switch back to Alice -> Alice quota remains strictly her 3 calls (100,000 tokens)
+  // 4. Subsequent check keeps all conversations and consumption totals intact without quota pools
   h.state.userStatus = { email: 'alice@example.com', userTier: { name: 'Google AI Ultra' } };
-  h.state.quotaSummary = makeQuota(0.8, 0.9);
   const pAliceBack = await h.buildTelemetryPayloadInternal('conv-shared', false, { range: 'all' });
   assert.equal(pAliceBack.consumption.account.calls, 5);
   assert.equal(pAliceBack.consumption.account.totalTokens, 140_900);
-  assert.equal(pAliceBack.quotas.weekly.calls, 3);
-  assert.equal(pAliceBack.quotas.weekly.tokens, 100_000);
+  assert.equal(pAliceBack.quotas, undefined);
+  assert.equal(pAliceBack.account, undefined);
 });
 
 test('BUG-03, BUG-12 & BUG-16: negative/NaN token sanitization, deferred costUsd rounding, and dynamicModelMap default', async () => {
@@ -398,75 +384,37 @@ test('BUG-04 & BUG-10: failed RUNNING trajectory fetch enters cooldown instead o
   const h = backendHarness({
     summaries: { run1: { stepCount: 2, lastModifiedTime: doneIso, status: 'CASCADE_RUN_STATUS_RUNNING' } },
     trajectories: { run1: new Error('LS timeout') },
-    quotaSummary: new Error('Quota RPC down'),
   });
 
   await h.buildTelemetryPayloadInternal('run1', false);
   const callsAfterFirst = h.state.calls.filter((c) => c.method === 'GetCascadeTrajectory').length;
-  const quotaCallsAfterFirst = h.state.calls.filter((c) => c.method === 'RetrieveUserQuotaSummary').length;
   assert.equal(callsAfterFirst, 1);
-  assert.equal(quotaCallsAfterFirst, 1);
+  assert.equal(h.state.calls.filter((c) => c.method === 'RetrieveUserQuotaSummary').length, 0);
 
-  // Immediate second background poll must respect cooldown for both trajectory and quota RPC
+  // Immediate second background poll must respect cooldown for trajectory RPC
   await h.buildTelemetryPayloadInternal('run1', false);
   assert.equal(h.state.calls.filter((c) => c.method === 'GetCascadeTrajectory').length, 1);
-  assert.equal(h.state.calls.filter((c) => c.method === 'RetrieveUserQuotaSummary').length, 1);
+  assert.equal(h.state.calls.filter((c) => c.method === 'RetrieveUserQuotaSummary').length, 0);
 
-  // Manual forceRefresh=true bypasses cooldown immediately
+  // Manual forceRefresh=true bypasses cooldown immediately without calling RetrieveUserQuotaSummary
   await h.buildTelemetryPayloadInternal('run1', true);
   assert.equal(h.state.calls.filter((c) => c.method === 'GetCascadeTrajectory').length, 2);
-  assert.equal(h.state.calls.filter((c) => c.method === 'RetrieveUserQuotaSummary').length, 2);
+  assert.equal(h.state.calls.filter((c) => c.method === 'RetrieveUserQuotaSummary').length, 0);
 });
 
-test('BUG-09, BUG-14 & BUG-15: SemVer 2.0 prerelease/build ordering, future-only exhausted quota inference, and <6h dual-bucket classification', async (t) => {
+test('BUG-09, BUG-14 & BUG-15: SemVer 2.0 prerelease/build ordering and zero quota telemetry', async (t) => {
   const prevLocale = i18nStore.getState().locale;
   setI18nLanguage('zh-CN');
   t.after(() => setI18nLanguage(prevLocale));
-  const h = backendHarness({
-    quotaSummary: {
-      groups: [
-        {
-          displayName: 'Gemini',
-          buckets: [
-            {
-              // Omitted remainingFraction with epoch-0 resetTime must NOT falsely report 0% remaining!
-              resetTime: '1970-01-01T00:00:00Z',
-            },
-          ],
-        },
-        {
-          displayName: 'Claude & GPT',
-          buckets: [
-            {
-              remainingFraction: 0.4,
-              resetTime: new Date(nowMs + 2 * 3600_000).toISOString(),
-            },
-            {
-              remainingFraction: 0.8,
-              // Weekly bucket that happens to be 4h away from resetting!
-              resetTime: new Date(nowMs + 4 * 3600_000).toISOString(),
-            },
-          ],
-        },
-      ],
-    },
-  });
+  const h = backendHarness();
 
   assert.equal(h.compareSemver('1.4.2+20261110', '1.4.2'), 0);
   assert.equal(h.compareSemver('1.5.0-beta.2', '1.5.0-alpha.10'), 1);
   assert.equal(h.compareSemver('1.5.0-alpha.1', '1.5.0-alpha.beta'), -1);
 
   const p = await h.buildTelemetryPayloadInternal('');
-  const geminiPool = p.quotas.pools.find((x) => x.poolKey === 'Gemini');
-  assert.ok(geminiPool);
-  assert.equal(geminiPool.isAvailable, false, 'epoch-0 omitted remainingFraction must not create fake 0% exhausted pool');
-  assert.equal(geminiPool.remainingPct, null);
-  assert.equal(geminiPool.usedPct, null);
-
-  const claudePool = p.quotas.pools.find((x) => x.poolKey === 'Claude & GPT');
-  assert.ok(claudePool);
-  assert.equal(claudePool.remainingPct, 40);
-  assert.equal(claudePool.weeklyRemainingPct, 80);
+  assert.equal(p.quotas, undefined);
+  assert.equal(p.account, undefined);
 
   assert.equal(formatCountdown(new Date(nowMs + 30_000).toISOString(), nowMs), '<1m');
   assert.equal(formatCountdown('1969-12-31T23:59:59Z', nowMs), '--');
@@ -1108,9 +1056,8 @@ test('P0 audit fixes: main/bridge-daemon import isolation, standalone lsAddr, du
   assert.doesNotMatch(renderBody, /\buiStore\.setState\b/);
 });
 
-test('P1 audit fixes: shared third-party pool & route single-source and pure frozen resolveScopedConversation', async () => {
+test('P1 audit fixes: route single-source and pure frozen resolveScopedConversation', async () => {
   const { normalizeI18nLanguage } = await import('../src/i18n/index.js');
-  const { resolveSpecificQuotaSlotSummary } = await import('../src/registries/metricRegistry.js');
   const { resolveScopedConversation, isEquivalentTelemetry } = await import(
     '../src/store/telemetryStore.js'
   );
@@ -1125,28 +1072,7 @@ test('P1 audit fixes: shared third-party pool & route single-source and pure fro
   assert.equal(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/host-i18n'), false);
   assert.equal(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/accounts'), false);
 
-  // 1. Third-party pool parity across backend, CLI statusline, and frontend metricRegistry
-  const h = backendHarness();
-  const poolSample = 'Fable / OSS Third-Party Pool';
-  assert.equal(h.classifyQuotaPoolIdentity({ groupName: poolSample }).poolKey, 'Claude & GPT');
-  const quotasFixture = {
-    pools: [
-      {
-        poolKey: poolSample,
-        poolLabel: poolSample,
-        family: poolSample,
-        remainingPct: 37,
-        weeklyRemainingPct: 68,
-      },
-    ],
-  };
-  assert.equal(resolveSpecificQuotaSlotSummary(quotasFixture, 'claude_5h')?.roundedPct, 37);
-  assert.match(
-    h.formatCliStatusLineCapsule({ quotas: quotasFixture }, { slots: ['claude_5h'], terminalWidth: 120 }),
-    /37%/
-  );
-
-  // 2. Pure resolveScopedConversation never mutates deeply frozen telemetry
+  // 1. Pure resolveScopedConversation never mutates deeply frozen telemetry
   const deepFreeze = (obj) => {
     if (!obj || typeof obj !== 'object') return obj;
     Object.freeze(obj);
@@ -1411,18 +1337,6 @@ test('5h quota cycle includes cycle-opening compaction CHECKPOINT and cross-boun
   };
 
   const h = backendHarness({
-    userStatus: { email: 'alice@example.com', userTier: { name: 'Google AI Ultra' } },
-    quotaSummary: {
-      groups: [
-        {
-          displayName: 'Gemini Models',
-          buckets: [
-            { bucketId: 'gemini-5h', window: '5h', remainingFraction: 0.929, resetTime: reset5hIso },
-            { bucketId: 'gemini-weekly', window: 'weekly', remainingFraction: 0.395, resetTime: resetWkIso },
-          ],
-        },
-      ],
-    },
     cache: {
       'cold-boot-conv': {
         accountName: '',
@@ -1443,12 +1357,14 @@ test('5h quota cycle includes cycle-opening compaction CHECKPOINT and cross-boun
     },
   });
 
-  const payload = await h.buildTelemetryPayloadInternal('main-conv', false, { range: '5h' });
-  const geminiPool = payload.quotas.pools.find((p) => p.poolKey === 'Gemini');
-  // Includes compactOpeningStep (304,000) + postCompactStep (88,000) + coldBootStep (11,000) = 403,000 tokens (3 calls)
-  assert.equal(geminiPool.cycle5h.calls, 3);
-  assert.equal(geminiPool.cycle5h.tokens, 403_000);
-  // Preset 5h account bucket includes Alice's 3 calls (403k) + Bob's 1 call (88k), excluding oldCycleStep (105k)
+  const payload = await h.buildTelemetryPayloadInternal('main-conv', false, {
+    range: 'custom',
+    startMs: start5hMs - 100_000,
+    endMs: nowMs + 60_000,
+  });
+  assert.equal(payload.quotas, undefined);
+  assert.equal(payload.account, undefined);
+  // Includes compactOpeningStep (304,000) + postCompactStep (88,000) + coldBootStep (11,000) + bob-conv (88,000) = 491,000 tokens (4 calls), excluding oldCycleStep
   assert.equal(payload.consumption.account.calls, 4);
   assert.equal(payload.consumption.account.totalTokens, 491_000);
 });
@@ -1806,55 +1722,6 @@ test('ConsumptionView and TrendAreaChart patch text DOM nodes in-place without o
     assert.equal(secondGridCells.length, firstGridCells.length);
     assert.equal(secondGridCells[10], firstGridCells[10], 'Heatmap cell DOM node reused in-place');
 
-    // Switch to 'cycle' with multiple quota pools -> compact inline pool selector becomes visible (and stays hidden on 'today'/'all')
-    assert.equal(view.refs.cyclePoolSelect.el.hasAttribute('hidden'), true, 'Hidden outside cycle range');
-    const cyclePoolsFixture = [
-      {
-        poolKey: 'Gemini',
-        poolLabel: 'Gemini',
-        weeklyRemainingPct: 99.7,
-        cycleWeekly: { calls: 12, tokens: 2_480_000, costUsd: 0.86 },
-      },
-      {
-        poolKey: 'Claude & GPT',
-        poolLabel: 'Claude & GPT',
-        weeklyRemainingPct: 38.0,
-        cycleWeekly: { calls: 690, tokens: 172_580_000, costUsd: 61.38 },
-      },
-    ];
-    const baseCyclePayload = makeRangePayload('cycle', 2_480_000, ['12:00', '14:00', '16:00', '18:00']);
-    baseCyclePayload.quotas = { pools: cyclePoolsFixture };
-    baseCyclePayload.consumption.selectedRange = {
-      key: 'cycle',
-      pool: 'Gemini',
-      poolLabel: 'Gemini',
-      label: '当前周期 · Gemini',
-      startMs: 1_760_040_000_000,
-      endMs: 1_760_061_600_000,
-    };
-    telemetryStore.setState(
-      {
-        selectedTimeRange: 'cycle',
-        selectedCyclePool: 'Gemini',
-        telemetry: baseCyclePayload,
-      },
-      { sync: true }
-    );
-    assert.equal(view.refs.cyclePoolSelect.el.hasAttribute('hidden'), false, 'Shown on cycle with >=2 pools');
-    assert.equal(view.refs.cyclePoolSelect.refs.triggerLabel.textContent, 'Gemini');
-    const badges = view.el.querySelectorAll('.cons-badge');
-    assert.equal(badges.length, 1, 'Only date-span badge remains');
-
-    // Open dropdown and verify localized pool metadata + switch back to 'today' hides dropdown
-    view.refs.cyclePoolSelect.open();
-    const optTexts = [...view.refs.cyclePoolSelect.refs.optionsListEl.children].map(
-      (btn) => btn.textContent
-    );
-    assert.equal(optTexts.length, 3);
-    assert.match(optTexts[0], /全部池.*\$62\.24/);
-    assert.match(optTexts[1], /Gemini.*剩 99\.7% · \$0\.86/);
-    assert.match(optTexts[2], /Claude & GPT.*剩 38\.0% · \$61\.38/);
-
     telemetryStore.setState(
       {
         selectedTimeRange: 'today',
@@ -1862,7 +1729,7 @@ test('ConsumptionView and TrendAreaChart patch text DOM nodes in-place without o
       },
       { sync: true }
     );
-    assert.equal(view.refs.cyclePoolSelect.el.hasAttribute('hidden'), true, 'Re-hidden on today');
+    assert.equal(view.refs.cyclePoolSelect, undefined);
 
     view.destroy();
     telemetryStore.setState(prevTelState, { sync: true });

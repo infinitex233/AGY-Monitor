@@ -6,7 +6,7 @@
  *    - 仅当 `~/.gemini/antigravity-cli` 目录已存在时生效；
  *    - 若用户已自行配置第三方 `statusLine.command`（非本插件 `cli-statusline.mjs`），严格原样保留绝不覆盖；
  *    - 开启时默认以 `stack_with_default: false` 单行内联接管底栏（左侧保留 `? for shortcuts`，中间渲染无底色监控指标，右侧保留 `auto · Model · effort`）；关闭时干净移除本插件托管项；
- * 2. 将 13 项胶囊槽位（`TOPBAR_SLOT_KEYS`）与多会话状态渲染为兼容 Windows `cmd.exe` (CP936) /
+ * 2. 将 8 项胶囊槽位（`TOPBAR_SLOT_KEYS`）与多会话状态渲染为兼容 Windows `cmd.exe` (CP936) /
  *    PowerShell / Windows Terminal / macOS / Linux 的单行无底色 24-bit ANSI 状态条（仅使用标准前景 CSI SGR，
  *    避免深色背景色块突兀及 OSC 序列干扰 Bubble Tea 宽度计算）。
  */
@@ -31,8 +31,6 @@ import {
   formatCompactCapsuleCost,
   formatCompactCapsuleTtft,
   formatCompactTokens,
-  hasArgonWeeklyQuotaPool,
-  resolveCapsuleQuotaSlotPct,
 } from '../shared/telemetry-display-rules.mjs';
 
 export const CLI_STATUSLINE_GAUGE_STYLES = Object.freeze(['pill', 'bar', 'compact']);
@@ -564,7 +562,6 @@ function cliStatusTtftSgr(ttftSec) {
 const cliFormatCompactCost = formatCompactCapsuleCost;
 const cliFormatCompactTtft = formatCompactCapsuleTtft;
 const cliFormatTokens = formatCompactTokens;
-const cliResolveQuotaPct = resolveCapsuleQuotaSlotPct;
 
 /**
  * 计算终端可见列宽（剥离 CSI SGR 转义序列，CJK 全角字符按 2 列、`●`/`◎`/`·` 与 ASCII 按 1 列计算）。
@@ -781,7 +778,7 @@ const CLI_BAR_PARTIAL_GLYPHS = Object.freeze([' ', '▏', '▎', '▍', '▌', '
 const CLI_BAR_TRACK_GLYPH = '⢕';
 
 /**
- * 渲染零背景色的透明迷你进度条（如 `上下文 ██▌⢕⢕ 42%` / `G5h █████ 95%`），适配浅色/透明终端及老旧 SSH 复用器。
+ * 渲染零背景色的透明迷你进度条（如 `上下文 ██▌⢕⢕ 42%`），适配浅色/透明终端及老旧 SSH 复用器。
  */
 function cliBuildBarGauge(label, pct, { fillFg = SGR_FG_ACCENT, valFg = SGR_FG_BRIGHT } = {}) {
   const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
@@ -798,17 +795,8 @@ function cliBuildBarGauge(label, pct, { fillFg = SGR_FG_ACCENT, valFg = SGR_FG_B
   return `${SGR_FG_MUTED}${label} ${fillFg}${filledPart}${emptyPart ? `${SGR_FG_DIM}${emptyPart}` : ''} ${valFg}${valStr}${SGR_RESET}`;
 }
 
-function cliResolveQuotaSlotPrefix(metricKey, isEn) {
-  if (metricKey === 'gemini_5h') return 'G5h';
-  if (metricKey === 'gemini_weekly') return isEn ? 'Gw' : 'G周';
-  if (metricKey === 'argon_weekly') return isEn ? 'Aw' : 'A周';
-  if (metricKey === 'claude_5h') return 'C5h';
-  if (metricKey === 'claude_weekly') return isEn ? 'Cw' : 'C周';
-  return isEn ? '5h' : '余';
-}
-
 /**
- * 将单槽位指标格式化为纯文本及 24-bit 终端语义 SGR 片段（上下文和配额支持底色胶囊填充）。
+ * 将单槽位指标格式化为纯文本及 24-bit 终端语义 SGR 片段（上下文支持底色胶囊填充）。
  */
 function cliRenderSingleSlot(
   metricKey,
@@ -946,48 +934,7 @@ function cliRenderSingleSlot(
     return `${valid ? SGR_FG_NORMAL : SGR_FG_MUTED}${textVal}${SGR_RESET}`;
   }
 
-  const quotaPct = hasTelemetry ? cliResolveQuotaPct(slotCtx.quotas, metricKey) : null;
-  const prefix = cliResolveQuotaSlotPrefix(metricKey, isEn);
-  const isDanger = quotaPct != null && quotaPct <= 15;
-  const isWarn = !isDanger && quotaPct != null && quotaPct <= 30;
-  const pctSgr = isDanger
-    ? `${SGR_BOLD}${SGR_FG_DANGER}`
-    : isWarn
-      ? `${SGR_BOLD}${SGR_FG_WARN}`
-      : quotaPct != null
-        ? SGR_FG_GOOD
-        : SGR_FG_MUTED;
-
-  if (quotaPct == null) {
-    const emptyText =
-      metricKey === 'quota_auto' && isEn ? 'Quota --' : `${prefix} --%`;
-    return useColor ? `${SGR_FG_MUTED}${emptyText}${SGR_RESET}` : emptyText;
-  }
-
-  if (!useColor) {
-    return `${prefix} ${quotaPct}%`;
-  }
-
-  if (resolvedStyle === 'pill') {
-    const fillBg = isDanger
-      ? SGR_BG_PILL_DANGER
-      : isWarn
-        ? SGR_BG_PILL_WARN
-        : SGR_BG_PILL_GREEN;
-    const fillLabelFg = isDanger
-      ? SGR_FG_PILL_LABEL_DANGER
-      : isWarn
-        ? SGR_FG_PILL_LABEL_WARN
-        : SGR_FG_PILL_LABEL_GREEN;
-    return cliBuildPillGauge(prefix, quotaPct, { fillBg, fillLabelFg });
-  }
-
-  if (resolvedStyle === 'bar') {
-    const fillFg = isDanger ? SGR_FG_DANGER : isWarn ? SGR_FG_WARN : SGR_FG_GOOD;
-    return cliBuildBarGauge(prefix, quotaPct, { fillFg, valFg: pctSgr });
-  }
-
-  return `${SGR_FG_MUTED}${prefix} ${pctSgr}${quotaPct}%${SGR_RESET}`;
+  return '';
 }
 
 /**
@@ -1044,18 +991,12 @@ function detectCliHostLanguageIsEn() {
 const CLI_STATUS_SLOT_KEEP_PRIORITY = Object.freeze({
   context: 100,
   tps: 90,
-  quota_auto: 80,
-  gemini_5h: 78,
-  claude_5h: 76,
   ttft: 70,
   session_cost: 60,
   cost: 58,
   cache_hit: 50,
   avg_tps: 45,
   session_tokens: 40,
-  gemini_weekly: 35,
-  argon_weekly: 33,
-  claude_weekly: 30,
 });
 
 function cliStatusHasRenderableValue(metricKey, slotCtx) {
@@ -1092,7 +1033,7 @@ function cliStatusHasRenderableValue(metricKey, slotCtx) {
       Number(slotCtx.sessionTokens) >= 0
     );
   }
-  return cliResolveQuotaPct(slotCtx.quotas, metricKey) != null;
+  return false;
 }
 
 function cliStatusFormatAnomalyTag(anomaly, { isEn = false, useColor = true } = {}) {
@@ -1156,12 +1097,6 @@ export function formatCliStatusLineCapsule(slotCtx = {}, options = {}) {
 
   // 新会话尚无任何完成步骤（stepCount === 0）时，隐藏纯占位性的 "--s" / "--" 槽位，避免刚启动显得满屏缺数据
   let activeSlots = rawSlots;
-  if (slotCtx.hasTelemetry !== false && activeSlots.includes('argon_weekly') && !hasArgonWeeklyQuotaPool(slotCtx.quotas)) {
-    const withoutArgon = activeSlots.filter((key) => key !== 'argon_weekly');
-    if (withoutArgon.length > 0) {
-      activeSlots = withoutArgon;
-    }
-  }
   if (slotCtx.stepCount === 0) {
     const filtered = activeSlots.filter(
       (key) => key === 'tps' || cliStatusHasRenderableValue(key, slotCtx)
@@ -1309,7 +1244,7 @@ export function formatCliStatusLineCapsule(slotCtx = {}, options = {}) {
 
 /**
  * 构建供外部终端提示符（Starship / Oh-My-Posh / tmux / Waybar）或脚本消费的结构化单行 JSON 遥测快照，
- * 内含压缩线对齐后的上下文占比及各配额池剩余额度状态。
+ * 内含压缩线对齐后的上下文占比及各性能/费用指标。
  *
  * @param {object} slotCtx
  * @param {{ modelDisplayName?: string, modelEffort?: string, cycleMode?: string, nowMs?: number }} [meta]
@@ -1320,14 +1255,6 @@ export function buildCliJsonStatusOutput(
   { modelDisplayName = '', modelEffort = '', cycleMode = '', nowMs = Date.now() } = {}
 ) {
   const parsedModel = parseCliModelAndEffort(modelDisplayName, modelEffort);
-  const pools = Array.isArray(slotCtx?.quotas?.pools) ? slotCtx.quotas.pools : [];
-  const quotaPools = pools.map((p) => ({
-    poolKey: p?.poolKey || p?.family || '',
-    remaining5hPct: p?.remainingPct ?? null,
-    remainingWeeklyPct: p?.weeklyRemainingPct ?? null,
-    reset5h: p?.resetTime || null,
-    resetWeekly: p?.weeklyResetTime || null,
-  }));
 
   return {
     timestamp: new Date(nowMs).toISOString(),
@@ -1358,10 +1285,6 @@ export function buildCliJsonStatusOutput(
     },
     context: {
       usedPct: slotCtx.usedPct ?? null,
-    },
-    quotas: {
-      autoRemainingPct: resolveCapsuleQuotaSlotPct(slotCtx.quotas, 'quota_auto'),
-      pools: quotaPools,
     },
     latestAnomaly: slotCtx.latestAnomaly || null,
   };

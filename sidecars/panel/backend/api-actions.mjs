@@ -179,8 +179,6 @@ function projectDisplayTelemetry(payload, requestedRevision) {
     const cacheKey = `${endpointKey}::${active.cascadeId || '__empty__'}`;
     const scope = [
       endpointKey,
-      payload.account?.status,
-      payload.account?.email || payload.account?.name || '',
       active.cascadeId,
       ...agents.map((agent) => agent.agentId),
     ];
@@ -355,14 +353,6 @@ export function executeSettingsAction(data) {
     ...payload,
     modernUi: nextModernUi,
     modelContextWindows: current.modelContextWindows,
-    weeklyTokenBudget: sanitizePositiveSettingNumber(
-      payload.weeklyTokenBudget ?? payload.weeklyTokenLimit,
-      current.weeklyTokenBudget
-    ),
-    weeklyCostBudget: sanitizePositiveSettingNumber(
-      payload.weeklyCostBudget,
-      current.weeklyCostBudget
-    ),
     modelDisplayMode: nextModelDisplayMode,
     pluginUpdateMode: nextPluginUpdateMode,
     windowMountMode: nextWindowMountMode,
@@ -384,9 +374,6 @@ export function executeSettingsAction(data) {
     (updated.contextWindowMainEnabled !== false) !== (current.contextWindowMainEnabled !== false) ||
     (updated.contextWindowSwarmEnabled === true) !== (current.contextWindowSwarmEnabled === true);
   const affectsBackendTelemetry =
-    updated.weeklyLimitMode !== current.weeklyLimitMode ||
-    updated.weeklyTokenBudget !== current.weeklyTokenBudget ||
-    updated.weeklyCostBudget !== current.weeklyCostBudget ||
     updated.enableWindowOverlay !== (current.enableWindowOverlay !== false) ||
     updated.windowMountMode !== prevMountMode ||
     contextWindowScopeChanged;

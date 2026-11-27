@@ -594,7 +594,7 @@ test('Capsule 4-stage responsive hysteresis and backend settings default/overrid
     settings: {
       enableWindowOverlay: false,
       showTopbarMultiSession: false,
-      topbarCapsuleSlots: ['gemini_5h', 'ttft', 'claude_weekly'],
+      topbarCapsuleSlots: ['avg_tps', 'ttft', 'cache_hit'],
     },
   });
   const disabledPayload = await disabledEnv.buildTelemetryPayloadInternal('', false, {});
@@ -602,9 +602,9 @@ test('Capsule 4-stage responsive hysteresis and backend settings default/overrid
   assert.equal(disabledPayload.settings.enableWindowOverlay, false);
   assert.equal(disabledPayload.settings.showTopbarMultiSession, false);
   assert.deepEqual(Array.from(disabledPayload.settings.topbarCapsuleSlots), [
-    'gemini_5h',
+    'avg_tps',
     'ttft',
-    'claude_weekly',
+    'cache_hit',
   ]);
 
   const composerEnv = backendHarness({
@@ -626,7 +626,7 @@ test('Capsule 4-stage responsive hysteresis and backend settings default/overrid
   // Dynamic 5-slot configuration & hysteresis width threshold scaling (+58px per slot beyond 3)
   const fiveSlotEnv = backendHarness({
     settings: {
-      topbarCapsuleSlots: ['context', 'tps', 'ttft', 'session_cost', 'claude_weekly'],
+      topbarCapsuleSlots: ['context', 'tps', 'ttft', 'session_cost', 'cache_hit'],
     },
   });
   const fiveSlotPayload = await fiveSlotEnv.buildTelemetryPayloadInternal('', false, {});
@@ -635,7 +635,7 @@ test('Capsule 4-stage responsive hysteresis and backend settings default/overrid
     'tps',
     'ttft',
     'session_cost',
-    'claude_weekly',
+    'cache_hit',
   ]);
   assert.equal(computeCapsuleLayoutMode(340, 'wide', { slotCount: 5 }), 'compact');
   assert.equal(computeCapsuleLayoutMode(400, 'compact', { slotCount: 5 }), 'wide');
@@ -3434,14 +3434,6 @@ test('Step table semantic tone classes (speed/cache/ttft/cost) and domain-aligne
     totalTokens: 25_500_000,
     context: { totalTokens: 158328, compactionLimitTokens: 256000, limitTokens: 256000 },
   };
-  const mockQuotas = {
-    activePool: {
-      poolLabel: 'Carbon',
-      family: 'Carbon',
-      remainingPct: 42,
-      weeklyRemainingPct: 85,
-    },
-  };
 
   const stepCostCell = resolveOverviewMetricCell('step_cost', {
     active: mockActive,
@@ -3477,12 +3469,9 @@ test('Step table semantic tone classes (speed/cache/ttft/cost) and domain-aligne
   assert.equal(tokCell.valueText, '25.5M');
   assert.equal(tokCell.subText, '入 25.1M · 出 400.0k');
 
-  const quotaCell = resolveOverviewMetricCell('quota_tightest', {
-    active: mockActive,
-    quotas: mockQuotas,
-  });
-  assert.equal(quotaCell.valueText, '余 42%');
-  assert.equal(quotaCell.subText, 'Carbon 5h · 周 85%', 'Identifies pool/window without repeating 余 42%');
+  const ctxCell = resolveOverviewMetricCell('context_usage', { active: mockActive });
+  assert.equal(ctxCell.valueText, '61.8%');
+  assert.equal(ctxCell.subText, '158.3k / 256.0k');
 
   const avgTpsCell = resolveOverviewMetricCell('avg_tps', { active: mockActive });
   assert.equal(avgTpsCell.valueClass, 'cell-value tone-info', 'avg_tps 57.3 tok/s uses same speed tone-info');
@@ -3501,7 +3490,6 @@ test('Step table semantic tone classes (speed/cache/ttft/cost) and domain-aligne
     cacheHitPct: 98.5,
     latestPromptTokens: 155212,
     sessionTokens: 25_500_000,
-    quotas: mockQuotas,
   };
   assert.equal(
     resolveCapsuleMetricPresentation('tps', capBaseCtx, 32.67).toneClass,

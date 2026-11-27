@@ -112,7 +112,6 @@ export const MetricMatrixWidget = defineComponent({
       );
       const active = scopedConv || data?.activeConversation || {};
       const ctx = ctxAgent?.context || active.context || {};
-      const quotas = data?.quotas || {};
       const settings = data?.settings || {};
       const locale = getEffectiveLocale();
 
@@ -120,7 +119,6 @@ export const MetricMatrixWidget = defineComponent({
         const cell = resolveOverviewMetricCell(key, {
           active,
           ctx,
-          quotas,
           settings,
           hasSubagents,
         });

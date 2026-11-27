@@ -6,10 +6,8 @@
 
 import { isContextWindowSettingId, isContextWindowOption } from './context-windows.mjs';
 import {
-  ACCOUNT_QUOTA_REFRESH_MINUTES,
   CLI_STATUSLINE_PRESETS,
   CONTEXT_AGENT_MODES,
-  DEFAULT_ACCOUNT_QUOTA_REFRESH_MINUTES,
   DEFAULT_CLI_STATUSLINE_SLOTS,
   DEFAULT_CONTEXT_AGENT_MODE,
   DEFAULT_HOVER_MODULES,
@@ -34,11 +32,9 @@ import {
   SUPPORTED_LANGUAGES,
   THEME_ACCENT_KEYS,
   TOPBAR_SLOT_KEYS,
-  normalizeAccountQuotaRefreshMinutes,
   normalizeCliStatusLineSlots,
   normalizeContextAgentMode,
   normalizeExperimentalModernUi,
-  normalizeExperimentalQuotaReservation,
   normalizeFontScale,
   normalizeHoverModules,
   normalizeLanguageSetting,
@@ -55,17 +51,14 @@ import {
   normalizeStepTokenComboFormat,
   normalizeThemeAccent,
   normalizeTopbarCapsuleSlots,
-  normalizeWeeklyLimitMode,
   normalizeWindowMountMode,
   parseStepTokenComboSegments,
   resolveEffectiveCliStatusLineSlots,
 } from '../shared/settings-normalization.mjs';
 
 export {
-  ACCOUNT_QUOTA_REFRESH_MINUTES,
   CLI_STATUSLINE_PRESETS,
   CONTEXT_AGENT_MODES,
-  DEFAULT_ACCOUNT_QUOTA_REFRESH_MINUTES,
   DEFAULT_CLI_STATUSLINE_SLOTS,
   DEFAULT_CONTEXT_AGENT_MODE,
   DEFAULT_HOVER_MODULES,
@@ -90,11 +83,9 @@ export {
   SUPPORTED_LANGUAGES,
   THEME_ACCENT_KEYS,
   TOPBAR_SLOT_KEYS,
-  normalizeAccountQuotaRefreshMinutes,
   normalizeCliStatusLineSlots,
   normalizeContextAgentMode,
   normalizeExperimentalModernUi,
-  normalizeExperimentalQuotaReservation,
   normalizeFontScale,
   normalizeHoverModules,
   normalizeLanguageSetting,
@@ -111,7 +102,6 @@ export {
   normalizeStepTokenComboFormat,
   normalizeThemeAccent,
   normalizeTopbarCapsuleSlots,
-  normalizeWeeklyLimitMode,
   normalizeWindowMountMode,
   parseStepTokenComboSegments,
   resolveEffectiveCliStatusLineSlots,
@@ -119,11 +109,6 @@ export {
 
 function isSchemaPlainObject(v) {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
-}
-
-function schemaSanitizePositiveNum(val, fallback) {
-  const num = Number(val);
-  return Number.isFinite(num) && num > 0 ? num : fallback;
 }
 
 export function normalizeModelContextWindows(value) {
@@ -140,9 +125,6 @@ export const DEFAULT_SETTINGS_SCHEMA = Object.freeze({
   fontScale: 'md',
   modernUi: true,
   experimentalModernUi: true,
-  weeklyTokenBudget: 150000000,
-  weeklyCostBudget: 100,
-  weeklyLimitMode: 'official',
   modelDisplayMode: 'short',
   showUpstreamModel: false,
   orchestratorIdMode: 'compact',
@@ -167,9 +149,6 @@ export const DEFAULT_SETTINGS_SCHEMA = Object.freeze({
   showStepFilterToolbar: false,
   stepTokenComboFormat: DEFAULT_STEP_TOKEN_COMBO_FORMAT,
   stepTableColumns: DEFAULT_STEP_TABLE_COLUMNS,
-  experimentalQuotaReservation: true,
-  accountQuotaRefreshMinutes: DEFAULT_ACCOUNT_QUOTA_REFRESH_MINUTES,
-  accountSwitchRiskAccepted: false,
   contextWindowRiskAccepted: false,
   contextWindowMainEnabled: true,
   contextWindowSwarmEnabled: false,
@@ -218,15 +197,6 @@ export function normalizeFullSettings(rawInput) {
     fontScale: normalizeFontScale(safeRaw.fontScale),
     modernUi,
     experimentalModernUi: modernUi,
-    weeklyTokenBudget: schemaSanitizePositiveNum(
-      safeRaw.weeklyTokenBudget ?? safeRaw.weeklyTokenLimit,
-      DEFAULT_SETTINGS_SCHEMA.weeklyTokenBudget
-    ),
-    weeklyCostBudget: schemaSanitizePositiveNum(
-      safeRaw.weeklyCostBudget,
-      DEFAULT_SETTINGS_SCHEMA.weeklyCostBudget
-    ),
-    weeklyLimitMode: normalizeWeeklyLimitMode(safeRaw.weeklyLimitMode),
     modelDisplayMode,
     showUpstreamModel: modelDisplayMode !== 'short',
     orchestratorIdMode: normalizeOrchestratorIdMode(safeRaw.orchestratorIdMode),
@@ -251,13 +221,6 @@ export function normalizeFullSettings(rawInput) {
     showStepFilterToolbar: safeRaw.showStepFilterToolbar === true,
     stepTokenComboFormat: normalizeStepTokenComboFormat(safeRaw.stepTokenComboFormat),
     stepTableColumns: normalizeStepTableColumns(safeRaw.stepTableColumns),
-    experimentalQuotaReservation: normalizeExperimentalQuotaReservation(
-      safeRaw.experimentalQuotaReservation
-    ),
-    accountQuotaRefreshMinutes: normalizeAccountQuotaRefreshMinutes(
-      safeRaw.accountQuotaRefreshMinutes
-    ),
-    accountSwitchRiskAccepted: safeRaw.accountSwitchRiskAccepted === true,
     contextWindowRiskAccepted: safeRaw.contextWindowRiskAccepted === true,
     contextWindowMainEnabled: safeRaw.contextWindowMainEnabled !== false,
     contextWindowSwarmEnabled: safeRaw.contextWindowSwarmEnabled === true,

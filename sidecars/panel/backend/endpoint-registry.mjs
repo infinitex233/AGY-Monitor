@@ -3,7 +3,7 @@
  *
  * 职责：
  * 1. 管理 `'local'`（委托既有本机全局状态，100% 向后兼容）与每个 SSH/远端窗口的独立端点上下文；
- * 2. 为每个远端端点维护隔离的轨迹缓存、配额缓存、模型目录缓存、扫描冷却表与实时活动缓存；
+ * 2. 为每个远端端点维护隔离的轨迹缓存、模型目录缓存、扫描冷却表与实时活动缓存；
  * 3. 对具备稳定主机标识的 SSH 端点按 `<prefix>-<sha256_12>.json` 原子持久化至 `DATA_DIR/remote_caches/`，
  *    临时端口端点仅驻留内存，防止磁盘残留垃圾文件；
  * 4. 维护同一远端主机的多窗口 CDP `targets` 映射、Tier-1 失败熔断器与 `inFlightCount` 防误回收保护。
@@ -25,7 +25,6 @@ import {
   loadJson,
   lsRuntimeEndpoint,
   persistTrajectoryCacheIfNeeded,
-  quotaSummaryCache,
   removeCachedTrajectory,
   setCachedTrajectory,
 } from './config.mjs';
@@ -125,17 +124,6 @@ function buildRemoteCacheFilePaths(stableHostKey) {
   };
 }
 
-function createRemoteQuotaCache() {
-  return {
-    ts: 0,
-    lastAttemptTs: 0,
-    accountName: '',
-    accountGeneration: 0,
-    data: null,
-    error: null,
-  };
-}
-
 function createRemoteEndpointStore(cacheFilePath, sqliteFilePath = '') {
   return createTrajectoryCacheStore({
     cacheFilePath,
@@ -199,7 +187,6 @@ export function registerRemoteEndpoint(info = {}) {
       preferTier2UntilMs: 0,
       inFlightCount: 0,
       store: createRemoteEndpointStore(cacheFilePath, sqliteFilePath),
-      quotaSummaryCache: createRemoteQuotaCache(),
       contextModelCatalog: null,
       failedFetchCooldownMap: new Map(),
       liveActivityMemo: new Map(),
@@ -335,22 +322,7 @@ export function getEndpointCacheStore(endpointOrId = null) {
 }
 
 /**
- * 返回目标端点对应的配额缓存容器。
- *
- * @param {object|string|null} [endpointOrId=null]
- */
-export function getEndpointQuotaCache(endpointOrId = null) {
-  const ep =
-    typeof endpointOrId === 'string'
-      ? getRegisteredRemoteEndpoint(endpointOrId)
-      : endpointOrId && typeof endpointOrId === 'object' && endpointOrId.isRemote
-        ? endpointOrId
-        : null;
-  return ep?.quotaSummaryCache || quotaSummaryCache;
-}
-
-/**
- * 清空目标远端端点的内存与持久化缓存（包含配额、模型目录、扫描冷却表与实时活动缓存）。
+ * 清空目标远端端点的内存与持久化缓存（包含模型目录、扫描冷却表与实时活动缓存）。
  *
  * @param {string} endpointId
  * @param {{ liveCascadeIds?: Iterable<string> | null }} [options]
@@ -369,12 +341,6 @@ export function clearRemoteEndpointCaches(endpointId, options = {}) {
   ep.liveActivityMemo.clear();
   ep.lastKnownLiveCascadeIds = null;
   ep.contextModelCatalog = null;
-  ep.quotaSummaryCache.ts = 0;
-  ep.quotaSummaryCache.lastAttemptTs = 0;
-  ep.quotaSummaryCache.accountName = '';
-  ep.quotaSummaryCache.accountGeneration += 1;
-  ep.quotaSummaryCache.data = null;
-  ep.quotaSummaryCache.error = null;
   return true;
 }
 

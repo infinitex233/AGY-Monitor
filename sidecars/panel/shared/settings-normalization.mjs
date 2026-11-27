@@ -25,12 +25,6 @@ export const TOPBAR_SLOT_KEYS = Object.freeze([
   'session_cost',
   'cache_hit',
   'session_tokens',
-  'quota_auto',
-  'gemini_5h',
-  'gemini_weekly',
-  'argon_weekly',
-  'claude_5h',
-  'claude_weekly',
 ]);
 
 export const DEFAULT_TOPBAR_SLOTS = Object.freeze(['tps', 'ttft', 'context']);
@@ -40,8 +34,8 @@ export const MAX_TOPBAR_SLOTS = 5;
 export const DEFAULT_CLI_STATUSLINE_SLOTS = Object.freeze([
   'tps',
   'ttft',
+  'cache_hit',
   'session_cost',
-  'quota_auto',
   'context',
 ]);
 export const MIN_CLI_STATUSLINE_SLOTS = 1;
@@ -49,24 +43,22 @@ export const MAX_CLI_STATUSLINE_SLOTS = 6;
 export const CLI_STATUSLINE_PRESETS = Object.freeze({
   compact: Object.freeze(['tps', 'ttft', 'context']),
   balanced: DEFAULT_CLI_STATUSLINE_SLOTS,
-  full: Object.freeze(['tps', 'ttft', 'cache_hit', 'session_cost', 'quota_auto', 'context']),
+  full: Object.freeze(['tps', 'ttft', 'avg_tps', 'cache_hit', 'session_cost', 'context']),
 });
 
 export const OVERVIEW_MODULE_KEYS = Object.freeze([
   'metrics',
   'context',
-  'quotas',
   'live_tasks',
 ]);
 
 export const DEFAULT_OVERVIEW_MODULES = Object.freeze([
   'metrics',
   'context',
-  'quotas',
   'live_tasks',
 ]);
 
-export const DEFAULT_HOVER_MODULES = Object.freeze(['metrics', 'context', 'quotas']);
+export const DEFAULT_HOVER_MODULES = Object.freeze(['metrics', 'context']);
 
 export const OVERVIEW_METRIC_KEYS = Object.freeze([
   'tps',
@@ -79,7 +71,6 @@ export const OVERVIEW_METRIC_KEYS = Object.freeze([
   'cache_hit',
   'session_tokens',
   'context_usage',
-  'quota_tightest',
 ]);
 
 export const DEFAULT_OVERVIEW_METRICS = Object.freeze([
@@ -314,19 +305,6 @@ export function normalizeWindowMountMode(mode, legacyEnableOverlay) {
 }
 
 /**
- * 归一化每周额度统计模式枚举（`'official'` | `'custom_tokens'` | `'custom_cost'`）。
- *
- * @param {unknown} mode
- * @returns {'official'|'custom_tokens'|'custom_cost'}
- */
-export function normalizeWeeklyLimitMode(mode) {
-  const m = String(mode || '').trim().toLowerCase();
-  if (m === 'custom_tokens' || m === 'tokens') return 'custom_tokens';
-  if (m === 'custom_cost' || m === 'cost') return 'custom_cost';
-  return 'official';
-}
-
-/**
  * 归一化顶栏/输入框胶囊槽位数组（1~5 项动态自添加，默认 3 项，自动清洗历史 `'none'` 与重复项）。
  *
  * @param {unknown} raw
@@ -396,7 +374,7 @@ export function normalizeCliStatusLineSlots(raw) {
  * 解析当前生效的 CLI 底栏槽位列表：
  * 1. 若用户显式设置了 `cliStatusLineSlots`，优先使用；
  * 2. 若用户自定义了非默认 `topbarCapsuleSlots`，沿用其自定义顺序保持兼容；
- * 3. 否则采用面向宽终端的 5 槽默认组合（速度 / 首字 / 费用 / 配额 / 上下文）。
+ * 3. 否则采用面向宽终端的 5 槽默认组合（速度 / 首字 / 缓存 / 费用 / 上下文）。
  *
  * @param {object|null|undefined} settings
  * @returns {string[]}
@@ -547,22 +525,6 @@ export function normalizeModernUi(val) {
 export const CONTEXT_AGENT_MODES = Object.freeze(['main', 'auto']);
 export const DEFAULT_CONTEXT_AGENT_MODE = 'main';
 
-export const ACCOUNT_QUOTA_REFRESH_MINUTES = Object.freeze([10, 30, 60, 180, 360, 720, 1440]);
-export const DEFAULT_ACCOUNT_QUOTA_REFRESH_MINUTES = 60;
-
-/**
- * 归一化非当前账号的后台配额刷新间隔（分钟，默认 `60` 即 1 小时）。
- *
- * @param {unknown} raw
- * @returns {10|30|60|180|360|720|1440}
- */
-export function normalizeAccountQuotaRefreshMinutes(raw) {
-  const num = Number(raw);
-  return ACCOUNT_QUOTA_REFRESH_MINUTES.includes(num)
-    ? /** @type {any} */ (num)
-    : DEFAULT_ACCOUNT_QUOTA_REFRESH_MINUTES;
-}
-
 /**
  * 归一化顶栏胶囊及悬停速览浮窗的上下文代理来源（默认 `'main'` 锁定主代理，可选 `'auto'` 跟随活跃）。
  *
@@ -572,23 +534,6 @@ export function normalizeAccountQuotaRefreshMinutes(raw) {
 export function normalizeContextAgentMode(raw) {
   const val = String(raw || '').trim().toLowerCase();
   return val === 'auto' ? 'auto' : 'main';
-}
-
-/**
- * 归一化配额预占估算开关（默认 `true`）。
- *
- * @param {unknown} val
- * @returns {boolean}
- */
-export function normalizeExperimentalQuotaReservation(val) {
-  if (val === undefined || val === null || val === '') return true;
-  if (typeof val === 'string') {
-    const lower = val.trim().toLowerCase();
-    if (lower === 'false' || lower === '0' || lower === 'off') return false;
-    if (lower === 'true' || lower === '1' || lower === 'on') return true;
-    return true;
-  }
-  return Boolean(val);
 }
 
 /**
