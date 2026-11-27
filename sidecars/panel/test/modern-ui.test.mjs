@@ -1301,3 +1301,131 @@ test('Capsule odometer digit rolling (0.15s) and color transition (0.1s) stay st
   assert.equal(capSlots[1].textSpan.textContent, '--s');
   assert.equal(capSlots[1].textSpan.hasAttribute('data-od-active'), false);
 });
+
+test('uiTheme setting defaults to liquid_glass, switches cleanly to default, and scopes liquid-glass.css strictly', () => {
+  const prevDoc = globalThis.document;
+  const { document } = createMockDom();
+  globalThis.document = document;
+  try {
+    applyAppearanceToRoot(document.documentElement, {});
+    assert.equal(document.documentElement.getAttribute('data-ui-theme'), 'liquid-glass');
+
+    applyAppearanceToRoot(document.documentElement, { uiTheme: 'default' });
+    assert.equal(document.documentElement.getAttribute('data-ui-theme'), 'default');
+
+    applyAppearanceToRoot(document.documentElement, { uiTheme: 'liquid_glass', modernUi: false });
+    assert.equal(document.documentElement.getAttribute('data-ui-theme'), 'default');
+
+    const builtStyles = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+    assert.match(builtStyles, /\[data-ui-theme="liquid-glass"\]\s+\.panel/);
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});
+
+test('StepTrendChart computes robust 4-metric scales and StepsDetailView switches dots/curve/table cleanly', async (t) => {
+  const { computeStepTrendScales } = await import('../src/components/charts/StepTrendChart.js');
+  const { setStepsViewMode } = await import('../src/store/uiStore.js');
+
+  const scales = computeStepTrendScales([
+    { tps: 132, ttft: 6.2, cache: 97.4, cost: 0.045 },
+    { tps: 148, ttft: 7.1, cache: 98.1, cost: 0.052 },
+    { tps: 162, ttft: 8.4, cache: 96.5, cost: 0.058 },
+    { tps: 155, ttft: 7.9, cache: 98.4, cost: 0.051 },
+    { tps: 174, ttft: 9.0, cache: 97.9, cost: 0.062 },
+    { tps: 141, ttft: 8.2, cache: 92.4, cost: 0.049 },
+    { tps: 168, ttft: 9.1, cache: 98.8, cost: 0.056 },
+    { tps: 1860, ttft: 10.4, cache: 99.1, cost: 0.064 },
+    { tps: 1938, ttft: 11.1, cache: 99.3, cost: 0.072 },
+    { tps: 1283, ttft: 9.9, cache: 99.2, cost: 0.068 },
+    { tps: 156, ttft: 7.7, cache: 97.3, cost: 0.046 },
+  ]);
+  assert.equal(scales.hasOutlier, true);
+  assert.ok(scales.tpsCap < 320 && scales.tpsCap > 160, `Expected robust cap in (160, 320), got ${scales.tpsCap}`);
+  assert.equal(scales.maxTpsRaw, 1938);
+  assert.equal(scales.cacheMin, 85, 'Dynamic cache floor zooms into high-hit range');
+  assert.equal(scales.cacheMax, 100);
+
+  const prevDoc = globalThis.document;
+  const prevWin = globalThis.window;
+  const prevUi = { ...uiStore.getState() };
+  const prevTel = { ...telemetryStore.getState() };
+  const { document } = createMockDom();
+  globalThis.document = document;
+  globalThis.window = {
+    innerWidth: 960,
+    innerHeight: 720,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+
+  let view = null;
+  t.after(() => {
+    view?.destroy?.();
+    uiStore.setState(prevUi, { sync: true });
+    telemetryStore.setState(prevTel, { sync: true });
+    globalThis.document = prevDoc;
+    globalThis.window = prevWin;
+  });
+
+  setStepsViewMode('dots');
+  uiStore.setState({ activeView: 'overview', monitorVisible: true }, { sync: true });
+  telemetryStore.setState(
+    {
+      telemetry: {
+        settings: {},
+        activeConversation: {
+          cascadeId: 'cid-trend-1',
+          stepCount: 3,
+          recentSteps: [
+            { stepIndex: 652, createdAtMs: 3000, modelShort: '4-neon-high', tokPerSec: 131, ttftSec: 9.1, cacheHitPct: 99.2, costUsd: 0.078, outputTokens: 690 },
+            { stepIndex: 650, createdAtMs: 2000, modelShort: '4-neon-high', tokPerSec: 1283, ttftSec: 13.1, cacheHitPct: 99.3, costUsd: 0.076, outputTokens: 64 },
+            { stepIndex: 646, createdAtMs: 1000, modelShort: '4-neon-high', tokPerSec: 149, ttftSec: 14.9, cacheHitPct: 99.1, costUsd: 0.099, outputTokens: 1180 },
+          ],
+          modelBreakdown: [],
+        },
+      },
+    },
+    { sync: true }
+  );
+
+  view = StepsDetailView({ embedded: true });
+  document.body.appendChild(view.el);
+
+  assert.equal(view.refs.stepTrendChart.el.hasAttribute('hidden'), false, 'Chart visible by default in dots mode');
+  assert.equal(view.refs.stepsScroll.el.hasAttribute('hidden'), true, 'Table hidden by default in dots mode');
+  assert.equal(view.refs.stepTrendChart.refs.getPointCount(), 3);
+  assert.equal(view.el.querySelectorAll('.step-quad-cell').length, 4, 'Renders 2x2 four-metric quad cells');
+  assert.deepEqual(
+    ['tps', 'ttft', 'cache', 'cost'].map((k) => view.refs.stepTrendChart.refs.cellMap[k].labelTextEl.textContent),
+    ['速度', '首字', '缓存', '费用'],
+    'Quad metric headers resolve localized labels rather than raw i18n keys'
+  );
+  assert.equal(view.refs.stepTrendChart.refs.cellMap.tps.numEl.textContent, '131');
+  assert.equal(view.refs.stepTrendChart.refs.cellMap.cost.numEl.textContent, '$0.078');
+
+  const scrubPill = view.el.querySelector('.steps-header-scrub-pill');
+  assert.equal(scrubPill.hasAttribute('hidden'), true);
+  view.refs.stepTrendChart.refs.setHoverIndexForTest(1);
+  assert.equal(scrubPill.hasAttribute('hidden'), false);
+  assert.match(scrubPill.textContent, /#650/);
+  assert.equal(view.refs.stepTrendChart.refs.cellMap.tps.numEl.textContent, '1283');
+  assert.equal(view.refs.stepTrendChart.refs.cellMap.ttft.numEl.textContent, '13.1');
+  assert.equal(view.refs.stepTrendChart.refs.cellMap.cache.numEl.textContent, '99.3');
+  assert.equal(view.refs.stepTrendChart.refs.cellMap.cost.numEl.textContent, '$0.076');
+
+  const curveBtn = view.refs.viewModeSwitchEl.querySelectorAll('.steps-view-mode-btn')[1];
+  const tableBtn = view.refs.viewModeSwitchEl.querySelectorAll('.steps-view-mode-btn')[2];
+  curveBtn.dispatchEvent({ type: 'click', stopPropagation() {} });
+  await Promise.resolve();
+  assert.equal(uiStore.getState().stepsViewMode, 'curve');
+  assert.equal(view.refs.stepTrendChart.el.hasAttribute('hidden'), false);
+  assert.equal(view.refs.stepsScroll.el.hasAttribute('hidden'), true);
+
+  tableBtn.dispatchEvent({ type: 'click', stopPropagation() {} });
+  await Promise.resolve();
+  assert.equal(uiStore.getState().stepsViewMode, 'table');
+  assert.equal(view.refs.stepTrendChart.el.hasAttribute('hidden'), true);
+  assert.equal(view.refs.stepsScroll.el.hasAttribute('hidden'), false);
+  assert.equal(scrubPill.hasAttribute('hidden'), true, 'Header scrub pill hides in table mode');
+});

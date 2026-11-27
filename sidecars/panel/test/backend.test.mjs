@@ -67,10 +67,10 @@ test('failed migration retains all accounting, makes legacy speed and TTFT unava
 test('successful migration rebuilds measurements and uses the same mean in both tables',async()=>{
   const h=backendHarness({cache:{test:old},trajectories:{test:raw}});
   const p=await h.buildTelemetryPayloadInternal('test');
-  assert.equal(p.activeConversation.latestTokPerSec,60);
+  assert.equal(p.activeConversation.latestTokPerSec,85.7);
   assert.equal(p.activeConversation.latestTtftSec,3);
-  assert.equal(p.activeConversation.avgTokPerSec,60);
-  assert.equal(p.modelBreakdown[0].avgTokPerSec,60);
+  assert.equal(p.activeConversation.avgTokPerSec,85.7);
+  assert.equal(p.modelBreakdown[0].avgTokPerSec,85.7);
   assert.equal(p.modelBreakdown[0].speedSummary.sampleCount,1);
   assert.equal(p.consumption.session.totalTokens,900);
   assert.match(h.state.saves[0].data.test.signature,/^v10-model-identity:/);
@@ -78,9 +78,9 @@ test('successful migration rebuilds measurements and uses the same mean in both 
 test('a legacy stream setting cannot re-enable mixed speed formulas',async()=>{
   const h=backendHarness({cache:{test:old},trajectories:{test:raw},settings:{speedMode:'stream'}});
   const p=await h.buildTelemetryPayloadInternal('test');
-  assert.equal(p.activeConversation.latestTokPerSec,60);
-  assert.equal(p.activeConversation.avgTokPerSec,60);
-  assert.equal(p.modelBreakdown[0].avgTokPerSec,60);
+  assert.equal(p.activeConversation.latestTokPerSec,85.7);
+  assert.equal(p.activeConversation.avgTokPerSec,85.7);
+  assert.equal(p.modelBreakdown[0].avgTokPerSec,85.7);
   assert.equal(p.settings.speedMode,undefined);
 });
 test('a malformed successful RPC cannot erase previously recorded usage',async()=>{
@@ -369,7 +369,7 @@ test('converges multi-level nested subagents to ultimate root and preserves metr
   assert.equal(p.activeConversation.agents[2].role,'Level 2 Deep Worker');
   // Even though sub-l2 is running with 0 steps, aggregated telemetry retains valid speed & context from sub-l1
   assert.equal(p.activeConversation.aggregated.activeAgentId,'sub-l2');
-  assert.equal(p.activeConversation.aggregated.latestTokPerSec,80);
+  assert.equal(p.activeConversation.aggregated.latestTokPerSec,100);
   assert.equal(p.activeConversation.aggregated.context.messagesTokens,24000);
   // Main agent steps are not duplicated in agents[0].recentSteps or aggregated.recentSteps
   assert.equal(p.activeConversation.agents[0].recentSteps,undefined);
@@ -710,9 +710,9 @@ test('unchanged running steps skip cache writes, but corrected timing with the s
 
   h.state.trajectories.live = raw;
   const completed = await h.buildTelemetryPayloadInternal('live');
-  assert.equal(completed.activeConversation.latestTokPerSec, 60);
+  assert.equal(completed.activeConversation.latestTokPerSec, 85.7);
   assert.equal(h.state.saves.length, writes + 1);
-  assert.equal(h.state.saves.at(-1).data.live.steps[0].totalTokPerSec, 60);
+  assert.equal(h.state.saves.at(-1).data.live.steps[0].totalTokPerSec, 600 / 7);
 });
 
 test('display step revisions omit only matching rows and invalidate on timing changes', async () => {
@@ -739,8 +739,8 @@ test('display step revisions omit only matching rows and invalidate on timing ch
   const changed = await get(initial.stepRevision);
   assert.equal(changed.stepsUnchanged, false);
   assert.notEqual(changed.stepRevision, initial.stepRevision);
-  assert.equal(changed.activeConversation.recentSteps[0].tokPerSec, 60);
-  assert.equal((await get()).activeConversation.recentSteps[0].tokPerSec, 60);
+  assert.equal(changed.activeConversation.recentSteps[0].tokPerSec, 85.7);
+  assert.equal((await get()).activeConversation.recentSteps[0].tokPerSec, 85.7);
 });
 
 test('telemetry reuses display rows only for a matching revision', async (t) => {
@@ -1527,7 +1527,7 @@ test('antigravity-cli multi-dir transcript fallback recovers offline sessions an
   const onlinePayload = await h.buildTelemetryPayloadInternal(cliId);
   const onlineStep = onlinePayload.activeConversation.recentSteps[0];
   assert.equal(onlinePayload.activeConversation.title, 'CLI 在线完整轨迹');
-  assert.equal(onlineStep.tokPerSec, 100);
+  assert.equal(onlineStep.tokPerSec, 125);
   assert.equal(onlineStep.ttftSec, 0.8);
 });
 
@@ -1810,7 +1810,7 @@ test('Antigravity CLI annotations.pbtxt + SQLite trajectory reader recovers titl
     const parsed = JSON.parse(rawOut);
     assert.equal(parsed.title, 'Greeting and Hello');
     assert.equal(parsed.modelLabel, 'Gemini 4 Hydrogen (Medium)');
-    assert.equal(parsed.tokPerSec, 23.2);
+    assert.equal(parsed.tokPerSec, 160.5);
     assert.ok(Math.abs(parsed.ttftSec - 3.2766) < 0.01);
     assert.equal(parsed.step.thinkingTokens, 57);
     assert.equal(parsed.step.responseTokens, 32);
@@ -2169,7 +2169,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
       input: stdinPayload,
       encoding: 'utf8',
     }).trim();
-    assert.equal(capsuleOut, '● 0 运行中   1.8s | 38.1 t/s | 上下文 17%');
+    assert.equal(capsuleOut, '● 0 运行中   1.8s | 46.5 t/s | 上下文 17%');
 
     // Full 3-column single-line E2E with terminal_width + cycle_mode + model
     const emptySnapDir = join(tempRoot, 'empty-data');
@@ -2204,7 +2204,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
     assert.equal(/\x1b\[48;2;/.test(fullLineOut), true, 'E2E ANSI output renders 24-bit pill background fill');
     const plainFullLine = fullLineOut.replace(/\x1b\[[0-9;]*m/g, '');
     assert.ok(plainFullLine.startsWith('? for shortcuts  '));
-    assert.ok(plainFullLine.includes('● 1 运行中   1.8s | 38.1 t/s |  上下文  2% '));
+    assert.ok(plainFullLine.includes('● 1 运行中   1.8s | 46.5 t/s |  上下文  2% '));
     assert.ok(plainFullLine.endsWith('  auto · Gemini 4 Hydrogen · medium'));
     assert.equal(h.cliDisplayWidth(fullLineOut), 129);
 
@@ -2215,7 +2215,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
         input: stdinPayload,
         encoding: 'utf8',
       }).trim();
-      assert.equal(cmdCapsuleOut, '● 0 运行中   1.8s | 38.1 t/s | 上下文 17%');
+      assert.equal(cmdCapsuleOut, '● 0 运行中   1.8s | 46.5 t/s | 上下文 17%');
 
       const spaceDir = join(tempRoot, 'Dir With Spaces');
       mkdirSync(spaceDir, { recursive: true });
@@ -2231,7 +2231,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
         input: stdinPayload,
         encoding: 'utf8',
       }).trim();
-      assert.equal(autorunOut, '● 0 运行中   1.8s | 38.1 t/s | 上下文 17%');
+      assert.equal(autorunOut, '● 0 运行中   1.8s | 46.5 t/s | 上下文 17%');
     }
 
     // Verify compaction-line precedence: when local trajectory reports maxContextTokens (e.g. 512k),
@@ -2328,7 +2328,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
     );
     const liveWrittenSnap = JSON.parse(readFileSync(join(dataDir, 'cli-status-snapshot.json'), 'utf8'));
     assert.equal(liveWrittenSnap.activeConversation.cascadeId, cid);
-    assert.equal(liveWrittenSnap.activeConversation.latestTokPerSec, 38.1);
+    assert.equal(liveWrittenSnap.activeConversation.latestTokPerSec, 46.5);
     assert.ok(Number.isFinite(liveWrittenSnap.updatedAtMs) && liveWrittenSnap.updatedAtMs > 0);
 
     // Verify uninstall removes managed statusLine while keeping other settings intact

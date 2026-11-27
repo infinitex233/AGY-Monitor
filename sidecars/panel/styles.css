@@ -93,23 +93,132 @@
   --quota-reserved-soft: color-mix(in srgb, var(--quota-reserved) 13%, transparent);
   --quota-reserved-border: color-mix(in srgb, var(--quota-reserved) 34%, transparent);
 
-  /* Context Window 10-Channel Palette */
-  --ctx-assistant: hsl(215 62% 52%);
-  --ctx-tool-results: hsl(172 68% 40%);
-  --ctx-user-input: hsl(256 76% 62%);
-  --ctx-subagent-msg: hsl(286 64% 58%);
-  --ctx-checkpoint: hsl(42 90% 49%);
-  --ctx-system-tools: hsl(24 86% 52%);
-  --ctx-mcp-tools: hsl(336 78% 58%);
-  --ctx-skills: hsl(150 60% 41%);
-  --ctx-system-prompt: hsl(214 26% 54%);
-  --ctx-user-rules: hsl(352 78% 56%);
+  /* Context Window 10-Channel Palette (Harmonious Apple System Tones) */
+  --ctx-assistant: #007aff;
+  --ctx-tool-results: #32ade6;
+  --ctx-user-input: #5856d6;
+  --ctx-subagent-msg: #af52de;
+  --ctx-checkpoint: #ff9500;
+  --ctx-system-tools: #ff6b4a;
+  --ctx-mcp-tools: #ff2d55;
+  --ctx-skills: #34c759;
+  --ctx-system-prompt: #8e8e93;
+  --ctx-user-rules: #a2845e;
 
-  /* Legacy 4-Channel Palette (retained for compatibility) */
-  --ctx-cached: hsl(217 82% 51%);
-  --ctx-input: hsl(22 86% 50%);
-  --ctx-thinking: hsl(145 64% 38%);
-  --ctx-output: hsl(190 80% 38%);
+  /* 4-Channel Consumption Palette (Apple System Tones) */
+  --ctx-cached: #007aff;
+  --ctx-input: #5856d6;
+  --ctx-thinking: #32ade6;
+  --ctx-output: #34c759;
+
+  /* Apple Liquid Glass Material & Ink Tokens (Light Polarity Default) */
+  --lg-ink-1: rgba(17, 17, 19, 0.90);
+  --lg-ink-2: rgba(17, 17, 19, 0.56);
+  --lg-ink-3: rgba(17, 17, 19, 0.38);
+  --lg-accent: var(--user-accent-primary, #007aff);
+  --lg-accent-soft: color-mix(in srgb, var(--lg-accent) 12%, transparent);
+  --lg-accent-ring: color-mix(in srgb, var(--lg-accent) 30%, transparent);
+  --lg-indigo: #5856d6;
+  --lg-purple: #af52de;
+  --lg-teal: #32ade6;
+  --lg-green: #34c759;
+  --lg-amber: #e58500;
+  --lg-amber-soft: rgba(229, 133, 0, 0.14);
+  --lg-danger: #ff3b30;
+  --lg-danger-soft: rgba(255, 59, 48, 0.12);
+
+  --lg-wash-bg: linear-gradient(160deg, #f5f6f8 0%, #ebedf1 55%, #f1f2f5 100%);
+  --lg-wash-overlay: rgba(255, 255, 255, 0.12);
+  --lg-overlay-sheen: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0) 32%,
+    rgba(255, 255, 255, 0) 72%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  --lg-card-bg: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.56) 0%,
+    rgba(255, 255, 255, 0.30) 54%,
+    rgba(255, 255, 255, 0.42) 100%
+  );
+  --lg-card-hover: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.72) 0%,
+    rgba(255, 255, 255, 0.46) 54%,
+    rgba(255, 255, 255, 0.58) 100%
+  );
+  --lg-overlay-card-bg: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.08) 52%,
+    rgba(255, 255, 255, 0.16) 100%
+  );
+  --lg-overlay-card-hover: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.42) 0%,
+    rgba(255, 255, 255, 0.18) 52%,
+    rgba(255, 255, 255, 0.28) 100%
+  );
+  --lg-capsule-hover: rgba(255, 255, 255, 0.36);
+  --lg-card-active: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.78) 0%,
+    rgba(255, 255, 255, 0.54) 100%
+  );
+  --lg-popover-bg: rgba(255, 255, 255, 0.96);
+  --lg-sticky-th-bg: rgba(250, 251, 253, 0.94);
+  --lg-rim-top: rgba(255, 255, 255, 0.96);
+  --lg-rim-side: rgba(255, 255, 255, 0.56);
+  --lg-rim-bottom: rgba(255, 255, 255, 0.38);
+  --lg-rim-edge: rgba(255, 255, 255, 0.78);
+  --lg-rim-outer: rgba(17, 17, 19, 0.075);
+  --lg-divider: rgba(17, 17, 19, 0.07);
+  --lg-track: rgba(17, 17, 19, 0.075);
+  --lg-bar-sep: rgba(255, 255, 255, 0.86);
+  --lg-seg-bg: rgba(17, 17, 19, 0.055);
+  --lg-seg-pill: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.96) 0%,
+    rgba(255, 255, 255, 0.76) 100%
+  );
+  --lg-sheen: rgba(255, 255, 255, 0.72);
+  --lg-row-hover: rgba(17, 17, 19, 0.042);
+  --lg-row-stripe: rgba(17, 17, 19, 0.018);
+  --lg-dot-idle: rgba(17, 17, 19, 0.075);
+  --lg-dot-hover-col: rgba(0, 122, 255, 0.085);
+  --lg-subcard-bg: rgba(255, 255, 255, 0.34);
+  --lg-subcard-hover: rgba(255, 255, 255, 0.52);
+  --lg-shadow-card:
+    inset 0 1px 0 var(--lg-rim-top),
+    inset 1px 0 0 var(--lg-rim-side),
+    inset 0 -1px 0 var(--lg-rim-bottom),
+    0 6px 20px rgba(0, 0, 0, 0.045),
+    0 1px 3px rgba(0, 0, 0, 0.03);
+  --lg-shadow-card-hover:
+    inset 0 1px 0 var(--lg-rim-top),
+    inset 1px 0 0 var(--lg-rim-side),
+    inset 0 -1px 0 var(--lg-rim-bottom),
+    0 10px 26px rgba(0, 0, 0, 0.07),
+    0 2px 6px rgba(0, 0, 0, 0.04);
+  --lg-shadow-pill:
+    inset 0 1px 0 rgba(255, 255, 255, 0.96),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.42),
+    0 3px 10px rgba(0, 0, 0, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+  --lg-shadow-popover:
+    inset 0 1px 0 var(--lg-rim-top),
+    inset 0 -1px 0 var(--lg-rim-bottom),
+    0 18px 46px rgba(0, 0, 0, 0.14),
+    0 4px 14px rgba(0, 0, 0, 0.06);
+  --lg-shadow-overlay:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 1px 0 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.35),
+    0 24px 64px rgba(0, 0, 0, 0.16),
+    0 6px 20px rgba(0, 0, 0, 0.07);
+  --lg-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --lg-spring-bounce: cubic-bezier(0.22, 1.16, 0.36, 1);
 
   /* Elevation & Shadows */
   --shadow-popover: 0 4px 12px rgb(0 0 0 / 0.22);
@@ -131,17 +240,128 @@
 :root[data-color-scheme="dark"],
 :host([data-color-scheme="dark"]),
 [data-color-scheme="dark"] {
-  --quota-reserved: hsl(264 86% 72%);
-  --ctx-assistant: hsl(216 30% 58%);
-  --ctx-tool-results: hsl(168 72% 54%);
-  --ctx-user-input: hsl(258 86% 73%);
-  --ctx-subagent-msg: hsl(288 72% 70%);
-  --ctx-checkpoint: hsl(43 94% 58%);
-  --ctx-system-tools: hsl(24 90% 62%);
-  --ctx-mcp-tools: hsl(338 82% 69%);
-  --ctx-skills: hsl(150 64% 55%);
-  --ctx-system-prompt: hsl(214 28% 68%);
-  --ctx-user-rules: hsl(354 82% 66%);
+  --quota-reserved: #bf5af2;
+  --ctx-assistant: #0a84ff;
+  --ctx-tool-results: #40c8e0;
+  --ctx-user-input: #5e5ce6;
+  --ctx-subagent-msg: #bf5af2;
+  --ctx-checkpoint: #ff9f0a;
+  --ctx-system-tools: #ff7b5a;
+  --ctx-mcp-tools: #ff375f;
+  --ctx-skills: #30d158;
+  --ctx-system-prompt: #98989d;
+  --ctx-user-rules: #ac8e68;
+
+  --ctx-cached: #0a84ff;
+  --ctx-input: #5e5ce6;
+  --ctx-thinking: #40c8e0;
+  --ctx-output: #30d158;
+
+  /* Apple Liquid Glass Material & Ink Tokens (Dark Polarity) */
+  --lg-ink-1: rgba(255, 255, 255, 0.93);
+  --lg-ink-2: rgba(255, 255, 255, 0.58);
+  --lg-ink-3: rgba(255, 255, 255, 0.38);
+  --lg-accent: var(--user-accent-primary, #0a84ff);
+  --lg-accent-soft: color-mix(in srgb, var(--lg-accent) 22%, transparent);
+  --lg-accent-ring: color-mix(in srgb, var(--lg-accent) 44%, transparent);
+  --lg-indigo: #5e5ce6;
+  --lg-purple: #bf5af2;
+  --lg-teal: #40c8e0;
+  --lg-green: #30d158;
+  --lg-amber: #ff9f0a;
+  --lg-amber-soft: rgba(255, 159, 10, 0.20);
+  --lg-danger: #ff453a;
+  --lg-danger-soft: rgba(255, 69, 58, 0.20);
+
+  --lg-wash-bg: linear-gradient(160deg, #17181c 0%, #121316 55%, #16171b 100%);
+  --lg-wash-overlay: rgba(18, 20, 25, 0.18);
+  --lg-overlay-sheen: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.09) 0%,
+    rgba(255, 255, 255, 0) 32%,
+    rgba(255, 255, 255, 0) 72%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  --lg-card-bg: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.105) 0%,
+    rgba(255, 255, 255, 0.042) 54%,
+    rgba(255, 255, 255, 0.068) 100%
+  );
+  --lg-card-hover: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.165) 0%,
+    rgba(255, 255, 255, 0.082) 54%,
+    rgba(255, 255, 255, 0.115) 100%
+  );
+  --lg-overlay-card-bg: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.018) 52%,
+    rgba(255, 255, 255, 0.036) 100%
+  );
+  --lg-overlay-card-hover: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.11) 0%,
+    rgba(255, 255, 255, 0.045) 52%,
+    rgba(255, 255, 255, 0.07) 100%
+  );
+  --lg-capsule-hover: rgba(255, 255, 255, 0.11);
+  --lg-card-active: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(255, 255, 255, 0.09) 100%
+  );
+  --lg-popover-bg: rgba(28, 30, 36, 0.95);
+  --lg-sticky-th-bg: rgba(26, 28, 34, 0.94);
+  --lg-rim-top: rgba(255, 255, 255, 0.26);
+  --lg-rim-side: rgba(255, 255, 255, 0.12);
+  --lg-rim-bottom: rgba(255, 255, 255, 0.06);
+  --lg-rim-edge: rgba(255, 255, 255, 0.14);
+  --lg-rim-outer: rgba(255, 255, 255, 0.10);
+  --lg-divider: rgba(255, 255, 255, 0.085);
+  --lg-track: rgba(255, 255, 255, 0.11);
+  --lg-bar-sep: rgba(22, 23, 27, 0.82);
+  --lg-seg-bg: rgba(255, 255, 255, 0.085);
+  --lg-seg-pill: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.24) 0%,
+    rgba(255, 255, 255, 0.14) 100%
+  );
+  --lg-sheen: rgba(255, 255, 255, 0.18);
+  --lg-row-hover: rgba(255, 255, 255, 0.065);
+  --lg-row-stripe: rgba(255, 255, 255, 0.025);
+  --lg-dot-idle: rgba(255, 255, 255, 0.088);
+  --lg-dot-hover-col: rgba(10, 132, 255, 0.16);
+  --lg-subcard-bg: rgba(255, 255, 255, 0.045);
+  --lg-subcard-hover: rgba(255, 255, 255, 0.08);
+  --lg-shadow-card:
+    inset 0 1px 0 var(--lg-rim-top),
+    inset 1px 0 0 var(--lg-rim-side),
+    inset 0 -1px 0 var(--lg-rim-bottom),
+    0 6px 22px rgba(0, 0, 0, 0.28),
+    0 1px 3px rgba(0, 0, 0, 0.18);
+  --lg-shadow-card-hover:
+    inset 0 1px 0 var(--lg-rim-top),
+    inset 1px 0 0 var(--lg-rim-side),
+    inset 0 -1px 0 var(--lg-rim-bottom),
+    0 12px 30px rgba(0, 0, 0, 0.36),
+    0 2px 6px rgba(0, 0, 0, 0.22);
+  --lg-shadow-pill:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    0 3px 12px rgba(0, 0, 0, 0.38);
+  --lg-shadow-popover:
+    inset 0 1px 0 var(--lg-rim-top),
+    inset 0 -1px 0 var(--lg-rim-bottom),
+    0 22px 54px rgba(0, 0, 0, 0.56),
+    0 4px 16px rgba(0, 0, 0, 0.32);
+  --lg-shadow-overlay:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 1px 0 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    0 28px 72px rgba(0, 0, 0, 0.62),
+    0 6px 22px rgba(0, 0, 0, 0.36);
 }
 
 :root[data-font-scale="sm"],
@@ -6061,6 +6281,244 @@ html[data-standalone="true"] .app-shell {
   overflow-y: visible;
 }
 
+/* Steps 3-way View Mode Switch (Dot-Matrix / Curve / Table) */
+.steps-title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.steps-header-scrub-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-track);
+  color: var(--text-secondary);
+  font-size: var(--fs-2xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 210px;
+}
+
+.steps-header-scrub-pill[hidden] {
+  display: none !important;
+}
+
+.steps-scrub-step {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.steps-scrub-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.steps-view-mode-switch {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-track);
+  border: 1px solid var(--border-hairline);
+  flex: 0 0 auto;
+}
+
+.steps-view-mode-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc((100% - 4px) / 3);
+  height: calc(100% - 4px);
+  border-radius: var(--radius-pill);
+  background: var(--surface-panel);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transition: transform 240ms var(--ease-fast);
+  pointer-events: none;
+}
+
+.steps-view-mode-btn {
+  position: relative;
+  z-index: 1;
+  appearance: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3.5px;
+  white-space: nowrap;
+  transition: color 160ms var(--ease-fast);
+}
+
+.steps-view-mode-btn:focus {
+  outline: none;
+}
+
+.steps-view-mode-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1.5px var(--accent-primary);
+}
+
+.steps-view-mode-btn:hover:not(.is-active) {
+  color: var(--text-primary);
+}
+
+.steps-view-mode-btn.is-active {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.steps-view-mode-btn .svg-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* 2x2 Synchronized 4-Metric Step Trend Chart (Dot-Matrix & Curve) */
+.step-trend-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.step-trend-wrap[hidden] {
+  display: none !important;
+}
+
+.step-quad-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.step-quad-grid[hidden] {
+  display: none !important;
+}
+
+.step-quad-cell {
+  border-radius: 13px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: crosshair;
+  user-select: none;
+  transition: background 160ms var(--ease-fast), border-color 160ms var(--ease-fast);
+}
+
+.step-quad-cell:hover {
+  background: var(--surface-hover);
+}
+
+.step-quad-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+.step-quad-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.step-quad-val {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.step-quad-num {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.step-quad-unit {
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.step-quad-unit[hidden] {
+  display: none !important;
+}
+
+.step-trend-dot {
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.step-trend-dot.is-tps {
+  background: var(--accent-primary);
+}
+
+.step-trend-dot.is-ttft {
+  background: var(--metric-warn);
+}
+
+.step-trend-dot.is-cache {
+  background: var(--metric-ok);
+}
+
+.step-trend-dot.is-cost {
+  background: var(--ctx-subagent-msg);
+}
+
+.step-quad-canvas-box {
+  position: relative;
+  width: 100%;
+  height: 62px;
+}
+
+.step-quad-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.step-trend-empty {
+  min-height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.step-trend-empty[hidden] {
+  display: none !important;
+}
+
 /* --- src/styles/views-settings.css --- */
 /*
  * 模块化偏好设置样式表 (views-settings.css).
@@ -8288,8 +8746,8 @@ html[data-standalone="true"] .app-shell {
   top: 42px;
   left: 12px;
   width: min(var(--wm-popover-w, 540px), calc(100vw - 24px));
-  height: min(588px, calc(100vh - 54px));
-  max-height: calc(100vh - 54px);
+  height: auto;
+  max-height: min(620px, calc(100vh - 54px));
   display: flex;
   flex-direction: column;
   background: var(--surface-bg);
@@ -8305,9 +8763,14 @@ html[data-standalone="true"] .app-shell {
 }
 
 .wm-popover-panel .app-shell {
-  height: 100%;
-  max-height: 100%;
+  height: auto;
+  max-height: inherit;
+  min-height: 0;
   max-width: none;
+}
+
+.wm-popover-panel .view-pane {
+  flex: 0 1 auto;
 }
 
 /* 顶栏胶囊悬停全景概览浮层（复用实时概览三卡片架构，全槽位预占，仅就地更新节点不跳动） */
@@ -9660,5 +10123,1254 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   [data-modern-ui="true"] .wm-ring-fill,
   [data-modern-ui="true"] .wm-multi-dot {
     transition: none !important;
+  }
+}
+
+/* --- src/styles/liquid-glass.css --- */
+/*
+ * Apple Liquid Glass Visual System for AGY Monitor (liquid-glass.css).
+ * Inspired by D:\antigravity_monitor:
+ * - Translucent frosted glass panels with 1px specular top bevel rims & cursor sheen
+ * - Restrained Apple neutral ink hierarchy (monochrome KPIs; semantic color only where meaningful)
+ * - Spring-animated segmented pills, macOS Storage context bar with hover readout & shimmer
+ * - Titlebar/Composer Capsule Style A: native borderless at rest, Liquid Glass pill on hover/open
+ */
+
+/* --- 1. Root & Atmospheric Liquid Glass Canvas --- */
+:root[data-ui-theme="liquid-glass"],
+:host([data-ui-theme="liquid-glass"]),
+[data-ui-theme="liquid-glass"] {
+  --accent-primary: var(--lg-accent);
+  --accent-primary-soft: var(--lg-accent-soft);
+  --accent-primary-border: var(--lg-accent-ring);
+  --metric-ok: var(--lg-green);
+  --metric-ok-soft: color-mix(in srgb, var(--lg-green) 14%, transparent);
+  --metric-info: var(--lg-teal);
+  --metric-info-soft: color-mix(in srgb, var(--lg-teal) 14%, transparent);
+  --metric-warn: var(--lg-amber);
+  --metric-warn-soft: var(--lg-amber-soft);
+  --metric-danger: var(--lg-danger);
+  --metric-danger-soft: var(--lg-danger-soft);
+  --metric-speed: var(--lg-accent);
+  --metric-speed-soft: var(--lg-accent-soft);
+  --border-hairline: var(--lg-divider);
+  --surface-hover: var(--lg-row-hover);
+  --surface-track: var(--lg-track);
+  --modern-surface-hover: var(--lg-row-hover);
+  --modern-progress-track: var(--lg-track);
+  --modern-stripe-bg: var(--lg-row-stripe);
+  --shadow-popover: var(--lg-shadow-popover);
+  --shadow-overlay: var(--lg-shadow-overlay);
+}
+
+html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
+[data-ui-theme="liquid-glass"] .app-shell {
+  background: var(--lg-wash-bg);
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .app-shell {
+  padding: var(--space-4);
+  gap: var(--space-3);
+}
+
+[data-ui-theme="liquid-glass"] .top-deck {
+  gap: 8px;
+}
+
+/* Keep cards pixel-symmetric (12px left / 12px right, aligned with .top-deck) while parking the floating 4px scrollbar cleanly in the outer right gutter */
+[data-ui-theme="liquid-glass"] .viewport-stage {
+  margin-right: -8px;
+}
+
+[data-ui-theme="liquid-glass"] .view-pane.custom-scroll-host {
+  padding-right: 0;
+}
+
+[data-ui-theme="liquid-glass"] .view-pane.custom-scroll-host > .custom-scroll-content {
+  padding-right: 8px;
+}
+
+[data-ui-theme="liquid-glass"] .view-pane.custom-scroll-host > .scrollbar-rail {
+  right: 2px;
+}
+
+/* --- 2. Liquid Glass Cards, Specular Meniscus Rim & Silky Spring Sheen --- */
+[data-ui-theme="liquid-glass"] .panel,
+[data-ui-theme="liquid-glass"] .session-header,
+[data-ui-theme="liquid-glass"] .live-task-card,
+[data-ui-theme="liquid-glass"] .matrix-cell {
+  position: relative;
+  background: var(--lg-card-bg);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid var(--lg-rim-edge);
+  border-radius: 20px;
+  box-shadow: var(--lg-shadow-card);
+  transition:
+    background 260ms var(--lg-spring),
+    border-color 220ms var(--lg-spring),
+    box-shadow 260ms var(--lg-spring),
+    transform 320ms var(--lg-spring-bounce);
+}
+
+/* Inside floating Liquid Glass overlay shells, use extra-crystalline glass & avoid nested Chromium double-blur muddying so real host backdrop shines crisply through */
+[data-ui-theme="liquid-glass"].wm-popover-panel,
+[data-ui-theme="liquid-glass"].wm-popover-panel .app-shell,
+[data-ui-theme="liquid-glass"].wm-hover-tip,
+:host([data-ui-theme="liquid-glass"]) .wm-popover-panel,
+:host([data-ui-theme="liquid-glass"]) .wm-popover-panel .app-shell,
+:host([data-ui-theme="liquid-glass"]) .wm-hover-tip {
+  --lg-card-bg: var(--lg-overlay-card-bg);
+  --lg-card-hover: var(--lg-overlay-card-hover);
+}
+
+[data-ui-theme="liquid-glass"].wm-popover-panel .panel,
+[data-ui-theme="liquid-glass"].wm-popover-panel .session-header,
+[data-ui-theme="liquid-glass"].wm-popover-panel .live-task-card,
+[data-ui-theme="liquid-glass"].wm-popover-panel .matrix-cell,
+[data-ui-theme="liquid-glass"].wm-hover-tip .panel,
+[data-ui-theme="liquid-glass"].wm-hover-tip .matrix-cell,
+:host([data-ui-theme="liquid-glass"]) .wm-popover-panel .panel,
+:host([data-ui-theme="liquid-glass"]) .wm-popover-panel .session-header,
+:host([data-ui-theme="liquid-glass"]) .wm-popover-panel .live-task-card,
+:host([data-ui-theme="liquid-glass"]) .wm-popover-panel .matrix-cell,
+:host([data-ui-theme="liquid-glass"]) .wm-hover-tip .panel,
+:host([data-ui-theme="liquid-glass"]) .wm-hover-tip .matrix-cell {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Surface specular liquid sheen rendered via ::after so children never create z-index traps */
+[data-ui-theme="liquid-glass"] .panel::after,
+[data-ui-theme="liquid-glass"] .live-task-card::after,
+[data-ui-theme="liquid-glass"] .matrix-cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    260px circle at var(--lg-mx, 50%) var(--lg-my, 50%),
+    var(--lg-sheen),
+    transparent 72%
+  );
+  transition: opacity 280ms var(--lg-spring);
+}
+
+[data-ui-theme="liquid-glass"] .panel:hover::after,
+[data-ui-theme="liquid-glass"] .live-task-card:hover::after,
+[data-ui-theme="liquid-glass"] .matrix-cell:hover::after {
+  opacity: 0.85;
+}
+
+/* Lift any glass panel / form row containing ANY open popover, dropdown, calendar, or hover tooltip above later siblings */
+[data-ui-theme="liquid-glass"] .panel:has(.is-open),
+[data-ui-theme="liquid-glass"] .panel:has(.select-menu:not([hidden])),
+[data-ui-theme="liquid-glass"] .panel:has(.action-menu-popover:not([hidden])),
+[data-ui-theme="liquid-glass"] .panel:has(.dt-popover:not([hidden])),
+[data-ui-theme="liquid-glass"] .panel:has(.trend-tooltip:not([hidden])),
+[data-ui-theme="liquid-glass"] .panel:has(.cons-breakdown-popover:not([hidden])),
+[data-ui-theme="liquid-glass"] .panel:has(.turn-prompt-tip:not([hidden])),
+[data-ui-theme="liquid-glass"] .panel:has(.step-anomaly-tip:not([hidden])),
+[data-ui-theme="liquid-glass"] .session-header:has(.is-open),
+[data-ui-theme="liquid-glass"] .session-header:has(.select-menu:not([hidden])) {
+  z-index: 60;
+}
+
+[data-ui-theme="liquid-glass"] .form-row:has(.is-open),
+[data-ui-theme="liquid-glass"] .form-row:has(.select-menu:not([hidden])),
+[data-ui-theme="liquid-glass"] .cons-custom-range-bar:has(.dt-popover:not([hidden])),
+[data-ui-theme="liquid-glass"] .datetime-picker:has(.dt-popover:not([hidden])),
+[data-ui-theme="liquid-glass"] .custom-select.is-open,
+[data-ui-theme="liquid-glass"] .action-menu.is-open {
+  position: relative;
+  z-index: 65;
+}
+
+[data-ui-theme="liquid-glass"] .panel {
+  padding: 13px 15px;
+  gap: 10px;
+}
+
+[data-ui-theme="liquid-glass"] .panel-title {
+  color: var(--lg-ink-1);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+[data-ui-theme="liquid-glass"] .panel-title .svg-icon {
+  color: var(--lg-ink-2);
+}
+
+/* Nested sub-panels stay quiet and flat */
+[data-ui-theme="liquid-glass"] .panel .panel {
+  background: var(--lg-seg-bg);
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-radius: 12px;
+}
+
+[data-ui-theme="liquid-glass"] .panel .panel::after {
+  display: none;
+}
+
+/* --- 3. Top Session Header & Restrained Status Pill --- */
+[data-ui-theme="liquid-glass"] .session-header {
+  border-radius: 15px;
+  padding: 5px 8px 5px 10px;
+  z-index: 15;
+}
+
+[data-ui-theme="liquid-glass"] .session-header .select-trigger {
+  border-radius: 10px;
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .session-header .select-label {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+[data-ui-theme="liquid-glass"] .session-header .select-trigger:hover,
+[data-ui-theme="liquid-glass"] .session-header .custom-select.is-open .select-trigger {
+  background: var(--lg-row-hover);
+}
+
+[data-ui-theme="liquid-glass"] .status-tag {
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  gap: 6px;
+  font-weight: 500;
+  background: var(--lg-seg-bg);
+  color: var(--lg-ink-2);
+}
+
+[data-ui-theme="liquid-glass"] .status-tag.state-running {
+  background: var(--lg-accent-soft);
+  color: var(--lg-accent);
+  font-weight: 600;
+}
+
+[data-ui-theme="liquid-glass"] .status-tag.state-synced {
+  background: var(--lg-accent-soft);
+  color: var(--lg-accent);
+}
+
+[data-ui-theme="liquid-glass"] .status-tag.state-warn {
+  background: var(--lg-amber-soft);
+  color: var(--lg-amber);
+}
+
+[data-ui-theme="liquid-glass"] .icon-btn,
+[data-ui-theme="liquid-glass"] .session-header .icon-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  background: var(--lg-card-bg);
+  border: 1px solid var(--lg-rim-edge);
+  box-shadow: inset 0 1px 0 var(--lg-rim-top);
+  color: var(--lg-ink-2);
+  transition:
+    background 220ms var(--lg-spring),
+    border-color 220ms var(--lg-spring),
+    color 180ms var(--lg-spring),
+    transform 240ms var(--lg-spring-bounce);
+}
+
+[data-ui-theme="liquid-glass"] .icon-btn:hover,
+[data-ui-theme="liquid-glass"] .session-header .icon-btn:hover {
+  background: var(--lg-card-hover);
+  border: 1px solid var(--lg-rim-edge);
+  color: var(--lg-ink-1);
+  transform: scale(1.04);
+}
+
+[data-ui-theme="liquid-glass"] .icon-btn:active,
+[data-ui-theme="liquid-glass"] .session-header .icon-btn:active {
+  transform: scale(0.94);
+}
+
+[data-ui-theme="liquid-glass"] .update-badge-btn {
+  border-radius: var(--radius-pill);
+  background: var(--lg-accent-soft);
+  color: var(--lg-accent);
+  padding: 2px 9px;
+}
+
+/* --- 4. Spring Segmented Pill Navigation & Inline Segmented Controls --- */
+[data-ui-theme="liquid-glass"] .long-pill-nav {
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  background: var(--lg-seg-bg);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+[data-ui-theme="liquid-glass"] .pill-glider {
+  border-radius: var(--radius-pill);
+  background: var(--lg-seg-pill);
+  box-shadow: var(--lg-shadow-pill);
+  transition: transform 340ms var(--lg-spring-bounce);
+}
+
+[data-ui-theme="liquid-glass"] .pill-tab {
+  color: var(--lg-ink-2);
+  font-weight: 500;
+}
+
+[data-ui-theme="liquid-glass"] .pill-tab:hover {
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .pill-tab.is-active,
+[data-ui-theme="liquid-glass"] .pill-tab.is-active .svg-icon,
+[data-ui-theme="liquid-glass"] .pill-tab.is-active .pill-tab-badge {
+  color: var(--lg-ink-1);
+  font-weight: 600;
+}
+
+[data-ui-theme="liquid-glass"] .segmented {
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--lg-seg-bg);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.055);
+}
+
+[data-ui-theme="liquid-glass"] .cons-overview-head {
+  flex-wrap: wrap;
+  row-gap: 7px;
+  column-gap: 8px;
+}
+
+[data-ui-theme="liquid-glass"] .cons-overview-head .cons-overview-title {
+  flex: 1 0 auto;
+  min-width: max-content;
+}
+
+[data-ui-theme="liquid-glass"] .cons-overview-controls {
+  flex: 0 1 auto;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+[data-ui-theme="liquid-glass"] .cons-overview-head .segmented {
+  padding: 2px;
+  gap: 1px;
+  max-width: 100%;
+}
+
+[data-ui-theme="liquid-glass"] .cons-overview-head .seg-btn {
+  padding: 2px 5.5px;
+  font-size: var(--fs-xs);
+}
+
+[data-ui-theme="liquid-glass"] .cons-custom-range-bar .datetime-picker {
+  min-width: 128px;
+}
+
+[data-ui-theme="liquid-glass"] .cons-custom-range-bar .dt-trigger {
+  border-radius: var(--radius-pill);
+  padding: 3px 9px;
+  background: var(--lg-seg-bg);
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .cons-custom-range-bar .dt-trigger:hover {
+  background: var(--lg-card-hover);
+}
+
+[data-ui-theme="liquid-glass"] .seg-glider {
+  border-radius: var(--radius-pill);
+  background: var(--lg-seg-pill);
+  box-shadow: var(--lg-shadow-pill);
+}
+
+[data-ui-theme="liquid-glass"] .seg-glider.is-ready {
+  transition:
+    transform 320ms var(--lg-spring-bounce),
+    width 320ms var(--lg-spring-bounce),
+    height 220ms var(--lg-spring);
+}
+
+[data-ui-theme="liquid-glass"] .segmented:not(.has-glider) .seg-btn.is-active {
+  border-radius: var(--radius-pill);
+  background: var(--lg-seg-pill);
+  box-shadow: var(--lg-shadow-pill);
+}
+
+[data-ui-theme="liquid-glass"] .seg-btn {
+  border-radius: var(--radius-pill);
+  color: var(--lg-ink-2);
+  font-weight: 500;
+}
+
+[data-ui-theme="liquid-glass"] .seg-btn:hover,
+[data-ui-theme="liquid-glass"] .segmented.has-glider .seg-btn:hover {
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .seg-btn.is-active,
+[data-ui-theme="liquid-glass"] .segmented .seg-btn.is-active,
+[data-ui-theme="liquid-glass"] .segmented.has-glider .seg-btn.is-active {
+  color: var(--lg-ink-1);
+  font-weight: 600;
+}
+
+/* --- 5. Live Overview 4 Independent Liquid Glass KPI Tiles (Prototype v4) --- */
+[data-ui-theme="liquid-glass"] .overview-modules-host {
+  padding-top: 2px;
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0;
+  gap: 0;
+  border-radius: 0;
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel::after {
+  display: none;
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel > .panel-header {
+  display: none;
+}
+
+[data-ui-theme="liquid-glass"] .telemetry-matrix,
+[data-ui-theme="liquid-glass"] .telemetry-matrix.is-flat-summary {
+  gap: 9px;
+  background: transparent;
+  border: none;
+  overflow: visible;
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .matrix-cell,
+[data-ui-theme="liquid-glass"] .session-summary-panel .matrix-cell,
+[data-ui-theme="liquid-glass"] .telemetry-matrix .matrix-cell {
+  background: var(--lg-card-bg);
+  border: 1px solid var(--lg-rim-edge);
+  border-radius: 16px;
+  box-shadow: var(--lg-shadow-card);
+  padding: 10px 13px 11px;
+  gap: 6px;
+  align-items: stretch;
+  text-align: left;
+  overflow: hidden;
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .matrix-cell:hover,
+[data-ui-theme="liquid-glass"] .session-summary-panel .matrix-cell:hover,
+[data-ui-theme="liquid-glass"] .telemetry-matrix .matrix-cell:hover {
+  background: var(--lg-card-hover);
+  border: 1px solid var(--lg-rim-edge);
+  border-radius: 16px;
+  padding: 10px 13px 11px;
+  box-shadow: var(--lg-shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+[data-ui-theme="liquid-glass"] .telemetry-matrix.is-flat-summary .cell-label,
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-label {
+  justify-content: space-between;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  color: var(--lg-ink-2);
+}
+
+[data-ui-theme="liquid-glass"] .telemetry-matrix.is-flat-summary .cell-label .svg-icon,
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-label .svg-icon {
+  display: inline-block;
+  color: var(--lg-ink-3);
+}
+
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-label .svg-icon.is-pulsing {
+  color: var(--lg-accent);
+}
+
+/* Restrained Apple Neutral KPI Numerals (Crisp tabular numerals + subordinate baseline unit) */
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value,
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-good,
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-info,
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.accent-ok,
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.accent-speed {
+  display: flex;
+  align-items: baseline;
+  color: var(--lg-ink-1);
+  font-size: calc(var(--fs-lg) * 1.12);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value .cell-num {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value .cell-unit {
+  flex-shrink: 0;
+  margin-left: 1px;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--lg-ink-2);
+}
+
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value .cell-unit.is-spaced {
+  margin-left: 3.5px;
+}
+
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-warn {
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-danger {
+  color: var(--lg-danger);
+}
+
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-muted {
+  color: var(--lg-ink-3);
+  font-weight: 500;
+}
+
+/* Keep flat dual-grid cells inside panels clean */
+[data-ui-theme="liquid-glass"] .dual-grid > .matrix-cell,
+[data-ui-theme="liquid-glass"] .dual-grid > .matrix-cell:hover {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transform: none;
+  padding: 2px 0;
+}
+
+[data-ui-theme="liquid-glass"] .dual-grid > .matrix-cell::after {
+  display: none;
+}
+
+/* --- 6. Context Window Card (macOS Storage Bar + Hover Readout + Shimmer) --- */
+[data-ui-theme="liquid-glass"] .ctx-hover-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--lg-seg-bg);
+  color: var(--lg-ink-1);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-4px);
+  pointer-events: none;
+  transition: opacity 150ms var(--ease-modern), transform 150ms var(--ease-modern);
+}
+
+[data-ui-theme="liquid-glass"] .ctx-hover-readout.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+[data-ui-theme="liquid-glass"] .ctx-hover-readout .swatch {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+[data-ui-theme="liquid-glass"] .ctx-summary-pct {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .ctx-summary-pct.tone-warn {
+  color: var(--lg-amber);
+}
+
+[data-ui-theme="liquid-glass"] .ctx-summary-pct.tone-danger {
+  color: var(--lg-danger);
+}
+
+[data-ui-theme="liquid-glass"] .ctx-summary-ratio {
+  color: var(--lg-ink-2);
+}
+
+[data-ui-theme="liquid-glass"] .ctx-legend-toggle {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--lg-seg-bg);
+  color: var(--lg-ink-2);
+}
+
+[data-ui-theme="liquid-glass"] .ctx-legend-toggle:hover {
+  background: var(--lg-card-hover);
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .ctx-agent-pill {
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
+  background: var(--lg-seg-bg);
+  color: var(--lg-ink-2);
+  font-weight: 500;
+}
+
+[data-ui-theme="liquid-glass"] .ctx-agent-pill:hover {
+  background: var(--lg-card-hover);
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .ctx-agent-pill.is-active {
+  background: var(--lg-seg-pill);
+  color: var(--lg-ink-1);
+  box-shadow: var(--lg-shadow-pill);
+  font-weight: 600;
+}
+
+[data-ui-theme="liquid-glass"] .progress-track.ctx-segment-meter {
+  position: relative;
+  height: 9px;
+  border-radius: var(--radius-pill);
+  background: var(--lg-track);
+  overflow: hidden;
+}
+
+[data-ui-theme="liquid-glass"] .progress-track.ctx-segment-meter.is-danger {
+  box-shadow: 0 0 0 1.2px color-mix(in srgb, var(--lg-danger) 55%, transparent);
+}
+
+[data-ui-theme="liquid-glass"] .progress-track.ctx-segment-meter .progress-seg {
+  border-radius: 0;
+  transition:
+    background-color 80ms ease,
+    width var(--dur-normal) var(--ease-modern),
+    opacity 160ms var(--ease-modern),
+    filter 160ms var(--ease-modern);
+}
+
+[data-ui-theme="liquid-glass"] .progress-track.ctx-segment-meter .progress-seg.is-active.has-sep {
+  margin-left: 0;
+  border-left: 1.5px solid var(--lg-bar-sep);
+}
+
+[data-ui-theme="liquid-glass"] .progress-track.ctx-segment-meter.has-seg-hover .progress-seg.is-active {
+  opacity: 0.34;
+}
+
+[data-ui-theme="liquid-glass"] .progress-track.ctx-segment-meter.has-seg-hover .progress-seg.is-active.is-seg-hovered {
+  opacity: 1;
+  filter: brightness(1.06);
+}
+
+@keyframes anim-lg-liquid-sweep {
+  0% { transform: translateX(-110%); }
+  58%, 100% { transform: translateX(260%); }
+}
+
+[data-ui-theme="liquid-glass"] .progress-track.ctx-segment-meter.is-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.36), transparent);
+  pointer-events: none;
+  animation: anim-lg-liquid-sweep 3.2s ease-in-out infinite;
+}
+
+[data-ui-theme="liquid-glass"][data-color-scheme="dark"] .progress-track.ctx-segment-meter.is-shimmer::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.20), transparent);
+}
+
+[data-ui-theme="liquid-glass"] .ctx-legend-grid {
+  padding-top: 8px;
+  border-top: 1px solid var(--lg-divider);
+  gap: 6px 16px;
+}
+
+[data-ui-theme="liquid-glass"] .swatch {
+  border-radius: var(--radius-pill);
+}
+
+[data-ui-theme="liquid-glass"] .legend-item {
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: background-color 140ms var(--ease-modern);
+}
+
+[data-ui-theme="liquid-glass"] .legend-item:hover,
+[data-ui-theme="liquid-glass"] .legend-item.is-seg-hovered {
+  background: var(--lg-row-hover);
+}
+
+[data-ui-theme="liquid-glass"] .legend-item .legend-left {
+  color: var(--lg-ink-2);
+}
+
+[data-ui-theme="liquid-glass"] .legend-item strong {
+  color: var(--lg-ink-1);
+  font-weight: 600;
+}
+
+/* --- 7. Live Running Activity Card --- */
+[data-ui-theme="liquid-glass"] .live-task-card {
+  padding: 12px 15px;
+  border-radius: 18px;
+}
+
+[data-ui-theme="liquid-glass"] .live-task-title {
+  color: var(--lg-ink-1);
+  font-weight: 600;
+}
+
+[data-ui-theme="liquid-glass"] .live-activity-progress {
+  border-radius: 6px;
+  background: var(--lg-accent-soft);
+  color: var(--lg-accent);
+  padding: 1px 6px;
+}
+
+[data-ui-theme="liquid-glass"] .live-sub-toggle {
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  background: var(--lg-seg-bg);
+  color: var(--lg-ink-2);
+}
+
+[data-ui-theme="liquid-glass"] .live-sub-toggle:hover {
+  background: var(--lg-card-hover);
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .live-sub-scroll-host {
+  border-top: 1px solid var(--lg-divider);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+/* --- 8. Steps Detail Table (Pure, Crisp, Calm Apple Neutral Tabular List) --- */
+[data-ui-theme="liquid-glass"] .table-viewport {
+  background: transparent;
+}
+
+[data-ui-theme="liquid-glass"] .steps-header-scrub-pill {
+  background: var(--lg-seg-bg);
+  color: var(--lg-ink-2);
+}
+
+[data-ui-theme="liquid-glass"] .steps-scrub-step {
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .steps-view-mode-switch {
+  background: var(--lg-seg-bg);
+  border: 0.5px solid var(--lg-divider);
+}
+
+[data-ui-theme="liquid-glass"] .steps-view-mode-thumb {
+  background: var(--lg-seg-pill);
+  box-shadow: var(--lg-shadow-pill);
+  transition: transform 280ms var(--lg-spring);
+}
+
+[data-ui-theme="liquid-glass"] .steps-view-mode-btn {
+  color: var(--lg-ink-2);
+  outline: none;
+}
+
+[data-ui-theme="liquid-glass"] .steps-view-mode-btn:focus-visible {
+  box-shadow: 0 0 0 1.5px var(--lg-accent);
+}
+
+[data-ui-theme="liquid-glass"] .steps-view-mode-btn:hover:not(.is-active),
+[data-ui-theme="liquid-glass"] .steps-view-mode-btn.is-active {
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .step-quad-cell {
+  background: var(--lg-subcard-bg);
+  border: 0.5px solid var(--lg-divider);
+}
+
+[data-ui-theme="liquid-glass"] .step-quad-cell:hover {
+  background: var(--lg-subcard-hover);
+  border-color: var(--lg-rim-edge);
+}
+
+[data-ui-theme="liquid-glass"] .step-quad-label,
+[data-ui-theme="liquid-glass"] .step-quad-unit {
+  color: var(--lg-ink-2);
+}
+
+[data-ui-theme="liquid-glass"] .step-quad-num {
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .step-trend-dot.is-tps {
+  background: var(--lg-accent);
+}
+
+[data-ui-theme="liquid-glass"] .step-trend-dot.is-ttft {
+  background: var(--lg-amber);
+}
+
+[data-ui-theme="liquid-glass"] .step-trend-dot.is-cache {
+  background: var(--lg-green);
+}
+
+[data-ui-theme="liquid-glass"] .step-trend-dot.is-cost {
+  background: var(--lg-purple);
+}
+
+[data-ui-theme="liquid-glass"] .step-trend-empty {
+  color: var(--lg-ink-3);
+}
+
+/* Sticky header MUST have an opaque frosted fill so scrolled rows never bleed through behind th text */
+[data-ui-theme="liquid-glass"] .data-table th {
+  background: var(--lg-sticky-th-bg);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  color: var(--lg-ink-3);
+  font-weight: 500;
+  border-bottom: 1px solid var(--lg-divider);
+  padding-top: 5px;
+  padding-bottom: 7px;
+  z-index: 4;
+}
+
+[data-ui-theme="liquid-glass"] .data-table td {
+  color: var(--lg-ink-2);
+  border-bottom: 1px solid var(--lg-divider);
+}
+
+[data-ui-theme="liquid-glass"] .data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+[data-ui-theme="liquid-glass"] .data-table td[data-col="step"] {
+  color: var(--lg-ink-3);
+}
+
+[data-ui-theme="liquid-glass"] .data-table td[data-col="model"],
+[data-ui-theme="liquid-glass"] .data-table td[data-col="tps"],
+[data-ui-theme="liquid-glass"] .data-table td[data-col="cost"] {
+  color: var(--lg-ink-1);
+}
+
+/* Keep table values calm & monochrome (preserve only warn/danger for slow TTFT / anomalies) */
+[data-ui-theme="liquid-glass"] .data-table td .tone-good,
+[data-ui-theme="liquid-glass"] .data-table td .tone-info,
+[data-ui-theme="liquid-glass"] .data-table td.tone-good,
+[data-ui-theme="liquid-glass"] .data-table td.tone-info {
+  color: var(--lg-ink-2);
+  font-weight: 500;
+}
+
+[data-ui-theme="liquid-glass"] .data-table td[data-col="tps"].tone-good,
+[data-ui-theme="liquid-glass"] .data-table td[data-col="tps"].tone-info,
+[data-ui-theme="liquid-glass"] .data-table td[data-col="tps"] .tone-good,
+[data-ui-theme="liquid-glass"] .data-table td[data-col="tps"] .tone-info {
+  color: var(--lg-ink-1);
+  font-weight: 600;
+}
+
+[data-ui-theme="liquid-glass"] .data-table td.tone-warn,
+[data-ui-theme="liquid-glass"] .data-table td .tone-warn {
+  color: var(--lg-amber);
+}
+
+[data-ui-theme="liquid-glass"] .data-table td.tone-danger,
+[data-ui-theme="liquid-glass"] .data-table td .tone-danger {
+  color: var(--lg-danger);
+}
+
+[data-ui-theme="liquid-glass"] .data-table tbody tr:not(.step-vspacer):not(.step-vsizer) td:first-child {
+  border-top-left-radius: 9px;
+  border-bottom-left-radius: 9px;
+}
+
+[data-ui-theme="liquid-glass"] .data-table tbody tr:not(.step-vspacer):not(.step-vsizer) td:last-child {
+  border-top-right-radius: 9px;
+  border-bottom-right-radius: 9px;
+}
+
+/* --- 9. Usage Analytics View (Restrained Monochrome KPIs + Apple Blue Trend Curve) --- */
+[data-ui-theme="liquid-glass"] .cons-split-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+[data-ui-theme="liquid-glass"] .cons-hero-sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: var(--fs-sm);
+  color: var(--lg-ink-2);
+  margin-top: -2px;
+}
+
+[data-ui-theme="liquid-glass"] .cons-hero-num,
+[data-ui-theme="liquid-glass"] .cons-hero-cost,
+[data-ui-theme="liquid-glass"] .cons-hero-cache,
+[data-ui-theme="liquid-glass"] .cons-hero-speed {
+  color: var(--lg-ink-1);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+[data-ui-theme="liquid-glass"] .cons-badge {
+  color: var(--lg-ink-2);
+  font-weight: 600;
+}
+
+[data-ui-theme="liquid-glass"] .trend-line {
+  stroke: var(--lg-accent);
+  stroke-width: 2.2;
+}
+
+[data-ui-theme="liquid-glass"] .trend-peak-dot,
+[data-ui-theme="liquid-glass"] .trend-hover-dot {
+  fill: var(--lg-accent);
+  stroke: var(--lg-popover-bg);
+}
+
+[data-ui-theme="liquid-glass"] .trend-peak-pill {
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
+  background: var(--lg-seg-bg);
+  color: var(--lg-ink-1);
+  font-weight: 500;
+}
+
+[data-ui-theme="liquid-glass"] .trend-tip-tokens,
+[data-ui-theme="liquid-glass"] .trend-tip-cost,
+[data-ui-theme="liquid-glass"] .cons-pop-cost {
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .cons-models-table thead th {
+  color: var(--lg-ink-3);
+  border-bottom-color: var(--lg-divider);
+}
+
+[data-ui-theme="liquid-glass"] .cons-models-table tbody td {
+  color: var(--lg-ink-2);
+  border-bottom-color: var(--lg-divider);
+}
+
+[data-ui-theme="liquid-glass"] .cons-models-table tbody td.col-model {
+  color: var(--lg-ink-1);
+  font-weight: 500;
+}
+
+/* --- 10. Preferences View & Frosted Controls / Popovers --- */
+[data-ui-theme="liquid-glass"] .settings-tab-stack .form-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--lg-divider);
+}
+
+[data-ui-theme="liquid-glass"] .settings-tab-stack .panel > .form-row:first-of-type {
+  padding-top: 2px;
+}
+
+[data-ui-theme="liquid-glass"] .settings-tab-stack .panel > .form-row:last-of-type {
+  border-bottom: none;
+  padding-bottom: 2px;
+}
+
+[data-ui-theme="liquid-glass"] .btn-primary {
+  border-radius: var(--radius-pill);
+  background: var(--lg-accent);
+  color: #ffffff;
+  box-shadow: 0 2px 10px var(--lg-accent-soft);
+}
+
+[data-ui-theme="liquid-glass"] .btn-secondary {
+  border-radius: var(--radius-pill);
+  background: var(--lg-card-bg);
+  border: 1px solid var(--lg-rim-edge);
+  box-shadow: inset 0 1px 0 var(--lg-rim-top);
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .btn-secondary:hover:not(:disabled) {
+  background: var(--lg-card-hover);
+  border: 1px solid var(--lg-rim-edge);
+}
+
+[data-ui-theme="liquid-glass"] .btn-danger-confirm {
+  color: var(--lg-danger) !important;
+  background: var(--lg-danger-soft) !important;
+}
+
+[data-ui-theme="liquid-glass"] .form-row > .custom-select > .select-trigger,
+[data-ui-theme="liquid-glass"] .cons-cycle-pool-select .select-trigger,
+[data-ui-theme="liquid-glass"] .steps-inline-scope-select .select-trigger,
+[data-ui-theme="liquid-glass"] .steps-inline-model-select .select-trigger {
+  border-radius: var(--radius-pill);
+  background: var(--lg-seg-bg);
+  color: var(--lg-ink-1);
+}
+
+[data-ui-theme="liquid-glass"] .form-row > .custom-select > .select-trigger:hover,
+[data-ui-theme="liquid-glass"] .cons-cycle-pool-select .select-trigger:hover,
+[data-ui-theme="liquid-glass"] .steps-inline-scope-select .select-trigger:hover,
+[data-ui-theme="liquid-glass"] .steps-inline-model-select .select-trigger:hover {
+  background: var(--lg-card-hover);
+}
+
+[data-ui-theme="liquid-glass"] .select-menu,
+[data-ui-theme="liquid-glass"] .action-menu-popover,
+[data-ui-theme="liquid-glass"] .app-toast,
+[data-ui-theme="liquid-glass"] .dt-popover,
+[data-ui-theme="liquid-glass"] .trend-tooltip,
+[data-ui-theme="liquid-glass"] .sstep-tooltip,
+[data-ui-theme="liquid-glass"] .step-anomaly-tip,
+[data-ui-theme="liquid-glass"] .turn-prompt-tip,
+[data-ui-theme="liquid-glass"] .cons-breakdown-popover {
+  border-radius: 16px;
+  background: var(--lg-popover-bg);
+  backdrop-filter: blur(18px) saturate(185%);
+  -webkit-backdrop-filter: blur(18px) saturate(185%);
+  border: 1px solid var(--lg-rim-edge);
+  box-shadow: var(--lg-shadow-popover);
+  z-index: 80;
+}
+
+[data-ui-theme="liquid-glass"] .select-option {
+  border-radius: 9px;
+  transition: background-color 180ms var(--lg-spring), color 180ms var(--lg-spring);
+}
+
+[data-ui-theme="liquid-glass"] .select-option.is-selected {
+  background: var(--lg-accent-soft);
+  color: var(--lg-ink-1);
+}
+
+/* --- 11. Floating Popover & Hover Preview Shell (Crystal-Clear High-Translucency Liquid Glass) --- */
+@keyframes anim-lg-spring-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes anim-lg-spring-pop-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+[data-ui-theme="liquid-glass"].wm-popover-panel,
+[data-ui-theme="liquid-glass"].wm-hover-tip,
+:host([data-ui-theme="liquid-glass"]) .wm-popover-panel,
+:host([data-ui-theme="liquid-glass"]) .wm-hover-tip {
+  border-radius: 24px;
+  background-color: var(--lg-wash-overlay);
+  background-image: var(--lg-overlay-sheen);
+  backdrop-filter: blur(9px) saturate(185%);
+  -webkit-backdrop-filter: blur(9px) saturate(185%);
+  border: 1px solid var(--lg-rim-edge);
+  box-shadow: var(--lg-shadow-overlay), 0 0 0 0.5px var(--lg-rim-outer);
+  animation: anim-lg-spring-pop 280ms var(--lg-spring-bounce);
+}
+
+[data-ui-theme="liquid-glass"][data-color-scheme="dark"].wm-popover-panel,
+[data-ui-theme="liquid-glass"][data-color-scheme="dark"].wm-hover-tip,
+:host([data-ui-theme="liquid-glass"][data-color-scheme="dark"]) .wm-popover-panel,
+:host([data-ui-theme="liquid-glass"][data-color-scheme="dark"]) .wm-hover-tip {
+  backdrop-filter: blur(11px) saturate(180%);
+  -webkit-backdrop-filter: blur(11px) saturate(180%);
+}
+
+[data-ui-theme="liquid-glass"].wm-popover-panel.is-above,
+[data-ui-theme="liquid-glass"].wm-hover-tip.is-above,
+:host([data-ui-theme="liquid-glass"]) .wm-popover-panel.is-above,
+:host([data-ui-theme="liquid-glass"]) .wm-hover-tip.is-above {
+  animation-name: anim-lg-spring-pop-up;
+}
+
+[data-ui-theme="liquid-glass"].wm-popover-panel .app-shell,
+:host([data-ui-theme="liquid-glass"]) .wm-popover-panel .app-shell {
+  background: transparent !important;
+}
+
+[data-ui-theme="liquid-glass"].wm-multi-panel,
+:host([data-ui-theme="liquid-glass"]) .wm-multi-panel {
+  border-radius: 22px;
+  background-color: var(--lg-popover-bg);
+  background-image: var(--lg-overlay-sheen);
+  backdrop-filter: blur(12px) saturate(185%);
+  -webkit-backdrop-filter: blur(12px) saturate(185%);
+  border: 1px solid var(--lg-rim-edge);
+  box-shadow: var(--lg-shadow-popover);
+  animation: anim-lg-spring-pop 260ms var(--lg-spring-bounce);
+}
+
+[data-ui-theme="liquid-glass"].wm-multi-panel.is-above,
+:host([data-ui-theme="liquid-glass"]) .wm-multi-panel.is-above {
+  animation-name: anim-lg-spring-pop-up;
+}
+
+/* --- 12. Titlebar / Composer Capsule Bar — Approved Style A ---
+ * Native borderless at rest -> materializes Liquid Glass pill on hover / open.
+ * Restrained Apple neutral numerals; semantic color strictly on live dot, ring, and >=80% danger.
+ */
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-multi-btn,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-capsule-btn,
+[data-ui-theme="liquid-glass"] .wm-multi-btn,
+[data-ui-theme="liquid-glass"] .wm-capsule-btn {
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--lg-ink-2);
+  transition:
+    background-color 240ms var(--lg-spring),
+    border-color 240ms var(--lg-spring),
+    box-shadow 260ms var(--lg-spring),
+    color 180ms var(--lg-spring),
+    transform 240ms var(--lg-spring-bounce);
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-multi-btn:hover,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-multi-btn.is-open,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-capsule-btn:hover,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-capsule-btn.is-open,
+[data-ui-theme="liquid-glass"] .wm-multi-btn:hover,
+[data-ui-theme="liquid-glass"] .wm-multi-btn.is-open,
+[data-ui-theme="liquid-glass"] .wm-capsule-btn:hover,
+[data-ui-theme="liquid-glass"] .wm-capsule-btn.is-open {
+  background-color: var(--lg-capsule-hover);
+  border-color: var(--lg-rim-edge);
+  backdrop-filter: blur(20px) saturate(200%);
+  -webkit-backdrop-filter: blur(20px) saturate(200%);
+  box-shadow: var(--lg-shadow-pill);
+  color: var(--lg-ink-1);
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-multi-btn:active,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-capsule-btn:active {
+  transform: scale(0.965);
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-multi-dot,
+[data-ui-theme="liquid-glass"] .wm-multi-dot {
+  width: 6.5px;
+  height: 6.5px;
+  background: var(--lg-ink-3);
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-multi-btn.is-running .wm-multi-dot,
+[data-ui-theme="liquid-glass"] .wm-multi-btn.is-running .wm-multi-dot {
+  background: var(--lg-accent);
+  box-shadow: 0 0 0 3px var(--lg-accent-soft);
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-multi-btn.is-waiting .wm-multi-dot,
+[data-ui-theme="liquid-glass"] .wm-multi-btn.is-waiting .wm-multi-dot {
+  background: var(--lg-amber);
+  box-shadow: 0 0 0 3px var(--lg-amber-soft);
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-sep,
+[data-ui-theme="liquid-glass"] .wm-sep {
+  height: 10px;
+  background: var(--lg-divider);
+}
+
+/* Restrained Apple Neutral Capsule Numerals (suppress cyan/green rainbow noise) */
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-good,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-good .wm-slot-text,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-info,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-info .wm-slot-text,
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-good,
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-good .wm-slot-text,
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-info,
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-info .wm-slot-text {
+  color: var(--lg-ink-2);
+  font-weight: 500;
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-seg-speed .wm-slot-text,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-ctx-pct,
+[data-ui-theme="liquid-glass"] .wm-seg-speed .wm-slot-text,
+[data-ui-theme="liquid-glass"] .wm-ctx-pct {
+  color: var(--lg-ink-1);
+  font-weight: 500;
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-seg-speed.state-running .wm-slot-text,
+[data-ui-theme="liquid-glass"] .wm-seg-speed.state-running .wm-slot-text {
+  color: var(--lg-accent);
+  font-weight: 600;
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-warn,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-warn .wm-slot-text,
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-warn,
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-warn .wm-slot-text {
+  color: var(--lg-amber);
+  font-weight: 500;
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-danger,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-danger .wm-slot-text,
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-danger,
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-danger .wm-slot-text {
+  color: var(--lg-danger);
+  font-weight: 600;
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-ring-track,
+[data-ui-theme="liquid-glass"] .wm-ring-track {
+  stroke: var(--lg-track);
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-ring-fill,
+[data-ui-theme="liquid-glass"] .wm-ring-fill {
+  stroke: var(--lg-accent);
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-ring-fill.tone-warn,
+[data-ui-theme="liquid-glass"] .wm-ring-fill.tone-warn {
+  stroke: var(--lg-amber);
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-ring-fill.tone-danger,
+[data-ui-theme="liquid-glass"] .wm-ring-fill.tone-danger {
+  stroke: var(--lg-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ui-theme="liquid-glass"] .progress-track.ctx-segment-meter.is-shimmer::after {
+    animation: none !important;
   }
 }

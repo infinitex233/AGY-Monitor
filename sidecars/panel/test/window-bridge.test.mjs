@@ -1470,20 +1470,37 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
     const generalPane = settingsRoot.querySelector('.settings-tab-stack');
     assert.ok(generalPane && !generalPane.hasAttribute('hidden'), 'Single-page SettingsView general stack visible');
 
-    // --- Tab 0: 常规 (languageSwitch, themeAccent, fontScaleSwitch, stepModelSelect, windowMountSelect, sync/update, rebuild/reset) ---
+    // --- Tab 0: 常规 (languageSwitch, uiThemeSwitch, themeAccent, fontScaleSwitch, stepModelSelect, windowMountSelect, sync/update, rebuild/reset) ---
     const generalSegControls = generalPane.querySelectorAll('.segmented');
     assert.equal(
       generalSegControls.length,
-      2,
-      'Streamlined General tab has Language and FontScale segmented controls'
+      3,
+      'Streamlined General tab has Language, UI Style, and FontScale segmented controls'
     );
     const langBtns = generalSegControls[0].querySelectorAll('.seg-btn');
-    const fontScaleBtns = generalSegControls[1].querySelectorAll('.seg-btn');
+    const uiThemeBtns = generalSegControls[1].querySelectorAll('.seg-btn');
+    const fontScaleBtns = generalSegControls[2].querySelectorAll('.seg-btn');
     assert.equal(langBtns.length, 3, 'Language switch has 跟随系统 / 简体中文 / English');
     assert.equal(langBtns[0].textContent, '跟随系统');
     assert.equal(langBtns[1].textContent, '简体中文');
     assert.equal(langBtns[2].textContent, 'English');
     assert.equal(langBtns[1].classList.contains('is-active'), true, 'mockSettings language zh-CN selects index 1');
+
+    // UI Style switch: defaults to liquid-glass, toggles cleanly to default and back across both hosts & portals
+    assert.equal(uiThemeBtns.length, 2, 'UI Style switch has 液态玻璃 / 默认');
+    assert.equal(portalHost.getAttribute('data-ui-theme'), 'liquid-glass');
+    assert.equal(capsuleHost.getAttribute('data-ui-theme'), 'liquid-glass');
+    assert.equal(popoverEl.getAttribute('data-ui-theme'), 'liquid-glass');
+    uiThemeBtns[1].dispatchEvent({ type: 'click', stopPropagation() {} });
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(mockSettings.uiTheme, 'default');
+    assert.equal(portalHost.getAttribute('data-ui-theme'), 'default', 'Portal host switches to default theme');
+    assert.equal(capsuleHost.getAttribute('data-ui-theme'), 'default', 'Capsule host switches to default theme');
+    assert.equal(popoverEl.getAttribute('data-ui-theme'), 'default', 'Popover panel switches to default theme');
+    uiThemeBtns[0].dispatchEvent({ type: 'click', stopPropagation() {} });
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(mockSettings.uiTheme, 'liquid_glass');
+    assert.equal(portalHost.getAttribute('data-ui-theme'), 'liquid-glass', 'Restores liquid-glass theme cleanly');
 
     const generalSelects = generalPane.querySelectorAll('.custom-select');
     assert.equal(generalSelects.length, 2, 'General tab has Model Display Format and Mount Mode selects');
@@ -4067,8 +4084,15 @@ test('v1.5 feedback E2E: sticky bridge port/token across hot-reloads, CDP->HTTP 
     const popEl = portalHost.shadowRoot.querySelector('.wm-popover-panel');
     assert.equal(popEl.style.width, '540px', 'Base overview width starts at 540px');
 
-    // Switch to Consumption then back to 实时监控 (index 0) after setting table dimensions to trigger adaptive widening
+    // Switch to Table mode inside 明细, then bounce tabs after setting table dimensions to trigger adaptive widening
     const navPills = popEl.querySelectorAll('.pill-tab');
+    const modeBtns = popEl.querySelectorAll('.steps-view-mode-btn');
+    const tableModeBtn = modeBtns.find((b) => b.getAttribute('data-mode') === 'table');
+    const dotsModeBtn = modeBtns.find((b) => b.getAttribute('data-mode') === 'dots');
+    assert.ok(tableModeBtn && dotsModeBtn, 'StepsDetailView exposes dots/curve/table mode buttons');
+    tableModeBtn.dispatchEvent({ type: 'click', stopPropagation() {} });
+    await new Promise((r) => setTimeout(r, 15));
+
     const tableViewport = popEl.querySelector('.table-viewport.is-step-table');
     const stepTable = tableViewport.querySelector('.steps-data-table');
     tableViewport.clientWidth = 506;
@@ -4083,6 +4107,13 @@ test('v1.5 feedback E2E: sticky bridge port/token across hot-reloads, CDP->HTTP 
 
     // Adaptive width expands popover to fit wide 660px table (+ 34px chrome + 4px buffer = 698px)
     assert.equal(popEl.style.width, '698px', 'Popover adaptively widens on wide step table to eliminate horizontal scroll');
+
+    // Switching back to compact dot-matrix view restores base 540px popover width
+    dotsModeBtn.dispatchEvent({ type: 'click', stopPropagation() {} });
+    await new Promise((r) => setTimeout(r, 15));
+    assert.equal(popEl.style.width, '540px', 'Popover returns to compact 540px width in dot-matrix trend mode');
+    tableModeBtn.dispatchEvent({ type: 'click', stopPropagation() {} });
+    await new Promise((r) => setTimeout(r, 15));
 
     // Verify trimmed raw IDs (hiding gemini-, claude-, gpt-) AND whole-row compaction tint (no inline ·压缩)
     const bodyRows = stepTable.querySelector('tbody').querySelectorAll('tr');

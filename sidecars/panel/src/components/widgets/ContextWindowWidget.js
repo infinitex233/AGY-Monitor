@@ -215,7 +215,36 @@ export const ContextWindowWidget = defineComponent({
           [createSvgIcon('chevron-down', { size: 12 })]
         )
       : null;
-    const ctxSegmentBar = ContextSegmentMeter({ context: {} });
+    const ctxHoverSwatch = h('span', { className: 'swatch seg-assistant' });
+    const ctxHoverLabel = h('span', { text: '' });
+    const ctxHoverReadout = interactiveInspector
+      ? h('span', { className: 'ctx-hover-readout text-mono', 'aria-hidden': 'true' }, [
+          ctxHoverSwatch,
+          ctxHoverLabel,
+        ])
+      : null;
+
+    function syncHoverReadout(meta) {
+      if (!ctxHoverReadout) return;
+      if (!meta) {
+        patchClasses(ctxHoverReadout, { 'is-visible': false });
+        for (const entry of ctxChannels) {
+          patchClasses(entry.itemEl, { 'is-seg-hovered': false });
+        }
+        return;
+      }
+      patchAttr(ctxHoverSwatch, 'class', `swatch ${meta.cls}`);
+      patchText(ctxHoverLabel, `${meta.label} ${meta.valText} (${meta.pctText})`);
+      patchClasses(ctxHoverReadout, { 'is-visible': true });
+      for (const entry of ctxChannels) {
+        patchClasses(entry.itemEl, { 'is-seg-hovered': entry.ch.key === meta.key });
+      }
+    }
+
+    const ctxSegmentBar = ContextSegmentMeter({
+      context: {},
+      onHoverSegment: interactiveInspector ? syncHoverReadout : null,
+    });
 
     const ctxPillGroup = h('div', { className: 'ctx-pill-group' });
     const ctxInspectorBar = h(
@@ -230,7 +259,16 @@ export const ContextWindowWidget = defineComponent({
       const valEl = h('strong', { className: 'text-mono', text: '0' });
       const itemEl = h(
         'div',
-        { className: 'legend-item', ...(interactiveInspector ? { title: ch.title } : {}) },
+        {
+          className: 'legend-item',
+          ...(interactiveInspector
+            ? {
+                title: ch.title,
+                onMouseenter: () => ctxSegmentBar.refs.setHoveredKey?.(ch.key),
+                onMouseleave: () => ctxSegmentBar.refs.setHoveredKey?.(''),
+              }
+            : {}),
+        },
         [h('span', { className: 'legend-left' }, [swatchEl, labelEl]), valEl]
       );
       return { ch, defaultOrder: idx, swatchEl, labelEl, valEl, itemEl };
@@ -250,6 +288,7 @@ export const ContextWindowWidget = defineComponent({
           createSvgIcon('layers', { size: 13 }),
           titleTextEl,
           ctxAgentBadge,
+          ...(ctxHoverReadout ? [ctxHoverReadout] : []),
         ]),
         h('span', { className: 'panel-meta' }, [
           ctxSummaryText,
@@ -609,7 +648,13 @@ export const ContextWindowWidget = defineComponent({
       );
       patchText(ctxPctEl, `${usedPct}%`);
       patchText(ctxRatioEl, `(${formatTokens(totalTokens)} / ${formatTokens(limitTokens)})`);
-      ctxSegmentBar.setProps({ context: { ...ctx, limitTokens, usedPct } });
+      const isRunning = Boolean(aggregated?.isRunning || active.isRunning);
+      ctxSegmentBar.setProps({
+        context: { ...ctx, limitTokens, usedPct },
+        isShimmer: isRunning,
+        isDanger: usedPct >= 88,
+        onHoverSegment: interactiveInspector ? syncHoverReadout : null,
+      });
 
       if (interactiveInspector) {
         const localeChanged = curLocale !== lastLocale;

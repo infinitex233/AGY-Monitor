@@ -578,6 +578,7 @@ export function buildBundle(panelDir = PANEL_DIR) {
     'src/styles/views-settings.css',
     'src/styles/overlay.css',
     'src/styles/modern-ui.css',
+    'src/styles/liquid-glass.css',
   ];
 
   const cssBundle =
@@ -622,6 +623,7 @@ export function buildBundle(panelDir = PANEL_DIR) {
     'src/components/ui/ConsumptionTooltipContent.js',
     'src/components/charts/chartMotion.js',
     'src/components/charts/TrendAreaChart.js',
+    'src/components/charts/StepTrendChart.js',
     'src/registries/metricRegistry.js',
     'src/components/widgets/MetricMatrixWidget.js',
     'src/components/widgets/ContextWindowWidget.js',

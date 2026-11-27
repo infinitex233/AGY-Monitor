@@ -23,7 +23,9 @@ import {
   normalizeClientFontScale,
   normalizeClientModernUi,
   normalizeClientThemeAccent,
+  normalizeClientUiTheme,
   resolveSettingsModernUi,
+  resolveSettingsUiTheme,
 } from '../core/appearance.js';
 import {
   CLI_STATUSLINE_PRESETS,
@@ -396,6 +398,7 @@ function extractReturnedSettings(res) {
   }
   if (
     typeof res.language === 'string' ||
+    typeof res.uiTheme === 'string' ||
     typeof res.themeAccent === 'string' ||
     typeof res.windowMountMode === 'string'
   ) {
@@ -510,6 +513,7 @@ export function isEquivalentTelemetry(prev, next) {
   const nSet = next.settings;
 
   if ((pSet?.language ?? 'auto') !== (nSet?.language ?? 'auto')) return false;
+  if (resolveSettingsUiTheme(pSet) !== resolveSettingsUiTheme(nSet)) return false;
   if ((pSet?.themeAccent ?? 'host') !== (nSet?.themeAccent ?? 'host')) return false;
   if ((pSet?.fontScale ?? 'md') !== (nSet?.fontScale ?? 'md')) return false;
   if (resolveSettingsModernUi(pSet) !== resolveSettingsModernUi(nSet)) return false;
@@ -1704,6 +1708,9 @@ export async function saveSettingsPatch(patch) {
   const safePatch = patch && typeof patch === 'object' ? { ...patch } : {};
   if (Object.prototype.hasOwnProperty.call(safePatch, 'language')) {
     safePatch.language = normalizeI18nLanguage(safePatch.language);
+  }
+  if (Object.prototype.hasOwnProperty.call(safePatch, 'uiTheme')) {
+    safePatch.uiTheme = normalizeClientUiTheme(safePatch.uiTheme);
   }
   if (Object.prototype.hasOwnProperty.call(safePatch, 'themeAccent')) {
     safePatch.themeAccent = normalizeClientThemeAccent(safePatch.themeAccent);

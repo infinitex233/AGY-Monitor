@@ -41,6 +41,15 @@ const SESSION_SUMMARY_SHORT_LABEL_KEYS = Object.freeze({
   session_cost: 'ovSummary.session_cost',
 });
 
+const VALUE_WITH_UNIT_RE = /^([^\s]+?)(\s*(?:tok\/s|t\/s|ms|s))$/;
+
+function splitValueUnit(valueText) {
+  const raw = String(valueText ?? '—');
+  const match = VALUE_WITH_UNIT_RE.exec(raw);
+  if (!match) return { main: raw, unit: '' };
+  return { main: match[1], unit: match[2] };
+}
+
 export const MetricMatrixWidget = defineComponent({
   name: 'MetricMatrixWidget',
   setup({ props }) {
@@ -77,14 +86,17 @@ export const MetricMatrixWidget = defineComponent({
     function createMetricCellNode() {
       const labelSpan = h('span', { text: '—' });
       const iconSvg = createSvgIcon('pulse', { size: 11 });
-      const valueEl = h('strong', { className: 'cell-value', text: '—' });
+      const valueMainSpan = h('span', { className: 'cell-num', text: '—' });
+      const valueUnitSpan = h('span', { className: 'cell-unit', text: '' });
+      valueUnitSpan.hidden = true;
+      const valueEl = h('strong', { className: 'cell-value' }, [valueMainSpan, valueUnitSpan]);
       const el = h('div', { className: 'matrix-cell' }, [
         h('div', { className: 'cell-label' }, [labelSpan, iconSvg]),
         valueEl,
       ]);
       return {
         el,
-        refs: { labelSpan, iconSvg, valueEl },
+        refs: { labelSpan, iconSvg, valueEl, valueMainSpan, valueUnitSpan },
       };
     }
 
@@ -149,7 +161,11 @@ export const MetricMatrixWidget = defineComponent({
           refs.iconSvg.setAttribute('height', String(cell.iconSize));
           patchClasses(refs.iconSvg, { 'is-pulsing': Boolean(cell.isPulsing) });
           patchAttr(refs.valueEl, 'class', cell.valueClass);
-          patchText(refs.valueEl, cell.valueText);
+          const { main, unit } = splitValueUnit(cell.valueText);
+          patchText(refs.valueMainSpan, main);
+          patchText(refs.valueUnitSpan, unit);
+          refs.valueUnitSpan.hidden = !unit;
+          patchClasses(refs.valueUnitSpan, { 'is-spaced': unit.startsWith(' ') });
         },
       });
     }

@@ -4,6 +4,7 @@
  * and single-viewport functional views.
  */
 
+import { attachLiquidGlassSheen } from './core/appearance.js';
 import { defineComponent } from './core/component.js';
 import { h, patchAttr, patchClasses, patchText } from './core/domPatch.js';
 import { isWindowOverlayMode } from './core/httpClient.js';
@@ -326,7 +327,10 @@ export const App = defineComponent({
       }
     );
 
+    const detachLiquidSheen = attachLiquidGlassSheen(shellEl);
+
     onCleanup(() => {
+      detachLiquidSheen();
       clearToastTimer();
       unsubUi();
       unsubStepCount();

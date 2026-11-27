@@ -2,7 +2,7 @@
 'use strict';
 
 // --- shared/settings-normalization.mjs ---
-const { SUPPORTED_LANGUAGES, THEME_ACCENT_KEYS, FONT_SCALE_KEYS, TOPBAR_SLOT_KEYS, DEFAULT_TOPBAR_SLOTS, MIN_TOPBAR_SLOTS, MAX_TOPBAR_SLOTS, DEFAULT_CLI_STATUSLINE_SLOTS, MIN_CLI_STATUSLINE_SLOTS, MAX_CLI_STATUSLINE_SLOTS, CLI_STATUSLINE_PRESETS, OVERVIEW_MODULE_KEYS, DEFAULT_OVERVIEW_MODULES, DEFAULT_HOVER_MODULES, OVERVIEW_METRIC_KEYS, DEFAULT_OVERVIEW_METRICS, STEP_TABLE_COLUMN_KEYS, DEFAULT_STEP_TABLE_COLUMNS, DEFAULT_STEP_TOKEN_COMBO_FORMAT, STEP_TOKEN_SEGMENT_ALIASES, POPOVER_WIDTH_MODES, MIN_POPOVER_WIDTH, MAX_POPOVER_WIDTH, DEFAULT_POPOVER_WIDTH, normalizeLanguageSetting, normalizeThemeAccent, normalizeFontScale, normalizeModelDisplayMode, normalizeOrchestratorIdMode, normalizePopoverWidthMode, normalizePopoverWidth, parseStepTokenComboSegments, normalizeStepTokenComboFormat, normalizePluginUpdateMode, normalizeWindowMountMode, normalizeTopbarCapsuleSlots, normalizeCliStatusLineSlots, resolveEffectiveCliStatusLineSlots, normalizeOverviewMetrics, normalizeOverviewModules, normalizeHoverModules, normalizeStepTableColumns, normalizeStandalonePort, normalizeModernUi, CONTEXT_AGENT_MODES, DEFAULT_CONTEXT_AGENT_MODE, normalizeContextAgentMode, normalizeExperimentalModernUi } = (() => {
+const { SUPPORTED_LANGUAGES, THEME_ACCENT_KEYS, UI_THEME_KEYS, DEFAULT_UI_THEME, FONT_SCALE_KEYS, TOPBAR_SLOT_KEYS, DEFAULT_TOPBAR_SLOTS, MIN_TOPBAR_SLOTS, MAX_TOPBAR_SLOTS, DEFAULT_CLI_STATUSLINE_SLOTS, MIN_CLI_STATUSLINE_SLOTS, MAX_CLI_STATUSLINE_SLOTS, CLI_STATUSLINE_PRESETS, OVERVIEW_MODULE_KEYS, DEFAULT_OVERVIEW_MODULES, DEFAULT_HOVER_MODULES, OVERVIEW_METRIC_KEYS, DEFAULT_OVERVIEW_METRICS, STEP_TABLE_COLUMN_KEYS, DEFAULT_STEP_TABLE_COLUMNS, DEFAULT_STEP_TOKEN_COMBO_FORMAT, STEP_TOKEN_SEGMENT_ALIASES, POPOVER_WIDTH_MODES, MIN_POPOVER_WIDTH, MAX_POPOVER_WIDTH, DEFAULT_POPOVER_WIDTH, normalizeLanguageSetting, normalizeThemeAccent, normalizeUiTheme, normalizeFontScale, normalizeModelDisplayMode, normalizeOrchestratorIdMode, normalizePopoverWidthMode, normalizePopoverWidth, parseStepTokenComboSegments, normalizeStepTokenComboFormat, normalizePluginUpdateMode, normalizeWindowMountMode, normalizeTopbarCapsuleSlots, normalizeCliStatusLineSlots, resolveEffectiveCliStatusLineSlots, normalizeOverviewMetrics, normalizeOverviewModules, normalizeHoverModules, normalizeStepTableColumns, normalizeStandalonePort, normalizeModernUi, CONTEXT_AGENT_MODES, DEFAULT_CONTEXT_AGENT_MODE, normalizeContextAgentMode, normalizeExperimentalModernUi } = (() => {
 /**
  * @fileoverview 前后端与 CLI 共用的偏好设置枚举常量、默认值与无状态纯函数归一化规则。
  */
@@ -18,6 +18,9 @@ const THEME_ACCENT_KEYS = Object.freeze([
   'cyan',
   'rose',
 ]);
+
+const UI_THEME_KEYS = Object.freeze(['liquid_glass', 'default']);
+const DEFAULT_UI_THEME = 'liquid_glass';
 
 const FONT_SCALE_KEYS = Object.freeze(['sm', 'md', 'lg', 'xl']);
 
@@ -179,6 +182,23 @@ function normalizeLanguageSetting(lang) {
 function normalizeThemeAccent(accent) {
   const clean = String(accent ?? '').trim().toLowerCase();
   return THEME_ACCENT_KEYS.includes(clean) ? /** @type {any} */ (clean) : 'host';
+}
+
+/**
+ * 归一化界面视觉主题（`'liquid_glass'` | `'default'`，默认 `'liquid_glass'`）。
+ *
+ * @param {unknown} theme
+ * @returns {'liquid_glass'|'default'}
+ */
+function normalizeUiTheme(theme) {
+  const clean = String(theme ?? '').trim().toLowerCase();
+  if (clean === 'default' || clean === 'classic' || clean === 'standard' || clean === 'native') {
+    return 'default';
+  }
+  if (clean === 'liquid_glass' || clean === 'liquid-glass' || clean === 'liquidglass' || clean === 'glass') {
+    return 'liquid_glass';
+  }
+  return DEFAULT_UI_THEME;
 }
 
 /**
@@ -554,7 +574,7 @@ function normalizeExperimentalModernUi(val) {
   }
   return Boolean(val);
 }
-return { SUPPORTED_LANGUAGES, THEME_ACCENT_KEYS, FONT_SCALE_KEYS, TOPBAR_SLOT_KEYS, DEFAULT_TOPBAR_SLOTS, MIN_TOPBAR_SLOTS, MAX_TOPBAR_SLOTS, DEFAULT_CLI_STATUSLINE_SLOTS, MIN_CLI_STATUSLINE_SLOTS, MAX_CLI_STATUSLINE_SLOTS, CLI_STATUSLINE_PRESETS, OVERVIEW_MODULE_KEYS, DEFAULT_OVERVIEW_MODULES, DEFAULT_HOVER_MODULES, OVERVIEW_METRIC_KEYS, DEFAULT_OVERVIEW_METRICS, STEP_TABLE_COLUMN_KEYS, DEFAULT_STEP_TABLE_COLUMNS, DEFAULT_STEP_TOKEN_COMBO_FORMAT, STEP_TOKEN_SEGMENT_ALIASES, POPOVER_WIDTH_MODES, MIN_POPOVER_WIDTH, MAX_POPOVER_WIDTH, DEFAULT_POPOVER_WIDTH, normalizeLanguageSetting, normalizeThemeAccent, normalizeFontScale, normalizeModelDisplayMode, normalizeOrchestratorIdMode, normalizePopoverWidthMode, normalizePopoverWidth, parseStepTokenComboSegments, normalizeStepTokenComboFormat, normalizePluginUpdateMode, normalizeWindowMountMode, normalizeTopbarCapsuleSlots, normalizeCliStatusLineSlots, resolveEffectiveCliStatusLineSlots, normalizeOverviewMetrics, normalizeOverviewModules, normalizeHoverModules, normalizeStepTableColumns, normalizeStandalonePort, normalizeModernUi, CONTEXT_AGENT_MODES, DEFAULT_CONTEXT_AGENT_MODE, normalizeContextAgentMode, normalizeExperimentalModernUi };
+return { SUPPORTED_LANGUAGES, THEME_ACCENT_KEYS, UI_THEME_KEYS, DEFAULT_UI_THEME, FONT_SCALE_KEYS, TOPBAR_SLOT_KEYS, DEFAULT_TOPBAR_SLOTS, MIN_TOPBAR_SLOTS, MAX_TOPBAR_SLOTS, DEFAULT_CLI_STATUSLINE_SLOTS, MIN_CLI_STATUSLINE_SLOTS, MAX_CLI_STATUSLINE_SLOTS, CLI_STATUSLINE_PRESETS, OVERVIEW_MODULE_KEYS, DEFAULT_OVERVIEW_MODULES, DEFAULT_HOVER_MODULES, OVERVIEW_METRIC_KEYS, DEFAULT_OVERVIEW_METRICS, STEP_TABLE_COLUMN_KEYS, DEFAULT_STEP_TABLE_COLUMNS, DEFAULT_STEP_TOKEN_COMBO_FORMAT, STEP_TOKEN_SEGMENT_ALIASES, POPOVER_WIDTH_MODES, MIN_POPOVER_WIDTH, MAX_POPOVER_WIDTH, DEFAULT_POPOVER_WIDTH, normalizeLanguageSetting, normalizeThemeAccent, normalizeUiTheme, normalizeFontScale, normalizeModelDisplayMode, normalizeOrchestratorIdMode, normalizePopoverWidthMode, normalizePopoverWidth, parseStepTokenComboSegments, normalizeStepTokenComboFormat, normalizePluginUpdateMode, normalizeWindowMountMode, normalizeTopbarCapsuleSlots, normalizeCliStatusLineSlots, resolveEffectiveCliStatusLineSlots, normalizeOverviewMetrics, normalizeOverviewModules, normalizeHoverModules, normalizeStepTableColumns, normalizeStandalonePort, normalizeModernUi, CONTEXT_AGENT_MODES, DEFAULT_CONTEXT_AGENT_MODE, normalizeContextAgentMode, normalizeExperimentalModernUi };
 })();
 
 // --- shared/telemetry-display-rules.mjs ---
@@ -886,6 +906,27 @@ const SVG_ICON_DEFS = Object.freeze({
     { tag: 'circle', attrs: { cx: '8', cy: '8', r: '6' } },
     { tag: 'ellipse', attrs: { cx: '8', cy: '8', rx: '2.7', ry: '6' } },
     { tag: 'path', attrs: { d: 'M2.3 6h11.4M2.3 10h11.4' } },
+  ],
+  dollar: [
+    { tag: 'path', attrs: { d: 'M8 2v12' } },
+    { tag: 'path', attrs: { d: 'M11 4.8c0-1.1-1.3-1.9-3-1.9s-3 .8-3 1.9c0 1.2 1.2 1.7 3 2.1s3 .9 3 2.2c0 1.2-1.3 2-3 2s-3-.8-3-2' } },
+  ],
+  'dot-matrix': [
+    { tag: 'circle', attrs: { cx: '3.6', cy: '4', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '8', cy: '4', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '12.4', cy: '4', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '3.6', cy: '8', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '8', cy: '8', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '12.4', cy: '8', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '3.6', cy: '12', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '8', cy: '12', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '12.4', cy: '12', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+  ],
+  'trend-curve': [
+    { tag: 'path', attrs: { d: 'M2 11.5C4.5 11.5 5 4.8 7.8 4.8s3 4.8 6.2 2.2' } },
+  ],
+  list: [
+    { tag: 'path', attrs: { d: 'M2.5 4.2h11M2.5 8h11M2.5 11.8h11' } },
   ],
 });
 return { SVG_ICON_DEFS };
@@ -1364,6 +1405,11 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   // Steps Detail View & Step Column Registry
   'steps.title': '调用记录',
   'steps.detailTitle': '明细',
+  'steps.modeDots': '点阵',
+  'steps.modeCurve': '曲线',
+  'steps.modeTable': '列表',
+  'steps.modeSwitchAria': '切换明细展示视图',
+  'steps.trendEmpty': '当前范围暂无步骤趋势数据',
   'steps.tabSteps': '明细',
   'steps.tabStepsFiltered': '明细 ({filtered}/{total})',
   'steps.tabModels': '汇总',
@@ -1378,6 +1424,7 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'steps.modelsEmpty': '当前范围暂无模型调用记录',
   'steps.metricTotalTokens': '总Token',
   'steps.metricContext': '上下文',
+  'steps.metricSpeed': '速度',
   'steps.metricTps': 'TPS',
   'steps.metricTtft': '首字',
   'steps.metricCache': '缓存',
@@ -1536,6 +1583,9 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'settings.gen.langZh': '简体中文',
   'settings.gen.langEn': 'English',
   'settings.gen.langAuto': '跟随系统',
+  'settings.gen.uiTheme': '界面风格',
+  'settings.gen.uiThemeLiquidGlass': '液态玻璃',
+  'settings.gen.uiThemeDefault': '默认',
   'settings.gen.themeAccent': '主题色',
   'settings.gen.accentHost': '跟随宿主',
   'settings.gen.accentBlue': '经典蓝',
@@ -2231,6 +2281,11 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   // Steps Detail View & Step Column Registry
   'steps.title': 'Step Records',
   'steps.detailTitle': 'Details',
+  'steps.modeDots': 'Dots',
+  'steps.modeCurve': 'Curve',
+  'steps.modeTable': 'List',
+  'steps.modeSwitchAria': 'Switch step display view',
+  'steps.trendEmpty': 'No step telemetry yet',
   'steps.tabSteps': 'Steps',
   'steps.tabStepsFiltered': 'Steps ({filtered}/{total})',
   'steps.tabModels': 'Analytics',
@@ -2245,6 +2300,7 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'steps.modelsEmpty': 'No model calls in current scope',
   'steps.metricTotalTokens': 'Tokens',
   'steps.metricContext': 'Context',
+  'steps.metricSpeed': 'Speed',
   'steps.metricTps': 'TPS',
   'steps.metricTtft': 'TTFT',
   'steps.metricCache': 'Cache',
@@ -2403,6 +2459,9 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'settings.gen.langZh': '简体中文',
   'settings.gen.langEn': 'English',
   'settings.gen.langAuto': 'Follow System',
+  'settings.gen.uiTheme': 'UI Style',
+  'settings.gen.uiThemeLiquidGlass': 'Liquid Glass',
+  'settings.gen.uiThemeDefault': 'Default',
   'settings.gen.themeAccent': 'Accent Color',
   'settings.gen.accentHost': 'Host',
   'settings.gen.accentBlue': 'Blue',
@@ -2868,7 +2927,7 @@ return { I18N_DICTIONARIES, normalizeI18nLanguage, detectHostSystemLocale, i18nS
 })();
 
 // --- src/core/appearance.js ---
-const { THEME_ACCENT_PRESETS, FONT_SCALE_FACTORS, PANEL_SCALE_FACTORS, normalizeClientThemeAccent, normalizeClientFontScale, normalizeClientModernUi, resolveSettingsModernUi, isModernUiActiveForElement, parseCssColorLuminance, detectHostColorScheme, applyAppearanceToRoot } = (() => {
+const { THEME_ACCENT_PRESETS, FONT_SCALE_FACTORS, PANEL_SCALE_FACTORS, normalizeClientThemeAccent, normalizeClientFontScale, normalizeClientUiTheme, resolveSettingsUiTheme, isLiquidGlassActiveForElement, normalizeClientModernUi, resolveSettingsModernUi, isModernUiActiveForElement, parseCssColorLuminance, detectHostColorScheme, applyAppearanceToRoot, attachLiquidGlassSheen } = (() => {
 /**
  * @fileoverview Theme accent palette & panel font-scale appearance engine.
  * Applies CSS custom properties cleanly to Sidebar `:root` and Shadow DOM hosts,
@@ -2907,6 +2966,43 @@ function normalizeClientThemeAccent(raw) {
 function normalizeClientFontScale(raw) {
   const val = String(raw ?? '').trim().toLowerCase();
   return Object.prototype.hasOwnProperty.call(FONT_SCALE_FACTORS, val) ? val : 'md';
+}
+
+function normalizeClientUiTheme(raw) {
+  const val = String(raw ?? '').trim().toLowerCase();
+  if (val === 'default' || val === 'classic' || val === 'standard' || val === 'native') {
+    return 'default';
+  }
+  if (val === 'liquid_glass' || val === 'liquid-glass' || val === 'liquidglass' || val === 'glass') {
+    return 'liquid_glass';
+  }
+  return 'liquid_glass';
+}
+
+function resolveSettingsUiTheme(settings) {
+  if (!settings || typeof settings !== 'object') return 'liquid_glass';
+  return normalizeClientUiTheme(settings.uiTheme);
+}
+
+function isLiquidGlassActiveForElement(el) {
+  let cur = el || null;
+  while (cur) {
+    if (typeof cur.getAttribute === 'function') {
+      const attr = cur.getAttribute('data-ui-theme');
+      if (attr) return attr === 'liquid-glass';
+    }
+    if (cur.parentNode) {
+      cur = cur.parentNode;
+    } else if (cur.host) {
+      cur = cur.host;
+    } else {
+      break;
+    }
+  }
+  if (typeof document !== 'undefined' && document.documentElement) {
+    return document.documentElement.getAttribute?.('data-ui-theme') === 'liquid-glass';
+  }
+  return false;
 }
 
 function normalizeClientModernUi(raw) {
@@ -3288,6 +3384,10 @@ function applyAppearanceToRoot(targetEl, settings, { includeFontScale = true } =
     removeAttrIfPresent(targetEl, 'data-modern-ui');
   }
 
+  const uiThemeKey = resolveSettingsUiTheme(settings);
+  const effectiveThemeAttr = isModernUi && uiThemeKey === 'liquid_glass' ? 'liquid-glass' : 'default';
+  setAttrIfChanged(targetEl, 'data-ui-theme', effectiveThemeAttr);
+
   if (includeFontScale) {
     const scaleKey = normalizeClientFontScale(settings?.fontScale);
     const factor = FONT_SCALE_FACTORS[scaleKey] ?? 1;
@@ -3301,7 +3401,64 @@ function applyAppearanceToRoot(targetEl, settings, { includeFontScale = true } =
     removeAttrIfPresent(targetEl, 'data-font-scale');
   }
 }
-return { THEME_ACCENT_PRESETS, FONT_SCALE_FACTORS, PANEL_SCALE_FACTORS, normalizeClientThemeAccent, normalizeClientFontScale, normalizeClientModernUi, resolveSettingsModernUi, isModernUiActiveForElement, parseCssColorLuminance, detectHostColorScheme, applyAppearanceToRoot };
+
+/**
+ * Attach cursor-tracking specular sheen coordinates (`--lg-mx`, `--lg-my`) onto
+ * Liquid Glass cards inside `rootEl`. Active only when `data-ui-theme="liquid-glass"`.
+ *
+ * @param {HTMLElement | null | undefined} rootEl
+ * @returns {() => void}
+ */
+function attachLiquidGlassSheen(rootEl) {
+  if (!rootEl || typeof rootEl.addEventListener !== 'function') return () => {};
+  let activeCard = null;
+  let rafId = 0;
+  let pendingX = 0;
+  let pendingY = 0;
+
+  const commit = () => {
+    rafId = 0;
+    if (!activeCard || !activeCard.style) return;
+    const rect = activeCard.getBoundingClientRect?.();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+    const rx = Math.round(pendingX - rect.left);
+    const ry = Math.round(pendingY - rect.top);
+    activeCard.style.setProperty?.('--lg-mx', `${rx}px`);
+    activeCard.style.setProperty?.('--lg-my', `${ry}px`);
+  };
+
+  const onPointerMove = (e) => {
+    if (!isLiquidGlassActiveForElement(rootEl)) return;
+    const target = e?.target;
+    const card = target?.closest?.('.panel, .matrix-cell, .live-task-card');
+    if (!card || !rootEl.contains?.(card)) {
+      activeCard = null;
+      return;
+    }
+    activeCard = card;
+    pendingX = Number(e.clientX || 0);
+    pendingY = Number(e.clientY || 0);
+    if (!rafId && typeof requestAnimationFrame === 'function') {
+      rafId = requestAnimationFrame(commit);
+    }
+  };
+
+  const onPointerLeave = () => {
+    activeCard = null;
+  };
+
+  rootEl.addEventListener('pointermove', onPointerMove, { passive: true });
+  rootEl.addEventListener('pointerleave', onPointerLeave, { passive: true });
+  return () => {
+    if (rafId && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+    rootEl.removeEventListener('pointermove', onPointerMove);
+    rootEl.removeEventListener('pointerleave', onPointerLeave);
+  };
+}
+return { THEME_ACCENT_PRESETS, FONT_SCALE_FACTORS, PANEL_SCALE_FACTORS, normalizeClientThemeAccent, normalizeClientFontScale, normalizeClientUiTheme, resolveSettingsUiTheme, isLiquidGlassActiveForElement, normalizeClientModernUi, resolveSettingsModernUi, isModernUiActiveForElement, parseCssColorLuminance, detectHostColorScheme, applyAppearanceToRoot, attachLiquidGlassSheen };
 })();
 
 // --- src/core/domPatch.js ---
@@ -8182,7 +8339,7 @@ return { abortSidecarApiKey, getWindowBridgeConfig, isWindowOverlayMode, deliver
 })();
 
 // --- src/store/uiStore.js ---
-const { getViewTabs, uiStore, showUiToast, dismissUiToast, getVisibleMonitorView } = (() => {
+const { getViewTabs, setStepsViewMode, uiStore, showUiToast, dismissUiToast, getVisibleMonitorView } = (() => {
 /**
  * @fileoverview UI navigation and view state store.
  */
@@ -8196,10 +8353,34 @@ function getViewTabs() {
   ];
 }
 
+const STEPS_VIEW_MODE_STORAGE_KEY = 'agy.stepsViewMode';
+const VALID_STEPS_VIEW_MODES = new Set(['dots', 'curve', 'table']);
+
+function loadInitialStepsViewMode() {
+  try {
+    const saved = globalThis.localStorage?.getItem?.(STEPS_VIEW_MODE_STORAGE_KEY);
+    if (VALID_STEPS_VIEW_MODES.has(saved)) return saved;
+  } catch {
+    // ignore storage restriction
+  }
+  return 'dots';
+}
+
+function setStepsViewMode(mode) {
+  const next = VALID_STEPS_VIEW_MODES.has(mode) ? mode : 'dots';
+  try {
+    globalThis.localStorage?.setItem?.(STEPS_VIEW_MODE_STORAGE_KEY, next);
+  } catch {
+    // ignore storage restriction
+  }
+  uiStore.setState({ stepsViewMode: next });
+}
+
 const uiStore = createReactiveStore({
   activeView: 'overview',
   monitorVisible: true,
   stepsSubTab: 'steps', // 'steps' | 'models'
+  stepsViewMode: loadInitialStepsViewMode(), // 'dots' | 'curve' | 'table'
   settingsSubTab: 'general', // 'general' | 'structure' | 'account' | 'other'
   settingsStructureTab: 'mount', // 'mount' | 'hover' | 'overview' | 'steps'
   selectedAgentScope: 'all', // 'all' | 'main' | <subagent cascadeId>
@@ -8242,7 +8423,7 @@ function dismissUiToast(toastId = 0) {
 function getVisibleMonitorView(state = uiStore.getState()) {
   return state.monitorVisible ? state.activeView : null;
 }
-return { getViewTabs, uiStore, showUiToast, dismissUiToast, getVisibleMonitorView };
+return { getViewTabs, setStepsViewMode, uiStore, showUiToast, dismissUiToast, getVisibleMonitorView };
 })();
 
 // --- src/core/fileExportClient.js ---
@@ -8876,6 +9057,7 @@ function extractReturnedSettings(res) {
   }
   if (
     typeof res.language === 'string' ||
+    typeof res.uiTheme === 'string' ||
     typeof res.themeAccent === 'string' ||
     typeof res.windowMountMode === 'string'
   ) {
@@ -8990,6 +9172,7 @@ function isEquivalentTelemetry(prev, next) {
   const nSet = next.settings;
 
   if ((pSet?.language ?? 'auto') !== (nSet?.language ?? 'auto')) return false;
+  if (resolveSettingsUiTheme(pSet) !== resolveSettingsUiTheme(nSet)) return false;
   if ((pSet?.themeAccent ?? 'host') !== (nSet?.themeAccent ?? 'host')) return false;
   if ((pSet?.fontScale ?? 'md') !== (nSet?.fontScale ?? 'md')) return false;
   if (resolveSettingsModernUi(pSet) !== resolveSettingsModernUi(nSet)) return false;
@@ -10184,6 +10367,9 @@ async function saveSettingsPatch(patch) {
   const safePatch = patch && typeof patch === 'object' ? { ...patch } : {};
   if (Object.prototype.hasOwnProperty.call(safePatch, 'language')) {
     safePatch.language = normalizeI18nLanguage(safePatch.language);
+  }
+  if (Object.prototype.hasOwnProperty.call(safePatch, 'uiTheme')) {
+    safePatch.uiTheme = normalizeClientUiTheme(safePatch.uiTheme);
   }
   if (Object.prototype.hasOwnProperty.call(safePatch, 'themeAccent')) {
     safePatch.themeAccent = normalizeClientThemeAccent(safePatch.themeAccent);
@@ -12579,9 +12765,27 @@ const SEGMENT_DEFS = [
 const ContextSegmentMeter = defineComponent({
   name: 'ContextSegmentMeter',
   setup({ getProps }) {
+    let slotMeta = SEGMENT_DEFS.map(() => null);
+    let currentHoveredKey = '';
+
     // 固定 10 个位置槽位节点，不通过 appendChild 移动 DOM，防止浏览器中断 CSS transition 动画
-    const slotEls = SEGMENT_DEFS.map((def) =>
-      h('div', { className: `progress-seg ${def.cls}` })
+    const slotEls = SEGMENT_DEFS.map((def, idx) =>
+      h('div', {
+        className: `progress-seg ${def.cls}`,
+        onMouseenter: () => {
+          const meta = slotMeta[idx];
+          if (!meta) return;
+          currentHoveredKey = meta.key;
+          syncHoverClasses();
+          getProps().onHoverSegment?.(meta);
+        },
+        onMouseleave: () => {
+          if (!currentHoveredKey) return;
+          currentHoveredKey = '';
+          syncHoverClasses();
+          getProps().onHoverSegment?.(null);
+        },
+      })
     );
 
     const trackEl = h(
@@ -12597,8 +12801,20 @@ const ContextSegmentMeter = defineComponent({
 
     let lastOrderSig = '';
 
+    function syncHoverClasses() {
+      const extHovered = getProps().hoveredKey || currentHoveredKey || '';
+      patchClasses(trackEl, { 'has-seg-hover': Boolean(extHovered) });
+      for (let i = 0; i < slotEls.length; i += 1) {
+        const meta = slotMeta[i];
+        patchClasses(slotEls[i], {
+          'is-seg-hovered': Boolean(extHovered && meta && meta.key === extHovered),
+        });
+      }
+    }
+
     function syncMeter() {
-      const ctx = getProps().context || {};
+      const props = getProps();
+      const ctx = props.context || {};
       const limit = Math.max(1, Number(ctx.compactionLimitTokens || ctx.limitTokens || 256000));
       const scored = SEGMENT_DEFS.map((def, defaultOrder) => {
         const val = def.getVal(ctx);
@@ -12617,7 +12833,11 @@ const ContextSegmentMeter = defineComponent({
         lastOrderSig = activeOrderSig;
       }
 
-      patchClasses(trackEl, { 'is-reordering': orderChanged });
+      patchClasses(trackEl, {
+        'is-reordering': orderChanged,
+        'is-shimmer': Boolean(props.isShimmer),
+        'is-danger': Boolean(props.isDanger),
+      });
 
       let seenActive = false;
       for (let i = 0; i < slotEls.length; i++) {
@@ -12626,6 +12846,15 @@ const ContextSegmentMeter = defineComponent({
         const isActive = item.val > 0 && item.pct > 0;
         const hasSep = isActive && seenActive;
         if (isActive) seenActive = true;
+        slotMeta[i] = isActive
+          ? {
+              key: item.def.key,
+              cls: item.def.cls,
+              label: t(item.def.labelKey),
+              valText: formatTokens(item.val),
+              pctText: formatPctNumber(item.pct, { withSymbol: true }),
+            }
+          : null;
         const cls = `progress-seg ${item.def.cls}${isActive ? ' is-active' : ''}${hasSep ? ' has-sep' : ''}`;
         patchAttr(slotEl, 'class', cls);
         patchStyleVar(slotEl, '--seg-w', isActive ? `${item.pct.toFixed(2)}%` : '0%');
@@ -12638,6 +12867,7 @@ const ContextSegmentMeter = defineComponent({
         );
       }
 
+      syncHoverClasses();
       patchAttr(trackEl, 'aria-valuenow', Math.round(ctx.compactionUsedPct ?? ctx.usedPct ?? 0));
     }
 
@@ -12645,7 +12875,7 @@ const ContextSegmentMeter = defineComponent({
 
     return {
       el: trackEl,
-      refs: { segments: slotEls },
+      refs: { segments: slotEls, setHoveredKey: (k) => { currentHoveredKey = k || ''; syncHoverClasses(); } },
       onPropsChange: syncMeter,
     };
   },
@@ -16003,6 +16233,699 @@ function createTrendAreaChart({ onSelectSlot = null } = {}) {
 return { HEATMAP_DAYS_THRESHOLD, createTrendAreaChart };
 })();
 
+// --- src/components/charts/StepTrendChart.js ---
+const { computeStepTrendScales, StepTrendChart } = (() => {
+/**
+ * @fileoverview 2x2 Synchronized 4-Metric Step Trend Chart (`StepTrendChart.js`).
+ * Displays Decode TPS, TTFT, Cache Hit %, and Step Cost in a clean 2x2 quad grid
+ * supporting Apple Pulse Dot-Matrix (`dots`) and Smooth Bezier Curve (`curve`) modes,
+ * silent median-anchored P85 outlier soft-capping, dynamic cache floor scaling,
+ * and synchronized 4-cell hover scrubbing with zero overlapping tooltips.
+ */
+
+
+const DOT_ROWS = 6;
+const MAX_POINTS = 24;
+
+const METRIC_KEYS = ['tps', 'ttft', 'cache', 'cost'];
+
+const METRIC_DEFS = Object.freeze({
+  tps: {
+    key: 'tps',
+    labelKey: 'steps.metricSpeed',
+    dotClass: 'is-tps',
+    colorVar: '--lg-accent',
+    fallbackColor: '#007aff',
+    formatParts: (v) =>
+      v == null
+        ? { num: '—', unit: '' }
+        : { num: v >= 100 ? String(Math.round(v)) : v.toFixed(1), unit: 'tok/s' },
+  },
+  ttft: {
+    key: 'ttft',
+    labelKey: 'steps.metricTtft',
+    dotClass: 'is-ttft',
+    colorVar: '--lg-amber',
+    fallbackColor: '#ff9500',
+    formatParts: (v) =>
+      v == null ? { num: '—', unit: '' } : { num: v.toFixed(1), unit: 's' },
+  },
+  cache: {
+    key: 'cache',
+    labelKey: 'steps.metricCache',
+    dotClass: 'is-cache',
+    colorVar: '--lg-green',
+    fallbackColor: '#34c759',
+    formatParts: (v) =>
+      v == null ? { num: '—', unit: '' } : { num: v.toFixed(1), unit: '%' },
+  },
+  cost: {
+    key: 'cost',
+    labelKey: 'steps.metricCost',
+    dotClass: 'is-cost',
+    colorVar: '--lg-purple',
+    fallbackColor: '#af52de',
+    formatParts: (v) =>
+      v == null ? { num: '—', unit: '' } : { num: formatUsd(v, { precise: true }), unit: '' },
+  },
+});
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function percentile(values, p) {
+  if (!values.length) return 0;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const idx = clamp(Math.floor((sorted.length - 1) * p), 0, sorted.length - 1);
+  return sorted[idx];
+}
+
+function toFinitePositive(val) {
+  if (val == null || val === '') return null;
+  const n = Number(val);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function toFiniteNonNegative(val) {
+  if (val == null || val === '') return null;
+  const n = Number(val);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function resolveStepCachePct(st) {
+  const direct = toFiniteNonNegative(st?.cacheHitPct);
+  if (direct != null) return direct;
+  const inTok = Math.max(0, Number(st?.inputTokens || 0));
+  const cacheTok = Math.max(0, Number(st?.cacheReadTokens || 0));
+  const promptTok = inTok + cacheTok;
+  return promptTok > 0 ? (cacheTok / promptTok) * 100 : null;
+}
+
+function normalizeRecentSeries(rawSteps) {
+  if (!Array.isArray(rawSteps) || rawSteps.length === 0) return [];
+  const valid = [];
+  for (let i = 0; i < rawSteps.length; i++) {
+    const st = rawSteps[i];
+    if (!st || typeof st !== 'object') continue;
+    const tps = toFinitePositive(st.tokPerSec);
+    const ttft = toFiniteNonNegative(st.ttftSec);
+    const cache = resolveStepCachePct(st);
+    const cost = toFiniteNonNegative(st.costUsd);
+    if (tps == null && ttft == null && cache == null && cost == null) continue;
+    valid.push({
+      step: st,
+      stepIndex: Number(st.stepIndex) || 0,
+      createdAtMs: Number(st.createdAtMs) || 0,
+      order: i,
+      tps,
+      ttft,
+      cache,
+      cost,
+      outputTokens: Math.max(0, Number(st.outputTokens || 0)),
+    });
+  }
+  if (valid.length === 0) return [];
+
+  valid.sort((a, b) => {
+    if (a.createdAtMs !== b.createdAtMs && a.createdAtMs > 0 && b.createdAtMs > 0) {
+      return a.createdAtMs - b.createdAtMs;
+    }
+    if (a.stepIndex !== b.stepIndex) return a.stepIndex - b.stepIndex;
+    return b.order - a.order;
+  });
+
+  return valid.length > MAX_POINTS ? valid.slice(valid.length - MAX_POINTS) : valid;
+}
+
+function computeStepTrendScales(series) {
+  const tpsVals = [];
+  const ttftVals = [];
+  const cacheVals = [];
+  const costVals = [];
+
+  for (let i = 0; i < series.length; i++) {
+    const item = series[i];
+    if (item.tps != null) tpsVals.push(item.tps);
+    if (item.ttft != null) ttftVals.push(item.ttft);
+    if (item.cache != null) cacheVals.push(item.cache);
+    if (item.cost != null) costVals.push(item.cost);
+  }
+
+  const maxTpsRaw = tpsVals.length > 0 ? Math.max(...tpsVals) : 0;
+  const maxTtftRaw = ttftVals.length > 0 ? Math.max(...ttftVals) : 0;
+  const maxCostRaw = costVals.length > 0 ? Math.max(...costVals) : 0;
+
+  // Median-anchored P85 soft-cap resists multiple 1500+ tok/s short-decode spikes
+  let tpsCap = 60;
+  if (tpsVals.length >= 4) {
+    const med = percentile(tpsVals, 0.5);
+    const p85 = percentile(tpsVals, 0.85);
+    tpsCap = Math.max(Math.min(p85 * 1.18, med * 1.85), med * 1.35, 60);
+  } else if (maxTpsRaw > 0) {
+    tpsCap = Math.max(maxTpsRaw * 1.12, 60);
+  }
+
+  let ttftCap = 2.5;
+  if (ttftVals.length >= 4) {
+    const med = percentile(ttftVals, 0.5);
+    const p90 = percentile(ttftVals, 0.9);
+    ttftCap = Math.max(Math.min(p90 * 1.15, med * 2.1), med * 1.35, 2.5);
+  } else if (maxTtftRaw > 0) {
+    ttftCap = Math.max(maxTtftRaw * 1.12, 2.5);
+  }
+
+  let cacheMin = 0;
+  const cacheMax = 100;
+  if (cacheVals.length > 0) {
+    const lo = Math.min(...cacheVals);
+    if (lo >= 80) {
+      cacheMin = Math.max(0, Math.floor((lo - 3) / 5) * 5);
+    }
+  }
+
+  let costCap = 0.01;
+  if (costVals.length >= 4) {
+    const med = percentile(costVals, 0.5);
+    const p90 = percentile(costVals, 0.9);
+    costCap = Math.max(Math.min(p90 * 1.18, med * 2.2), med * 1.35, 0.005);
+  } else if (maxCostRaw > 0) {
+    costCap = Math.max(maxCostRaw * 1.15, 0.005);
+  }
+
+  const hasOutlier =
+    tpsVals.some((v) => v > tpsCap) ||
+    ttftVals.some((v) => v > ttftCap) ||
+    costVals.some((v) => v > costCap);
+
+  return {
+    tpsCap,
+    ttftCap,
+    cacheMin,
+    cacheMax,
+    costCap,
+    maxTpsRaw,
+    maxTtftRaw,
+    maxCostRaw,
+    hasOutlier,
+  };
+}
+
+function getMetricRange(metricKey, scales) {
+  switch (metricKey) {
+    case 'tps':
+      return { min: 0, max: scales.tpsCap };
+    case 'ttft':
+      return { min: 0, max: scales.ttftCap };
+    case 'cache':
+      return { min: scales.cacheMin, max: scales.cacheMax };
+    case 'cost':
+    default:
+      return { min: 0, max: scales.costCap };
+  }
+}
+
+function parseColorWithAlpha(colorStr, alpha) {
+  const s = String(colorStr || '').trim();
+  if (!s) return `rgba(0, 122, 255, ${alpha})`;
+  if (s.startsWith('#')) {
+    let hex = s.slice(1);
+    if (hex.length === 3) {
+      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    if (hex.length >= 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+    }
+  }
+  const rgbMatch = s.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
+  if (rgbMatch) {
+    return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${alpha})`;
+  }
+  return s;
+}
+
+function drawRoundedRect(ctx, x, y, w, h, r) {
+  const rad = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rad);
+  ctx.arcTo(x + w, y + h, x, y + h, rad);
+  ctx.arcTo(x, y + h, x, y, rad);
+  ctx.arcTo(x, y, x + w, y, rad);
+  ctx.closePath();
+}
+
+const StepTrendChart = defineComponent({
+  name: 'StepTrendChart',
+  setup({ props, onCleanup }) {
+    const onHoverChange = typeof props?.onHoverChange === 'function' ? props.onHoverChange : null;
+
+    let mode = 'dots'; // 'dots' | 'curve'
+    let series = [];
+    let scales = computeStepTrendScales([]);
+    let displaySettings = {};
+    let hoverIdx = -1;
+    let rafId = null;
+    let resizeObserver = null;
+
+    const animLevels = { tps: [], ttft: [], cache: [], cost: [] };
+    const targetLevels = { tps: [], ttft: [], cache: [], cost: [] };
+
+    const cellMap = {};
+    const cells = METRIC_KEYS.map((key) => {
+      const def = METRIC_DEFS[key];
+      const labelTextEl = h('span', { text: t(def.labelKey) });
+      const numEl = h('span', { className: 'step-quad-num', text: '—' });
+      const unitEl = h('span', { className: 'step-quad-unit', text: '' });
+      const canvasEl = h('canvas', { className: 'step-quad-canvas', 'data-metric': key });
+      const canvasBoxEl = h('div', { className: 'step-quad-canvas-box' }, [canvasEl]);
+      const cellEl = h(
+        'div',
+        { className: 'step-quad-cell', 'data-metric': key },
+        [
+          h('div', { className: 'step-quad-head' }, [
+            h('span', { className: 'step-quad-label' }, [
+              h('span', { className: `step-trend-dot ${def.dotClass}` }),
+              labelTextEl,
+            ]),
+            h('span', { className: 'step-quad-val text-mono' }, [numEl, unitEl]),
+          ]),
+          canvasBoxEl,
+        ]
+      );
+      const entry = { key, def, cellEl, canvasBoxEl, canvasEl, labelTextEl, numEl, unitEl };
+      cellMap[key] = entry;
+      return entry;
+    });
+
+    const quadGridEl = h(
+      'div',
+      { className: 'step-quad-grid' },
+      cells.map((c) => c.cellEl)
+    );
+    const emptyEl = h('div', {
+      className: 'step-trend-empty',
+      text: t('steps.trendEmpty'),
+      hidden: true,
+    });
+    const rootEl = h('div', { className: 'step-trend-wrap' }, [quadGridEl, emptyEl]);
+
+    function readPalette() {
+      const fallback = {
+        tps: '#007aff',
+        ttft: '#ff9500',
+        cache: '#34c759',
+        cost: '#af52de',
+        ink3: 'rgba(17, 17, 19, 0.38)',
+        dotIdle: 'rgba(17, 17, 19, 0.075)',
+        gridLine: 'rgba(17, 17, 19, 0.065)',
+      };
+      if (typeof globalThis.getComputedStyle !== 'function') return fallback;
+      try {
+        const cs = globalThis.getComputedStyle(rootEl);
+        const pick = (v, fb) => {
+          const val = cs.getPropertyValue(v)?.trim();
+          return val || fb;
+        };
+        return {
+          tps: pick('--lg-accent', pick('--accent-primary', fallback.tps)),
+          ttft: pick('--lg-amber', pick('--metric-warn', fallback.ttft)),
+          cache: pick('--lg-green', pick('--metric-ok', fallback.cache)),
+          cost: pick('--lg-purple', pick('--ctx-subagent-msg', fallback.cost)),
+          ink3: pick('--lg-ink-3', pick('--text-muted', fallback.ink3)),
+          dotIdle: pick('--lg-dot-idle', pick('--lg-seg-bg', fallback.dotIdle)),
+          gridLine: pick('--lg-divider', fallback.gridLine),
+        };
+      } catch {
+        return fallback;
+      }
+    }
+
+    function stopAnim() {
+      if (rafId != null && typeof globalThis.cancelAnimationFrame === 'function') {
+        globalThis.cancelAnimationFrame(rafId);
+      }
+      rafId = null;
+    }
+
+    function prefersReducedMotion() {
+      try {
+        return Boolean(
+          globalThis.window?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+        );
+      } catch {
+        return false;
+      }
+    }
+
+    function syncReadouts() {
+      const hasData = series.length > 0;
+      const isHover = hasData && hoverIdx >= 0 && hoverIdx < series.length;
+      const activeItem = isHover ? series[hoverIdx] : hasData ? series[series.length - 1] : null;
+
+      for (const entry of cells) {
+        const val = activeItem ? activeItem[entry.key] : null;
+        const parts = entry.def.formatParts(val);
+        patchText(entry.numEl, parts.num);
+        patchText(entry.unitEl, parts.unit);
+        patchAttr(entry.unitEl, 'hidden', !parts.unit);
+      }
+
+      if (onHoverChange) {
+        if (isHover && activeItem) {
+          const modelInfo = resolveModelDisplayInfo(activeItem.step, displaySettings, {
+            fallback: t('fmt.unknownModel'),
+          });
+          onHoverChange({
+            stepIndex: activeItem.stepIndex,
+            modelText: modelInfo.text || modelInfo.baseText || '',
+            outputTokensText:
+              activeItem.outputTokens > 0 ? `${formatTokens(activeItem.outputTokens)} tok` : '',
+          });
+        } else {
+          onHoverChange(null);
+        }
+      }
+    }
+
+    function syncAnimationTargets(immediate = false) {
+      let lengthMismatch = false;
+      for (const key of METRIC_KEYS) {
+        const range = getMetricRange(key, scales);
+        const span = Math.max(1e-6, range.max - range.min);
+        const next = new Array(series.length);
+        for (let i = 0; i < series.length; i++) {
+          const v = series[i][key];
+          next[i] = v == null ? 0 : clamp(((v - range.min) / span) * DOT_ROWS, 0.75, DOT_ROWS);
+        }
+        if (animLevels[key].length !== next.length) lengthMismatch = true;
+        targetLevels[key] = next;
+      }
+
+      const noRaf = typeof globalThis.requestAnimationFrame !== 'function';
+      if (immediate || noRaf || prefersReducedMotion() || lengthMismatch) {
+        for (const key of METRIC_KEYS) {
+          animLevels[key] = targetLevels[key].slice();
+        }
+        stopAnim();
+        draw();
+        return;
+      }
+
+      if (rafId == null) {
+        const tick = () => {
+          let moving = false;
+          const k = 0.24;
+          for (const key of METRIC_KEYS) {
+            const cur = animLevels[key];
+            const tgt = targetLevels[key];
+            for (let i = 0; i < tgt.length; i++) {
+              const d = tgt[i] - cur[i];
+              if (Math.abs(d) > 0.025) {
+                cur[i] += d * k;
+                moving = true;
+              } else {
+                cur[i] = tgt[i];
+              }
+            }
+          }
+          draw();
+          if (moving) {
+            rafId = globalThis.requestAnimationFrame(tick);
+          } else {
+            rafId = null;
+          }
+        };
+        rafId = globalThis.requestAnimationFrame(tick);
+      }
+    }
+
+    function paintMetricCanvas(entry, pal) {
+      const canvasEl = entry.canvasEl;
+      if (typeof canvasEl.getContext !== 'function') return;
+      const rect = entry.canvasBoxEl.getBoundingClientRect?.();
+      const w = Math.round(rect?.width || 0);
+      const h = Math.round(rect?.height || 0);
+      if (w <= 0 || h <= 0) return;
+
+      const dpr = Math.min(Number(globalThis.window?.devicePixelRatio) || 1, 2);
+      const pxW = Math.max(1, Math.round(w * dpr));
+      const pxH = Math.max(1, Math.round(h * dpr));
+      if (canvasEl.width !== pxW || canvasEl.height !== pxH) {
+        canvasEl.width = pxW;
+        canvasEl.height = pxH;
+      }
+
+      const ctx = canvasEl.getContext('2d');
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      const n = series.length;
+      if (n === 0) return;
+
+      const key = entry.key;
+      const color = pal[key];
+      const range = getMetricRange(key, scales);
+      const span = Math.max(1e-6, range.max - range.min);
+
+      if (mode === 'dots') {
+        const padX = 1;
+        const padY = 2;
+        const usableW = Math.max(1, w - padX * 2);
+        const usableH = Math.max(1, h - padY * 2);
+        const gapX = usableW / n;
+        const gapY = usableH / DOT_ROWS;
+        const baseRad = Math.max(1.5, Math.min(gapX, gapY) * 0.31);
+        const lvls = animLevels[key];
+
+        for (let c = 0; c < n; c++) {
+          const level = Math.round(lvls[c] ?? 0);
+          const isHover = c === hoverIdx;
+
+          if (isHover) {
+            ctx.fillStyle = parseColorWithAlpha(color, 0.14);
+            drawRoundedRect(ctx, padX + c * gapX + 0.5, 0, Math.max(2, gapX - 1), h, 4);
+            ctx.fill();
+          }
+
+          const rad = isHover ? baseRad * 1.22 : baseRad;
+          for (let r = 0; r < DOT_ROWS; r++) {
+            const fromBot = DOT_ROWS - 1 - r;
+            ctx.fillStyle = fromBot < level ? color : pal.dotIdle;
+            const cx = padX + c * gapX + gapX / 2;
+            const cy = padY + r * gapY + gapY / 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      } else {
+        const padX = 4;
+        const padTop = 7;
+        const padBot = 5;
+        const usableW = Math.max(1, w - padX * 2);
+        const usableH = Math.max(1, h - padTop - padBot);
+
+        ctx.strokeStyle = pal.gridLine;
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 1; i++) {
+          const y = Math.round(padTop + usableH * i) + 0.5;
+          ctx.beginPath();
+          ctx.moveTo(padX, y);
+          ctx.lineTo(w - padX, y);
+          ctx.stroke();
+        }
+
+        const pts = series.map((item, i) => {
+          const v = item[key];
+          if (v == null) return null;
+          return {
+            x: padX + (n <= 1 ? usableW / 2 : (i / (n - 1)) * usableW),
+            y: padTop + usableH * (1 - clamp((v - range.min) / span, 0, 1)),
+          };
+        });
+        const validPts = pts.filter((p) => p != null);
+        if (validPts.length === 1) {
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(validPts[0].x, validPts[0].y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (validPts.length >= 2) {
+          const baseY = padTop + usableH;
+          const buildPath = () => {
+            ctx.beginPath();
+            ctx.moveTo(validPts[0].x, validPts[0].y);
+            for (let i = 0; i < validPts.length - 1; i++) {
+              const p0 = validPts[Math.max(0, i - 1)];
+              const p1 = validPts[i];
+              const p2 = validPts[i + 1];
+              const p3 = validPts[Math.min(validPts.length - 1, i + 2)];
+              const cp1x = p1.x + (p2.x - p0.x) / 6;
+              const cp1y = clamp(p1.y + (p2.y - p0.y) / 6, padTop - 2, baseY);
+              const cp2x = p2.x - (p3.x - p1.x) / 6;
+              const cp2y = clamp(p2.y - (p3.y - p1.y) / 6, padTop - 2, baseY);
+              ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+            }
+          };
+
+          const grad = ctx.createLinearGradient(0, padTop, 0, baseY);
+          grad.addColorStop(0, parseColorWithAlpha(color, 0.24));
+          grad.addColorStop(1, parseColorWithAlpha(color, 0));
+          buildPath();
+          ctx.lineTo(validPts[validPts.length - 1].x, baseY);
+          ctx.lineTo(validPts[0].x, baseY);
+          ctx.closePath();
+          ctx.fillStyle = grad;
+          ctx.fill();
+
+          buildPath();
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.8;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+        }
+
+        if (hoverIdx >= 0 && hoverIdx < n && pts[hoverIdx]) {
+          const pt = pts[hoverIdx];
+          ctx.save();
+          ctx.strokeStyle = pal.ink3;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2.5, 2.5]);
+          ctx.beginPath();
+          ctx.moveTo(pt.x, padTop - 3);
+          ctx.lineTo(pt.x, h - padBot + 2);
+          ctx.stroke();
+          ctx.restore();
+
+          ctx.save();
+          ctx.fillStyle = parseColorWithAlpha(color, 0.25);
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 5.8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 3.1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.3;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+
+    function draw() {
+      const hasData = series.length > 0;
+      patchAttr(emptyEl, 'hidden', hasData);
+      patchAttr(quadGridEl, 'hidden', !hasData);
+      syncReadouts();
+      if (!hasData) return;
+
+      const pal = readPalette();
+      for (const entry of cells) {
+        paintMetricCanvas(entry, pal);
+      }
+    }
+
+    function clearHover() {
+      if (hoverIdx !== -1) {
+        hoverIdx = -1;
+        draw();
+      } else if (onHoverChange) {
+        onHoverChange(null);
+      }
+    }
+
+    const pointerCleanups = [];
+    for (const entry of cells) {
+      const onMove = (e) => {
+        if (series.length === 0) return;
+        const rect = entry.canvasBoxEl.getBoundingClientRect?.();
+        if (!rect || rect.width <= 0) return;
+        const x = clamp((e.clientX ?? 0) - rect.left, 0, Math.max(0, rect.width - 0.01));
+        const idx =
+          mode === 'curve' && series.length > 1
+            ? clamp(Math.round((x / rect.width) * (series.length - 1)), 0, series.length - 1)
+            : clamp(Math.floor((x / rect.width) * series.length), 0, series.length - 1);
+        if (idx !== hoverIdx) {
+          hoverIdx = idx;
+          draw();
+        }
+      };
+      entry.cellEl.addEventListener?.('pointermove', onMove);
+      entry.cellEl.addEventListener?.('pointerleave', clearHover);
+      pointerCleanups.push(() => {
+        entry.cellEl.removeEventListener?.('pointermove', onMove);
+        entry.cellEl.removeEventListener?.('pointerleave', clearHover);
+      });
+    }
+
+    if (typeof globalThis.ResizeObserver === 'function') {
+      resizeObserver = new globalThis.ResizeObserver(() => {
+        if (!rootEl.hasAttribute('hidden')) draw();
+      });
+      resizeObserver.observe(quadGridEl);
+    }
+
+    function refreshLabels() {
+      for (const entry of cells) {
+        patchText(entry.labelTextEl, t(entry.def.labelKey));
+      }
+      patchText(emptyEl, t('steps.trendEmpty'));
+      draw();
+    }
+
+    function update({
+      steps = [],
+      mode: nextMode = mode,
+      displaySettings: nextDisplaySettings = {},
+      immediate = false,
+    } = {}) {
+      const modeChanged = nextMode !== mode;
+      mode = nextMode === 'curve' ? 'curve' : 'dots';
+      displaySettings = nextDisplaySettings || {};
+      series = normalizeRecentSeries(steps);
+      scales = computeStepTrendScales(series);
+      if (hoverIdx >= series.length) {
+        hoverIdx = -1;
+      }
+      syncAnimationTargets(immediate || modeChanged);
+    }
+
+    onCleanup(() => {
+      stopAnim();
+      resizeObserver?.disconnect();
+      for (const fn of pointerCleanups) fn();
+    });
+
+    return {
+      el: rootEl,
+      refs: {
+        quadGridEl,
+        cellMap,
+        update,
+        draw,
+        hideTooltip: clearHover,
+        refreshLabels,
+        getPointCount: () => series.length,
+        setHoverIndexForTest: (idx) => {
+          hoverIdx = idx;
+          draw();
+        },
+      },
+    };
+  },
+});
+return { computeStepTrendScales, StepTrendChart };
+})();
+
 // --- src/registries/metricRegistry.js ---
 const { CAPSULE_METRIC_KEYS, getCapsuleMetricOptions, getOverviewMetricOptions, resolveCapsuleMetricPresentation, resolveOverviewMetricCell } = (() => {
 /**
@@ -16387,8 +17310,8 @@ function resolveOverviewMetricCell(metricKey, cellCtx = {}) {
       return {
         key: 'step_cost',
         label: t('ovMetric.step_cost'),
-        icon: 'bolt',
-        iconSize: 11,
+        icon: 'dollar',
+        iconSize: 12,
         isPulsing: false,
         valueText: stepCostText,
         valueClass: costTone ? `cell-value ${costTone}` : 'cell-value',
@@ -16400,8 +17323,8 @@ function resolveOverviewMetricCell(metricKey, cellCtx = {}) {
     return {
       key: 'session_cost',
       label: t('ovMetric.session_cost'),
-      icon: 'bolt',
-      iconSize: 11,
+      icon: 'dollar',
+      iconSize: 12,
       isPulsing: false,
       valueText: totalCostText,
       valueClass: 'cell-value',
@@ -16508,6 +17431,15 @@ const SESSION_SUMMARY_SHORT_LABEL_KEYS = Object.freeze({
   session_cost: 'ovSummary.session_cost',
 });
 
+const VALUE_WITH_UNIT_RE = /^([^\s]+?)(\s*(?:tok\/s|t\/s|ms|s))$/;
+
+function splitValueUnit(valueText) {
+  const raw = String(valueText ?? '—');
+  const match = VALUE_WITH_UNIT_RE.exec(raw);
+  if (!match) return { main: raw, unit: '' };
+  return { main: match[1], unit: match[2] };
+}
+
 const MetricMatrixWidget = defineComponent({
   name: 'MetricMatrixWidget',
   setup({ props }) {
@@ -16544,14 +17476,17 @@ const MetricMatrixWidget = defineComponent({
     function createMetricCellNode() {
       const labelSpan = h('span', { text: '—' });
       const iconSvg = createSvgIcon('pulse', { size: 11 });
-      const valueEl = h('strong', { className: 'cell-value', text: '—' });
+      const valueMainSpan = h('span', { className: 'cell-num', text: '—' });
+      const valueUnitSpan = h('span', { className: 'cell-unit', text: '' });
+      valueUnitSpan.hidden = true;
+      const valueEl = h('strong', { className: 'cell-value' }, [valueMainSpan, valueUnitSpan]);
       const el = h('div', { className: 'matrix-cell' }, [
         h('div', { className: 'cell-label' }, [labelSpan, iconSvg]),
         valueEl,
       ]);
       return {
         el,
-        refs: { labelSpan, iconSvg, valueEl },
+        refs: { labelSpan, iconSvg, valueEl, valueMainSpan, valueUnitSpan },
       };
     }
 
@@ -16616,7 +17551,11 @@ const MetricMatrixWidget = defineComponent({
           refs.iconSvg.setAttribute('height', String(cell.iconSize));
           patchClasses(refs.iconSvg, { 'is-pulsing': Boolean(cell.isPulsing) });
           patchAttr(refs.valueEl, 'class', cell.valueClass);
-          patchText(refs.valueEl, cell.valueText);
+          const { main, unit } = splitValueUnit(cell.valueText);
+          patchText(refs.valueMainSpan, main);
+          patchText(refs.valueUnitSpan, unit);
+          refs.valueUnitSpan.hidden = !unit;
+          patchClasses(refs.valueUnitSpan, { 'is-spaced': unit.startsWith(' ') });
         },
       });
     }
@@ -16832,7 +17771,36 @@ const ContextWindowWidget = defineComponent({
           [createSvgIcon('chevron-down', { size: 12 })]
         )
       : null;
-    const ctxSegmentBar = ContextSegmentMeter({ context: {} });
+    const ctxHoverSwatch = h('span', { className: 'swatch seg-assistant' });
+    const ctxHoverLabel = h('span', { text: '' });
+    const ctxHoverReadout = interactiveInspector
+      ? h('span', { className: 'ctx-hover-readout text-mono', 'aria-hidden': 'true' }, [
+          ctxHoverSwatch,
+          ctxHoverLabel,
+        ])
+      : null;
+
+    function syncHoverReadout(meta) {
+      if (!ctxHoverReadout) return;
+      if (!meta) {
+        patchClasses(ctxHoverReadout, { 'is-visible': false });
+        for (const entry of ctxChannels) {
+          patchClasses(entry.itemEl, { 'is-seg-hovered': false });
+        }
+        return;
+      }
+      patchAttr(ctxHoverSwatch, 'class', `swatch ${meta.cls}`);
+      patchText(ctxHoverLabel, `${meta.label} ${meta.valText} (${meta.pctText})`);
+      patchClasses(ctxHoverReadout, { 'is-visible': true });
+      for (const entry of ctxChannels) {
+        patchClasses(entry.itemEl, { 'is-seg-hovered': entry.ch.key === meta.key });
+      }
+    }
+
+    const ctxSegmentBar = ContextSegmentMeter({
+      context: {},
+      onHoverSegment: interactiveInspector ? syncHoverReadout : null,
+    });
 
     const ctxPillGroup = h('div', { className: 'ctx-pill-group' });
     const ctxInspectorBar = h(
@@ -16847,7 +17815,16 @@ const ContextWindowWidget = defineComponent({
       const valEl = h('strong', { className: 'text-mono', text: '0' });
       const itemEl = h(
         'div',
-        { className: 'legend-item', ...(interactiveInspector ? { title: ch.title } : {}) },
+        {
+          className: 'legend-item',
+          ...(interactiveInspector
+            ? {
+                title: ch.title,
+                onMouseenter: () => ctxSegmentBar.refs.setHoveredKey?.(ch.key),
+                onMouseleave: () => ctxSegmentBar.refs.setHoveredKey?.(''),
+              }
+            : {}),
+        },
         [h('span', { className: 'legend-left' }, [swatchEl, labelEl]), valEl]
       );
       return { ch, defaultOrder: idx, swatchEl, labelEl, valEl, itemEl };
@@ -16867,6 +17844,7 @@ const ContextWindowWidget = defineComponent({
           createSvgIcon('layers', { size: 13 }),
           titleTextEl,
           ctxAgentBadge,
+          ...(ctxHoverReadout ? [ctxHoverReadout] : []),
         ]),
         h('span', { className: 'panel-meta' }, [
           ctxSummaryText,
@@ -17226,7 +18204,13 @@ const ContextWindowWidget = defineComponent({
       );
       patchText(ctxPctEl, `${usedPct}%`);
       patchText(ctxRatioEl, `(${formatTokens(totalTokens)} / ${formatTokens(limitTokens)})`);
-      ctxSegmentBar.setProps({ context: { ...ctx, limitTokens, usedPct } });
+      const isRunning = Boolean(aggregated?.isRunning || active.isRunning);
+      ctxSegmentBar.setProps({
+        context: { ...ctx, limitTokens, usedPct },
+        isShimmer: isRunning,
+        isDanger: usedPct >= 88,
+        onHoverSegment: interactiveInspector ? syncHoverReadout : null,
+      });
 
       if (interactiveInspector) {
         const localeChanged = curLocale !== lastLocale;
@@ -22202,6 +23186,7 @@ const TopSessionHeader = defineComponent({
 
       if (isSyncing) {
         patchSvgIcon(statusIcon, 'refresh');
+        patchClasses(statusIcon, { 'is-pulsing': false });
         patchText(statusText, t('header.statusSyncing'));
         patchClasses(statusTag, {
           'state-running': false,
@@ -22210,6 +23195,7 @@ const TopSessionHeader = defineComponent({
         });
       } else if (isSynced) {
         patchSvgIcon(statusIcon, 'check');
+        patchClasses(statusIcon, { 'is-pulsing': false });
         patchText(statusText, t('header.statusSynced'));
         patchClasses(statusTag, {
           'state-running': false,
@@ -22218,6 +23204,7 @@ const TopSessionHeader = defineComponent({
         });
       } else if (isError) {
         patchSvgIcon(statusIcon, 'warning');
+        patchClasses(statusIcon, { 'is-pulsing': false });
         patchText(statusText, t('header.statusRetrying'));
         patchClasses(statusTag, {
           'state-running': false,
@@ -22228,7 +23215,8 @@ const TopSessionHeader = defineComponent({
         const runningAgent = (telemetry?.activeConversation?.agents || []).find((a) => a.isRunning);
         const runSuffix =
           hasSubagents && runningAgent ? ` · ${formatAgentBadgeText(runningAgent)}` : '';
-        patchSvgIcon(statusIcon, 'bolt');
+        patchSvgIcon(statusIcon, 'dot');
+        patchClasses(statusIcon, { 'is-pulsing': true });
         patchText(statusText, t('header.statusGenerating', { suffix: runSuffix }));
         patchClasses(statusTag, {
           'state-running': true,
@@ -22237,6 +23225,7 @@ const TopSessionHeader = defineComponent({
         });
       } else {
         patchSvgIcon(statusIcon, 'pulse');
+        patchClasses(statusIcon, { 'is-pulsing': false });
         patchText(statusText, t('header.statusLive'));
         patchClasses(statusTag, {
           'state-running': false,
@@ -22773,6 +23762,103 @@ const StepsDetailView = defineComponent({
       stepsModelSelect.el,
     ]);
 
+    // --- 三态视图切换（点阵 / 曲线 / 列表）与步骤趋势图 ---
+    const VIEW_MODE_DEFS = [
+      { value: 'dots', icon: 'dot-matrix', i18nKey: 'steps.modeDots' },
+      { value: 'curve', icon: 'trend-curve', i18nKey: 'steps.modeCurve' },
+      { value: 'table', icon: 'list', i18nKey: 'steps.modeTable' },
+    ];
+    let currentViewMode = uiStore.getState().stepsViewMode || 'dots';
+    const viewModeThumbEl = h('span', { className: 'steps-view-mode-thumb', 'aria-hidden': 'true' });
+    const viewModeBtns = VIEW_MODE_DEFS.map((def) => {
+      const labelEl = h('span', { text: t(def.i18nKey) });
+      const btn = h(
+        'button',
+        {
+          type: 'button',
+          className: 'steps-view-mode-btn',
+          'data-mode': def.value,
+          role: 'tab',
+          'aria-selected': def.value === currentViewMode ? 'true' : 'false',
+          onclick: () => setStepsViewMode(def.value),
+        },
+        [createSvgIcon(def.icon, { size: 11 }), labelEl]
+      );
+      return { def, btn, labelEl };
+    });
+    const viewModeSwitchEl = h(
+      'div',
+      {
+        className: 'steps-view-mode-switch',
+        role: 'tablist',
+        'aria-label': t('steps.modeSwitchAria'),
+      },
+      [viewModeThumbEl, ...viewModeBtns.map((item) => item.btn)]
+    );
+
+    const headerScrubStepEl = h('strong', { className: 'steps-scrub-step text-mono' });
+    const headerScrubMetaEl = h('span', { className: 'steps-scrub-meta' });
+    const headerScrubPillEl = h(
+      'span',
+      { className: 'steps-header-scrub-pill', hidden: true },
+      [headerScrubStepEl, headerScrubMetaEl]
+    );
+    const stepsTitleGroupEl = h('div', { className: 'steps-title-group' }, [
+      stepsTitleEl,
+      headerScrubPillEl,
+    ]);
+
+    const stepTrendChart = StepTrendChart({
+      onHoverChange: (info) => {
+        if (!info || currentViewMode === 'table') {
+          patchAttr(headerScrubPillEl, 'hidden', true);
+          return;
+        }
+        patchText(headerScrubStepEl, `#${info.stepIndex}`);
+        const metaParts = [info.modelText, info.outputTokensText].filter(Boolean);
+        patchText(headerScrubMetaEl, metaParts.length > 0 ? ` · ${metaParts.join(' · ')}` : '');
+        patchAttr(headerScrubPillEl, 'hidden', false);
+      },
+    });
+
+    function applyStepsViewMode(nextMode, { skipChartUpdate = false } = {}) {
+      const resolved =
+        nextMode === 'curve' || nextMode === 'table' || nextMode === 'dots' ? nextMode : 'dots';
+      currentViewMode = resolved;
+      const activeIdx = Math.max(
+        0,
+        VIEW_MODE_DEFS.findIndex((d) => d.value === resolved)
+      );
+      viewModeThumbEl.style.transform = `translateX(${activeIdx * 100}%)`;
+      for (const item of viewModeBtns) {
+        const isActive = item.def.value === resolved;
+        patchClasses(item.btn, { 'is-active': isActive });
+        patchAttr(item.btn, 'aria-selected', isActive ? 'true' : 'false');
+      }
+      const isTable = resolved === 'table';
+      patchAttr(stepTrendChart.el, 'hidden', isTable);
+      patchAttr(stepsScroll.el, 'hidden', !isTable);
+      if (isTable) {
+        stepTrendChart.refs.hideTooltip();
+        stepsScroll.refresh();
+        refreshStepTableViewport?.();
+      } else {
+        hideTurnTip();
+        hideAnomalyTip();
+        if (!skipChartUpdate) {
+          stepTrendChart.refs.update({
+            steps: currentTableSteps,
+            mode: resolved,
+            displaySettings: currentDisplaySettings,
+            immediate: true,
+          });
+        }
+      }
+      onLayoutChange?.();
+    }
+
+    applyStepsViewMode(currentViewMode, { skipChartUpdate: true });
+
     const panelEl = h(
       'section',
       {
@@ -22784,15 +23870,17 @@ const StepsDetailView = defineComponent({
       [
         h('div', { className: 'panel-header steps-panel-header' }, [
           h('div', { className: 'steps-header-controls' }, [
-            stepsTitleEl,
+            stepsTitleGroupEl,
             h('div', { className: 'steps-header-right' }, [
               headerFiltersEl,
+              viewModeSwitchEl,
               stepsExportMenu.el,
             ]),
           ]),
         ]),
         stepsFilterToolbarEl,
         anomalyFilterBarEl,
+        stepTrendChart.el,
         stepsScroll.el,
         turnTipEl,
         anomalyTipEl,
@@ -22828,6 +23916,11 @@ const StepsDetailView = defineComponent({
       const colKeys = resolveStepDisplayColumns(latestSlice?.stepTableColumns, isEmbedded);
       syncTableHeaderColumns(colKeys);
       patchText(stepsTitleTextEl, t('steps.detailTitle'));
+      patchAttr(viewModeSwitchEl, 'aria-label', t('steps.modeSwitchAria'));
+      for (const item of viewModeBtns) {
+        patchText(item.labelEl, t(item.def.i18nKey));
+      }
+      stepTrendChart.refs.refreshLabels();
     }
 
     function renderStepsData(slice, { allowNewRowFade = false } = {}) {
@@ -23127,6 +24220,14 @@ const StepsDetailView = defineComponent({
         sortKey,
         sortDir,
       });
+      if (currentViewMode !== 'table') {
+        stepTrendChart.refs.update({
+          steps: tableSteps,
+          mode: currentViewMode,
+          displaySettings,
+          immediate: !allowNewRowFade,
+        });
+      }
       stepsScroll.refresh();
       onLayoutChange?.();
     }
@@ -23170,11 +24271,13 @@ const StepsDetailView = defineComponent({
 
     let prevScope = uiStore.getState().selectedAgentScope;
     let prevActiveView = getVisibleMonitorView();
+    let prevViewMode = currentViewMode;
 
     const unsubView = uiStore.subscribe(
       (st) => ({
         activeView: getVisibleMonitorView(st),
         selectedAgentScope: st.selectedAgentScope,
+        stepsViewMode: st.stepsViewMode || 'dots',
       }),
       (uiSlice) => {
         const scopeChanged = uiSlice.selectedAgentScope !== prevScope;
@@ -23182,18 +24285,26 @@ const StepsDetailView = defineComponent({
           lastSyncedUiScope = uiSlice.selectedAgentScope;
           selectedAgentScopes = [uiSlice.selectedAgentScope || 'all'];
         }
+        const modeChanged = uiSlice.stepsViewMode !== prevViewMode;
+        if (modeChanged) {
+          prevViewMode = uiSlice.stepsViewMode;
+          applyStepsViewMode(uiSlice.stepsViewMode);
+        }
         const viewEntered = isStepsViewActive(uiSlice.activeView) && !isStepsViewActive(prevActiveView);
         prevScope = uiSlice.selectedAgentScope;
         prevActiveView = uiSlice.activeView;
         if (!isStepsViewActive(uiSlice.activeView)) {
           hideTurnTip();
           hideAnomalyTip();
+          stepTrendChart.refs.hideTooltip();
           if (scopeChanged) isDirty = true;
           return;
         }
         if ((isDirty || scopeChanged || viewEntered) && latestSlice) {
           isDirty = false;
           renderStepsData(latestSlice);
+        } else if (viewEntered && currentViewMode !== 'table') {
+          stepTrendChart.refs.draw();
         }
       }
     );
@@ -23212,6 +24323,7 @@ const StepsDetailView = defineComponent({
 
     onCleanup(() => {
       stepsExportMenu.destroy();
+      stepTrendChart.destroy();
       unsubTelemetry();
       unsubView();
       unsubI18n();
@@ -23234,6 +24346,8 @@ const StepsDetailView = defineComponent({
         stepSearchInput,
         stepQuickChipsEl,
         stepsExportMenu,
+        viewModeSwitchEl,
+        stepTrendChart,
         inlineScopeSelect,
         stepsModelSelect,
         stepsScroll,
@@ -23668,7 +24782,6 @@ const ConsumptionView = defineComponent({
         h('div', { className: 'cons-col' }, [
           totalTokensLabel,
           h('div', { className: 'cons-baseline' }, [heroTotalTokens]),
-          heroTokenSplitSub,
         ]),
         h('div', { className: 'cons-col is-bordered-col' }, [
           estCostLabel,
@@ -23701,6 +24814,7 @@ const ConsumptionView = defineComponent({
       customRangeBar,
       unifiedMatrixEl,
       overviewSegBar.el,
+      heroTokenSplitSub,
     ]);
 
     function drillDownToTimeRange(startMs, endMs) {
@@ -24231,6 +25345,13 @@ function getLanguageOptions() {
   ];
 }
 
+function getUiThemeOptions() {
+  return [
+    { value: 'liquid_glass', label: t('settings.gen.uiThemeLiquidGlass') },
+    { value: 'default', label: t('settings.gen.uiThemeDefault') },
+  ];
+}
+
 function getFontScaleOptions() {
   return [
     { value: 'sm', label: t('settings.gen.fontSm') },
@@ -24268,6 +25389,7 @@ const SettingsView = defineComponent({
 
     // --- 常规精简页状态与回调 ---
     let draftLanguage = 'auto';
+    let draftUiTheme = 'liquid_glass';
     let draftThemeAccent = 'host';
     let draftFontScale = 'md';
     let draftModelDisplayMode = 'short';
@@ -24338,9 +25460,10 @@ const SettingsView = defineComponent({
       }
     }
 
-    // Card 1: 外观与显示 (语言、主题色、字号、模型名显示、挂载位置)
+    // Card 1: 外观与显示 (语言、界面风格、主题色、字号、模型名显示、挂载位置)
     const appearanceTitleEl = h('span', { text: t('settings.simple.appearanceTitle') });
     const langLabelEl = h('span', { className: 'form-label', text: t('settings.gen.language') });
+    const uiThemeLabelEl = h('span', { className: 'form-label', text: t('settings.gen.uiTheme') });
     const accentLabelEl = h('span', { className: 'form-label', text: t('settings.gen.themeAccent') });
     const fontLabelEl = h('span', { className: 'form-label', text: t('settings.gen.fontScale') });
     const modelFormatLabelEl = h('span', { className: 'form-label', text: t('settings.oth.modelFormat') });
@@ -24356,6 +25479,19 @@ const SettingsView = defineComponent({
         setI18nLanguage(nextLang);
         languageSwitch.setValue(nextLang);
         void persistQuickPatch({ language: nextLang });
+      },
+    });
+
+    const uiThemeSwitch = SegmentedControl({
+      ariaLabel: t('settings.gen.uiTheme'),
+      modelValue: draftUiTheme,
+      options: getUiThemeOptions(),
+      onUpdateModelValue: (val) => {
+        const nextTheme = normalizeClientUiTheme(val);
+        draftUiTheme = nextTheme;
+        uiThemeSwitch.setValue(nextTheme);
+        refreshScroll();
+        void persistQuickPatch({ uiTheme: nextTheme });
       },
     });
 
@@ -24422,6 +25558,7 @@ const SettingsView = defineComponent({
         displayStatusText,
       ]),
       h('div', { className: 'form-row' }, [langLabelEl, languageSwitch.el]),
+      h('div', { className: 'form-row' }, [uiThemeLabelEl, uiThemeSwitch.el]),
       h('div', { className: 'form-row' }, [accentLabelEl, themeColorPicker.el]),
       h('div', { className: 'form-row' }, [fontLabelEl, fontScaleSwitch.el]),
       h('div', { className: 'form-row' }, [modelFormatLabelEl, stepModelSelect.el]),
@@ -24634,6 +25771,7 @@ const SettingsView = defineComponent({
       if (!settings) return;
       latestSettings = settings;
       draftLanguage = normalizeI18nLanguage(settings.language);
+      draftUiTheme = normalizeClientUiTheme(settings.uiTheme);
       draftThemeAccent = normalizeClientThemeAccent(settings.themeAccent);
       draftFontScale = normalizeClientFontScale(settings.fontScale);
       draftModelDisplayMode = normalizeClientModelDisplayMode(
@@ -24648,6 +25786,10 @@ const SettingsView = defineComponent({
       languageSwitch.setProps({
         modelValue: draftLanguage,
         options: getLanguageOptions(),
+      });
+      uiThemeSwitch.setProps({
+        modelValue: draftUiTheme,
+        options: getUiThemeOptions(),
       });
       themeColorPicker.refs.setValue(draftThemeAccent);
       fontScaleSwitch.setProps({
@@ -24682,6 +25824,7 @@ const SettingsView = defineComponent({
     function refreshGeneralLabels() {
       patchText(appearanceTitleEl, t('settings.simple.appearanceTitle'));
       patchText(langLabelEl, t('settings.gen.language'));
+      patchText(uiThemeLabelEl, t('settings.gen.uiTheme'));
       patchText(accentLabelEl, t('settings.gen.themeAccent'));
       patchText(fontLabelEl, t('settings.gen.fontScale'));
       patchText(modelFormatLabelEl, t('settings.oth.modelFormat'));
@@ -24704,6 +25847,10 @@ const SettingsView = defineComponent({
       languageSwitch.setProps({
         modelValue: draftLanguage,
         options: getLanguageOptions(),
+      });
+      uiThemeSwitch.setProps({
+        modelValue: draftUiTheme,
+        options: getUiThemeOptions(),
       });
       themeColorPicker.refs.refreshLabels();
       fontScaleSwitch.setProps({
@@ -24770,6 +25917,7 @@ const SettingsView = defineComponent({
       unsubUi();
       unsubI18n();
       languageSwitch.destroy();
+      uiThemeSwitch.destroy();
       themeColorPicker.destroy();
       fontScaleSwitch.destroy();
       stepModelSelect.destroy();
@@ -24782,6 +25930,7 @@ const SettingsView = defineComponent({
       refs: {
         viewScrollbar,
         languageSwitch,
+        uiThemeSwitch,
         themeColorPicker,
         fontScaleSwitch,
         stepModelSelect,
@@ -25109,7 +26258,10 @@ const App = defineComponent({
       }
     );
 
+    const detachLiquidSheen = attachLiquidGlassSheen(shellEl);
+
     onCleanup(() => {
+      detachLiquidSheen();
       clearToastTimer();
       unsubUi();
       unsubStepCount();
@@ -26643,6 +27795,10 @@ function mountWindowOverlay() {
     applyAppearanceToRoot(portalHost, settings, { includeFontScale: true });
     const scaleKey = normalizeClientFontScale(settings?.fontScale);
     const isModernUi = resolveSettingsModernUi(settings);
+    const uiThemeAttr =
+      isModernUi && resolveSettingsUiTheme(settings) === 'liquid_glass'
+        ? 'liquid-glass'
+        : 'default';
     const colorScheme = portalHost.getAttribute?.('data-color-scheme') || 'light';
     for (const el of [popoverEl, hoverTipEl, multiPanelEl]) {
       if (el.getAttribute?.('data-font-scale') !== scaleKey) {
@@ -26650,6 +27806,9 @@ function mountWindowOverlay() {
       }
       if (el.getAttribute?.('data-color-scheme') !== colorScheme) {
         el.setAttribute?.('data-color-scheme', colorScheme);
+      }
+      if (el.getAttribute?.('data-ui-theme') !== uiThemeAttr) {
+        el.setAttribute?.('data-ui-theme', uiThemeAttr);
       }
       if (isModernUi) {
         if (el.getAttribute?.('data-modern-ui') !== 'true') {
@@ -27209,15 +28368,15 @@ function mountWindowOverlay() {
         let top;
         if (openPopAbove) {
           const maxPopH = Math.max(240, Math.floor(bRect.top - 20));
-          const targetPopH = Math.min(588, maxPopH);
-          popoverEl.style.height = `${targetPopH}px`;
-          popoverEl.style.maxHeight = `${maxPopH}px`;
-          const actualPopH = Math.min(Number(popoverEl.offsetHeight) || targetPopH, maxPopH);
+          const targetPopH = Math.min(620, maxPopH);
+          popoverEl.style.height = '';
+          popoverEl.style.maxHeight = `${targetPopH}px`;
+          const actualPopH = Math.min(Number(popoverEl.offsetHeight) || targetPopH, targetPopH);
           top = Math.max(12, Math.round(bRect.top - actualPopH - 8));
         } else {
           popoverEl.style.height = '';
           top = Math.max(38, Math.min(vh - 140, Math.round(bRect.bottom + 6)));
-          popoverEl.style.maxHeight = `${Math.max(240, vh - top - 12)}px`;
+          popoverEl.style.maxHeight = `${Math.min(620, Math.max(240, vh - top - 12))}px`;
         }
         patchClasses(popoverEl, { 'is-above': openPopAbove });
         let left = Math.round(rightAnchorEdge - panelW);
@@ -27768,6 +28927,7 @@ function mountWindowOverlay() {
       ctxInspectorAgentId: st.ctxInspectorAgentId,
       activeView: st.activeView,
       stepsSubTab: st.stepsSubTab,
+      stepsViewMode: st.stepsViewMode,
       settingsSubTab: st.settingsSubTab,
       settingsStructureTab: st.settingsStructureTab,
     }),

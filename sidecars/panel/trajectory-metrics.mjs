@@ -1,15 +1,15 @@
 /**
- * 客户端观测请求级吞吐率（TPS）、首字延迟（TTFT）、上下文构成拆解与模型身份归因计算模块。
+ * 客户端观测请求级纯吐字吞吐率（Pure Decode TPS）、首字延迟（TTFT）、上下文构成拆解与模型身份归因计算模块。
  *
  * 核心设计原则：
- * 1. 采用客户端观测到的端到端请求耗时（包含排队等待、思考与工具调用生成），对纯文本生成与工具调用采用统一公式计算。
- * 2. 严禁基于速率上限裁剪异常值或动态篡改分母（如扣除思考时间或仅取流式片段耗时），保证统计口径客观一致。
+ * 1. 采用扣除原生首字延迟（TTFT）后的纯解码耗时 `max(totalDurationSec - nativeTtftSec, 0.05s)` 计算纯吐字速度（缺失 TTFT 时回退至总耗时）。
+ * 2. 严禁基于速率上限裁剪异常值或使用易失真的流式/思考分片计时器篡改分母，保证统计口径客观一致。
  */
 
 import { extractCleanUserRequestBody } from './shared/prompt-clean.mjs';
 
 /** 速度测量口径版本号；当耗时或样本过滤算法变更时递增，用于触发旧版缓存测量字段失效重算 */
-export const MEASUREMENT_VERSION = 4;
+export const MEASUREMENT_VERSION = 5;
 
 /** 模型身份归因版本号；当模型识别优先级或占位符清洗策略变更时递增 */
 export const MODEL_IDENTITY_VERSION = 1;
@@ -17,8 +17,33 @@ export const MODEL_IDENTITY_VERSION = 1;
 /** 纳入有效测速的最小请求总耗时阈值（0.5 秒），过滤极短请求因时钟抖动导致的速率失真 */
 export const MIN_SPEED_DURATION_SECONDS = 0.5;
 
-/** 纳入平均吞吐率（Mean TPS）统计的最小输出 Token 数阈值（50 Tokens），避免短回复被首字延迟主导 */
+/** 纯吐字解码耗时下限（50 毫秒），防止极短解码窗口除零或放大时钟抖动 */
+export const MIN_DECODE_DURATION_SECONDS = 0.05;
+
+/** 纳入平均吞吐率（Mean TPS）统计的最小输出 Token 数阈值（50 Tokens），避免短回复噪声干扰均速 */
 export const MIN_MEAN_OUTPUT_TOKENS = 50;
+
+/**
+ * 计算纯吐字解码阶段耗时秒数：`max(totalDurationSec - nativeTtftSec, MIN_DECODE_DURATION_SECONDS)`。
+ * 若原生 TTFT 缺失或不可用，则回退为请求总耗时 `totalDurationSec`。
+ *
+ * @param {number | null} totalDurationSec 请求总耗时（秒）
+ * @param {number | null} nativeTtftSec 原生首字延迟（秒）
+ * @returns {number | null}
+ */
+export function computeDecodeDurationSec(totalDurationSec, nativeTtftSec) {
+  if (!(Number.isFinite(totalDurationSec) && totalDurationSec > 0)) {
+    return null;
+  }
+  if (
+    Number.isFinite(nativeTtftSec) &&
+    nativeTtftSec >= 0 &&
+    nativeTtftSec <= totalDurationSec + 0.01
+  ) {
+    return Math.max(totalDurationSec - nativeTtftSec, MIN_DECODE_DURATION_SECONDS);
+  }
+  return totalDurationSec;
+}
 
 /**
  * 解析 ISO-8601 时间戳字符串为亚毫秒精度的浮点毫秒时间戳。
@@ -1479,8 +1504,14 @@ export function extractModelSteps(rawSteps = [], generatorMetadata = []) {
       timingReason = 'inconsistent_timing';
     }
 
+    const decodeDurationSec =
+      timingReason === null
+        ? computeDecodeDurationSec(totalDurationSec, nativeTtftSec)
+        : null;
     const totalTokPerSec =
-      timingReason === null ? outputTokens / totalDurationSec : null;
+      timingReason === null && decodeDurationSec > 0
+        ? outputTokens / decodeDurationSec
+        : null;
     const shortOutputSample =
       totalTokPerSec !== null && outputTokens < MIN_MEAN_OUTPUT_TOKENS;
     const speedReason =
@@ -1580,8 +1611,14 @@ export function extractModelSteps(rawSteps = [], generatorMetadata = []) {
       ttftSource: nativeTtftSec === null ? 'unavailable' : 'native',
       thinkingDurationSec,
       totalDurationSec,
+      decodeDurationSec,
       totalTokPerSec,
-      speedBasis: totalTokPerSec === null ? 'unavailable' : 'request_total',
+      speedBasis:
+        totalTokPerSec === null
+          ? 'unavailable'
+          : nativeTtftSec !== null
+            ? 'decode'
+            : 'request_total',
       speedSampleEligible:
         totalTokPerSec !== null && !shortOutputSample && !isCompactionStep,
       speedReason,
@@ -1883,6 +1920,7 @@ export function normalizeCachedStep(step) {
     ttftSource: 'unavailable',
     thinkingDurationSec: null,
     totalDurationSec: null,
+    decodeDurationSec: null,
     totalTokPerSec: null,
     speedBasis: 'unavailable',
     speedSampleEligible: false,
@@ -1919,10 +1957,16 @@ export function speedMetric(step) {
       : reason);
   }
 
+  const speedSeconds =
+    Number.isFinite(step.decodeDurationSec) && step.decodeDurationSec > 0
+      ? step.decodeDurationSec
+      : computeDecodeDurationSec(step.totalDurationSec, step.nativeTtftSec) ??
+        step.totalDurationSec;
+
   return {
     value: step.totalTokPerSec,
     tokens: step.outputTokens,
-    seconds: step.totalDurationSec,
+    seconds: speedSeconds,
     eligible:
       step.speedSampleEligible === true &&
       !step.isCompactionStep &&

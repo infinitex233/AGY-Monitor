@@ -30,9 +30,27 @@ const SEGMENT_DEFS = [
 export const ContextSegmentMeter = defineComponent({
   name: 'ContextSegmentMeter',
   setup({ getProps }) {
+    let slotMeta = SEGMENT_DEFS.map(() => null);
+    let currentHoveredKey = '';
+
     // 固定 10 个位置槽位节点，不通过 appendChild 移动 DOM，防止浏览器中断 CSS transition 动画
-    const slotEls = SEGMENT_DEFS.map((def) =>
-      h('div', { className: `progress-seg ${def.cls}` })
+    const slotEls = SEGMENT_DEFS.map((def, idx) =>
+      h('div', {
+        className: `progress-seg ${def.cls}`,
+        onMouseenter: () => {
+          const meta = slotMeta[idx];
+          if (!meta) return;
+          currentHoveredKey = meta.key;
+          syncHoverClasses();
+          getProps().onHoverSegment?.(meta);
+        },
+        onMouseleave: () => {
+          if (!currentHoveredKey) return;
+          currentHoveredKey = '';
+          syncHoverClasses();
+          getProps().onHoverSegment?.(null);
+        },
+      })
     );
 
     const trackEl = h(
@@ -48,8 +66,20 @@ export const ContextSegmentMeter = defineComponent({
 
     let lastOrderSig = '';
 
+    function syncHoverClasses() {
+      const extHovered = getProps().hoveredKey || currentHoveredKey || '';
+      patchClasses(trackEl, { 'has-seg-hover': Boolean(extHovered) });
+      for (let i = 0; i < slotEls.length; i += 1) {
+        const meta = slotMeta[i];
+        patchClasses(slotEls[i], {
+          'is-seg-hovered': Boolean(extHovered && meta && meta.key === extHovered),
+        });
+      }
+    }
+
     function syncMeter() {
-      const ctx = getProps().context || {};
+      const props = getProps();
+      const ctx = props.context || {};
       const limit = Math.max(1, Number(ctx.compactionLimitTokens || ctx.limitTokens || 256000));
       const scored = SEGMENT_DEFS.map((def, defaultOrder) => {
         const val = def.getVal(ctx);
@@ -68,7 +98,11 @@ export const ContextSegmentMeter = defineComponent({
         lastOrderSig = activeOrderSig;
       }
 
-      patchClasses(trackEl, { 'is-reordering': orderChanged });
+      patchClasses(trackEl, {
+        'is-reordering': orderChanged,
+        'is-shimmer': Boolean(props.isShimmer),
+        'is-danger': Boolean(props.isDanger),
+      });
 
       let seenActive = false;
       for (let i = 0; i < slotEls.length; i++) {
@@ -77,6 +111,15 @@ export const ContextSegmentMeter = defineComponent({
         const isActive = item.val > 0 && item.pct > 0;
         const hasSep = isActive && seenActive;
         if (isActive) seenActive = true;
+        slotMeta[i] = isActive
+          ? {
+              key: item.def.key,
+              cls: item.def.cls,
+              label: t(item.def.labelKey),
+              valText: formatTokens(item.val),
+              pctText: formatPctNumber(item.pct, { withSymbol: true }),
+            }
+          : null;
         const cls = `progress-seg ${item.def.cls}${isActive ? ' is-active' : ''}${hasSep ? ' has-sep' : ''}`;
         patchAttr(slotEl, 'class', cls);
         patchStyleVar(slotEl, '--seg-w', isActive ? `${item.pct.toFixed(2)}%` : '0%');
@@ -89,6 +132,7 @@ export const ContextSegmentMeter = defineComponent({
         );
       }
 
+      syncHoverClasses();
       patchAttr(trackEl, 'aria-valuenow', Math.round(ctx.compactionUsedPct ?? ctx.usedPct ?? 0));
     }
 
@@ -96,7 +140,7 @@ export const ContextSegmentMeter = defineComponent({
 
     return {
       el: trackEl,
-      refs: { segments: slotEls },
+      refs: { segments: slotEls, setHoveredKey: (k) => { currentHoveredKey = k || ''; syncHoverClasses(); } },
       onPropsChange: syncMeter,
     };
   },

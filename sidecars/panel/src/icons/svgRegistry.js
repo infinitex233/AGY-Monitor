@@ -145,4 +145,25 @@ export const SVG_ICON_DEFS = Object.freeze({
     { tag: 'ellipse', attrs: { cx: '8', cy: '8', rx: '2.7', ry: '6' } },
     { tag: 'path', attrs: { d: 'M2.3 6h11.4M2.3 10h11.4' } },
   ],
+  dollar: [
+    { tag: 'path', attrs: { d: 'M8 2v12' } },
+    { tag: 'path', attrs: { d: 'M11 4.8c0-1.1-1.3-1.9-3-1.9s-3 .8-3 1.9c0 1.2 1.2 1.7 3 2.1s3 .9 3 2.2c0 1.2-1.3 2-3 2s-3-.8-3-2' } },
+  ],
+  'dot-matrix': [
+    { tag: 'circle', attrs: { cx: '3.6', cy: '4', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '8', cy: '4', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '12.4', cy: '4', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '3.6', cy: '8', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '8', cy: '8', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '12.4', cy: '8', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '3.6', cy: '12', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '8', cy: '12', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+    { tag: 'circle', attrs: { cx: '12.4', cy: '12', r: '1.35', fill: 'currentColor', stroke: 'none' } },
+  ],
+  'trend-curve': [
+    { tag: 'path', attrs: { d: 'M2 11.5C4.5 11.5 5 4.8 7.8 4.8s3 4.8 6.2 2.2' } },
+  ],
+  list: [
+    { tag: 'path', attrs: { d: 'M2.5 4.2h11M2.5 8h11M2.5 11.8h11' } },
+  ],
 });

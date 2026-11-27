@@ -69,6 +69,7 @@ export {
   normalizeStepTokenComboFormat,
   normalizeThemeAccent,
   normalizeTopbarCapsuleSlots,
+  normalizeUiTheme,
   normalizeWindowMountMode,
   parseStepTokenComboSegments,
   resolveEffectiveCliStatusLineSlots,
