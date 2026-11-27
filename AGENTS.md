@@ -49,7 +49,8 @@ Run from `sidecars/panel/`:
 1. Bump version consistently in `plugin.json`, `sidecars/panel/package.json`, `pricing-catalog.json` (`latestPluginVersion`), and `CHANGELOG.md`.
 2. Run `cd sidecars/panel && npm run build && npm test && npm run pack:release`.
 3. Commit to `main`, create and push tag `vX.Y.Z` — `.github/workflows/release.yml` runs tests on `ubuntu-latest` and publishes `dist/agy-monitor.zip` to GitHub Releases.
-4. To sync model pricing from upstream without pulling upstream version metadata, run the `Sync Upstream Pricing Catalog` workflow (`workflow_dispatch`) in GitHub Actions.
+4. **Release Notes & Changelog Style**: Write bilingual notes in both `CHANGELOG.md` and the GitHub Release (replacing the CI auto-generated body via `gh release edit vX.Y.Z` after `release.yml` completes). Use `### 更新内容` (never `### 简体中文更新说明`) for Chinese and `### English` for English, keeping bullets factual and concise, plus brief installation/verification notes and the `Full Changelog` compare link.
+5. To sync model pricing from upstream without pulling upstream version metadata, run the `Sync Upstream Pricing Catalog` workflow (`workflow_dispatch`) in GitHub Actions.
 
 ### Local Antigravity Desktop Testing Paths
 - Installed plugin runtime: `~/.gemini/config/plugins/agy-monitor` (test clean installs by extracting `dist/agy-monitor.zip` so deleted dev/legacy files don't linger).
