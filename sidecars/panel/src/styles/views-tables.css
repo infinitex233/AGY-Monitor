@@ -1451,7 +1451,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 210px;
+  max-width: 250px;
 }
 
 .steps-header-scrub-pill[hidden] {

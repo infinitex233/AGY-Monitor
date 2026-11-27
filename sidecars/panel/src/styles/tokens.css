@@ -112,15 +112,17 @@
 
   /* Apple Liquid Glass Material & Ink Tokens (Light Polarity Default) */
   --lg-ink-1: rgba(17, 17, 19, 0.90);
-  --lg-ink-2: rgba(17, 17, 19, 0.56);
-  --lg-ink-3: rgba(17, 17, 19, 0.38);
+  --lg-ink-2: rgba(17, 17, 19, 0.70);
+  --lg-ink-3: rgba(17, 17, 19, 0.58);
   --lg-accent: var(--user-accent-primary, #007aff);
   --lg-accent-soft: color-mix(in srgb, var(--lg-accent) 12%, transparent);
   --lg-accent-ring: color-mix(in srgb, var(--lg-accent) 30%, transparent);
   --lg-indigo: #5856d6;
   --lg-purple: #af52de;
   --lg-teal: #32ade6;
+  --lg-teal-text: #0e8ec7;
   --lg-green: #34c759;
+  --lg-green-text: #22a046;
   --lg-amber: #e58500;
   --lg-amber-soft: rgba(229, 133, 0, 0.14);
   --lg-danger: #ff3b30;
@@ -258,15 +260,17 @@
 
   /* Apple Liquid Glass Material & Ink Tokens (Dark Polarity) */
   --lg-ink-1: rgba(255, 255, 255, 0.93);
-  --lg-ink-2: rgba(255, 255, 255, 0.58);
-  --lg-ink-3: rgba(255, 255, 255, 0.38);
+  --lg-ink-2: rgba(255, 255, 255, 0.72);
+  --lg-ink-3: rgba(255, 255, 255, 0.58);
   --lg-accent: var(--user-accent-primary, #0a84ff);
   --lg-accent-soft: color-mix(in srgb, var(--lg-accent) 22%, transparent);
   --lg-accent-ring: color-mix(in srgb, var(--lg-accent) 44%, transparent);
   --lg-indigo: #5e5ce6;
   --lg-purple: #bf5af2;
   --lg-teal: #40c8e0;
+  --lg-teal-text: #40c8e0;
   --lg-green: #30d158;
+  --lg-green-text: #30d158;
   --lg-amber: #ff9f0a;
   --lg-amber-soft: rgba(255, 159, 10, 0.20);
   --lg-danger: #ff453a;

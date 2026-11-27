@@ -26,7 +26,7 @@ Switchable Liquid Glass & Classic UI · 2×2 four-metric live trends · Pure Dec
 
 <br />
 
-[Latest Release (`v1.1.0`)](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [Download `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
+[Latest Release (`v1.1.1`)](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [Download `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
 
 </div>
 

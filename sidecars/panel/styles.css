@@ -113,15 +113,17 @@
 
   /* Apple Liquid Glass Material & Ink Tokens (Light Polarity Default) */
   --lg-ink-1: rgba(17, 17, 19, 0.90);
-  --lg-ink-2: rgba(17, 17, 19, 0.56);
-  --lg-ink-3: rgba(17, 17, 19, 0.38);
+  --lg-ink-2: rgba(17, 17, 19, 0.70);
+  --lg-ink-3: rgba(17, 17, 19, 0.58);
   --lg-accent: var(--user-accent-primary, #007aff);
   --lg-accent-soft: color-mix(in srgb, var(--lg-accent) 12%, transparent);
   --lg-accent-ring: color-mix(in srgb, var(--lg-accent) 30%, transparent);
   --lg-indigo: #5856d6;
   --lg-purple: #af52de;
   --lg-teal: #32ade6;
+  --lg-teal-text: #0e8ec7;
   --lg-green: #34c759;
+  --lg-green-text: #22a046;
   --lg-amber: #e58500;
   --lg-amber-soft: rgba(229, 133, 0, 0.14);
   --lg-danger: #ff3b30;
@@ -259,15 +261,17 @@
 
   /* Apple Liquid Glass Material & Ink Tokens (Dark Polarity) */
   --lg-ink-1: rgba(255, 255, 255, 0.93);
-  --lg-ink-2: rgba(255, 255, 255, 0.58);
-  --lg-ink-3: rgba(255, 255, 255, 0.38);
+  --lg-ink-2: rgba(255, 255, 255, 0.72);
+  --lg-ink-3: rgba(255, 255, 255, 0.58);
   --lg-accent: var(--user-accent-primary, #0a84ff);
   --lg-accent-soft: color-mix(in srgb, var(--lg-accent) 22%, transparent);
   --lg-accent-ring: color-mix(in srgb, var(--lg-accent) 44%, transparent);
   --lg-indigo: #5e5ce6;
   --lg-purple: #bf5af2;
   --lg-teal: #40c8e0;
+  --lg-teal-text: #40c8e0;
   --lg-green: #30d158;
+  --lg-green-text: #30d158;
   --lg-amber: #ff9f0a;
   --lg-amber-soft: rgba(255, 159, 10, 0.20);
   --lg-danger: #ff453a;
@@ -2033,6 +2037,30 @@ html[data-standalone="true"] .app-shell {
   border-radius: var(--radius-sm);
 }
 
+.panel:has(.is-open),
+.panel:has(.select-menu:not([hidden])),
+.panel:has(.action-menu-popover:not([hidden])),
+.panel:has(.dt-popover:not([hidden])),
+.panel:has(.trend-tooltip:not([hidden])),
+.panel:has(.cons-breakdown-popover:not([hidden])),
+.panel:has(.turn-prompt-tip:not([hidden])),
+.panel:has(.step-anomaly-tip:not([hidden])),
+.session-header:has(.is-open),
+.session-header:has(.select-menu:not([hidden])) {
+  position: relative;
+  z-index: 60;
+}
+
+.form-row:has(.is-open),
+.form-row:has(.select-menu:not([hidden])),
+.cons-custom-range-bar:has(.dt-popover:not([hidden])),
+.datetime-picker:has(.dt-popover:not([hidden])),
+.custom-select.is-open,
+.action-menu.is-open {
+  position: relative;
+  z-index: 65;
+}
+
 .panel-header {
   display: flex;
   align-items: center;
@@ -2429,6 +2457,36 @@ html[data-standalone="true"] .app-shell {
   text-overflow: ellipsis;
 }
 
+.telemetry-matrix .cell-value {
+  display: inline-flex;
+  align-items: baseline;
+  max-width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.telemetry-matrix.is-flat-summary .cell-value {
+  justify-content: center;
+}
+
+.telemetry-matrix .cell-value .cell-num {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.telemetry-matrix .cell-value .cell-unit {
+  flex-shrink: 0;
+  margin-left: 1px;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-secondary);
+}
+
+.telemetry-matrix .cell-value .cell-unit.is-spaced {
+  margin-left: 3px;
+}
+
 .cell-value.accent-speed,
 .accent-speed {
   color: var(--metric-speed);
@@ -2512,6 +2570,7 @@ html[data-standalone="true"] .app-shell {
     background-color 0.08s ease,
     width var(--dur-normal) var(--ease-fast),
     margin-left var(--dur-fast) var(--ease-fast),
+    opacity 160ms var(--ease-fast),
     filter 120ms ease;
 }
 
@@ -2520,6 +2579,7 @@ html[data-standalone="true"] .app-shell {
     background-color 0.05s ease,
     width var(--dur-normal) var(--ease-fast) 0.05s,
     margin-left var(--dur-fast) var(--ease-fast),
+    opacity 160ms var(--ease-fast),
     filter 120ms ease;
 }
 
@@ -2534,6 +2594,15 @@ html[data-standalone="true"] .app-shell {
 
 .progress-track.ctx-segment-meter .progress-seg.is-active:hover {
   filter: brightness(1.12);
+}
+
+.progress-track.ctx-segment-meter.has-seg-hover .progress-seg.is-active {
+  opacity: 0.38;
+}
+
+.progress-track.ctx-segment-meter.has-seg-hover .progress-seg.is-active.is-seg-hovered {
+  opacity: 1;
+  filter: brightness(1.08);
 }
 
 .progress-seg.seg-assistant {
@@ -2910,7 +2979,41 @@ html[data-standalone="true"] .app-shell {
   color: var(--text-secondary);
 }
 
-/* --- 4. 上下文双列图例网格 (Context 10-Channel Legend Grid) --- */
+/* --- 4. 上下文双列图例网格与悬停读数胶囊 (Context 10-Channel Legend Grid & Hover Readout) --- */
+.ctx-hover-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-4px);
+  pointer-events: none;
+  transition:
+    opacity var(--dur-fast) var(--ease-fast),
+    transform var(--dur-fast) var(--ease-fast),
+    visibility var(--dur-fast) var(--ease-fast);
+}
+
+.ctx-hover-readout.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+}
+
+.ctx-hover-readout .swatch {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
 .ctx-legend-toggle {
   display: inline-flex;
   align-items: center;
@@ -2965,6 +3068,14 @@ html[data-standalone="true"] .app-shell {
   justify-content: space-between;
   gap: var(--space-2);
   min-width: 0;
+  padding: 2px 4px;
+  border-radius: var(--radius-xs);
+  transition: background-color var(--dur-fast) var(--ease-fast);
+}
+
+.legend-item:hover,
+.legend-item.is-seg-hovered {
+  background: var(--surface-hover);
 }
 
 .legend-left {
@@ -6303,7 +6414,7 @@ html[data-standalone="true"] .app-shell {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 210px;
+  max-width: 250px;
 }
 
 .steps-header-scrub-pill[hidden] {
@@ -9020,6 +9131,7 @@ html[data-standalone="true"] .app-shell {
   --modern-card-shadow: none;
   --modern-nav-track-bg: var(--modern-surface-card);
   --modern-inline-track-bg: color-mix(in srgb, var(--text-primary) 4.2%, transparent);
+  --modern-divider: color-mix(in srgb, var(--text-primary) 8.5%, transparent);
   --modern-glider-bg: color-mix(in srgb, var(--accent-primary) 17%, color-mix(in srgb, var(--text-primary) 4%, transparent));
   --modern-glider-shadow: none;
   --modern-progress-track: color-mix(in srgb, var(--text-primary) 8%, transparent);
@@ -9043,9 +9155,10 @@ html[data-standalone="true"] .app-shell {
   --modern-pill-select-open: hsl(220 14% 88.5%);
   --modern-card-shadow: 0 1px 3px rgb(15 23 42 / 0.045), 0 4px 14px rgb(15 23 42 / 0.028);
   --modern-nav-track-bg: hsl(216 28% 94.2%);
-  --modern-inline-track-bg: hsl(216 32% 96.2%);
+  --modern-inline-track-bg: hsl(216 24% 93.8%);
+  --modern-divider: color-mix(in srgb, var(--text-primary) 7%, transparent);
   --modern-glider-bg: #ffffff;
-  --modern-glider-shadow: 0 1px 2px rgb(15 23 42 / 0.08), 0 1px 1px rgb(15 23 42 / 0.04);
+  --modern-glider-shadow: 0 2px 8px rgb(15 23 42 / 0.085), 0 1px 2px rgb(15 23 42 / 0.045);
   --modern-progress-track: hsl(216 28% 93.4%);
   --modern-stripe-bg: hsl(216 40% 97.8%);
   --text-secondary: color-mix(in srgb, var(--text-primary) 72%, transparent);
@@ -9154,7 +9267,29 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 }
 
 [data-modern-ui="true"] .app-shell {
+  padding: var(--space-4);
+  gap: var(--space-3);
   background: var(--modern-canvas-bg);
+}
+
+[data-modern-ui="true"] .top-deck {
+  gap: 8px;
+}
+
+[data-modern-ui="true"] .viewport-stage {
+  margin-right: -8px;
+}
+
+[data-modern-ui="true"] .view-pane.custom-scroll-host {
+  padding-right: 0;
+}
+
+[data-modern-ui="true"] .view-pane.custom-scroll-host > .custom-scroll-content {
+  padding-right: 8px;
+}
+
+[data-modern-ui="true"] .view-pane.custom-scroll-host > .scrollbar-rail {
+  right: 2px;
 }
 
 [data-modern-ui="true"] .view-pane {
@@ -9168,7 +9303,23 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   box-shadow: var(--modern-card-shadow);
 }
 
+[data-modern-ui="true"] .panel {
+  padding: 13px 15px;
+  gap: 10px;
+  border-radius: 20px;
+}
+
+[data-modern-ui="true"] .session-header {
+  border-radius: 15px;
+  padding: 5px 8px 5px 10px;
+}
+
+[data-modern-ui="true"] .session-header .select-trigger {
+  border-radius: 10px;
+}
+
 [data-modern-ui="true"] .panel .panel {
+  border-radius: 12px;
   background: var(--modern-surface-subtle);
   box-shadow: none;
 }
@@ -9186,15 +9337,44 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 }
 
 [data-modern-ui="true"] .segmented {
+  --seg-pad: 3px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--modern-inline-track-bg);
+}
+
+[data-modern-ui="true"] .cons-overview-head {
+  flex-wrap: wrap;
+  row-gap: 7px;
+  column-gap: 8px;
+}
+
+[data-modern-ui="true"] .cons-overview-head .cons-overview-title {
+  flex: 1 0 auto;
+  min-width: max-content;
+}
+
+[data-modern-ui="true"] .cons-overview-controls {
+  flex: 0 1 auto;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+[data-modern-ui="true"] .cons-overview-head .segmented {
   --seg-pad: 2px;
   padding: 2px;
-  border-radius: var(--radius-xs);
-  background: var(--modern-inline-track-bg);
+  gap: 1px;
+  max-width: 100%;
+}
+
+[data-modern-ui="true"] .cons-overview-head .seg-btn {
+  padding: 2px 5.5px;
+  font-size: var(--fs-xs);
 }
 
 [data-modern-ui="true"] .settings-subnav-bar .segmented {
   padding: 3px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   background: var(--modern-nav-track-bg);
 }
 
@@ -9207,6 +9387,7 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 
 [data-modern-ui="true"] .seg-glider {
   border: none;
+  border-radius: var(--radius-pill);
   background: var(--modern-glider-bg);
   box-shadow: var(--modern-glider-shadow);
 }
@@ -9219,6 +9400,7 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 }
 
 [data-modern-ui="true"] .segmented:not(.has-glider) .seg-btn.is-active {
+  border-radius: var(--radius-pill);
   background: var(--modern-glider-bg);
   box-shadow: var(--modern-glider-shadow);
 }
@@ -9228,6 +9410,10 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   background: var(--modern-glider-bg);
   box-shadow: var(--modern-glider-shadow);
   transition: transform 220ms var(--ease-modern);
+}
+
+[data-modern-ui="true"] .seg-btn {
+  border-radius: var(--radius-pill);
 }
 
 [data-modern-ui="true"] .pill-tab,
@@ -9257,6 +9443,18 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   border: none;
 }
 
+[data-modern-ui="true"] .status-tag {
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  gap: 6px;
+  font-weight: 500;
+}
+
+[data-modern-ui="true"] .update-badge-btn {
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
+}
+
 [data-modern-ui="true"] .icon-btn,
 [data-modern-ui="true"] .btn-secondary,
 [data-modern-ui="true"] .btn-ghost-sm,
@@ -9270,6 +9468,30 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
     background-color 160ms var(--ease-modern),
     color 160ms var(--ease-modern),
     transform 140ms var(--ease-modern);
+}
+
+[data-modern-ui="true"] .icon-btn:not(.host-i18n-icon-btn),
+[data-modern-ui="true"] .session-header .icon-btn {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
+  border-radius: var(--radius-pill);
+}
+
+[data-modern-ui="true"] .btn-secondary {
+  border-radius: var(--radius-pill);
+}
+
+[data-modern-ui="true"] .live-sub-toggle {
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+}
+
+[data-modern-ui="true"] .ctx-agent-pill {
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
+  font-weight: 500;
 }
 
 [data-modern-ui="true"] .session-header .icon-btn {
@@ -9338,6 +9560,7 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 
 [data-modern-ui="true"] .btn-primary {
   border: none;
+  border-radius: var(--radius-pill);
   transition:
     opacity 160ms var(--ease-modern),
     transform 140ms var(--ease-modern);
@@ -9354,19 +9577,23 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 }
 
 /* --- 3. 实时概览矩阵与任务卡片：顶层独立卡片，面板内子块绝不叠套背景 --- */
+[data-modern-ui="true"] .overview-modules-host {
+  padding-top: 2px;
+}
+
 [data-modern-ui="true"] .telemetry-matrix {
   border: none;
   background: transparent;
-  gap: 6px;
+  gap: 9px;
   overflow: visible;
 }
 
 [data-modern-ui="true"] .matrix-cell {
   background: var(--modern-surface-card);
   box-shadow: var(--modern-card-shadow);
-  border-radius: var(--radius-sm);
-  padding: 11px 13px;
-  gap: 5px;
+  border-radius: 16px;
+  padding: 10px 13px 11px;
+  gap: 6px;
   transition: background-color 160ms var(--ease-modern);
 }
 
@@ -9374,13 +9601,34 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   background: color-mix(in srgb, var(--modern-surface-card) 94%, var(--text-primary) 6%);
 }
 
+[data-modern-ui="true"] .ctx-hover-readout {
+  padding: 2px 8px;
+}
+
 [data-modern-ui="true"] .ctx-legend-toggle {
+  width: 22px;
+  height: 22px;
   border-radius: var(--radius-pill);
+  background: var(--modern-inline-track-bg);
 }
 
 [data-modern-ui="true"] .ctx-legend-toggle:hover,
 [data-modern-ui="true"] .ctx-legend-toggle:focus-visible {
   background: var(--modern-surface-hover);
+}
+
+[data-modern-ui="true"] .ctx-legend-grid {
+  padding-top: 8px;
+  border-top: 1px solid var(--modern-divider);
+  gap: 6px 16px;
+}
+
+[data-modern-ui="true"] .swatch {
+  border-radius: var(--radius-pill);
+}
+
+[data-modern-ui="true"] .legend-item {
+  border-radius: 6px;
 }
 
 /* 面板内的双栏信息项（如版本更新中的「价格表 / 当前版本」）不套二层背景 */
@@ -9391,13 +9639,68 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   padding: 2px 0;
 }
 
-/* 实时监控「会话总览」面板内部 4 格保持扁平无二层卡片阴影 */
-[data-modern-ui="true"] .session-summary-panel .matrix-cell,
-[data-modern-ui="true"] .session-summary-panel .matrix-cell:hover {
+/* 实时监控「会话总览」外框下保留 4 个独立圆角分块（与液态玻璃几何结构保持一致） */
+[data-modern-ui="true"] .session-summary-panel .telemetry-matrix,
+[data-modern-ui="true"] .session-summary-panel .telemetry-matrix.is-flat-summary {
+  gap: 9px;
   background: transparent;
-  box-shadow: none;
-  border-radius: 0;
-  padding: 6px 0 4px;
+  border: none;
+  overflow: visible;
+}
+
+[data-modern-ui="true"] .session-summary-panel .telemetry-matrix .matrix-cell {
+  border: 1px solid color-mix(in srgb, var(--text-primary) 5.5%, transparent);
+  background: color-mix(in srgb, var(--modern-surface-card) 98.5%, var(--text-primary) 1.5%);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.025);
+  border-radius: 16px;
+  padding: 10px 12px 11px;
+  gap: 6px;
+  align-items: stretch;
+  text-align: left;
+  overflow: hidden;
+  transition:
+    background-color 160ms var(--ease-modern),
+    border-color 160ms var(--ease-modern),
+    box-shadow 160ms var(--ease-modern);
+}
+
+[data-modern-ui="true"] .session-summary-panel .telemetry-matrix .matrix-cell:hover {
+  border-color: color-mix(in srgb, var(--text-primary) 9%, transparent);
+  background: color-mix(in srgb, var(--modern-surface-card) 96.5%, var(--text-primary) 3.5%);
+  box-shadow: 0 2px 6px rgb(15 23 42 / 0.04);
+  transform: none;
+}
+
+[data-modern-ui="true"] .session-summary-panel .telemetry-matrix .cell-label {
+  justify-content: center;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+[data-modern-ui="true"] .session-summary-panel .telemetry-matrix .cell-label .svg-icon {
+  display: none;
+}
+
+[data-modern-ui="true"] .session-summary-panel .telemetry-matrix .cell-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  font-size: calc(var(--fs-lg) * 1.12);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+
+@media (max-width: 420px) {
+  [data-modern-ui="true"] .session-summary-panel .telemetry-matrix:not([data-cols="1"]):not([data-cols="2"]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* 结构页预览画布内的测速卡与任务卡保持轻微层次以呈现真实预览布局 */
@@ -9411,7 +9714,13 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   border: none;
   background: var(--modern-surface-card);
   box-shadow: var(--modern-card-shadow);
-  border-radius: var(--radius-sm);
+  padding: 12px 15px;
+  border-radius: 18px;
+}
+
+[data-modern-ui="true"] .live-activity-progress {
+  border-radius: 6px;
+  padding: 1px 6px;
 }
 
 [data-modern-ui="true"] .structure-preview-canvas .live-task-card {
@@ -9422,7 +9731,8 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 
 [data-modern-ui="true"] .live-sub-scroll-host {
   border-top: none;
-  padding-top: 6px;
+  padding-top: 8px;
+  margin-top: 4px;
 }
 
 [data-modern-ui="true"] .live-sub-scroll-host.is-sub-animating > .scrollbar-rail {
@@ -9436,7 +9746,7 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 }
 
 [data-modern-ui="true"] .progress-track.ctx-segment-meter {
-  height: 7px;
+  height: 9px;
   border-radius: var(--radius-pill);
   background: var(--modern-progress-track);
 }
@@ -9446,6 +9756,15 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 [data-modern-ui="true"] .cons-custom-range-bar {
   border: none;
   background: transparent;
+}
+
+[data-modern-ui="true"] .cons-custom-range-bar .datetime-picker {
+  min-width: 128px;
+}
+
+[data-modern-ui="true"] .cons-custom-range-bar .dt-trigger {
+  border-radius: var(--radius-pill);
+  padding: 3px 9px;
 }
 
 [data-modern-ui="true"] .dt-popover .icon-btn {
@@ -9470,9 +9789,30 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   background: var(--modern-surface-hover);
 }
 
-[data-modern-ui="true"] .cons-split-3,
-[data-modern-ui="true"] .cons-split-4 {
+[data-modern-ui="true"] .cons-split-3 {
   gap: 12px;
+}
+
+[data-modern-ui="true"] .cons-split-4 {
+  gap: 10px;
+}
+
+@media (min-width: 521px) {
+  [data-modern-ui="true"] .cons-split-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+[data-modern-ui="true"] .cons-hero-sub {
+  gap: 4px 14px;
+  font-size: var(--fs-sm);
+  margin-top: -2px;
+}
+
+[data-modern-ui="true"] .cons-hero-cost,
+[data-modern-ui="true"] .cons-hero-cache,
+[data-modern-ui="true"] .cons-hero-speed {
+  color: var(--text-primary);
 }
 
 [data-modern-ui="true"] .cons-matrix-bottom {
@@ -9507,6 +9847,11 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 [data-modern-ui="true"] .trend-hm-cell.lv-0,
 [data-modern-ui="true"] .trend-hm-swatch.lv-0 {
   border: none;
+}
+
+[data-modern-ui="true"] .trend-peak-pill {
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
 }
 
 [data-modern-ui="true"] .trend-tip-sub,
@@ -9548,6 +9893,21 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
   background: var(--modern-surface-card);
 }
 
+[data-modern-ui="true"] .data-table th {
+  padding-top: 5px;
+  padding-bottom: 7px;
+}
+
+[data-modern-ui="true"] .steps-view-mode-switch {
+  background: var(--modern-inline-track-bg);
+  border: none;
+}
+
+[data-modern-ui="true"] .steps-view-mode-thumb {
+  background: var(--modern-glider-bg);
+  box-shadow: var(--modern-glider-shadow);
+}
+
 [data-modern-ui="true"] .data-table th,
 [data-modern-ui="true"] .data-table td {
   border-bottom: none;
@@ -9576,13 +9936,13 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 }
 
 [data-modern-ui="true"] .data-table tbody tr:not(.step-vspacer):not(.step-vsizer) td:first-child {
-  border-top-left-radius: var(--radius-xs);
-  border-bottom-left-radius: var(--radius-xs);
+  border-top-left-radius: 9px;
+  border-bottom-left-radius: 9px;
 }
 
 [data-modern-ui="true"] .data-table tbody tr:not(.step-vspacer):not(.step-vsizer) td:last-child {
-  border-top-right-radius: var(--radius-xs);
-  border-bottom-right-radius: var(--radius-xs);
+  border-top-right-radius: 9px;
+  border-bottom-right-radius: 9px;
 }
 
 [data-modern-ui="true"] .data-table tbody tr.is-compaction,
@@ -9685,6 +10045,21 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 }
 
 /* --- 6. 设置表单、折叠面板、槽位排序与输入控件去边框 --- */
+[data-modern-ui="true"] .settings-tab-stack .form-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--modern-divider);
+}
+
+[data-modern-ui="true"] .settings-tab-stack .panel > .form-row:first-child,
+[data-modern-ui="true"] .settings-tab-stack .panel > .panel-header + .form-row {
+  padding-top: 2px;
+}
+
+[data-modern-ui="true"] .settings-tab-stack .panel > .form-row:last-of-type {
+  border-bottom: none;
+  padding-bottom: 2px;
+}
+
 [data-modern-ui="true"] .collapsible-body,
 [data-modern-ui="true"] .settings-action-block + .settings-action-block,
 [data-modern-ui="true"] .dt-time-row {
@@ -9851,9 +10226,14 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 [data-modern-ui="true"] .dt-popover,
 [data-modern-ui="true"] .sstep-tooltip {
   border: none;
+  border-radius: 16px;
   background: var(--modern-surface-card);
   box-shadow: var(--shadow-popover);
   animation: anim-modern-tip-fade 120ms var(--ease-modern);
+}
+
+[data-modern-ui="true"] .select-option {
+  border-radius: 9px;
 }
 
 [data-modern-ui="true"] .action-menu-trigger:hover,
@@ -9887,6 +10267,7 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 [data-modern-ui="true"] .quota-rate-popover,
 :host([data-modern-ui="true"]) .quota-rate-popover {
   border: none;
+  border-radius: 16px;
   background: var(--modern-surface-card);
   box-shadow: var(--shadow-popover);
   animation: anim-modern-tip-fade 150ms var(--ease-modern);
@@ -9967,10 +10348,33 @@ html[data-standalone="true"][data-modern-ui="true"] .app-shell {
 :host([data-modern-ui="true"]) .wm-hover-tip,
 :host([data-modern-ui="true"]) .wm-multi-panel {
   border: none;
-  border-radius: 12px;
+  border-radius: 24px;
   background: var(--modern-canvas-bg);
   box-shadow: var(--shadow-overlay);
   animation: anim-modern-pop-in 200ms var(--ease-modern);
+}
+
+[data-modern-ui="true"].wm-multi-panel,
+:host([data-modern-ui="true"]) .wm-multi-panel {
+  border-radius: 22px;
+}
+
+:host(.wm-capsule-host[data-modern-ui="true"]) .wm-multi-btn,
+:host(.wm-capsule-host[data-modern-ui="true"]) .wm-capsule-btn,
+[data-modern-ui="true"] .wm-multi-btn,
+[data-modern-ui="true"] .wm-capsule-btn {
+  border-radius: var(--radius-pill);
+}
+
+:host([data-modern-ui="true"]) .wm-multi-dot,
+[data-modern-ui="true"] .wm-multi-dot {
+  width: 6.5px;
+  height: 6.5px;
+}
+
+:host([data-modern-ui="true"]) .wm-sep,
+[data-modern-ui="true"] .wm-sep {
+  height: 10px;
 }
 
 [data-modern-ui="true"].wm-popover-panel.is-above,
@@ -10519,28 +10923,9 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   font-weight: 600;
 }
 
-/* --- 5. Live Overview 4 Independent Liquid Glass KPI Tiles (Prototype v4) --- */
+/* --- 5. Live Overview Session Summary Panel with 4 Liquid Glass KPI Tiles --- */
 [data-ui-theme="liquid-glass"] .overview-modules-host {
   padding-top: 2px;
-}
-
-[data-ui-theme="liquid-glass"] .session-summary-panel {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  padding: 0;
-  gap: 0;
-  border-radius: 0;
-}
-
-[data-ui-theme="liquid-glass"] .session-summary-panel::after {
-  display: none;
-}
-
-[data-ui-theme="liquid-glass"] .session-summary-panel > .panel-header {
-  display: none;
 }
 
 [data-ui-theme="liquid-glass"] .telemetry-matrix,
@@ -10551,8 +10936,6 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   overflow: visible;
 }
 
-[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .matrix-cell,
-[data-ui-theme="liquid-glass"] .session-summary-panel .matrix-cell,
 [data-ui-theme="liquid-glass"] .telemetry-matrix .matrix-cell {
   background: var(--lg-card-bg);
   border: 1px solid var(--lg-rim-edge);
@@ -10565,8 +10948,6 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   overflow: hidden;
 }
 
-[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .matrix-cell:hover,
-[data-ui-theme="liquid-glass"] .session-summary-panel .matrix-cell:hover,
 [data-ui-theme="liquid-glass"] .telemetry-matrix .matrix-cell:hover {
   background: var(--lg-card-hover);
   border: 1px solid var(--lg-rim-edge);
@@ -10576,7 +10957,47 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   transform: translateY(-2px);
 }
 
-[data-ui-theme="liquid-glass"] .telemetry-matrix.is-flat-summary .cell-label,
+[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .matrix-cell {
+  background: var(--lg-card-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--lg-rim-outer);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 var(--lg-rim-top), 0 1px 4px rgba(0, 0, 0, 0.045);
+  padding: 10px 12px 11px;
+  gap: 6px;
+  align-items: stretch;
+  text-align: left;
+  overflow: hidden;
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .matrix-cell:hover {
+  background: var(--lg-card-hover);
+  border: 1px solid var(--lg-rim-edge);
+  border-radius: 16px;
+  padding: 10px 12px 11px;
+  box-shadow: inset 0 1px 0 var(--lg-rim-top), 0 3px 10px rgba(0, 0, 0, 0.07);
+  transform: none;
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .matrix-cell::after {
+  display: none;
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .cell-label {
+  justify-content: center;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--lg-ink-2);
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .cell-label .svg-icon {
+  display: none;
+}
+
 [data-ui-theme="liquid-glass"] .telemetry-matrix .cell-label {
   justify-content: space-between;
   font-size: var(--fs-sm);
@@ -10586,7 +11007,6 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   color: var(--lg-ink-2);
 }
 
-[data-ui-theme="liquid-glass"] .telemetry-matrix.is-flat-summary .cell-label .svg-icon,
 [data-ui-theme="liquid-glass"] .telemetry-matrix .cell-label .svg-icon {
   display: inline-block;
   color: var(--lg-ink-3);
@@ -10596,12 +11016,8 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   color: var(--lg-accent);
 }
 
-/* Restrained Apple Neutral KPI Numerals (Crisp tabular numerals + subordinate baseline unit) */
-[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value,
-[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-good,
-[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-info,
-[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.accent-ok,
-[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.accent-speed {
+/* KPI Numerals with Semantic Tiers (Crisp tabular numerals + subordinate baseline unit) */
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value {
   display: flex;
   align-items: baseline;
   color: var(--lg-ink-1);
@@ -10632,8 +11048,18 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   margin-left: 3.5px;
 }
 
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-good,
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.accent-ok {
+  color: var(--lg-green-text);
+}
+
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-info,
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.accent-speed {
+  color: var(--lg-teal-text);
+}
+
 [data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-warn {
-  color: var(--lg-ink-1);
+  color: var(--lg-amber);
 }
 
 [data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-danger {
@@ -10964,7 +11390,8 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   border-bottom: none;
 }
 
-[data-ui-theme="liquid-glass"] .data-table td[data-col="step"] {
+[data-ui-theme="liquid-glass"] .data-table td[data-col="step"],
+[data-ui-theme="liquid-glass"] .data-table td[data-col="time"] {
   color: var(--lg-ink-3);
 }
 
@@ -10974,20 +11401,28 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   color: var(--lg-ink-1);
 }
 
-/* Keep table values calm & monochrome (preserve only warn/danger for slow TTFT / anomalies) */
+/* Semantic color tiers for table values (TPS & cache hit rates) */
 [data-ui-theme="liquid-glass"] .data-table td .tone-good,
+[data-ui-theme="liquid-glass"] .data-table td.tone-good {
+  color: var(--lg-green-text);
+  font-weight: 500;
+}
+
 [data-ui-theme="liquid-glass"] .data-table td .tone-info,
-[data-ui-theme="liquid-glass"] .data-table td.tone-good,
 [data-ui-theme="liquid-glass"] .data-table td.tone-info {
-  color: var(--lg-ink-2);
+  color: var(--lg-teal-text);
   font-weight: 500;
 }
 
 [data-ui-theme="liquid-glass"] .data-table td[data-col="tps"].tone-good,
+[data-ui-theme="liquid-glass"] .data-table td[data-col="tps"] .tone-good {
+  color: var(--lg-green-text);
+  font-weight: 600;
+}
+
 [data-ui-theme="liquid-glass"] .data-table td[data-col="tps"].tone-info,
-[data-ui-theme="liquid-glass"] .data-table td[data-col="tps"] .tone-good,
 [data-ui-theme="liquid-glass"] .data-table td[data-col="tps"] .tone-info {
-  color: var(--lg-ink-1);
+  color: var(--lg-teal-text);
   font-weight: 600;
 }
 
@@ -11013,8 +11448,13 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
 
 /* --- 9. Usage Analytics View (Restrained Monochrome KPIs + Apple Blue Trend Curve) --- */
 [data-ui-theme="liquid-glass"] .cons-split-4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+}
+
+@media (min-width: 521px) {
+  [data-ui-theme="liquid-glass"] .cons-split-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 [data-ui-theme="liquid-glass"] .cons-hero-sub {
@@ -11087,7 +11527,8 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   border-bottom: 1px solid var(--lg-divider);
 }
 
-[data-ui-theme="liquid-glass"] .settings-tab-stack .panel > .form-row:first-of-type {
+[data-ui-theme="liquid-glass"] .settings-tab-stack .panel > .form-row:first-child,
+[data-ui-theme="liquid-glass"] .settings-tab-stack .panel > .panel-header + .form-row {
   padding-top: 2px;
 }
 
@@ -11306,29 +11747,33 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   background: var(--lg-divider);
 }
 
-/* Restrained Apple Neutral Capsule Numerals (suppress cyan/green rainbow noise) */
+/* Semantic Capsule Numerals (Apple-tuned green/teal/amber/red tiers) */
 :host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-good,
 :host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-good .wm-slot-text,
-:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-info,
-:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-info .wm-slot-text,
 [data-ui-theme="liquid-glass"] .wm-cap-slot.tone-good,
-[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-good .wm-slot-text,
-[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-info,
-[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-info .wm-slot-text {
-  color: var(--lg-ink-2);
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-good .wm-slot-text {
+  color: var(--lg-green-text);
   font-weight: 500;
 }
 
-:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-seg-speed .wm-slot-text,
-:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-ctx-pct,
-[data-ui-theme="liquid-glass"] .wm-seg-speed .wm-slot-text,
-[data-ui-theme="liquid-glass"] .wm-ctx-pct {
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-info,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-info .wm-slot-text,
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-info,
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-info .wm-slot-text {
+  color: var(--lg-teal-text);
+  font-weight: 500;
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-seg-speed:not(.tone-good):not(.tone-info):not(.tone-warn):not(.tone-danger) .wm-slot-text,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-ctx-pct:not(.tone-good):not(.tone-info):not(.tone-warn):not(.tone-danger),
+[data-ui-theme="liquid-glass"] .wm-seg-speed:not(.tone-good):not(.tone-info):not(.tone-warn):not(.tone-danger) .wm-slot-text,
+[data-ui-theme="liquid-glass"] .wm-ctx-pct:not(.tone-good):not(.tone-info):not(.tone-warn):not(.tone-danger) {
   color: var(--lg-ink-1);
   font-weight: 500;
 }
 
-:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-seg-speed.state-running .wm-slot-text,
-[data-ui-theme="liquid-glass"] .wm-seg-speed.state-running .wm-slot-text {
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-seg-speed.state-running:not([class*="tone-"]) .wm-slot-text,
+[data-ui-theme="liquid-glass"] .wm-seg-speed.state-running:not([class*="tone-"]) .wm-slot-text {
   color: var(--lg-accent);
   font-weight: 600;
 }

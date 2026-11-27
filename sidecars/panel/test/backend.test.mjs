@@ -1025,7 +1025,7 @@ test('preferences schema defaults match pre-refactor UI, migrate legacy none slo
   assert.equal(def.showStepAgentBadge, true);
   assert.equal(def.showStepSpeedColor, false);
   assert.equal(def.showStepFilterToolbar, false);
-  assert.deepEqual([...def.stepTableColumns], ['step', 'model', 'tps', 'ttft', 'cache', 'cost']);
+  assert.deepEqual([...def.stepTableColumns], ['time', 'model', 'tps', 'ttft', 'cache', 'cost']);
   assert.deepEqual({ ...def.modelContextWindows }, {});
 
   // 2. Legacy 3-slot ['context', 'none', 'quota_auto'] strips removed quota & none slots to ['context']
@@ -1044,7 +1044,7 @@ test('preferences schema defaults match pre-refactor UI, migrate legacy none slo
   assert.deepEqual([...hDefault.normalizeHoverModules([])], []);
   assert.deepEqual([...hDefault.normalizeOverviewModules([])], ['metrics']);
   assert.deepEqual([...hDefault.normalizeOverviewMetrics([])], ['tps']);
-  assert.deepEqual([...hDefault.normalizeStepTableColumns(['cost'])], ['cost', 'step']);
+  assert.deepEqual([...hDefault.normalizeStepTableColumns(['cost'])], ['cost', 'time']);
   assert.equal(hDefault.normalizeContextAgentMode('auto'), 'auto');
   assert.equal(hDefault.normalizeContextAgentMode('main'), 'main');
   assert.equal(hDefault.normalizeContextAgentMode('unknown'), 'main');

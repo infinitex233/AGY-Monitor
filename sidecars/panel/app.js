@@ -19,8 +19,8 @@ const THEME_ACCENT_KEYS = Object.freeze([
   'rose',
 ]);
 
-const UI_THEME_KEYS = Object.freeze(['liquid_glass', 'default']);
-const DEFAULT_UI_THEME = 'liquid_glass';
+const UI_THEME_KEYS = Object.freeze(['default', 'liquid_glass']);
+const DEFAULT_UI_THEME = 'default';
 
 const FONT_SCALE_KEYS = Object.freeze(['sm', 'md', 'lg', 'xl']);
 
@@ -106,7 +106,7 @@ const STEP_TABLE_COLUMN_KEYS = Object.freeze([
 ]);
 
 const DEFAULT_STEP_TABLE_COLUMNS = Object.freeze([
-  'step',
+  'time',
   'model',
   'tps',
   'ttft',
@@ -185,7 +185,7 @@ function normalizeThemeAccent(accent) {
 }
 
 /**
- * 归一化界面视觉主题（`'liquid_glass'` | `'default'`，默认 `'liquid_glass'`）。
+ * 归一化界面视觉主题（`'default'` | `'liquid_glass'`，默认 `'default'`）。
  *
  * @param {unknown} theme
  * @returns {'liquid_glass'|'default'}
@@ -506,7 +506,7 @@ function normalizeStepTableColumns(raw) {
     if (out.length >= STEP_TABLE_COLUMN_KEYS.length) break;
   }
   if (out.length < 2) {
-    for (const fallbackCol of ['step', 'model', 'tps']) {
+    for (const fallbackCol of ['time', 'model', 'tps']) {
       if (!seen.has(fallbackCol)) {
         seen.add(fallbackCol);
         out.push(fallbackCol);
@@ -2976,11 +2976,11 @@ function normalizeClientUiTheme(raw) {
   if (val === 'liquid_glass' || val === 'liquid-glass' || val === 'liquidglass' || val === 'glass') {
     return 'liquid_glass';
   }
-  return 'liquid_glass';
+  return 'default';
 }
 
 function resolveSettingsUiTheme(settings) {
-  if (!settings || typeof settings !== 'object') return 'liquid_glass';
+  if (!settings || typeof settings !== 'object') return 'default';
   return normalizeClientUiTheme(settings.uiTheme);
 }
 
@@ -8354,7 +8354,7 @@ function getViewTabs() {
 }
 
 const STEPS_VIEW_MODE_STORAGE_KEY = 'agy.stepsViewMode';
-const VALID_STEPS_VIEW_MODES = new Set(['dots', 'curve', 'table']);
+const VALID_STEPS_VIEW_MODES = new Set(['table', 'dots', 'curve']);
 
 function loadInitialStepsViewMode() {
   try {
@@ -8363,11 +8363,11 @@ function loadInitialStepsViewMode() {
   } catch {
     // ignore storage restriction
   }
-  return 'dots';
+  return 'table';
 }
 
 function setStepsViewMode(mode) {
-  const next = VALID_STEPS_VIEW_MODES.has(mode) ? mode : 'dots';
+  const next = VALID_STEPS_VIEW_MODES.has(mode) ? mode : 'table';
   try {
     globalThis.localStorage?.setItem?.(STEPS_VIEW_MODE_STORAGE_KEY, next);
   } catch {
@@ -8380,7 +8380,7 @@ const uiStore = createReactiveStore({
   activeView: 'overview',
   monitorVisible: true,
   stepsSubTab: 'steps', // 'steps' | 'models'
-  stepsViewMode: loadInitialStepsViewMode(), // 'dots' | 'curve' | 'table'
+  stepsViewMode: loadInitialStepsViewMode(), // 'table' | 'dots' | 'curve'
   settingsSubTab: 'general', // 'general' | 'structure' | 'account' | 'other'
   settingsStructureTab: 'mount', // 'mount' | 'hover' | 'overview' | 'steps'
   selectedAgentScope: 'all', // 'all' | 'main' | <subagent cascadeId>
@@ -16234,7 +16234,7 @@ return { HEATMAP_DAYS_THRESHOLD, createTrendAreaChart };
 })();
 
 // --- src/components/charts/StepTrendChart.js ---
-const { computeStepTrendScales, StepTrendChart } = (() => {
+const { computeStepTrendScales, parseColorWithAlpha, StepTrendChart } = (() => {
 /**
  * @fileoverview 2x2 Synchronized 4-Metric Step Trend Chart (`StepTrendChart.js`).
  * Displays Decode TPS, TTFT, Cache Hit %, and Step Cost in a clean 2x2 quad grid
@@ -16445,28 +16445,220 @@ function getMetricRange(metricKey, scales) {
   }
 }
 
-function parseColorWithAlpha(colorStr, alpha) {
+function hslToRgb(hDeg, sPct, lPct) {
+  const h = (((hDeg % 360) + 360) % 360) / 360;
+  const s = clamp(sPct / 100, 0, 1);
+  const l = clamp(lPct / 100, 0, 1);
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return [v, v, v];
+  }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const hue2rgb = (t) => {
+    let u = t;
+    if (u < 0) u += 1;
+    if (u > 1) u -= 1;
+    if (u < 1 / 6) return p + (q - p) * 6 * u;
+    if (u < 1 / 2) return q;
+    if (u < 2 / 3) return p + (q - p) * (2 / 3 - u) * 6;
+    return p;
+  };
+  return [
+    Math.round(hue2rgb(h + 1 / 3) * 255),
+    Math.round(hue2rgb(h) * 255),
+    Math.round(hue2rgb(h - 1 / 3) * 255),
+  ];
+}
+
+function parseHueDegrees(rawToken) {
+  const t = String(rawToken || '').trim().toLowerCase();
+  const num = parseFloat(t);
+  if (!Number.isFinite(num)) return NaN;
+  if (t.endsWith('grad')) return num * 0.9;
+  if (t.endsWith('rad')) return (num * 180) / Math.PI;
+  if (t.endsWith('turn')) return num * 360;
+  return num;
+}
+
+function parseCssAlpha(rawToken) {
+  if (rawToken == null || rawToken === '') return 1;
+  const t = String(rawToken).trim();
+  const val = parseFloat(t);
+  if (!Number.isFinite(val)) return NaN;
+  return clamp(t.endsWith('%') ? val / 100 : val, 0, 1);
+}
+
+function parseUnitFloat(tok) {
+  const t = String(tok || '').trim();
+  const val = parseFloat(t);
+  if (!Number.isFinite(val)) return NaN;
+  return t.endsWith('%') ? val / 100 : val;
+}
+
+function parseDirectColorComponents(colorStr) {
   const s = String(colorStr || '').trim();
-  if (!s) return `rgba(0, 122, 255, ${alpha})`;
+  if (!s) return null;
+
   if (s.startsWith('#')) {
     let hex = s.slice(1);
-    if (hex.length === 3) {
-      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    if (!/^[0-9a-f]+$/i.test(hex)) return null;
+    if (hex.length === 3 || hex.length === 4) {
+      const r = parseInt(hex[0] + hex[0], 16);
+      const g = parseInt(hex[1] + hex[1], 16);
+      const b = parseInt(hex[2] + hex[2], 16);
+      const srcAlpha = hex.length === 4 ? parseInt(hex[3] + hex[3], 16) / 255 : 1;
+      return { r, g, b, srcAlpha };
     }
-    if (hex.length >= 6) {
+    if (hex.length === 6 || hex.length === 8) {
       const r = parseInt(hex.slice(0, 2), 16);
       const g = parseInt(hex.slice(2, 4), 16);
       const b = parseInt(hex.slice(4, 6), 16);
-      if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      const srcAlpha = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1;
+      return { r, g, b, srcAlpha };
+    }
+    return null;
+  }
+
+  const rgbMatch = s.match(/^rgba?\(\s*([^)]+)\)$/i);
+  if (rgbMatch) {
+    const [colorPart, alphaPart] = rgbMatch[1].split('/');
+    const parts = colorPart.trim().split(/[\s,]+/).filter(Boolean);
+    if (parts.length >= 3) {
+      const parseChan = (tok) => {
+        const val = parseFloat(tok);
+        if (!Number.isFinite(val)) return NaN;
+        return tok.endsWith('%')
+          ? clamp(Math.round((val / 100) * 255), 0, 255)
+          : clamp(Math.round(val), 0, 255);
+      };
+      const r = parseChan(parts[0]);
+      const g = parseChan(parts[1]);
+      const b = parseChan(parts[2]);
+      const srcAlpha =
+        alphaPart != null ? parseCssAlpha(alphaPart) : parts.length >= 4 ? parseCssAlpha(parts[3]) : 1;
+      if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b) && Number.isFinite(srcAlpha)) {
+        return { r, g, b, srcAlpha };
       }
     }
+    return null;
   }
-  const rgbMatch = s.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
-  if (rgbMatch) {
-    return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${alpha})`;
+
+  const hslMatch = s.match(/^hsla?\(\s*([^)]+)\)$/i);
+  if (hslMatch) {
+    const [colorPart, alphaPart] = hslMatch[1].split('/');
+    const parts = colorPart.trim().split(/[\s,]+/).filter(Boolean);
+    if (parts.length >= 3) {
+      const hDeg = parseHueDegrees(parts[0]);
+      const sPct = parseFloat(parts[1]);
+      const lPct = parseFloat(parts[2]);
+      const srcAlpha =
+        alphaPart != null ? parseCssAlpha(alphaPart) : parts.length >= 4 ? parseCssAlpha(parts[3]) : 1;
+      if (
+        Number.isFinite(hDeg) &&
+        Number.isFinite(sPct) &&
+        Number.isFinite(lPct) &&
+        Number.isFinite(srcAlpha)
+      ) {
+        const [r, g, b] = hslToRgb(hDeg, sPct, lPct);
+        return { r, g, b, srcAlpha };
+      }
+    }
+    return null;
+  }
+
+  const srgbMatch = s.match(/^color\(\s*srgb\s+([^)]+)\)$/i);
+  if (srgbMatch) {
+    const [colorPart, alphaPart] = srgbMatch[1].split('/');
+    const parts = colorPart.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 3) {
+      const rUnit = parseUnitFloat(parts[0]);
+      const gUnit = parseUnitFloat(parts[1]);
+      const bUnit = parseUnitFloat(parts[2]);
+      const srcAlpha = alphaPart != null ? parseCssAlpha(alphaPart) : 1;
+      if (
+        Number.isFinite(rUnit) &&
+        Number.isFinite(gUnit) &&
+        Number.isFinite(bUnit) &&
+        Number.isFinite(srcAlpha)
+      ) {
+        return {
+          r: clamp(Math.round(rUnit * 255), 0, 255),
+          g: clamp(Math.round(gUnit * 255), 0, 255),
+          b: clamp(Math.round(bUnit * 255), 0, 255),
+          srcAlpha,
+        };
+      }
+    }
+    return null;
+  }
+
+  return null;
+}
+
+function probeCanvasColor(colorStr, ctx) {
+  if (!ctx || typeof ctx !== 'object' || !('fillStyle' in ctx)) return null;
+  const s = String(colorStr || '').trim();
+  if (!s) return null;
+  const prev = ctx.fillStyle;
+  try {
+    ctx.fillStyle = '#010203';
+    ctx.fillStyle = s;
+    const r1 = String(ctx.fillStyle || '');
+    if (r1 && r1 !== '#010203') return r1;
+
+    ctx.fillStyle = '#040506';
+    ctx.fillStyle = s;
+    const r2 = String(ctx.fillStyle || '');
+    if (r2 && r2 !== '#040506') return r2;
+
+    return null;
+  } catch {
+    return null;
+  } finally {
+    ctx.fillStyle = prev;
+  }
+}
+
+function resolveCanvasColor(colorStr, fallbackColor, ctx = null) {
+  const s = String(colorStr || '').trim();
+  const fallback = String(fallbackColor || '#007aff');
+  if (!s) return fallback;
+  if (parseDirectColorComponents(s)) return s;
+  if (ctx && typeof ctx === 'object' && 'fillStyle' in ctx) {
+    return probeCanvasColor(s, ctx) || fallback;
   }
   return s;
+}
+
+function parseColorWithAlpha(colorStr, alpha, ctx = null, fallbackColor = '#007aff') {
+  const a = clamp(Number(alpha) || 0, 0, 1);
+  const s = String(colorStr || '').trim();
+  const fallback = String(fallbackColor || '#007aff');
+  if (!s) return parseColorWithAlpha(fallback, a, null, '#007aff');
+
+  const direct = parseDirectColorComponents(s);
+  if (direct) {
+    const outA = +clamp(a * direct.srcAlpha, 0, 1).toFixed(4);
+    return `rgba(${direct.r}, ${direct.g}, ${direct.b}, ${outA})`;
+  }
+
+  if (ctx && typeof ctx === 'object' && 'fillStyle' in ctx) {
+    const probed = probeCanvasColor(s, ctx);
+    if (!probed) {
+      return parseColorWithAlpha(fallback, a, null, '#007aff');
+    }
+    const directProbed = parseDirectColorComponents(probed);
+    if (directProbed) {
+      const outA = +clamp(a * directProbed.srcAlpha, 0, 1).toFixed(4);
+      return `rgba(${directProbed.r}, ${directProbed.g}, ${directProbed.b}, ${outA})`;
+    }
+    if (a <= 0) return 'rgba(0, 0, 0, 0)';
+    return `color-mix(in srgb, ${probed} ${+(a * 100).toFixed(2)}%, transparent)`;
+  }
+
+  if (a <= 0) return 'rgba(0, 0, 0, 0)';
+  return `color-mix(in srgb, ${s} ${+(a * 100).toFixed(2)}%, transparent)`;
 }
 
 function drawRoundedRect(ctx, x, y, w, h, r) {
@@ -16536,15 +16728,26 @@ const StepTrendChart = defineComponent({
     const rootEl = h('div', { className: 'step-trend-wrap' }, [quadGridEl, emptyEl]);
 
     function readPalette() {
-      const fallback = {
-        tps: '#007aff',
-        ttft: '#ff9500',
-        cache: '#34c759',
-        cost: '#af52de',
-        ink3: 'rgba(17, 17, 19, 0.38)',
-        dotIdle: 'rgba(17, 17, 19, 0.075)',
-        gridLine: 'rgba(17, 17, 19, 0.065)',
-      };
+      const isGlass = isLiquidGlassActiveForElement(rootEl);
+      const fallback = isGlass
+        ? {
+            tps: '#007aff',
+            ttft: '#ff9500',
+            cache: '#34c759',
+            cost: '#af52de',
+            ink3: 'rgba(17, 17, 19, 0.58)',
+            dotIdle: 'rgba(17, 17, 19, 0.075)',
+            gridLine: 'rgba(17, 17, 19, 0.065)',
+          }
+        : {
+            tps: '#2563eb',
+            ttft: '#d97706',
+            cache: '#059669',
+            cost: '#8b5cf6',
+            ink3: 'rgba(71, 85, 105, 0.72)',
+            dotIdle: 'rgba(15, 23, 42, 0.08)',
+            gridLine: 'rgba(15, 23, 42, 0.08)',
+          };
       if (typeof globalThis.getComputedStyle !== 'function') return fallback;
       try {
         const cs = globalThis.getComputedStyle(rootEl);
@@ -16552,14 +16755,25 @@ const StepTrendChart = defineComponent({
           const val = cs.getPropertyValue(v)?.trim();
           return val || fb;
         };
+        if (isGlass) {
+          return {
+            tps: pick('--lg-accent', pick('--accent-primary', fallback.tps)),
+            ttft: pick('--lg-amber', pick('--metric-warn', fallback.ttft)),
+            cache: pick('--lg-green', pick('--metric-ok', fallback.cache)),
+            cost: pick('--lg-purple', pick('--ctx-subagent-msg', fallback.cost)),
+            ink3: pick('--lg-ink-3', pick('--text-muted', fallback.ink3)),
+            dotIdle: pick('--lg-dot-idle', pick('--lg-seg-bg', fallback.dotIdle)),
+            gridLine: pick('--lg-divider', fallback.gridLine),
+          };
+        }
         return {
-          tps: pick('--lg-accent', pick('--accent-primary', fallback.tps)),
-          ttft: pick('--lg-amber', pick('--metric-warn', fallback.ttft)),
-          cache: pick('--lg-green', pick('--metric-ok', fallback.cache)),
-          cost: pick('--lg-purple', pick('--ctx-subagent-msg', fallback.cost)),
-          ink3: pick('--lg-ink-3', pick('--text-muted', fallback.ink3)),
-          dotIdle: pick('--lg-dot-idle', pick('--lg-seg-bg', fallback.dotIdle)),
-          gridLine: pick('--lg-divider', fallback.gridLine),
+          tps: pick('--accent-primary', fallback.tps),
+          ttft: pick('--metric-warn', fallback.ttft),
+          cache: pick('--metric-ok', fallback.cache),
+          cost: pick('--ctx-subagent-msg', fallback.cost),
+          ink3: pick('--text-muted', fallback.ink3),
+          dotIdle: pick('--surface-track', fallback.dotIdle),
+          gridLine: pick('--border-hairline', fallback.gridLine),
         };
       } catch {
         return fallback;
@@ -16602,6 +16816,7 @@ const StepTrendChart = defineComponent({
             fallback: t('fmt.unknownModel'),
           });
           onHoverChange({
+            step: activeItem.step,
             stepIndex: activeItem.stepIndex,
             modelText: modelInfo.text || modelInfo.baseText || '',
             outputTokensText:
@@ -16690,7 +16905,7 @@ const StepTrendChart = defineComponent({
       if (n === 0) return;
 
       const key = entry.key;
-      const color = pal[key];
+      const color = resolveCanvasColor(pal[key], entry.def.fallbackColor, ctx);
       const range = getMetricRange(key, scales);
       const span = Math.max(1e-6, range.max - range.min);
 
@@ -16709,7 +16924,7 @@ const StepTrendChart = defineComponent({
           const isHover = c === hoverIdx;
 
           if (isHover) {
-            ctx.fillStyle = parseColorWithAlpha(color, 0.14);
+            ctx.fillStyle = parseColorWithAlpha(color, 0.14, ctx, entry.def.fallbackColor);
             drawRoundedRect(ctx, padX + c * gapX + 0.5, 0, Math.max(2, gapX - 1), h, 4);
             ctx.fill();
           }
@@ -16775,8 +16990,13 @@ const StepTrendChart = defineComponent({
           };
 
           const grad = ctx.createLinearGradient(0, padTop, 0, baseY);
-          grad.addColorStop(0, parseColorWithAlpha(color, 0.24));
-          grad.addColorStop(1, parseColorWithAlpha(color, 0));
+          try {
+            grad.addColorStop(0, parseColorWithAlpha(color, 0.24, ctx, entry.def.fallbackColor));
+            grad.addColorStop(1, parseColorWithAlpha(color, 0, ctx, entry.def.fallbackColor));
+          } catch {
+            grad.addColorStop(0, parseColorWithAlpha(entry.def.fallbackColor, 0.24));
+            grad.addColorStop(1, parseColorWithAlpha(entry.def.fallbackColor, 0));
+          }
           buildPath();
           ctx.lineTo(validPts[validPts.length - 1].x, baseY);
           ctx.lineTo(validPts[0].x, baseY);
@@ -16805,7 +17025,7 @@ const StepTrendChart = defineComponent({
           ctx.restore();
 
           ctx.save();
-          ctx.fillStyle = parseColorWithAlpha(color, 0.25);
+          ctx.fillStyle = parseColorWithAlpha(color, 0.25, ctx, entry.def.fallbackColor);
           ctx.beginPath();
           ctx.arc(pt.x, pt.y, 5.8, 0, Math.PI * 2);
           ctx.fill();
@@ -16849,11 +17069,13 @@ const StepTrendChart = defineComponent({
         if (series.length === 0) return;
         const rect = entry.canvasBoxEl.getBoundingClientRect?.();
         if (!rect || rect.width <= 0) return;
-        const x = clamp((e.clientX ?? 0) - rect.left, 0, Math.max(0, rect.width - 0.01));
+        const padX = mode === 'curve' ? 4 : 1;
+        const usableW = Math.max(1, rect.width - padX * 2);
+        const x = clamp((e.clientX ?? 0) - rect.left - padX, 0, Math.max(0, usableW - 0.01));
         const idx =
           mode === 'curve' && series.length > 1
-            ? clamp(Math.round((x / rect.width) * (series.length - 1)), 0, series.length - 1)
-            : clamp(Math.floor((x / rect.width) * series.length), 0, series.length - 1);
+            ? clamp(Math.round((x / usableW) * (series.length - 1)), 0, series.length - 1)
+            : clamp(Math.floor((x / usableW) * series.length), 0, series.length - 1);
         if (idx !== hoverIdx) {
           hoverIdx = idx;
           draw();
@@ -16914,6 +17136,7 @@ const StepTrendChart = defineComponent({
         draw,
         hideTooltip: clearHover,
         refreshLabels,
+        readPalette,
         getPointCount: () => series.length,
         setHoverIndexForTest: (idx) => {
           hoverIdx = idx;
@@ -16923,7 +17146,7 @@ const StepTrendChart = defineComponent({
     };
   },
 });
-return { computeStepTrendScales, StepTrendChart };
+return { computeStepTrendScales, parseColorWithAlpha, StepTrendChart };
 })();
 
 // --- src/registries/metricRegistry.js ---
@@ -19329,7 +19552,7 @@ return { OVERVIEW_WIDGET_KEYS, OVERVIEW_WIDGET_REGISTRY, getOverviewModuleOption
 })();
 
 // --- src/registries/stepColumnRegistry.js ---
-const { STEP_COLUMN_KEYS, DEFAULT_STEP_COLUMN_KEYS, resolveStepTokenParts, formatCustomTokenComboHeader, isCompactionStepItem, STEP_COLUMN_REGISTRY, getStepColumnOptions, sortStepsByColumn } = (() => {
+const { STEP_COLUMN_KEYS, DEFAULT_STEP_COLUMN_KEYS, resolveStepTokenParts, formatCustomTokenComboHeader, resolveStepTimestampMs, formatStepClockTime, isCompactionStepItem, STEP_COLUMN_REGISTRY, getStepColumnOptions, sortStepsByColumn } = (() => {
 /**
  * @fileoverview Decoupled Step Table Column Registry (`stepColumnRegistry.js`).
  * Defines all 12 customizable columns for `StepsDetailView` ("按步查看"),
@@ -19420,16 +19643,114 @@ function resolveSegmentDisplay(seg, parts, st) {
   }
 }
 
-function formatStepClockTime(createdAtMs) {
+const stepTimeFormatterCache = new Map();
+
+function formatUtcOffset(offsetEastMinutes) {
+  const total = Math.round(Number(offsetEastMinutes || 0));
+  const sign = total >= 0 ? '+' : '-';
+  const abs = Math.abs(total);
+  const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+  const mm = String(abs % 60).padStart(2, '0');
+  return `UTC${sign}${hh}:${mm}`;
+}
+
+function getStepTimeFormatter(timeZone) {
+  if (typeof Intl === 'undefined' || typeof Intl.DateTimeFormat !== 'function') return null;
+  let fmt = stepTimeFormatterCache.get(timeZone);
+  if (!fmt) {
+    try {
+      fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23',
+        timeZoneName: 'longOffset',
+      });
+      stepTimeFormatterCache.set(timeZone, fmt);
+    } catch {
+      return null;
+    }
+  }
+  return fmt;
+}
+
+const MAX_VALID_DATE_MS = 8.64e15;
+
+function resolveStepTimestampMs(st) {
+  if (!st || typeof st !== 'object') return 0;
+  const direct = Number(st.createdAtMs || 0);
+  if (Number.isFinite(direct) && direct > 0 && direct <= MAX_VALID_DATE_MS) return direct;
+  if (typeof st.createdAt === 'string' && st.createdAt.trim()) {
+    const parsed = Date.parse(st.createdAt.trim());
+    if (Number.isFinite(parsed) && parsed > 0 && parsed <= MAX_VALID_DATE_MS) return parsed;
+  }
+  const completed = Number(st.completedAtMs || 0);
+  if (Number.isFinite(completed) && completed > 0 && completed <= MAX_VALID_DATE_MS) return completed;
+  return 0;
+}
+
+function formatStepClockTime(createdAtMs, { timeZone, stepIndex } = {}) {
   const ms = Number(createdAtMs || 0);
-  if (!(ms > 0) || !Number.isFinite(ms)) {
+  if (!(ms > 0) || !Number.isFinite(ms) || ms > MAX_VALID_DATE_MS) {
     return { text: '—', title: '' };
   }
-  const d = new Date(ms);
+  let yyyy;
+  let mo;
+  let dd;
+  let hh;
+  let mi;
+  let ss;
+  let tzStr = '';
   const pad = (n) => String(n).padStart(2, '0');
-  const hhmmss = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  const full = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hhmmss}`;
-  return { text: hhmmss, title: full };
+
+  if (timeZone && typeof timeZone === 'string') {
+    const fmt = getStepTimeFormatter(timeZone);
+    if (fmt && typeof fmt.formatToParts === 'function') {
+      const partMap = Object.create(null);
+      for (const p of fmt.formatToParts(new Date(ms))) {
+        if (p.type !== 'literal') partMap[p.type] = p.value;
+      }
+      if (partMap.year && partMap.month && partMap.day && partMap.hour != null) {
+        yyyy = String(partMap.year).padStart(4, '0');
+        mo = String(partMap.month).padStart(2, '0');
+        dd = String(partMap.day).padStart(2, '0');
+        hh = partMap.hour === '24' ? '00' : String(partMap.hour).padStart(2, '0');
+        mi = String(partMap.minute ?? '00').padStart(2, '0');
+        ss = String(partMap.second ?? '00').padStart(2, '0');
+        const rawTz = String(partMap.timeZoneName || '').trim();
+        if (rawTz === 'GMT' || rawTz === 'UTC') {
+          tzStr = 'UTC+00:00';
+        } else if (rawTz.startsWith('GMT')) {
+          tzStr = `UTC${rawTz.slice(3)}`;
+        } else if (rawTz) {
+          tzStr = rawTz;
+        }
+      }
+    }
+  }
+
+  if (!yyyy) {
+    const d = new Date(ms);
+    yyyy = String(d.getFullYear()).padStart(4, '0');
+    mo = pad(d.getMonth() + 1);
+    dd = pad(d.getDate());
+    hh = pad(d.getHours());
+    mi = pad(d.getMinutes());
+    ss = pad(d.getSeconds());
+    tzStr = formatUtcOffset(-d.getTimezoneOffset());
+  }
+
+  const hhmmss = `${hh}:${mi}:${ss}`;
+  const stepNum = stepIndex != null && stepIndex !== '' ? Number(stepIndex) : NaN;
+  const stepSuffix = Number.isFinite(stepNum) ? ` · #${stepNum}` : '';
+  return {
+    text: hhmmss,
+    title: `${yyyy}-${mo}-${dd} ${hhmmss} (${tzStr})${stepSuffix}`,
+  };
 }
 
 function isCompactionStepItem(st) {
@@ -19460,15 +19781,17 @@ const STEP_COLUMN_REGISTRY = Object.freeze({
     key: 'time',
     thLabel: () => t('stepCol.time.th'),
     optLabel: () => t('stepCol.time.opt'),
-    sigPart: (st) => `${st.createdAtMs || 0}`,
-    sortValue: (st) => finiteSortNum(st?.createdAtMs, { allowZero: false }),
+    sigPart: (st) => `${resolveStepTimestampMs(st)}:${st?.stepIndex ?? ''}`,
+    sortValue: (st) => finiteSortNum(resolveStepTimestampMs(st), { allowZero: false }),
     createCell: () => {
       const valEl = h('span');
-      const td = h('td', { className: 'text-muted' }, [valEl]);
+      const td = h('td', {}, [valEl]);
       return { td, refs: { td, valEl } };
     },
     updateCell: (refs, st) => {
-      const { text, title } = formatStepClockTime(st.createdAtMs);
+      const { text, title } = formatStepClockTime(resolveStepTimestampMs(st), {
+        stepIndex: st?.stepIndex,
+      });
       patchText(refs.valEl, text);
       patchAttr(refs.td, 'title', title || null);
     },
@@ -19816,7 +20139,7 @@ function sortStepsByColumn(steps, sortKey, sortDir, ctx = {}) {
   });
   return decorated.map((d) => d.st);
 }
-return { STEP_COLUMN_KEYS, DEFAULT_STEP_COLUMN_KEYS, resolveStepTokenParts, formatCustomTokenComboHeader, isCompactionStepItem, STEP_COLUMN_REGISTRY, getStepColumnOptions, sortStepsByColumn };
+return { STEP_COLUMN_KEYS, DEFAULT_STEP_COLUMN_KEYS, resolveStepTokenParts, formatCustomTokenComboHeader, resolveStepTimestampMs, formatStepClockTime, isCompactionStepItem, STEP_COLUMN_REGISTRY, getStepColumnOptions, sortStepsByColumn };
 })();
 
 // --- src/components/widgets/CapsuleBarWidget.js ---
@@ -21992,7 +22315,8 @@ const StepTableWidget = defineComponent({
               timingDiagGetter: isFirstTimingCol ? timingDiagGetter : null,
               tr,
             });
-            const useWholeCellTurnTip = firstColKey === 'step' && !hasRowTip;
+            const useWholeCellTurnTip =
+              (firstColKey === 'step' || firstColKey === 'time') && !hasRowTip;
             hoverTd.onmouseenter = useWholeCellTurnTip ? enterStepCell : null;
             hoverTd.onmousemove = useWholeCellTurnTip ? moveInStepCell : moveAlongTurnRail;
             hoverTd.onmouseleave = leaveStepCell;
@@ -23492,10 +23816,12 @@ function mergeSelectedAgentUnits(units) {
 }
 
 const LEGACY_FIVE_COL_SIG = 'step,model,tps,ttft,cost';
+const LEGACY_SIX_STEP_COL_SIG = 'step,model,tps,ttft,cache,cost';
 function resolveStepDisplayColumns(rawCols, isEmbedded) {
   const cols = normalizeClientStepColumns(rawCols);
-  if (isEmbedded && cols.join(',') === LEGACY_FIVE_COL_SIG) {
-    return ['step', 'model', 'tps', 'ttft', 'cache', 'cost'];
+  const sig = cols.join(',');
+  if (isEmbedded && (sig === LEGACY_FIVE_COL_SIG || sig === LEGACY_SIX_STEP_COL_SIG)) {
+    return ['time', 'model', 'tps', 'ttft', 'cache', 'cost'];
   }
   return cols;
 }
@@ -23762,13 +24088,13 @@ const StepsDetailView = defineComponent({
       stepsModelSelect.el,
     ]);
 
-    // --- 三态视图切换（点阵 / 曲线 / 列表）与步骤趋势图 ---
+    // --- 三态视图切换（列表 / 点阵 / 曲线）与步骤趋势图 ---
     const VIEW_MODE_DEFS = [
+      { value: 'table', icon: 'list', i18nKey: 'steps.modeTable' },
       { value: 'dots', icon: 'dot-matrix', i18nKey: 'steps.modeDots' },
       { value: 'curve', icon: 'trend-curve', i18nKey: 'steps.modeCurve' },
-      { value: 'table', icon: 'list', i18nKey: 'steps.modeTable' },
     ];
-    let currentViewMode = uiStore.getState().stepsViewMode || 'dots';
+    let currentViewMode = uiStore.getState().stepsViewMode || 'table';
     const viewModeThumbEl = h('span', { className: 'steps-view-mode-thumb', 'aria-hidden': 'true' });
     const viewModeBtns = VIEW_MODE_DEFS.map((def) => {
       const labelEl = h('span', { text: t(def.i18nKey) });
@@ -23814,7 +24140,10 @@ const StepsDetailView = defineComponent({
           patchAttr(headerScrubPillEl, 'hidden', true);
           return;
         }
-        patchText(headerScrubStepEl, `#${info.stepIndex}`);
+        const clock = formatStepClockTime(resolveStepTimestampMs(info.step), {
+          stepIndex: info.stepIndex,
+        });
+        patchText(headerScrubStepEl, clock.title ? clock.text : '—');
         const metaParts = [info.modelText, info.outputTokensText].filter(Boolean);
         patchText(headerScrubMetaEl, metaParts.length > 0 ? ` · ${metaParts.join(' · ')}` : '');
         patchAttr(headerScrubPillEl, 'hidden', false);
@@ -23823,7 +24152,7 @@ const StepsDetailView = defineComponent({
 
     function applyStepsViewMode(nextMode, { skipChartUpdate = false } = {}) {
       const resolved =
-        nextMode === 'curve' || nextMode === 'table' || nextMode === 'dots' ? nextMode : 'dots';
+        nextMode === 'curve' || nextMode === 'table' || nextMode === 'dots' ? nextMode : 'table';
       currentViewMode = resolved;
       const activeIdx = Math.max(
         0,
@@ -24277,7 +24606,7 @@ const StepsDetailView = defineComponent({
       (st) => ({
         activeView: getVisibleMonitorView(st),
         selectedAgentScope: st.selectedAgentScope,
-        stepsViewMode: st.stepsViewMode || 'dots',
+        stepsViewMode: st.stepsViewMode || 'table',
       }),
       (uiSlice) => {
         const scopeChanged = uiSlice.selectedAgentScope !== prevScope;
@@ -24774,7 +25103,7 @@ const ConsumptionView = defineComponent({
     consExportMenu.refs.setHidden(true);
     const totalTokensLabel = h('span', { className: 'text-muted', style: 'font-size: var(--fs-md);', text: t('cons.totalTokens') });
     const estCostLabel = h('span', { className: 'text-muted', style: 'font-size: var(--fs-md);', text: t('cons.estCost') });
-    const cacheHitRateLabel = h('span', { text: t('cons.cacheHitRate') });
+    const cacheHitRateLabel = h('span', { className: 'text-muted', style: 'font-size: var(--fs-md);', text: t('cons.cacheHitRate') });
     const avgSpeedLabel = h('span', { className: 'text-muted', style: 'font-size: var(--fs-md);', text: t('cons.avgOutputSpeed') });
 
     const unifiedMatrixEl = h('div', { className: 'cons-box cons-unified-matrix' }, [
@@ -24788,10 +25117,7 @@ const ConsumptionView = defineComponent({
           h('div', { className: 'cons-baseline' }, [heroCostUsd]),
         ]),
         h('div', { className: 'cons-col is-bordered-col' }, [
-          h('span', { className: 'legend-left text-muted', style: 'font-size: var(--fs-md);' }, [
-            h('span', { className: 'dot-swatch seg-cached' }),
-            cacheHitRateLabel,
-          ]),
+          cacheHitRateLabel,
           h('div', { className: 'cons-baseline' }, [cacheHitPctEl]),
         ]),
         h('div', { className: 'cons-col is-bordered-col' }, [
@@ -25347,8 +25673,8 @@ function getLanguageOptions() {
 
 function getUiThemeOptions() {
   return [
-    { value: 'liquid_glass', label: t('settings.gen.uiThemeLiquidGlass') },
     { value: 'default', label: t('settings.gen.uiThemeDefault') },
+    { value: 'liquid_glass', label: t('settings.gen.uiThemeLiquidGlass') },
   ];
 }
 
@@ -25389,7 +25715,7 @@ const SettingsView = defineComponent({
 
     // --- 常规精简页状态与回调 ---
     let draftLanguage = 'auto';
-    let draftUiTheme = 'liquid_glass';
+    let draftUiTheme = 'default';
     let draftThemeAccent = 'host';
     let draftFontScale = 'md';
     let draftModelDisplayMode = 'short';

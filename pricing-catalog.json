@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "catalogVersion": "2026.11.25.1",
   "updatedAt": "2026-11-25T14:23:00+09:00",
-  "latestPluginVersion": "1.1.0",
+  "latestPluginVersion": "1.1.1",
   "releaseUrl": "https://github.com/infinitex233/AGY-Monitor/releases/latest",
   "downloadUrl": "https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip",
   "archiveFallbackUrl": "https://codeload.github.com/infinitex233/AGY-Monitor/zip/refs/heads/main",

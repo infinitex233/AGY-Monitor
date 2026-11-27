@@ -60,7 +60,11 @@ import { CustomSelect } from '../components/ui/CustomSelect.js';
 import { createSearchInput } from '../components/ui/SearchInput.js';
 import { StepTrendChart } from '../components/charts/StepTrendChart.js';
 import { StepTableWidget } from '../components/widgets/StepTableWidget.js';
-import { sortStepsByColumn } from '../registries/stepColumnRegistry.js';
+import {
+  formatStepClockTime,
+  resolveStepTimestampMs,
+  sortStepsByColumn,
+} from '../registries/stepColumnRegistry.js';
 
 function getStepModelGroupKey(step) {
   if (!step || typeof step !== 'object') return t('fmt.unknownModel');
@@ -268,10 +272,12 @@ export function mergeSelectedAgentUnits(units) {
 }
 
 const LEGACY_FIVE_COL_SIG = 'step,model,tps,ttft,cost';
+const LEGACY_SIX_STEP_COL_SIG = 'step,model,tps,ttft,cache,cost';
 function resolveStepDisplayColumns(rawCols, isEmbedded) {
   const cols = normalizeClientStepColumns(rawCols);
-  if (isEmbedded && cols.join(',') === LEGACY_FIVE_COL_SIG) {
-    return ['step', 'model', 'tps', 'ttft', 'cache', 'cost'];
+  const sig = cols.join(',');
+  if (isEmbedded && (sig === LEGACY_FIVE_COL_SIG || sig === LEGACY_SIX_STEP_COL_SIG)) {
+    return ['time', 'model', 'tps', 'ttft', 'cache', 'cost'];
   }
   return cols;
 }
@@ -538,13 +544,13 @@ export const StepsDetailView = defineComponent({
       stepsModelSelect.el,
     ]);
 
-    // --- 三态视图切换（点阵 / 曲线 / 列表）与步骤趋势图 ---
+    // --- 三态视图切换（列表 / 点阵 / 曲线）与步骤趋势图 ---
     const VIEW_MODE_DEFS = [
+      { value: 'table', icon: 'list', i18nKey: 'steps.modeTable' },
       { value: 'dots', icon: 'dot-matrix', i18nKey: 'steps.modeDots' },
       { value: 'curve', icon: 'trend-curve', i18nKey: 'steps.modeCurve' },
-      { value: 'table', icon: 'list', i18nKey: 'steps.modeTable' },
     ];
-    let currentViewMode = uiStore.getState().stepsViewMode || 'dots';
+    let currentViewMode = uiStore.getState().stepsViewMode || 'table';
     const viewModeThumbEl = h('span', { className: 'steps-view-mode-thumb', 'aria-hidden': 'true' });
     const viewModeBtns = VIEW_MODE_DEFS.map((def) => {
       const labelEl = h('span', { text: t(def.i18nKey) });
@@ -590,7 +596,10 @@ export const StepsDetailView = defineComponent({
           patchAttr(headerScrubPillEl, 'hidden', true);
           return;
         }
-        patchText(headerScrubStepEl, `#${info.stepIndex}`);
+        const clock = formatStepClockTime(resolveStepTimestampMs(info.step), {
+          stepIndex: info.stepIndex,
+        });
+        patchText(headerScrubStepEl, clock.title ? clock.text : '—');
         const metaParts = [info.modelText, info.outputTokensText].filter(Boolean);
         patchText(headerScrubMetaEl, metaParts.length > 0 ? ` · ${metaParts.join(' · ')}` : '');
         patchAttr(headerScrubPillEl, 'hidden', false);
@@ -599,7 +608,7 @@ export const StepsDetailView = defineComponent({
 
     function applyStepsViewMode(nextMode, { skipChartUpdate = false } = {}) {
       const resolved =
-        nextMode === 'curve' || nextMode === 'table' || nextMode === 'dots' ? nextMode : 'dots';
+        nextMode === 'curve' || nextMode === 'table' || nextMode === 'dots' ? nextMode : 'table';
       currentViewMode = resolved;
       const activeIdx = Math.max(
         0,
@@ -1053,7 +1062,7 @@ export const StepsDetailView = defineComponent({
       (st) => ({
         activeView: getVisibleMonitorView(st),
         selectedAgentScope: st.selectedAgentScope,
-        stepsViewMode: st.stepsViewMode || 'dots',
+        stepsViewMode: st.stepsViewMode || 'table',
       }),
       (uiSlice) => {
         const scopeChanged = uiSlice.selectedAgentScope !== prevScope;

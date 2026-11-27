@@ -110,16 +110,114 @@ function resolveSegmentDisplay(seg, parts, st) {
   }
 }
 
-function formatStepClockTime(createdAtMs) {
+const stepTimeFormatterCache = new Map();
+
+function formatUtcOffset(offsetEastMinutes) {
+  const total = Math.round(Number(offsetEastMinutes || 0));
+  const sign = total >= 0 ? '+' : '-';
+  const abs = Math.abs(total);
+  const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+  const mm = String(abs % 60).padStart(2, '0');
+  return `UTC${sign}${hh}:${mm}`;
+}
+
+function getStepTimeFormatter(timeZone) {
+  if (typeof Intl === 'undefined' || typeof Intl.DateTimeFormat !== 'function') return null;
+  let fmt = stepTimeFormatterCache.get(timeZone);
+  if (!fmt) {
+    try {
+      fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23',
+        timeZoneName: 'longOffset',
+      });
+      stepTimeFormatterCache.set(timeZone, fmt);
+    } catch {
+      return null;
+    }
+  }
+  return fmt;
+}
+
+const MAX_VALID_DATE_MS = 8.64e15;
+
+export function resolveStepTimestampMs(st) {
+  if (!st || typeof st !== 'object') return 0;
+  const direct = Number(st.createdAtMs || 0);
+  if (Number.isFinite(direct) && direct > 0 && direct <= MAX_VALID_DATE_MS) return direct;
+  if (typeof st.createdAt === 'string' && st.createdAt.trim()) {
+    const parsed = Date.parse(st.createdAt.trim());
+    if (Number.isFinite(parsed) && parsed > 0 && parsed <= MAX_VALID_DATE_MS) return parsed;
+  }
+  const completed = Number(st.completedAtMs || 0);
+  if (Number.isFinite(completed) && completed > 0 && completed <= MAX_VALID_DATE_MS) return completed;
+  return 0;
+}
+
+export function formatStepClockTime(createdAtMs, { timeZone, stepIndex } = {}) {
   const ms = Number(createdAtMs || 0);
-  if (!(ms > 0) || !Number.isFinite(ms)) {
+  if (!(ms > 0) || !Number.isFinite(ms) || ms > MAX_VALID_DATE_MS) {
     return { text: '—', title: '' };
   }
-  const d = new Date(ms);
+  let yyyy;
+  let mo;
+  let dd;
+  let hh;
+  let mi;
+  let ss;
+  let tzStr = '';
   const pad = (n) => String(n).padStart(2, '0');
-  const hhmmss = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  const full = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hhmmss}`;
-  return { text: hhmmss, title: full };
+
+  if (timeZone && typeof timeZone === 'string') {
+    const fmt = getStepTimeFormatter(timeZone);
+    if (fmt && typeof fmt.formatToParts === 'function') {
+      const partMap = Object.create(null);
+      for (const p of fmt.formatToParts(new Date(ms))) {
+        if (p.type !== 'literal') partMap[p.type] = p.value;
+      }
+      if (partMap.year && partMap.month && partMap.day && partMap.hour != null) {
+        yyyy = String(partMap.year).padStart(4, '0');
+        mo = String(partMap.month).padStart(2, '0');
+        dd = String(partMap.day).padStart(2, '0');
+        hh = partMap.hour === '24' ? '00' : String(partMap.hour).padStart(2, '0');
+        mi = String(partMap.minute ?? '00').padStart(2, '0');
+        ss = String(partMap.second ?? '00').padStart(2, '0');
+        const rawTz = String(partMap.timeZoneName || '').trim();
+        if (rawTz === 'GMT' || rawTz === 'UTC') {
+          tzStr = 'UTC+00:00';
+        } else if (rawTz.startsWith('GMT')) {
+          tzStr = `UTC${rawTz.slice(3)}`;
+        } else if (rawTz) {
+          tzStr = rawTz;
+        }
+      }
+    }
+  }
+
+  if (!yyyy) {
+    const d = new Date(ms);
+    yyyy = String(d.getFullYear()).padStart(4, '0');
+    mo = pad(d.getMonth() + 1);
+    dd = pad(d.getDate());
+    hh = pad(d.getHours());
+    mi = pad(d.getMinutes());
+    ss = pad(d.getSeconds());
+    tzStr = formatUtcOffset(-d.getTimezoneOffset());
+  }
+
+  const hhmmss = `${hh}:${mi}:${ss}`;
+  const stepNum = stepIndex != null && stepIndex !== '' ? Number(stepIndex) : NaN;
+  const stepSuffix = Number.isFinite(stepNum) ? ` · #${stepNum}` : '';
+  return {
+    text: hhmmss,
+    title: `${yyyy}-${mo}-${dd} ${hhmmss} (${tzStr})${stepSuffix}`,
+  };
 }
 
 export function isCompactionStepItem(st) {
@@ -150,15 +248,17 @@ export const STEP_COLUMN_REGISTRY = Object.freeze({
     key: 'time',
     thLabel: () => t('stepCol.time.th'),
     optLabel: () => t('stepCol.time.opt'),
-    sigPart: (st) => `${st.createdAtMs || 0}`,
-    sortValue: (st) => finiteSortNum(st?.createdAtMs, { allowZero: false }),
+    sigPart: (st) => `${resolveStepTimestampMs(st)}:${st?.stepIndex ?? ''}`,
+    sortValue: (st) => finiteSortNum(resolveStepTimestampMs(st), { allowZero: false }),
     createCell: () => {
       const valEl = h('span');
-      const td = h('td', { className: 'text-muted' }, [valEl]);
+      const td = h('td', {}, [valEl]);
       return { td, refs: { td, valEl } };
     },
     updateCell: (refs, st) => {
-      const { text, title } = formatStepClockTime(st.createdAtMs);
+      const { text, title } = formatStepClockTime(resolveStepTimestampMs(st), {
+        stepIndex: st?.stepIndex,
+      });
       patchText(refs.valEl, text);
       patchAttr(refs.td, 'title', title || null);
     },

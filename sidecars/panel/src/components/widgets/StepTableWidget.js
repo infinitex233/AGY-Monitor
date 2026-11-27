@@ -1559,7 +1559,8 @@ export const StepTableWidget = defineComponent({
               timingDiagGetter: isFirstTimingCol ? timingDiagGetter : null,
               tr,
             });
-            const useWholeCellTurnTip = firstColKey === 'step' && !hasRowTip;
+            const useWholeCellTurnTip =
+              (firstColKey === 'step' || firstColKey === 'time') && !hasRowTip;
             hoverTd.onmouseenter = useWholeCellTurnTip ? enterStepCell : null;
             hoverTd.onmousemove = useWholeCellTurnTip ? moveInStepCell : moveAlongTurnRail;
             hoverTd.onmouseleave = leaveStepCell;

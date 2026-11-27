@@ -7,6 +7,7 @@
  */
 
 import { defineComponent } from '../../core/component.js';
+import { isLiquidGlassActiveForElement } from '../../core/appearance.js';
 import { h, patchAttr, patchText } from '../../core/domPatch.js';
 import {
   formatTokens,
@@ -216,28 +217,220 @@ function getMetricRange(metricKey, scales) {
   }
 }
 
-function parseColorWithAlpha(colorStr, alpha) {
+function hslToRgb(hDeg, sPct, lPct) {
+  const h = (((hDeg % 360) + 360) % 360) / 360;
+  const s = clamp(sPct / 100, 0, 1);
+  const l = clamp(lPct / 100, 0, 1);
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return [v, v, v];
+  }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const hue2rgb = (t) => {
+    let u = t;
+    if (u < 0) u += 1;
+    if (u > 1) u -= 1;
+    if (u < 1 / 6) return p + (q - p) * 6 * u;
+    if (u < 1 / 2) return q;
+    if (u < 2 / 3) return p + (q - p) * (2 / 3 - u) * 6;
+    return p;
+  };
+  return [
+    Math.round(hue2rgb(h + 1 / 3) * 255),
+    Math.round(hue2rgb(h) * 255),
+    Math.round(hue2rgb(h - 1 / 3) * 255),
+  ];
+}
+
+function parseHueDegrees(rawToken) {
+  const t = String(rawToken || '').trim().toLowerCase();
+  const num = parseFloat(t);
+  if (!Number.isFinite(num)) return NaN;
+  if (t.endsWith('grad')) return num * 0.9;
+  if (t.endsWith('rad')) return (num * 180) / Math.PI;
+  if (t.endsWith('turn')) return num * 360;
+  return num;
+}
+
+function parseCssAlpha(rawToken) {
+  if (rawToken == null || rawToken === '') return 1;
+  const t = String(rawToken).trim();
+  const val = parseFloat(t);
+  if (!Number.isFinite(val)) return NaN;
+  return clamp(t.endsWith('%') ? val / 100 : val, 0, 1);
+}
+
+function parseUnitFloat(tok) {
+  const t = String(tok || '').trim();
+  const val = parseFloat(t);
+  if (!Number.isFinite(val)) return NaN;
+  return t.endsWith('%') ? val / 100 : val;
+}
+
+function parseDirectColorComponents(colorStr) {
   const s = String(colorStr || '').trim();
-  if (!s) return `rgba(0, 122, 255, ${alpha})`;
+  if (!s) return null;
+
   if (s.startsWith('#')) {
     let hex = s.slice(1);
-    if (hex.length === 3) {
-      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    if (!/^[0-9a-f]+$/i.test(hex)) return null;
+    if (hex.length === 3 || hex.length === 4) {
+      const r = parseInt(hex[0] + hex[0], 16);
+      const g = parseInt(hex[1] + hex[1], 16);
+      const b = parseInt(hex[2] + hex[2], 16);
+      const srcAlpha = hex.length === 4 ? parseInt(hex[3] + hex[3], 16) / 255 : 1;
+      return { r, g, b, srcAlpha };
     }
-    if (hex.length >= 6) {
+    if (hex.length === 6 || hex.length === 8) {
       const r = parseInt(hex.slice(0, 2), 16);
       const g = parseInt(hex.slice(2, 4), 16);
       const b = parseInt(hex.slice(4, 6), 16);
-      if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      const srcAlpha = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1;
+      return { r, g, b, srcAlpha };
+    }
+    return null;
+  }
+
+  const rgbMatch = s.match(/^rgba?\(\s*([^)]+)\)$/i);
+  if (rgbMatch) {
+    const [colorPart, alphaPart] = rgbMatch[1].split('/');
+    const parts = colorPart.trim().split(/[\s,]+/).filter(Boolean);
+    if (parts.length >= 3) {
+      const parseChan = (tok) => {
+        const val = parseFloat(tok);
+        if (!Number.isFinite(val)) return NaN;
+        return tok.endsWith('%')
+          ? clamp(Math.round((val / 100) * 255), 0, 255)
+          : clamp(Math.round(val), 0, 255);
+      };
+      const r = parseChan(parts[0]);
+      const g = parseChan(parts[1]);
+      const b = parseChan(parts[2]);
+      const srcAlpha =
+        alphaPart != null ? parseCssAlpha(alphaPart) : parts.length >= 4 ? parseCssAlpha(parts[3]) : 1;
+      if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b) && Number.isFinite(srcAlpha)) {
+        return { r, g, b, srcAlpha };
       }
     }
+    return null;
   }
-  const rgbMatch = s.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
-  if (rgbMatch) {
-    return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${alpha})`;
+
+  const hslMatch = s.match(/^hsla?\(\s*([^)]+)\)$/i);
+  if (hslMatch) {
+    const [colorPart, alphaPart] = hslMatch[1].split('/');
+    const parts = colorPart.trim().split(/[\s,]+/).filter(Boolean);
+    if (parts.length >= 3) {
+      const hDeg = parseHueDegrees(parts[0]);
+      const sPct = parseFloat(parts[1]);
+      const lPct = parseFloat(parts[2]);
+      const srcAlpha =
+        alphaPart != null ? parseCssAlpha(alphaPart) : parts.length >= 4 ? parseCssAlpha(parts[3]) : 1;
+      if (
+        Number.isFinite(hDeg) &&
+        Number.isFinite(sPct) &&
+        Number.isFinite(lPct) &&
+        Number.isFinite(srcAlpha)
+      ) {
+        const [r, g, b] = hslToRgb(hDeg, sPct, lPct);
+        return { r, g, b, srcAlpha };
+      }
+    }
+    return null;
+  }
+
+  const srgbMatch = s.match(/^color\(\s*srgb\s+([^)]+)\)$/i);
+  if (srgbMatch) {
+    const [colorPart, alphaPart] = srgbMatch[1].split('/');
+    const parts = colorPart.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 3) {
+      const rUnit = parseUnitFloat(parts[0]);
+      const gUnit = parseUnitFloat(parts[1]);
+      const bUnit = parseUnitFloat(parts[2]);
+      const srcAlpha = alphaPart != null ? parseCssAlpha(alphaPart) : 1;
+      if (
+        Number.isFinite(rUnit) &&
+        Number.isFinite(gUnit) &&
+        Number.isFinite(bUnit) &&
+        Number.isFinite(srcAlpha)
+      ) {
+        return {
+          r: clamp(Math.round(rUnit * 255), 0, 255),
+          g: clamp(Math.round(gUnit * 255), 0, 255),
+          b: clamp(Math.round(bUnit * 255), 0, 255),
+          srcAlpha,
+        };
+      }
+    }
+    return null;
+  }
+
+  return null;
+}
+
+function probeCanvasColor(colorStr, ctx) {
+  if (!ctx || typeof ctx !== 'object' || !('fillStyle' in ctx)) return null;
+  const s = String(colorStr || '').trim();
+  if (!s) return null;
+  const prev = ctx.fillStyle;
+  try {
+    ctx.fillStyle = '#010203';
+    ctx.fillStyle = s;
+    const r1 = String(ctx.fillStyle || '');
+    if (r1 && r1 !== '#010203') return r1;
+
+    ctx.fillStyle = '#040506';
+    ctx.fillStyle = s;
+    const r2 = String(ctx.fillStyle || '');
+    if (r2 && r2 !== '#040506') return r2;
+
+    return null;
+  } catch {
+    return null;
+  } finally {
+    ctx.fillStyle = prev;
+  }
+}
+
+function resolveCanvasColor(colorStr, fallbackColor, ctx = null) {
+  const s = String(colorStr || '').trim();
+  const fallback = String(fallbackColor || '#007aff');
+  if (!s) return fallback;
+  if (parseDirectColorComponents(s)) return s;
+  if (ctx && typeof ctx === 'object' && 'fillStyle' in ctx) {
+    return probeCanvasColor(s, ctx) || fallback;
   }
   return s;
+}
+
+export function parseColorWithAlpha(colorStr, alpha, ctx = null, fallbackColor = '#007aff') {
+  const a = clamp(Number(alpha) || 0, 0, 1);
+  const s = String(colorStr || '').trim();
+  const fallback = String(fallbackColor || '#007aff');
+  if (!s) return parseColorWithAlpha(fallback, a, null, '#007aff');
+
+  const direct = parseDirectColorComponents(s);
+  if (direct) {
+    const outA = +clamp(a * direct.srcAlpha, 0, 1).toFixed(4);
+    return `rgba(${direct.r}, ${direct.g}, ${direct.b}, ${outA})`;
+  }
+
+  if (ctx && typeof ctx === 'object' && 'fillStyle' in ctx) {
+    const probed = probeCanvasColor(s, ctx);
+    if (!probed) {
+      return parseColorWithAlpha(fallback, a, null, '#007aff');
+    }
+    const directProbed = parseDirectColorComponents(probed);
+    if (directProbed) {
+      const outA = +clamp(a * directProbed.srcAlpha, 0, 1).toFixed(4);
+      return `rgba(${directProbed.r}, ${directProbed.g}, ${directProbed.b}, ${outA})`;
+    }
+    if (a <= 0) return 'rgba(0, 0, 0, 0)';
+    return `color-mix(in srgb, ${probed} ${+(a * 100).toFixed(2)}%, transparent)`;
+  }
+
+  if (a <= 0) return 'rgba(0, 0, 0, 0)';
+  return `color-mix(in srgb, ${s} ${+(a * 100).toFixed(2)}%, transparent)`;
 }
 
 function drawRoundedRect(ctx, x, y, w, h, r) {
@@ -307,15 +500,26 @@ export const StepTrendChart = defineComponent({
     const rootEl = h('div', { className: 'step-trend-wrap' }, [quadGridEl, emptyEl]);
 
     function readPalette() {
-      const fallback = {
-        tps: '#007aff',
-        ttft: '#ff9500',
-        cache: '#34c759',
-        cost: '#af52de',
-        ink3: 'rgba(17, 17, 19, 0.38)',
-        dotIdle: 'rgba(17, 17, 19, 0.075)',
-        gridLine: 'rgba(17, 17, 19, 0.065)',
-      };
+      const isGlass = isLiquidGlassActiveForElement(rootEl);
+      const fallback = isGlass
+        ? {
+            tps: '#007aff',
+            ttft: '#ff9500',
+            cache: '#34c759',
+            cost: '#af52de',
+            ink3: 'rgba(17, 17, 19, 0.58)',
+            dotIdle: 'rgba(17, 17, 19, 0.075)',
+            gridLine: 'rgba(17, 17, 19, 0.065)',
+          }
+        : {
+            tps: '#2563eb',
+            ttft: '#d97706',
+            cache: '#059669',
+            cost: '#8b5cf6',
+            ink3: 'rgba(71, 85, 105, 0.72)',
+            dotIdle: 'rgba(15, 23, 42, 0.08)',
+            gridLine: 'rgba(15, 23, 42, 0.08)',
+          };
       if (typeof globalThis.getComputedStyle !== 'function') return fallback;
       try {
         const cs = globalThis.getComputedStyle(rootEl);
@@ -323,14 +527,25 @@ export const StepTrendChart = defineComponent({
           const val = cs.getPropertyValue(v)?.trim();
           return val || fb;
         };
+        if (isGlass) {
+          return {
+            tps: pick('--lg-accent', pick('--accent-primary', fallback.tps)),
+            ttft: pick('--lg-amber', pick('--metric-warn', fallback.ttft)),
+            cache: pick('--lg-green', pick('--metric-ok', fallback.cache)),
+            cost: pick('--lg-purple', pick('--ctx-subagent-msg', fallback.cost)),
+            ink3: pick('--lg-ink-3', pick('--text-muted', fallback.ink3)),
+            dotIdle: pick('--lg-dot-idle', pick('--lg-seg-bg', fallback.dotIdle)),
+            gridLine: pick('--lg-divider', fallback.gridLine),
+          };
+        }
         return {
-          tps: pick('--lg-accent', pick('--accent-primary', fallback.tps)),
-          ttft: pick('--lg-amber', pick('--metric-warn', fallback.ttft)),
-          cache: pick('--lg-green', pick('--metric-ok', fallback.cache)),
-          cost: pick('--lg-purple', pick('--ctx-subagent-msg', fallback.cost)),
-          ink3: pick('--lg-ink-3', pick('--text-muted', fallback.ink3)),
-          dotIdle: pick('--lg-dot-idle', pick('--lg-seg-bg', fallback.dotIdle)),
-          gridLine: pick('--lg-divider', fallback.gridLine),
+          tps: pick('--accent-primary', fallback.tps),
+          ttft: pick('--metric-warn', fallback.ttft),
+          cache: pick('--metric-ok', fallback.cache),
+          cost: pick('--ctx-subagent-msg', fallback.cost),
+          ink3: pick('--text-muted', fallback.ink3),
+          dotIdle: pick('--surface-track', fallback.dotIdle),
+          gridLine: pick('--border-hairline', fallback.gridLine),
         };
       } catch {
         return fallback;
@@ -373,6 +588,7 @@ export const StepTrendChart = defineComponent({
             fallback: t('fmt.unknownModel'),
           });
           onHoverChange({
+            step: activeItem.step,
             stepIndex: activeItem.stepIndex,
             modelText: modelInfo.text || modelInfo.baseText || '',
             outputTokensText:
@@ -461,7 +677,7 @@ export const StepTrendChart = defineComponent({
       if (n === 0) return;
 
       const key = entry.key;
-      const color = pal[key];
+      const color = resolveCanvasColor(pal[key], entry.def.fallbackColor, ctx);
       const range = getMetricRange(key, scales);
       const span = Math.max(1e-6, range.max - range.min);
 
@@ -480,7 +696,7 @@ export const StepTrendChart = defineComponent({
           const isHover = c === hoverIdx;
 
           if (isHover) {
-            ctx.fillStyle = parseColorWithAlpha(color, 0.14);
+            ctx.fillStyle = parseColorWithAlpha(color, 0.14, ctx, entry.def.fallbackColor);
             drawRoundedRect(ctx, padX + c * gapX + 0.5, 0, Math.max(2, gapX - 1), h, 4);
             ctx.fill();
           }
@@ -546,8 +762,13 @@ export const StepTrendChart = defineComponent({
           };
 
           const grad = ctx.createLinearGradient(0, padTop, 0, baseY);
-          grad.addColorStop(0, parseColorWithAlpha(color, 0.24));
-          grad.addColorStop(1, parseColorWithAlpha(color, 0));
+          try {
+            grad.addColorStop(0, parseColorWithAlpha(color, 0.24, ctx, entry.def.fallbackColor));
+            grad.addColorStop(1, parseColorWithAlpha(color, 0, ctx, entry.def.fallbackColor));
+          } catch {
+            grad.addColorStop(0, parseColorWithAlpha(entry.def.fallbackColor, 0.24));
+            grad.addColorStop(1, parseColorWithAlpha(entry.def.fallbackColor, 0));
+          }
           buildPath();
           ctx.lineTo(validPts[validPts.length - 1].x, baseY);
           ctx.lineTo(validPts[0].x, baseY);
@@ -576,7 +797,7 @@ export const StepTrendChart = defineComponent({
           ctx.restore();
 
           ctx.save();
-          ctx.fillStyle = parseColorWithAlpha(color, 0.25);
+          ctx.fillStyle = parseColorWithAlpha(color, 0.25, ctx, entry.def.fallbackColor);
           ctx.beginPath();
           ctx.arc(pt.x, pt.y, 5.8, 0, Math.PI * 2);
           ctx.fill();
@@ -620,11 +841,13 @@ export const StepTrendChart = defineComponent({
         if (series.length === 0) return;
         const rect = entry.canvasBoxEl.getBoundingClientRect?.();
         if (!rect || rect.width <= 0) return;
-        const x = clamp((e.clientX ?? 0) - rect.left, 0, Math.max(0, rect.width - 0.01));
+        const padX = mode === 'curve' ? 4 : 1;
+        const usableW = Math.max(1, rect.width - padX * 2);
+        const x = clamp((e.clientX ?? 0) - rect.left - padX, 0, Math.max(0, usableW - 0.01));
         const idx =
           mode === 'curve' && series.length > 1
-            ? clamp(Math.round((x / rect.width) * (series.length - 1)), 0, series.length - 1)
-            : clamp(Math.floor((x / rect.width) * series.length), 0, series.length - 1);
+            ? clamp(Math.round((x / usableW) * (series.length - 1)), 0, series.length - 1)
+            : clamp(Math.floor((x / usableW) * series.length), 0, series.length - 1);
         if (idx !== hoverIdx) {
           hoverIdx = idx;
           draw();
@@ -685,6 +908,7 @@ export const StepTrendChart = defineComponent({
         draw,
         hideTooltip: clearHover,
         refreshLabels,
+        readPalette,
         getPointCount: () => series.length,
         setHoverIndexForTest: (idx) => {
           hoverIdx = idx;

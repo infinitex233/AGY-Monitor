@@ -46,11 +46,11 @@ export function normalizeClientUiTheme(raw) {
   if (val === 'liquid_glass' || val === 'liquid-glass' || val === 'liquidglass' || val === 'glass') {
     return 'liquid_glass';
   }
-  return 'liquid_glass';
+  return 'default';
 }
 
 export function resolveSettingsUiTheme(settings) {
-  if (!settings || typeof settings !== 'object') return 'liquid_glass';
+  if (!settings || typeof settings !== 'object') return 'default';
   return normalizeClientUiTheme(settings.uiTheme);
 }
 

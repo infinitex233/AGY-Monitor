@@ -281,7 +281,7 @@ export const ConsumptionView = defineComponent({
     consExportMenu.refs.setHidden(true);
     const totalTokensLabel = h('span', { className: 'text-muted', style: 'font-size: var(--fs-md);', text: t('cons.totalTokens') });
     const estCostLabel = h('span', { className: 'text-muted', style: 'font-size: var(--fs-md);', text: t('cons.estCost') });
-    const cacheHitRateLabel = h('span', { text: t('cons.cacheHitRate') });
+    const cacheHitRateLabel = h('span', { className: 'text-muted', style: 'font-size: var(--fs-md);', text: t('cons.cacheHitRate') });
     const avgSpeedLabel = h('span', { className: 'text-muted', style: 'font-size: var(--fs-md);', text: t('cons.avgOutputSpeed') });
 
     const unifiedMatrixEl = h('div', { className: 'cons-box cons-unified-matrix' }, [
@@ -295,10 +295,7 @@ export const ConsumptionView = defineComponent({
           h('div', { className: 'cons-baseline' }, [heroCostUsd]),
         ]),
         h('div', { className: 'cons-col is-bordered-col' }, [
-          h('span', { className: 'legend-left text-muted', style: 'font-size: var(--fs-md);' }, [
-            h('span', { className: 'dot-swatch seg-cached' }),
-            cacheHitRateLabel,
-          ]),
+          cacheHitRateLabel,
           h('div', { className: 'cons-baseline' }, [cacheHitPctEl]),
         ]),
         h('div', { className: 'cons-col is-bordered-col' }, [

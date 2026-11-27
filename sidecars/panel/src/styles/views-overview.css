@@ -20,6 +20,30 @@
   border-radius: var(--radius-sm);
 }
 
+.panel:has(.is-open),
+.panel:has(.select-menu:not([hidden])),
+.panel:has(.action-menu-popover:not([hidden])),
+.panel:has(.dt-popover:not([hidden])),
+.panel:has(.trend-tooltip:not([hidden])),
+.panel:has(.cons-breakdown-popover:not([hidden])),
+.panel:has(.turn-prompt-tip:not([hidden])),
+.panel:has(.step-anomaly-tip:not([hidden])),
+.session-header:has(.is-open),
+.session-header:has(.select-menu:not([hidden])) {
+  position: relative;
+  z-index: 60;
+}
+
+.form-row:has(.is-open),
+.form-row:has(.select-menu:not([hidden])),
+.cons-custom-range-bar:has(.dt-popover:not([hidden])),
+.datetime-picker:has(.dt-popover:not([hidden])),
+.custom-select.is-open,
+.action-menu.is-open {
+  position: relative;
+  z-index: 65;
+}
+
 .panel-header {
   display: flex;
   align-items: center;
@@ -416,6 +440,36 @@
   text-overflow: ellipsis;
 }
 
+.telemetry-matrix .cell-value {
+  display: inline-flex;
+  align-items: baseline;
+  max-width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.telemetry-matrix.is-flat-summary .cell-value {
+  justify-content: center;
+}
+
+.telemetry-matrix .cell-value .cell-num {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.telemetry-matrix .cell-value .cell-unit {
+  flex-shrink: 0;
+  margin-left: 1px;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-secondary);
+}
+
+.telemetry-matrix .cell-value .cell-unit.is-spaced {
+  margin-left: 3px;
+}
+
 .cell-value.accent-speed,
 .accent-speed {
   color: var(--metric-speed);
@@ -499,6 +553,7 @@
     background-color 0.08s ease,
     width var(--dur-normal) var(--ease-fast),
     margin-left var(--dur-fast) var(--ease-fast),
+    opacity 160ms var(--ease-fast),
     filter 120ms ease;
 }
 
@@ -507,6 +562,7 @@
     background-color 0.05s ease,
     width var(--dur-normal) var(--ease-fast) 0.05s,
     margin-left var(--dur-fast) var(--ease-fast),
+    opacity 160ms var(--ease-fast),
     filter 120ms ease;
 }
 
@@ -521,6 +577,15 @@
 
 .progress-track.ctx-segment-meter .progress-seg.is-active:hover {
   filter: brightness(1.12);
+}
+
+.progress-track.ctx-segment-meter.has-seg-hover .progress-seg.is-active {
+  opacity: 0.38;
+}
+
+.progress-track.ctx-segment-meter.has-seg-hover .progress-seg.is-active.is-seg-hovered {
+  opacity: 1;
+  filter: brightness(1.08);
 }
 
 .progress-seg.seg-assistant {
@@ -897,7 +962,41 @@
   color: var(--text-secondary);
 }
 
-/* --- 4. 上下文双列图例网格 (Context 10-Channel Legend Grid) --- */
+/* --- 4. 上下文双列图例网格与悬停读数胶囊 (Context 10-Channel Legend Grid & Hover Readout) --- */
+.ctx-hover-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-4px);
+  pointer-events: none;
+  transition:
+    opacity var(--dur-fast) var(--ease-fast),
+    transform var(--dur-fast) var(--ease-fast),
+    visibility var(--dur-fast) var(--ease-fast);
+}
+
+.ctx-hover-readout.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+}
+
+.ctx-hover-readout .swatch {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
 .ctx-legend-toggle {
   display: inline-flex;
   align-items: center;
@@ -952,6 +1051,14 @@
   justify-content: space-between;
   gap: var(--space-2);
   min-width: 0;
+  padding: 2px 4px;
+  border-radius: var(--radius-xs);
+  transition: background-color var(--dur-fast) var(--ease-fast);
+}
+
+.legend-item:hover,
+.legend-item.is-seg-hovered {
+  background: var(--surface-hover);
 }
 
 .legend-left {

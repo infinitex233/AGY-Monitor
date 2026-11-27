@@ -14,8 +14,8 @@ export const THEME_ACCENT_KEYS = Object.freeze([
   'rose',
 ]);
 
-export const UI_THEME_KEYS = Object.freeze(['liquid_glass', 'default']);
-export const DEFAULT_UI_THEME = 'liquid_glass';
+export const UI_THEME_KEYS = Object.freeze(['default', 'liquid_glass']);
+export const DEFAULT_UI_THEME = 'default';
 
 export const FONT_SCALE_KEYS = Object.freeze(['sm', 'md', 'lg', 'xl']);
 
@@ -101,7 +101,7 @@ export const STEP_TABLE_COLUMN_KEYS = Object.freeze([
 ]);
 
 export const DEFAULT_STEP_TABLE_COLUMNS = Object.freeze([
-  'step',
+  'time',
   'model',
   'tps',
   'ttft',
@@ -180,7 +180,7 @@ export function normalizeThemeAccent(accent) {
 }
 
 /**
- * 归一化界面视觉主题（`'liquid_glass'` | `'default'`，默认 `'liquid_glass'`）。
+ * 归一化界面视觉主题（`'default'` | `'liquid_glass'`，默认 `'default'`）。
  *
  * @param {unknown} theme
  * @returns {'liquid_glass'|'default'}
@@ -501,7 +501,7 @@ export function normalizeStepTableColumns(raw) {
     if (out.length >= STEP_TABLE_COLUMN_KEYS.length) break;
   }
   if (out.length < 2) {
-    for (const fallbackCol of ['step', 'model', 'tps']) {
+    for (const fallbackCol of ['time', 'model', 'tps']) {
       if (!seen.has(fallbackCol)) {
         seen.add(fallbackCol);
         out.push(fallbackCol);

@@ -705,7 +705,7 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
     hoverModules: ['metrics', 'context', 'quotas'],
     overviewModules: ['metrics', 'context', 'quotas', 'live_tasks'],
     overviewMetrics: ['tps', 'ttft', 'avg_tps', 'step_cost'],
-    stepTableColumns: ['step', 'model', 'tps', 'ttft', 'cache', 'cost'],
+    stepTableColumns: ['time', 'model', 'tps', 'ttft', 'cache', 'cost'],
     showStepTurnRail: false,
     showStepAgentBadge: true,
     showStepSpeedColor: false,
@@ -1487,21 +1487,23 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
     assert.equal(langBtns[2].textContent, 'English');
     assert.equal(langBtns[1].classList.contains('is-active'), true, 'mockSettings language zh-CN selects index 1');
 
-    // UI Style switch: defaults to liquid-glass, toggles cleanly to default and back across both hosts & portals
-    assert.equal(uiThemeBtns.length, 2, 'UI Style switch has 液态玻璃 / 默认');
-    assert.equal(portalHost.getAttribute('data-ui-theme'), 'liquid-glass');
-    assert.equal(capsuleHost.getAttribute('data-ui-theme'), 'liquid-glass');
-    assert.equal(popoverEl.getAttribute('data-ui-theme'), 'liquid-glass');
+    // UI Style switch: defaults to default (left), toggles cleanly to liquid-glass (right) and back across both hosts & portals
+    assert.equal(uiThemeBtns.length, 2, 'UI Style switch has 默认 / 液态玻璃');
+    assert.equal(uiThemeBtns[0].textContent, '默认');
+    assert.equal(uiThemeBtns[1].textContent, '液态玻璃');
+    assert.equal(portalHost.getAttribute('data-ui-theme'), 'default');
+    assert.equal(capsuleHost.getAttribute('data-ui-theme'), 'default');
+    assert.equal(popoverEl.getAttribute('data-ui-theme'), 'default');
     uiThemeBtns[1].dispatchEvent({ type: 'click', stopPropagation() {} });
     await new Promise((r) => setTimeout(r, 30));
-    assert.equal(mockSettings.uiTheme, 'default');
-    assert.equal(portalHost.getAttribute('data-ui-theme'), 'default', 'Portal host switches to default theme');
-    assert.equal(capsuleHost.getAttribute('data-ui-theme'), 'default', 'Capsule host switches to default theme');
-    assert.equal(popoverEl.getAttribute('data-ui-theme'), 'default', 'Popover panel switches to default theme');
+    assert.equal(mockSettings.uiTheme, 'liquid_glass');
+    assert.equal(portalHost.getAttribute('data-ui-theme'), 'liquid-glass', 'Portal host switches to liquid-glass theme');
+    assert.equal(capsuleHost.getAttribute('data-ui-theme'), 'liquid-glass', 'Capsule host switches to liquid-glass theme');
+    assert.equal(popoverEl.getAttribute('data-ui-theme'), 'liquid-glass', 'Popover panel switches to liquid-glass theme');
     uiThemeBtns[0].dispatchEvent({ type: 'click', stopPropagation() {} });
     await new Promise((r) => setTimeout(r, 30));
-    assert.equal(mockSettings.uiTheme, 'liquid_glass');
-    assert.equal(portalHost.getAttribute('data-ui-theme'), 'liquid-glass', 'Restores liquid-glass theme cleanly');
+    assert.equal(mockSettings.uiTheme, 'default');
+    assert.equal(portalHost.getAttribute('data-ui-theme'), 'default', 'Restores default theme cleanly');
 
     const generalSelects = generalPane.querySelectorAll('.custom-select');
     assert.equal(generalSelects.length, 2, 'General tab has Model Display Format and Mount Mode selects');
@@ -1749,7 +1751,7 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
     hmGridEl.dispatchEvent({ type: 'mouseleave' });
     assert.equal(trendTooltipEl.hasAttribute('hidden'), true, 'Tooltip hides on mouseleave');
 
-    // Verify embedded StepsDetailView in 实时监控 renders the 6 streamlined default columns ('步序', '模型', '速度', '首字', '缓存命中率', '费用')
+    // Verify embedded StepsDetailView in 实时监控 renders the 6 streamlined default columns ('时间', '模型', '速度', '首字', '缓存命中率', '费用')
     pillTabs[0].dispatchEvent({ type: 'click', stopPropagation() {} });
     await new Promise((r) => setTimeout(r, 20));
     const stepsPane = allPanes[0];
@@ -1757,7 +1759,7 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
     const stepHeaders = stepsPane.querySelectorAll('.data-table')[0].children[0].children[0].children;
     assert.deepEqual(
       Array.from(stepHeaders, (th) => th.textContent),
-      ['步序', '模型', '速度', '首字', '缓存命中率', '费用']
+      ['时间', '模型', '速度', '首字', '缓存命中率', '费用']
     );
     const stepRows = stepsPane.querySelectorAll('.data-table')[0].children[1].children;
     assert.equal(stepRows.length, 2);
@@ -1903,10 +1905,13 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
       true,
       '[主] badge hidden when showStepAgentBadge=false'
     );
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const subStepDate = new Date(3500);
+    const expectedSubTime = `${pad2(subStepDate.getHours())}:${pad2(subStepDate.getMinutes())}:${pad2(subStepDate.getSeconds())}`;
     assert.equal(
       multiStepRows[0].children[0].children.at(-1).textContent,
-      '#4',
-      'Step index remains intact when [主]/[子] badge is hidden'
+      expectedSubTime,
+      'Step time remains intact when [主]/[子] badge is hidden'
     );
     assert.equal(
       multiStepRows[0].children[0].querySelector('.turn-rail').hasAttribute('hidden'),
@@ -1940,7 +1945,7 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
     );
 
     // Reset columns back to default before subsequent route tests
-    mockSettings.stepTableColumns = ['step', 'model', 'tps', 'ttft', 'cache', 'cost'];
+    mockSettings.stepTableColumns = ['time', 'model', 'tps', 'ttft', 'cache', 'cost'];
     popoverEl.querySelector('.app-shell').dispatchEvent({
       type: 'keydown',
       key: 'r',
@@ -4088,9 +4093,14 @@ test('v1.5 feedback E2E: sticky bridge port/token across hot-reloads, CDP->HTTP 
     // Switch to Table mode inside 明细, then bounce tabs after setting table dimensions to trigger adaptive widening
     const navPills = popEl.querySelectorAll('.pill-tab');
     const modeBtns = popEl.querySelectorAll('.steps-view-mode-btn');
+    assert.deepEqual(
+      modeBtns.map((b) => b.getAttribute('data-mode')),
+      ['table', 'dots', 'curve'],
+      'StepsDetailView places table leftmost followed by dots and curve'
+    );
     const tableModeBtn = modeBtns.find((b) => b.getAttribute('data-mode') === 'table');
     const dotsModeBtn = modeBtns.find((b) => b.getAttribute('data-mode') === 'dots');
-    assert.ok(tableModeBtn && dotsModeBtn, 'StepsDetailView exposes dots/curve/table mode buttons');
+    assert.ok(tableModeBtn && dotsModeBtn, 'StepsDetailView exposes table/dots/curve mode buttons');
     tableModeBtn.dispatchEvent({ type: 'click', stopPropagation() {} });
     await new Promise((r) => setTimeout(r, 15));
 
@@ -5131,7 +5141,7 @@ test('Issue #35: topbar capsule and hover HUD lock to main agent by default, tog
     hoverModules: ['metrics', 'context'],
     overviewModules: ['metrics', 'context'],
     overviewMetrics: ['tps', 'ttft', 'avg_tps', 'step_cost'],
-    stepTableColumns: ['step', 'model', 'tps', 'ttft', 'cache', 'cost'],
+    stepTableColumns: ['time', 'model', 'tps', 'ttft', 'cache', 'cost'],
   };
 
   const mainContext = {

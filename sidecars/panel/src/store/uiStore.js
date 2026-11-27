@@ -14,7 +14,7 @@ export function getViewTabs() {
 }
 
 const STEPS_VIEW_MODE_STORAGE_KEY = 'agy.stepsViewMode';
-const VALID_STEPS_VIEW_MODES = new Set(['dots', 'curve', 'table']);
+const VALID_STEPS_VIEW_MODES = new Set(['table', 'dots', 'curve']);
 
 function loadInitialStepsViewMode() {
   try {
@@ -23,11 +23,11 @@ function loadInitialStepsViewMode() {
   } catch {
     // ignore storage restriction
   }
-  return 'dots';
+  return 'table';
 }
 
 export function setStepsViewMode(mode) {
-  const next = VALID_STEPS_VIEW_MODES.has(mode) ? mode : 'dots';
+  const next = VALID_STEPS_VIEW_MODES.has(mode) ? mode : 'table';
   try {
     globalThis.localStorage?.setItem?.(STEPS_VIEW_MODE_STORAGE_KEY, next);
   } catch {
@@ -40,7 +40,7 @@ export const uiStore = createReactiveStore({
   activeView: 'overview',
   monitorVisible: true,
   stepsSubTab: 'steps', // 'steps' | 'models'
-  stepsViewMode: loadInitialStepsViewMode(), // 'dots' | 'curve' | 'table'
+  stepsViewMode: loadInitialStepsViewMode(), // 'table' | 'dots' | 'curve'
   settingsSubTab: 'general', // 'general' | 'structure' | 'account' | 'other'
   settingsStructureTab: 'mount', // 'mount' | 'hover' | 'overview' | 'steps'
   selectedAgentScope: 'all', // 'all' | 'main' | <subagent cascadeId>

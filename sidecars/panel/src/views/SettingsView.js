@@ -41,8 +41,8 @@ function getLanguageOptions() {
 
 function getUiThemeOptions() {
   return [
-    { value: 'liquid_glass', label: t('settings.gen.uiThemeLiquidGlass') },
     { value: 'default', label: t('settings.gen.uiThemeDefault') },
+    { value: 'liquid_glass', label: t('settings.gen.uiThemeLiquidGlass') },
   ];
 }
 
@@ -83,7 +83,7 @@ export const SettingsView = defineComponent({
 
     // --- 常规精简页状态与回调 ---
     let draftLanguage = 'auto';
-    let draftUiTheme = 'liquid_glass';
+    let draftUiTheme = 'default';
     let draftThemeAccent = 'host';
     let draftFontScale = 'md';
     let draftModelDisplayMode = 'short';

@@ -1302,16 +1302,16 @@ test('Capsule odometer digit rolling (0.15s) and color transition (0.1s) stay st
   assert.equal(capSlots[1].textSpan.hasAttribute('data-od-active'), false);
 });
 
-test('uiTheme setting defaults to liquid_glass, switches cleanly to default, and scopes liquid-glass.css strictly', () => {
+test('uiTheme setting defaults to default, switches cleanly to liquid_glass, and scopes liquid-glass.css strictly', () => {
   const prevDoc = globalThis.document;
   const { document } = createMockDom();
   globalThis.document = document;
   try {
     applyAppearanceToRoot(document.documentElement, {});
-    assert.equal(document.documentElement.getAttribute('data-ui-theme'), 'liquid-glass');
-
-    applyAppearanceToRoot(document.documentElement, { uiTheme: 'default' });
     assert.equal(document.documentElement.getAttribute('data-ui-theme'), 'default');
+
+    applyAppearanceToRoot(document.documentElement, { uiTheme: 'liquid_glass' });
+    assert.equal(document.documentElement.getAttribute('data-ui-theme'), 'liquid-glass');
 
     applyAppearanceToRoot(document.documentElement, { uiTheme: 'liquid_glass', modernUi: false });
     assert.equal(document.documentElement.getAttribute('data-ui-theme'), 'default');
@@ -1325,6 +1325,7 @@ test('uiTheme setting defaults to liquid_glass, switches cleanly to default, and
 
 test('StepTrendChart computes robust 4-metric scales and StepsDetailView switches dots/curve/table cleanly', async (t) => {
   const { computeStepTrendScales } = await import('../src/components/charts/StepTrendChart.js');
+  const { formatStepClockTime } = await import('../src/registries/stepColumnRegistry.js');
   const { setStepsViewMode } = await import('../src/store/uiStore.js');
 
   const scales = computeStepTrendScales([
@@ -1368,7 +1369,8 @@ test('StepTrendChart computes robust 4-metric scales and StepsDetailView switche
     globalThis.window = prevWin;
   });
 
-  setStepsViewMode('dots');
+  setStepsViewMode(undefined);
+  assert.equal(uiStore.getState().stepsViewMode, 'table', 'Default stepsViewMode resolves to table');
   uiStore.setState({ activeView: 'overview', monitorVisible: true }, { sync: true });
   telemetryStore.setState(
     {
@@ -1392,8 +1394,22 @@ test('StepTrendChart computes robust 4-metric scales and StepsDetailView switche
   view = StepsDetailView({ embedded: true });
   document.body.appendChild(view.el);
 
-  assert.equal(view.refs.stepTrendChart.el.hasAttribute('hidden'), false, 'Chart visible by default in dots mode');
-  assert.equal(view.refs.stepsScroll.el.hasAttribute('hidden'), true, 'Table hidden by default in dots mode');
+  const modeBtns = view.refs.viewModeSwitchEl.querySelectorAll('.steps-view-mode-btn');
+  assert.deepEqual(
+    modeBtns.map((b) => b.getAttribute('data-mode')),
+    ['table', 'dots', 'curve'],
+    'View mode switch places table leftmost followed by dots and curve'
+  );
+  const [tableBtn, dotsBtn, curveBtn] = modeBtns;
+
+  assert.equal(view.refs.stepTrendChart.el.hasAttribute('hidden'), true, 'Chart hidden by default in table mode');
+  assert.equal(view.refs.stepsScroll.el.hasAttribute('hidden'), false, 'Table visible by default in table mode');
+
+  dotsBtn.dispatchEvent({ type: 'click', stopPropagation() {} });
+  await Promise.resolve();
+  assert.equal(uiStore.getState().stepsViewMode, 'dots');
+  assert.equal(view.refs.stepTrendChart.el.hasAttribute('hidden'), false, 'Chart visible when switched to dots mode');
+  assert.equal(view.refs.stepsScroll.el.hasAttribute('hidden'), true, 'Table hidden in dots mode');
   assert.equal(view.refs.stepTrendChart.refs.getPointCount(), 3);
   assert.equal(view.el.querySelectorAll('.step-quad-cell').length, 4, 'Renders 2x2 four-metric quad cells');
   assert.deepEqual(
@@ -1408,14 +1424,15 @@ test('StepTrendChart computes robust 4-metric scales and StepsDetailView switche
   assert.equal(scrubPill.hasAttribute('hidden'), true);
   view.refs.stepTrendChart.refs.setHoverIndexForTest(1);
   assert.equal(scrubPill.hasAttribute('hidden'), false);
-  assert.match(scrubPill.textContent, /#650/);
+  const expectedScrubClock = formatStepClockTime(2000, { stepIndex: 650 });
+  assert.ok(scrubPill.textContent.startsWith(expectedScrubClock.text));
+  assert.doesNotMatch(scrubPill.textContent, /#650/);
+  assert.equal(scrubPill.hasAttribute('title'), false);
   assert.equal(view.refs.stepTrendChart.refs.cellMap.tps.numEl.textContent, '1283');
   assert.equal(view.refs.stepTrendChart.refs.cellMap.ttft.numEl.textContent, '13.1');
   assert.equal(view.refs.stepTrendChart.refs.cellMap.cache.numEl.textContent, '99.3');
   assert.equal(view.refs.stepTrendChart.refs.cellMap.cost.numEl.textContent, '$0.076');
 
-  const curveBtn = view.refs.viewModeSwitchEl.querySelectorAll('.steps-view-mode-btn')[1];
-  const tableBtn = view.refs.viewModeSwitchEl.querySelectorAll('.steps-view-mode-btn')[2];
   curveBtn.dispatchEvent({ type: 'click', stopPropagation() {} });
   await Promise.resolve();
   assert.equal(uiStore.getState().stepsViewMode, 'curve');
@@ -1428,4 +1445,436 @@ test('StepTrendChart computes robust 4-metric scales and StepsDetailView switche
   assert.equal(view.refs.stepTrendChart.el.hasAttribute('hidden'), true);
   assert.equal(view.refs.stepsScroll.el.hasAttribute('hidden'), false);
   assert.equal(scrubPill.hasAttribute('hidden'), true, 'Header scrub pill hides in table mode');
+});
+
+test('Default theme hides .ctx-hover-readout unless .is-visible is active and shares core visual parity rules', () => {
+  const stylesCss = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const baseRuleMatch = stylesCss.match(/(?:^|\n)\.ctx-hover-readout\s*\{([\s\S]*?)\}/);
+  assert.ok(baseRuleMatch, 'Unscoped .ctx-hover-readout rule must exist for default theme');
+  assert.match(baseRuleMatch[1], /opacity:\s*0\s*;/);
+  assert.match(baseRuleMatch[1], /visibility:\s*hidden\s*;/);
+
+  const visibleRuleMatch = stylesCss.match(/(?:^|\n)\.ctx-hover-readout\.is-visible\s*\{([\s\S]*?)\}/);
+  assert.ok(visibleRuleMatch, 'Unscoped .ctx-hover-readout.is-visible rule must exist for default theme');
+  assert.match(visibleRuleMatch[1], /opacity:\s*1\s*;/);
+  assert.match(visibleRuleMatch[1], /visibility:\s*visible\s*;/);
+
+  // Unscoped base parity rules for default theme (unit split, context hover focus, popover z-index lifting)
+  assert.match(
+    stylesCss,
+    /(?:^|\n)\.telemetry-matrix \.cell-value \.cell-unit\s*\{[\s\S]*?font-size:\s*var\(--fs-sm\)/
+  );
+  assert.match(
+    stylesCss,
+    /(?:^|\n)\.progress-track\.ctx-segment-meter\.has-seg-hover \.progress-seg\.is-active\s*\{[\s\S]*?opacity:\s*0\.38/
+  );
+  assert.match(
+    stylesCss,
+    /(?:^|\n)\.legend-item:hover,\s*\n\.legend-item\.is-seg-hovered\s*\{[\s\S]*?background:\s*var\(--surface-hover\)/
+  );
+  assert.match(
+    stylesCss,
+    /(?:^|\n)\.panel:has\(\.select-menu:not\(\[hidden\]\)\)[\s\S]*?z-index:\s*60/
+  );
+});
+
+test('StepTrendChart readPalette branches between Default (--accent-primary) and Liquid Glass (--lg-accent) tokens', async (t) => {
+  const { StepTrendChart } = await import('../src/components/charts/StepTrendChart.js');
+  const { document } = createMockDom();
+  const prevDoc = globalThis.document;
+  const prevGcs = globalThis.getComputedStyle;
+  globalThis.document = document;
+  globalThis.getComputedStyle = () => ({
+    getPropertyValue: (prop) => {
+      const vars = {
+        '--lg-accent': '#007aff',
+        '--lg-amber': '#ff9500',
+        '--lg-green': '#34c759',
+        '--lg-purple': '#af52de',
+        '--lg-ink-3': '#999999',
+        '--lg-dot-idle': '#eeeeee',
+        '--lg-divider': '#dddddd',
+        '--accent-primary': '#7c3aed',
+        '--metric-warn': '#d97706',
+        '--metric-ok': '#059669',
+        '--ctx-subagent-msg': '#8b5cf6',
+        '--text-muted': '#64748b',
+        '--surface-track': '#e2e8f0',
+        '--border-hairline': '#cbd5e1',
+      };
+      return vars[prop] || '';
+    },
+  });
+  let chart = null;
+  t.after(() => {
+    chart?.destroy?.();
+    globalThis.document = prevDoc;
+    globalThis.getComputedStyle = prevGcs;
+  });
+
+  const host = document.createElement('div');
+  host.setAttribute('data-ui-theme', 'default');
+  chart = StepTrendChart();
+  host.appendChild(chart.el);
+  document.body.appendChild(host);
+
+  const defaultPal = chart.refs.readPalette();
+  assert.equal(defaultPal.tps, '#7c3aed');
+  assert.equal(defaultPal.ttft, '#d97706');
+  assert.equal(defaultPal.cache, '#059669');
+  assert.equal(defaultPal.dotIdle, '#e2e8f0');
+
+  host.setAttribute('data-ui-theme', 'liquid-glass');
+  const glassPal = chart.refs.readPalette();
+  assert.equal(glassPal.tps, '#007aff');
+  assert.equal(glassPal.ttft, '#ff9500');
+  assert.equal(glassPal.cache, '#34c759');
+  assert.equal(glassPal.dotIdle, '#eeeeee');
+});
+
+test('Liquid Glass theme preserves semantic green/teal/amber tiers across capsule, KPIs, and tables', () => {
+  const stylesCss = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.match(stylesCss, /--lg-green-text:\s*#22a046\s*;/);
+  assert.match(stylesCss, /--lg-teal-text:\s*#0e8ec7\s*;/);
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\] \.telemetry-matrix \.cell-value\.tone-good[\s\S]*?color:\s*var\(--lg-green-text\)/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\] \.telemetry-matrix \.cell-value\.tone-info[\s\S]*?color:\s*var\(--lg-teal-text\)/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\] \.data-table td\.tone-good[\s\S]*?color:\s*var\(--lg-green-text\)/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\] \.data-table td\.tone-info[\s\S]*?color:\s*var\(--lg-teal-text\)/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\] \.wm-cap-slot\.tone-good[\s\S]*?color:\s*var\(--lg-green-text\)/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\] \.wm-cap-slot\.tone-info[\s\S]*?color:\s*var\(--lg-teal-text\)/
+  );
+});
+
+test('Step time column formats local system time and multiple timezones accurately, and migrates legacy default step column', async (t) => {
+  const { formatStepClockTime, resolveStepTimestampMs } = await import('../src/registries/stepColumnRegistry.js');
+  const { setStepsViewMode } = await import('../src/store/uiStore.js');
+
+  // Invalid / missing timestamps
+  assert.deepEqual(formatStepClockTime(0), { text: '—', title: '' });
+  assert.deepEqual(formatStepClockTime(NaN), { text: '—', title: '' });
+  assert.equal(resolveStepTimestampMs({ createdAt: '2026-01-15T16:00:05.000Z' }), Date.parse('2026-01-15T16:00:05.000Z'));
+
+  // Winter standard time: 2026-01-15T16:00:05Z => 2026-01-16 00:00:05 in Shanghai (+08:00), 2026-01-15 08:00:05 in LA (-08:00)
+  const winterMs = Date.parse('2026-01-15T16:00:05.000Z');
+  assert.deepEqual(formatStepClockTime(winterMs, { timeZone: 'UTC', stepIndex: 42 }), {
+    text: '16:00:05',
+    title: '2026-01-15 16:00:05 (UTC+00:00) · #42',
+  });
+  assert.deepEqual(formatStepClockTime(winterMs, { timeZone: 'Asia/Shanghai', stepIndex: 42 }), {
+    text: '00:00:05',
+    title: '2026-01-16 00:00:05 (UTC+08:00) · #42',
+  });
+  assert.deepEqual(formatStepClockTime(winterMs, { timeZone: 'America/Los_Angeles' }), {
+    text: '08:00:05',
+    title: '2026-01-15 08:00:05 (UTC-08:00)',
+  });
+  assert.deepEqual(formatStepClockTime(winterMs, { timeZone: 'Asia/Kolkata' }), {
+    text: '21:30:05',
+    title: '2026-01-15 21:30:05 (UTC+05:30)',
+  });
+
+  // Summer DST: 2026-07-15T07:00:09Z => midnight 00:00:09 in LA (UTC-07:00) — never '24:00:09'
+  const summerMs = Date.parse('2026-07-15T07:00:09.000Z');
+  assert.deepEqual(formatStepClockTime(summerMs, { timeZone: 'America/Los_Angeles', stepIndex: 7 }), {
+    text: '00:00:09',
+    title: '2026-07-15 00:00:09 (UTC-07:00) · #7',
+  });
+
+  // Default system timezone path matches Date local getters
+  const sysRes = formatStepClockTime(winterMs, { stepIndex: 10 });
+  const expectedDate = new Date(winterMs);
+  const pad = (n) => String(n).padStart(2, '0');
+  const expectedClock = `${pad(expectedDate.getHours())}:${pad(expectedDate.getMinutes())}:${pad(expectedDate.getSeconds())}`;
+  assert.equal(sysRes.text, expectedClock);
+  assert.match(sysRes.title, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \(UTC[+-]\d{2}:\d{2}\) · #10$/);
+
+  // Embedded StepsDetailView migrates persisted legacy default ['step','model','tps','ttft','cache','cost'] to time-first
+  const prevDoc = globalThis.document;
+  const prevUi = { ...uiStore.getState() };
+  const prevTel = { ...telemetryStore.getState() };
+  const { document } = createMockDom();
+  globalThis.document = document;
+  let view = null;
+  t.after(() => {
+    view?.destroy?.();
+    uiStore.setState(prevUi, { sync: true });
+    telemetryStore.setState(prevTel, { sync: true });
+    globalThis.document = prevDoc;
+  });
+
+  setStepsViewMode('table');
+  uiStore.setState({ activeView: 'overview', monitorVisible: true }, { sync: true });
+  telemetryStore.setState(
+    {
+      telemetry: {
+        settings: { stepTableColumns: ['step', 'model', 'tps', 'ttft', 'cache', 'cost'] },
+        activeConversation: {
+          cascadeId: 'cid-time-col-1',
+          stepCount: 1,
+          recentSteps: [
+            { stepIndex: 446, createdAtMs: winterMs, modelShort: '4-hydrogen-high', tokPerSec: 219, ttftSec: 8.1, cacheHitPct: 97.6, costUsd: 0.019 },
+          ],
+          modelBreakdown: [],
+        },
+      },
+    },
+    { sync: true }
+  );
+
+  view = StepsDetailView({ embedded: true });
+  document.body.appendChild(view.el);
+  const thCols = Array.from(view.refs.stepsTheadRow.children, (th) => th.getAttribute('data-col'));
+  assert.deepEqual(thCols, ['time', 'model', 'tps', 'ttft', 'cache', 'cost']);
+  const firstRowTimeCell = view.refs.stepsTbody.querySelector('tr')?.children?.[0];
+  assert.equal(firstRowTimeCell?.getAttribute('data-col'), 'time');
+  assert.equal(firstRowTimeCell?.textContent, expectedClock);
+  assert.equal(firstRowTimeCell?.getAttribute('title'), formatStepClockTime(winterMs, { stepIndex: 446 }).title);
+});
+
+test('Default Modern UI aligns structural geometry (radii, spacing, settings rows, view switch) with Liquid Glass', () => {
+  const stylesCss = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+
+  assert.match(stylesCss, /\[data-modern-ui="true"\]\s+\.top-deck\s*\{[^}]*gap:\s*8px;/);
+  assert.match(stylesCss, /\[data-modern-ui="true"\]\s+\.viewport-stage\s*\{[^}]*margin-right:\s*-8px;/);
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.panel\s*\{[^}]*padding:\s*13px\s+15px;[^}]*gap:\s*10px;[^}]*border-radius:\s*20px;/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.session-header\s*\{[^}]*border-radius:\s*15px;[^}]*padding:\s*5px\s+8px\s+5px\s+10px;/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.segmented\s*\{[^}]*--seg-pad:\s*3px;[^}]*padding:\s*3px;[^}]*border-radius:\s*var\(--radius-pill\);/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.settings-tab-stack\s+\.form-row\s*\{[^}]*padding:\s*8px\s+0;[^}]*border-bottom:\s*1px\s+solid\s+var\(--modern-divider\);/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.settings-tab-stack\s+\.panel\s*>\s*\.panel-header\s*\+\s*\.form-row\s*\{[^}]*padding-top:\s*2px;/
+  );
+  assert.match(
+    stylesCss,
+    /@media\s*\(min-width:\s*521px\)\s*\{\s*\[data-modern-ui="true"\]\s+\.cons-split-4\s*\{\s*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.btn-secondary\s*\{[^}]*border-radius:\s*var\(--radius-pill\);/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.steps-view-mode-switch\s*\{[^}]*background:\s*var\(--modern-inline-track-bg\);[^}]*border:\s*none;/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.progress-track\.ctx-segment-meter\s*\{[^}]*height:\s*9px;/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\.wm-popover-panel,[^}]*border-radius:\s*24px;/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\.wm-multi-panel,[^}]*border-radius:\s*22px;/
+  );
+});
+
+test('Consumption overview hero values use monochrome primary ink and omit header dot swatch in both themes', async (t) => {
+  const stylesCss = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.cons-hero-cost,\s*\n\[data-modern-ui="true"\]\s+\.cons-hero-cache,\s*\n\[data-modern-ui="true"\]\s+\.cons-hero-speed\s*\{[^}]*color:\s*var\(--text-primary\);/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\]\s+\.cons-hero-num,\s*\n\[data-ui-theme="liquid-glass"\]\s+\.cons-hero-cost,\s*\n\[data-ui-theme="liquid-glass"\]\s+\.cons-hero-cache,\s*\n\[data-ui-theme="liquid-glass"\]\s+\.cons-hero-speed\s*\{[^}]*color:\s*var\(--lg-ink-1\);/
+  );
+  assert.doesNotMatch(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\]\s+\.cons-hero-cache\s*\{[^}]*color:\s*var\(--lg-green-text\)/
+  );
+
+  const prevDoc = globalThis.document;
+  const prevTel = { ...telemetryStore.getState() };
+  const prevUi = { ...uiStore.getState() };
+  const { document } = createMockDom();
+  globalThis.document = document;
+  let view = null;
+  t.after(() => {
+    view?.destroy?.();
+    telemetryStore.setState(prevTel, { sync: true });
+    uiStore.setState(prevUi, { sync: true });
+    globalThis.document = prevDoc;
+  });
+
+  uiStore.setState({ activeView: 'consumption', monitorVisible: true }, { sync: true });
+  view = ConsumptionView({});
+  document.body.appendChild(view.el);
+  await Promise.resolve();
+
+  const headerDots = view.el.querySelectorAll('.cons-split-4 .dot-swatch');
+  assert.equal(headerDots.length, 0, 'Cache hit rate header in .cons-split-4 must not render a dot-swatch');
+  const legendDots = view.el.querySelectorAll('.cons-hero-sub .dot-swatch');
+  assert.equal(legendDots.length, 3, 'Bottom token breakdown legend must retain its 3 segment dots');
+});
+
+test('Live session summary renders outer panel header + 4 rounded tiles consistently in Default Modern UI and Liquid Glass', () => {
+  const stylesCss = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+
+  // Liquid Glass restores outer .session-summary-panel card & "会话总览" header
+  assert.doesNotMatch(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\]\s+\.session-summary-panel\s*>\s*\.panel-header\s*\{[^}]*display:\s*none;/
+  );
+  assert.doesNotMatch(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\]\s+\.session-summary-panel\s*\{[^}]*padding:\s*0;/
+  );
+
+  // Default Modern UI renders 4 rounded sub-cards with centered label text, hidden per-cell icons, and centered compact hero values
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.session-summary-panel\s+\.telemetry-matrix\s+\.matrix-cell\s*\{[^}]*border:\s*1px\s+solid\s+color-mix\(in srgb,\s*var\(--text-primary\)\s*5\.5%,\s*transparent\);[^}]*background:\s*color-mix\(in srgb,\s*var\(--modern-surface-card\)\s*98\.5%,\s*var\(--text-primary\)\s*1\.5%\);[^}]*border-radius:\s*16px;[^}]*padding:\s*10px\s+12px\s+11px;[^}]*gap:\s*6px;/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.session-summary-panel\s+\.telemetry-matrix\s+\.cell-label\s*\{[^}]*justify-content:\s*center;/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.session-summary-panel\s+\.telemetry-matrix\s+\.cell-label\s+\.svg-icon\s*\{[^}]*display:\s*none;/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-modern-ui="true"\]\s+\.session-summary-panel\s+\.telemetry-matrix\s+\.cell-value\s*\{[^}]*justify-content:\s*center;[^}]*font-size:\s*calc\(var\(--fs-lg\)\s*\*\s*1\.12\);[^}]*font-weight:\s*600;/
+  );
+
+  // Liquid Glass keeps 4 nested glass tiles with centered labels, hidden per-cell icons, matching geometry, and disables double backdrop-filter
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\]\s+\.session-summary-panel\s+\.telemetry-matrix\s+\.matrix-cell\s*\{[^}]*background:\s*var\(--lg-card-bg\);[^}]*backdrop-filter:\s*none;[^}]*border:\s*1px\s+solid\s+var\(--lg-rim-outer\);[^}]*border-radius:\s*16px;[^}]*padding:\s*10px\s+12px\s+11px;[^}]*gap:\s*6px;/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\]\s+\.session-summary-panel\s+\.telemetry-matrix\s+\.cell-label\s*\{[^}]*justify-content:\s*center;/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\]\s+\.session-summary-panel\s+\.telemetry-matrix\s+\.cell-label\s+\.svg-icon\s*\{[^}]*display:\s*none;/
+  );
+  assert.match(
+    stylesCss,
+    /@media\s*\(max-width:\s*420px\)\s*\{\s*\[data-modern-ui="true"\]\s+\.session-summary-panel\s+\.telemetry-matrix:not\(\[data-cols="1"\]\):not\(\[data-cols="2"\]\)\s*\{\s*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/
+  );
+});
+
+test('StepTrendChart parseColorWithAlpha converts hsl/rgb/hex colors cleanly and Liquid Glass ink tokens strengthen contrast', async () => {
+  const { parseColorWithAlpha } = await import('../src/components/charts/StepTrendChart.js');
+  const stylesCss = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+
+  assert.equal(parseColorWithAlpha('#2563eb', 0.24), 'rgba(37, 99, 235, 0.24)');
+  assert.equal(parseColorWithAlpha('rgb(37 99 235)', 0.14), 'rgba(37, 99, 235, 0.14)');
+  assert.match(parseColorWithAlpha('hsl(35 88% 47%)', 0.24), /^rgba\(\d+, \d+, \d+, 0\.24\)$/);
+  assert.match(parseColorWithAlpha('hsl(145, 64%, 41%)', 0), /^rgba\(\d+, \d+, \d+, 0\)$/);
+  assert.match(parseColorWithAlpha('hsl(217 82% 51%)', 0.14), /^rgba\(\d+, \d+, \d+, 0\.14\)$/);
+  assert.equal(
+    parseColorWithAlpha('oklch(0.62 0.2 250)', 0.24),
+    'color-mix(in srgb, oklch(0.62 0.2 250) 24%, transparent)'
+  );
+  assert.equal(parseColorWithAlpha('oklch(0.62 0.2 250)', 0), 'rgba(0, 0, 0, 0)');
+
+  // Canvas fillStyle probe resolves opaque non-rgb CSS tokens when a 2D context is passed
+  const probeCtx = {
+    _fill: '#000000',
+    get fillStyle() {
+      return this._fill;
+    },
+    set fillStyle(val) {
+      this._fill = val === 'oklch(0.62 0.2 250)' ? '#2563eb' : val;
+    },
+  };
+  assert.equal(parseColorWithAlpha('oklch(0.62 0.2 250)', 0.24, probeCtx), 'rgba(37, 99, 235, 0.24)');
+
+  // Unit grad must not collide with rad, srgb supports % and scientific notation, and rejected tokens fall back safely
+  assert.equal(parseColorWithAlpha('hsl(100grad 100% 50%)', 0.5), 'rgba(128, 255, 0, 0.5)');
+  assert.equal(parseColorWithAlpha('color(srgb 50% 1e-1 0.2 / 0.5)', 0.5), 'rgba(128, 26, 51, 0.25)');
+  assert.equal(parseColorWithAlpha('rgba(37, 99, 235, 0.5)', 0.5), 'rgba(37, 99, 235, 0.25)');
+  const rejectingCtx = {
+    _fill: '#000000',
+    get fillStyle() {
+      return this._fill;
+    },
+    set fillStyle(val) {
+      if (/^#[0-9a-f]{6}$/i.test(String(val))) this._fill = val;
+    },
+  };
+  assert.equal(
+    parseColorWithAlpha('not-a-color', 0.24, rejectingCtx, '#ff9500'),
+    'rgba(255, 149, 0, 0.24)'
+  );
+
+  assert.match(stylesCss, /--lg-ink-2:\s*rgba\(17,\s*17,\s*19,\s*0\.70\);/);
+  assert.match(stylesCss, /--lg-ink-3:\s*rgba\(17,\s*17,\s*19,\s*0\.58\);/);
+  assert.match(stylesCss, /--lg-ink-2:\s*rgba\(255,\s*255,\s*255,\s*0\.72\);/);
+  assert.match(stylesCss, /--lg-ink-3:\s*rgba\(255,\s*255,\s*255,\s*0\.58\);/);
+});
+
+test('StepTrendChart pointer hit-testing aligns with padded curve/dot positions and out-of-range timestamps fall back safely', async (t) => {
+  const { StepTrendChart } = await import('../src/components/charts/StepTrendChart.js');
+  const { formatStepClockTime, resolveStepTimestampMs } = await import('../src/registries/stepColumnRegistry.js');
+
+  assert.equal(resolveStepTimestampMs({ createdAtMs: 1e20 }), 0);
+  assert.deepEqual(formatStepClockTime(1e20, { timeZone: 'UTC', stepIndex: 1 }), { text: '—', title: '' });
+
+  const prevDoc = globalThis.document;
+  const { document } = createMockDom();
+  globalThis.document = document;
+  let hovered = null;
+  let chart = null;
+  t.after(() => {
+    chart?.destroy?.();
+    globalThis.document = prevDoc;
+  });
+
+  chart = StepTrendChart({ onHoverChange: (info) => { hovered = info; } });
+  const steps = Array.from({ length: 24 }, (_, idx) => ({
+    stepIndex: idx + 1,
+    createdAtMs: 1_700_000_000_000 + idx * 1000,
+    tokPerSec: 100 + idx,
+    ttftSec: 1.5,
+    cacheHitPct: 95,
+    costUsd: 0.01,
+  }));
+  chart.refs.update({ steps, mode: 'curve', immediate: true });
+
+  const cell = chart.refs.cellMap.tps;
+  cell.canvasBoxEl.getBoundingClientRect = () => ({ left: 0, width: 160, height: 64 });
+  const renderedX1 = 4 + (1 / 23) * (160 - 8);
+  cell.cellEl.dispatchEvent({ type: 'pointermove', clientX: renderedX1 });
+  assert.equal(hovered?.stepIndex, 1 + 1, 'Rendered position of index 1 must select stepIndex 2 instead of adjacent step');
+
+  chart.refs.update({ steps, mode: 'dots', immediate: true });
+  const renderedCol2Center = 1 + (2 + 0.5) * ((160 - 2) / 24);
+  cell.cellEl.dispatchEvent({ type: 'pointermove', clientX: renderedCol2Center });
+  assert.equal(hovered?.stepIndex, 2 + 1, 'Dots column 2 center must select stepIndex 3');
 });

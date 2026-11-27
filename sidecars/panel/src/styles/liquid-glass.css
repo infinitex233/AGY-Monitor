@@ -390,28 +390,9 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   font-weight: 600;
 }
 
-/* --- 5. Live Overview 4 Independent Liquid Glass KPI Tiles (Prototype v4) --- */
+/* --- 5. Live Overview Session Summary Panel with 4 Liquid Glass KPI Tiles --- */
 [data-ui-theme="liquid-glass"] .overview-modules-host {
   padding-top: 2px;
-}
-
-[data-ui-theme="liquid-glass"] .session-summary-panel {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  padding: 0;
-  gap: 0;
-  border-radius: 0;
-}
-
-[data-ui-theme="liquid-glass"] .session-summary-panel::after {
-  display: none;
-}
-
-[data-ui-theme="liquid-glass"] .session-summary-panel > .panel-header {
-  display: none;
 }
 
 [data-ui-theme="liquid-glass"] .telemetry-matrix,
@@ -422,8 +403,6 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   overflow: visible;
 }
 
-[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .matrix-cell,
-[data-ui-theme="liquid-glass"] .session-summary-panel .matrix-cell,
 [data-ui-theme="liquid-glass"] .telemetry-matrix .matrix-cell {
   background: var(--lg-card-bg);
   border: 1px solid var(--lg-rim-edge);
@@ -436,8 +415,6 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   overflow: hidden;
 }
 
-[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .matrix-cell:hover,
-[data-ui-theme="liquid-glass"] .session-summary-panel .matrix-cell:hover,
 [data-ui-theme="liquid-glass"] .telemetry-matrix .matrix-cell:hover {
   background: var(--lg-card-hover);
   border: 1px solid var(--lg-rim-edge);
@@ -447,7 +424,47 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   transform: translateY(-2px);
 }
 
-[data-ui-theme="liquid-glass"] .telemetry-matrix.is-flat-summary .cell-label,
+[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .matrix-cell {
+  background: var(--lg-card-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--lg-rim-outer);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 var(--lg-rim-top), 0 1px 4px rgba(0, 0, 0, 0.045);
+  padding: 10px 12px 11px;
+  gap: 6px;
+  align-items: stretch;
+  text-align: left;
+  overflow: hidden;
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .matrix-cell:hover {
+  background: var(--lg-card-hover);
+  border: 1px solid var(--lg-rim-edge);
+  border-radius: 16px;
+  padding: 10px 12px 11px;
+  box-shadow: inset 0 1px 0 var(--lg-rim-top), 0 3px 10px rgba(0, 0, 0, 0.07);
+  transform: none;
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .matrix-cell::after {
+  display: none;
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .cell-label {
+  justify-content: center;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--lg-ink-2);
+}
+
+[data-ui-theme="liquid-glass"] .session-summary-panel .telemetry-matrix .cell-label .svg-icon {
+  display: none;
+}
+
 [data-ui-theme="liquid-glass"] .telemetry-matrix .cell-label {
   justify-content: space-between;
   font-size: var(--fs-sm);
@@ -457,7 +474,6 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   color: var(--lg-ink-2);
 }
 
-[data-ui-theme="liquid-glass"] .telemetry-matrix.is-flat-summary .cell-label .svg-icon,
 [data-ui-theme="liquid-glass"] .telemetry-matrix .cell-label .svg-icon {
   display: inline-block;
   color: var(--lg-ink-3);
@@ -467,12 +483,8 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   color: var(--lg-accent);
 }
 
-/* Restrained Apple Neutral KPI Numerals (Crisp tabular numerals + subordinate baseline unit) */
-[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value,
-[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-good,
-[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-info,
-[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.accent-ok,
-[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.accent-speed {
+/* KPI Numerals with Semantic Tiers (Crisp tabular numerals + subordinate baseline unit) */
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value {
   display: flex;
   align-items: baseline;
   color: var(--lg-ink-1);
@@ -503,8 +515,18 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   margin-left: 3.5px;
 }
 
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-good,
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.accent-ok {
+  color: var(--lg-green-text);
+}
+
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-info,
+[data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.accent-speed {
+  color: var(--lg-teal-text);
+}
+
 [data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-warn {
-  color: var(--lg-ink-1);
+  color: var(--lg-amber);
 }
 
 [data-ui-theme="liquid-glass"] .telemetry-matrix .cell-value.tone-danger {
@@ -835,7 +857,8 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   border-bottom: none;
 }
 
-[data-ui-theme="liquid-glass"] .data-table td[data-col="step"] {
+[data-ui-theme="liquid-glass"] .data-table td[data-col="step"],
+[data-ui-theme="liquid-glass"] .data-table td[data-col="time"] {
   color: var(--lg-ink-3);
 }
 
@@ -845,20 +868,28 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   color: var(--lg-ink-1);
 }
 
-/* Keep table values calm & monochrome (preserve only warn/danger for slow TTFT / anomalies) */
+/* Semantic color tiers for table values (TPS & cache hit rates) */
 [data-ui-theme="liquid-glass"] .data-table td .tone-good,
+[data-ui-theme="liquid-glass"] .data-table td.tone-good {
+  color: var(--lg-green-text);
+  font-weight: 500;
+}
+
 [data-ui-theme="liquid-glass"] .data-table td .tone-info,
-[data-ui-theme="liquid-glass"] .data-table td.tone-good,
 [data-ui-theme="liquid-glass"] .data-table td.tone-info {
-  color: var(--lg-ink-2);
+  color: var(--lg-teal-text);
   font-weight: 500;
 }
 
 [data-ui-theme="liquid-glass"] .data-table td[data-col="tps"].tone-good,
+[data-ui-theme="liquid-glass"] .data-table td[data-col="tps"] .tone-good {
+  color: var(--lg-green-text);
+  font-weight: 600;
+}
+
 [data-ui-theme="liquid-glass"] .data-table td[data-col="tps"].tone-info,
-[data-ui-theme="liquid-glass"] .data-table td[data-col="tps"] .tone-good,
 [data-ui-theme="liquid-glass"] .data-table td[data-col="tps"] .tone-info {
-  color: var(--lg-ink-1);
+  color: var(--lg-teal-text);
   font-weight: 600;
 }
 
@@ -884,8 +915,13 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
 
 /* --- 9. Usage Analytics View (Restrained Monochrome KPIs + Apple Blue Trend Curve) --- */
 [data-ui-theme="liquid-glass"] .cons-split-4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+}
+
+@media (min-width: 521px) {
+  [data-ui-theme="liquid-glass"] .cons-split-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 [data-ui-theme="liquid-glass"] .cons-hero-sub {
@@ -958,7 +994,8 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   border-bottom: 1px solid var(--lg-divider);
 }
 
-[data-ui-theme="liquid-glass"] .settings-tab-stack .panel > .form-row:first-of-type {
+[data-ui-theme="liquid-glass"] .settings-tab-stack .panel > .form-row:first-child,
+[data-ui-theme="liquid-glass"] .settings-tab-stack .panel > .panel-header + .form-row {
   padding-top: 2px;
 }
 
@@ -1177,29 +1214,33 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   background: var(--lg-divider);
 }
 
-/* Restrained Apple Neutral Capsule Numerals (suppress cyan/green rainbow noise) */
+/* Semantic Capsule Numerals (Apple-tuned green/teal/amber/red tiers) */
 :host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-good,
 :host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-good .wm-slot-text,
-:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-info,
-:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-info .wm-slot-text,
 [data-ui-theme="liquid-glass"] .wm-cap-slot.tone-good,
-[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-good .wm-slot-text,
-[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-info,
-[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-info .wm-slot-text {
-  color: var(--lg-ink-2);
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-good .wm-slot-text {
+  color: var(--lg-green-text);
   font-weight: 500;
 }
 
-:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-seg-speed .wm-slot-text,
-:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-ctx-pct,
-[data-ui-theme="liquid-glass"] .wm-seg-speed .wm-slot-text,
-[data-ui-theme="liquid-glass"] .wm-ctx-pct {
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-info,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-cap-slot.tone-info .wm-slot-text,
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-info,
+[data-ui-theme="liquid-glass"] .wm-cap-slot.tone-info .wm-slot-text {
+  color: var(--lg-teal-text);
+  font-weight: 500;
+}
+
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-seg-speed:not(.tone-good):not(.tone-info):not(.tone-warn):not(.tone-danger) .wm-slot-text,
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-ctx-pct:not(.tone-good):not(.tone-info):not(.tone-warn):not(.tone-danger),
+[data-ui-theme="liquid-glass"] .wm-seg-speed:not(.tone-good):not(.tone-info):not(.tone-warn):not(.tone-danger) .wm-slot-text,
+[data-ui-theme="liquid-glass"] .wm-ctx-pct:not(.tone-good):not(.tone-info):not(.tone-warn):not(.tone-danger) {
   color: var(--lg-ink-1);
   font-weight: 500;
 }
 
-:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-seg-speed.state-running .wm-slot-text,
-[data-ui-theme="liquid-glass"] .wm-seg-speed.state-running .wm-slot-text {
+:host(.wm-capsule-host[data-ui-theme="liquid-glass"]) .wm-seg-speed.state-running:not([class*="tone-"]) .wm-slot-text,
+[data-ui-theme="liquid-glass"] .wm-seg-speed.state-running:not([class*="tone-"]) .wm-slot-text {
   color: var(--lg-accent);
   font-weight: 600;
 }
