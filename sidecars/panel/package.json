@@ -1,6 +1,6 @@
 {
   "name": "agy-monitor-panel",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Sidecar backend and web UI for AGY Monitor.",

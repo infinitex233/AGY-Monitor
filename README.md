@@ -1,12 +1,14 @@
 <div align="center">
 
-<img src="assets/agy-monitor-icon.png" alt="AGY Monitor icon" width="128" height="128" />
+<img src="assets/banner.png" alt="AGY Monitor — Apple Liquid Glass Local Telemetry Plugin" width="100%" />
 
 # AGY Monitor
 
-Lightweight local telemetry and token analytics plugin for Google Antigravity — zero external dependencies, zero credential access, built for clarity.
+**Apple Liquid Glass local telemetry & token analytics plugin for Google Antigravity**
 
-[![Release](https://img.shields.io/github/v/release/infinitex233/AGY-Monitor?style=flat-square&color=2A5E76&label=release)](https://github.com/infinitex233/AGY-Monitor/releases/latest)
+Switchable Liquid Glass & Classic UI · 2×2 four-metric live trends · Pure Decode TPS · Zero npm dependencies · Zero credential access
+
+[![Release](https://img.shields.io/github/v/release/infinitex233/AGY-Monitor?style=flat-square&color=007aff&label=release)](https://github.com/infinitex233/AGY-Monitor/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/infinitex233/AGY-Monitor/total?style=flat-square&color=0ea5e9)](https://github.com/infinitex233/AGY-Monitor/releases)
 [![Stars](https://img.shields.io/github/stars/infinitex233/AGY-Monitor?style=flat-square&color=f59e0b)](https://github.com/infinitex233/AGY-Monitor/stargazers)
 [![License](https://img.shields.io/github/license/infinitex233/AGY-Monitor?style=flat-square&color=3b82f6)](LICENSE)
@@ -20,11 +22,7 @@ Lightweight local telemetry and token analytics plugin for Google Antigravity �
 
 <br />
 
-<img src="assets/screenshots/popover-live.png" alt="AGY Monitor Live Popover Preview" width="100%" />
-
-<br />
-
-[Latest Release](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [Download `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
+[Latest Release (`v1.1.0`)](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [Download `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
 
 </div>
 
@@ -56,9 +54,9 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
     <td align="center" width="50%">
       <img src="assets/screenshots/popover-live.png" alt="Live Monitor Popover" width="100%" />
       <br />
-      <b>Live Monitor (Popover)</b>
+      <b>Live Monitor (Liquid Glass Popover)</b>
       <br />
-      <sub>Session summary cards, 10-channel context breakdown, active task status, and embedded step table</sub>
+      <sub>Pure Decode TPS, 10-channel context bar, active task status, and synchronized 2×2 four-metric dot-matrix / curve / table switch</sub>
     </td>
   </tr>
   <tr>
@@ -74,7 +72,7 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
       <br />
       <b>Auxiliary Sidebar View</b>
       <br />
-      <sub>Full-height sidebar layout with sortable per-step diagnostics and model breakdown</sub>
+      <sub>Full-height sidebar layout with 2×2 synchronized dot-matrix trends and full step diagnostics</sub>
     </td>
   </tr>
 </table>
@@ -87,10 +85,10 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
 - **Non-Invasive Mounting**: Injects overlays cleanly in memory over local CDP — **never modifies** the host `app.asar` bundle.
 - **Instant Telemetry at a Glance**: Displays **Live Speed (`tok/s`) | TTFT | Live Cache Hit | Context Ring %** right in the titlebar; hover for a 4-card snapshot (**Live Speed, TTFT, Live Cache, Step Cost**) and context channel bar, click to toggle the 3-tab popover, or right-click to refresh.
 
-### 2. Live Monitor: Session Summary, Context Channels & Step Table
-- **Session Overview**: Tracks overall generation speed, average TTFT, cache hit rate, and cumulative estimated cost for the active thread.
-- **10-Channel Context Window**: Visualizes how context capacity is divided across model replies, tool outputs, user turns, subagent notices, compaction summaries, system prompts, system tools, MCP tools, skills, and user rules — switchable between the main agent and any subagent/Swarm worker.
-- **Embedded Call Details**: Browse, sort, and filter per-step timing, latency waterfalls, anomaly tags, and compaction events directly inside Live Monitor, or export reports as multi-sheet `.xlsx` workbooks or Markdown.
+### 2. Live Monitor: Pure Decode TPS, Context Channels & 2×2 Trend Switch
+- **Pure Decode TPS & Session Overview**: Measures true model output throughput (`outputTokens / max(totalDuration - TTFT, 50ms)`) alongside average TTFT, cache hit rate, and cumulative estimated cost with subordinate unit typography.
+- **10-Channel Context Window**: Visualizes how context capacity is divided across model replies, tool outputs, user turns, subagent notices, compaction summaries, system prompts, system tools, MCP tools, skills, and user rules — with interactive hover dimming and inline readout pill.
+- **2×2 Four-Metric Trends & Call Details (`Dots / Curve / List`)**: Switch effortlessly between synchronized 2×2 dot-matrix charts, smooth Bezier curves (Speed, TTFT, Cache %, Cost with silent P85 outlier soft-capping and 4-cell hover scrubbing), and the full sortable step table with `.xlsx` and Markdown export.
 - **Version-First Compact Model Labels**: Cleaner short identifiers like `4-hydrogen-high` and `4-neon-high`.
 
 ### 3. Analytics: Trends, Full-Fit 6-Month Heatmap & Leaderboards
@@ -100,7 +98,7 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
 - **Multi-Dimensional Rankings**: Compare usage, estimated USD cost, cache hit %, speed, and TTFT across models, project workspaces, and sessions, with `.xlsx` and Markdown export support.
 
 ### 4. Streamlined Single-Page Preferences
-- Configure language (`Auto` / `简体中文` / `English`), accent theme, font scale (`sm / md / lg / xl`), model name formatting, mount mode (`Dual` / `Composer` / `Sidebar`), pricing catalog sync, update checks, and local cache rebuild on a single clean page.
+- Configure language (`Auto` / `简体中文` / `English`), **UI Style (`Liquid Glass` / `Default`)**, accent theme, font scale (`sm / md / lg / xl`), model name formatting, mount mode (`Dual` / `Composer` / `Sidebar`), pricing catalog sync, update checks, and local cache rebuild on a single clean page.
 
 ---
 

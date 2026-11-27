@@ -1,12 +1,14 @@
 <div align="center">
 
-<img src="assets/agy-monitor-icon.png" alt="AGY Monitor 图标" width="128" height="128" />
+<img src="assets/banner.png" alt="AGY Monitor — Apple Liquid Glass 实时监控插件" width="100%" />
 
 # AGY Monitor
 
-专注于本地实时性能指标与 Token 用量分析的 Google Antigravity 监控插件 —— 零外部依赖、零账号权限触碰、即装即用
+**Apple Liquid Glass 质感 · Google Antigravity 本地实时性能监控与 Token 分析插件**
 
-[![Release](https://img.shields.io/github/v/release/infinitex233/AGY-Monitor?style=flat-square&color=2A5E76&label=release)](https://github.com/infinitex233/AGY-Monitor/releases/latest)
+支持液态玻璃 / 默认经典双主题热切换 · 2×2 四维点阵/曲线趋势 · 纯吐字 TPS · 零外部依赖 · 零账号凭证触碰
+
+[![Release](https://img.shields.io/github/v/release/infinitex233/AGY-Monitor?style=flat-square&color=007aff&label=release)](https://github.com/infinitex233/AGY-Monitor/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/infinitex233/AGY-Monitor/total?style=flat-square&color=0ea5e9)](https://github.com/infinitex233/AGY-Monitor/releases)
 [![Stars](https://img.shields.io/github/stars/infinitex233/AGY-Monitor?style=flat-square&color=f59e0b)](https://github.com/infinitex233/AGY-Monitor/stargazers)
 [![License](https://img.shields.io/github/license/infinitex233/AGY-Monitor?style=flat-square&color=3b82f6)](LICENSE)
@@ -20,11 +22,7 @@
 
 <br />
 
-<img src="assets/screenshots/popover-live.png" alt="AGY Monitor 实时监控浮窗" width="100%" />
-
-<br />
-
-[下载最新版本 (Releases)](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [直接下载 `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
+[下载最新版本 (`v1.1.0`)](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [直接下载 `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
 
 </div>
 
@@ -56,9 +54,9 @@
     <td align="center" width="50%">
       <img src="assets/screenshots/popover-live.png" alt="实时监控浮窗" width="100%" />
       <br />
-      <b>实时监控（悬浮浮窗）</b>
+      <b>实时监控（Liquid Glass 悬浮浮窗）</b>
       <br />
-      <sub>会话总览、10 通道上下文构成条、活跃任务状态与内嵌式调用明细表</sub>
+      <sub>纯吐字 TPS、10 通道上下文条、活跃任务状态与 2×2 四维点阵 / 曲线 / 列表三态切换</sub>
     </td>
   </tr>
   <tr>
@@ -74,7 +72,7 @@
       <br />
       <b>右侧辅助栏视图</b>
       <br />
-      <sub>宽屏辅助栏常驻监控，完整展开多步骤模型性能与费用明细</sub>
+      <sub>宽屏辅助栏常驻监控，完整呈现 2×2 四维同步点阵与步骤明细</sub>
     </td>
   </tr>
 </table>
@@ -87,10 +85,10 @@
 - **无侵入轻量挂载**：通过本地 CDP 在内存层渲染，**绝不修改**宿主 `app.asar` 安装包。
 - **一眼掌握关键状态**：顶栏默认展示 **实时速度（`tok/s`）| 首字延迟（`TTFT`）| 实时缓存命中率 | 上下文环形占比**；鼠标悬停展开四卡速览（实时速度、首字延迟、实时缓存、本次费用）与上下文通道分布，点击开启完整面板，右键快速刷新。
 
-### 2. 「实时监控」：会话总览 + 上下文拆解 + 内嵌明细
-- **四合一会话总览**：直观汇总当前会话的平均输出速度、平均首字延迟、缓存命中率与累计预估费用。
-- **10 类上下文窗口构成**：清晰拆分模型回复、工具结果、用户消息、子代理通知、压缩摘要、系统提示词、系统工具、MCP 工具、Skill 与用户规则，支持在主代理与任意子代理 / Swarm Worker 间切换查看。
-- **内嵌式调用明细表**：无需切出标签页，直接在监控页底部浏览、排序或按模型筛选每一步调用；支持悬停查看首字/耗时拆解、异常与压缩诊断标注、关键词检索，以及导出为多表 Excel（`.xlsx`）或复制 Markdown 汇总。
+### 2. 「实时监控」：纯吐字 TPS + 上下文拆解 + 2×2 四维趋势
+- **纯吐字速度与四合一总览**：自动剔除首字排队/预填充等待（`outputTokens / max(totalDuration - TTFT, 50ms)`），真实反映模型生成吞吐，同时汇总平均首字延迟、缓存命中率与累计预估费用。
+- **10 类上下文窗口构成**：清晰拆分模型回复、工具结果、用户消息、子代理通知、压缩摘要、系统提示词、系统工具、MCP 工具、Skill 与用户规则，悬停任意分段即时高亮读数，支持主代理与子代理/蜂群切换查看。
+- **2×2 四维趋势与明细三态切换（点阵 / 曲线 / 列表）**：默认以 2×2 纯色点阵同屏呈现最近 24 步的速度、首字、缓存与费用（支持平滑曲线与完整明细表一键切换）；内置中位数锚定 P85 静默封顶与四格同步 Hover 联动，列表模式下保留筛选、排序与多表 Excel（`.xlsx`）/ Markdown 导出。
 - **更直观的模型代号**：精简模式采用版本号前置命名（例如 `4-hydrogen-high`、`4-neon-high`），符合 Gemini 模型识别直觉。
 
 ### 3. 「用量统计」：时间趋势 + 半年热力图 + 多维排行
@@ -100,7 +98,7 @@
 - **多维排行与报表导出**：对比不同模型、项目工作区与历史会话的 Token、费用、缓存命中率、平均速度与首字表现，同样支持导出 `.xlsx` 与 Markdown。
 
 ### 4. 「偏好设置」：单页轻量控制
-- **界面与显示**：一键切换语言（跟随宿主 / 简体中文 / English）、主题强调色、字号缩放（`sm / md / lg / xl`）、模型名称展示格式与挂载方式（双栖挂载 / 输入框挂载 / 仅侧边栏）。
+- **界面与显示**：一键切换语言（跟随宿主 / 简体中文 / English）、**界面风格（液态玻璃 / 默认）**、主题强调色、字号缩放（`sm / md / lg / xl`）、模型名称展示格式与挂载方式（双栖挂载 / 输入框挂载 / 仅侧边栏）。
 - **维护与同步**：支持从 GitHub 检查插件更新、同步 [`pricing-catalog.json`](pricing-catalog.json) 公开定价目录，或按需重建本地轨迹缓存、恢复默认配置。
 
 ---

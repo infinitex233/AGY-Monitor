@@ -2,6 +2,14 @@
 
 All notable changes to **AGY Monitor** are documented in this file.
 
+## [1.1.0] - 2026-11
+
+### Highlights
+- **Switchable Apple Liquid Glass Theme (`uiTheme`, default: `liquid_glass`)**: Introduced a pure-neutral, crystal-clear frosted Liquid Glass visual system with specular meniscus rims, cursor-tracking sheen, and spring-eased transitions across the sidebar, floating popover, and hover cards — plus a live **UI Style (`Liquid Glass` / `Default`)** switcher in Preferences that preserves the classic upstream UI pixel-for-pixel.
+- **2×2 Four-Metric Step Trend View (`Dots / Curve / List`)**: Added a universal 3-way switcher in the step details header (default: **Dots**) displaying Speed, TTFT, Cache Hit %, and Step Cost in synchronized 2×2 dot-matrix or smooth Bezier curves, with median-anchored P85 silent outlier soft-capping, dynamic cache floor scaling, and synchronized 4-cell hover scrubbing with an inline header step pill.
+- **Pure Decode TPS (`MEASUREMENT_VERSION = 5`)**: Switched per-step and weighted-average speed calculations from end-to-end duration to pure decode duration (`max(totalDuration - TTFT, 50ms)`), excluding TTFT prefill/queue wait time and automatically recalculating legacy v4 caches.
+- **Crystal Glass & Layout Polish**: Refined KPI tiles with subordinate units (`tok/s`, `s`) and a minimalist `$` cost icon, upgraded the 10-channel context window bar with segment hover dimming and inline readout, kept secondary popovers/tooltips high-opacity frosted, made floating popover height adapt cleanly to content, and aligned card gutters pixel-symmetrically with the top bar.
+
 ## [1.0.2] - 2026-11
 
 ### Fixes & Consistency
