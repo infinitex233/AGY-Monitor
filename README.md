@@ -36,7 +36,7 @@ Switchable Default & Liquid Glass UI · 2×2 four-metric live trends · Pure Dec
 
 When working inside Antigravity, two questions matter most: **how fast is the current turn performing** (throughput, TTFT, live cache hit, context pressure), and **how many tokens and estimated dollars have been spent today and over recent weeks**.
 
-**AGY Monitor** (streamlined from [`yuhuan-dev/antigravity-usage-monitor`](https://github.com/yuhuan-dev/antigravity-usage-monitor) and independently maintained from `v1.0.0`) strips away everything unrelated to pure telemetry:
+**AGY Monitor** (streamlined from [`yuhuan-dev/antigravity-usage-monitor`](https://github.com/yuhuan-dev/antigravity-usage-monitor)) strips away everything unrelated to pure telemetry:
 
 - **Focused 3-Tab Interface**: Consolidated into **Live Monitor**, **Analytics**, and **Preferences** — removing subscription quota polling, account switching, quota reservation heuristics, cross-client session migration, and host UI translation injection.
 - **Zero Account & Credential Surface**: Ships with no OAuth login flows and no PowerShell/DPAPI credential scripts. All metrics are read strictly from local Antigravity telemetry and trajectory caches.
@@ -76,7 +76,7 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
       <br />
       <b>Auxiliary Sidebar View</b>
       <br />
-      <sub>Full-height sidebar layout showing session overview, context breakdown, and full step details (with 2×2 dot-matrix / curve switch)</sub>
+      <sub>Full-height sidebar layout showing session overview, context breakdown, and step details</sub>
     </td>
   </tr>
 </table>
@@ -87,19 +87,19 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
 
 ### 1. Topbar Capsule, Quick Hover Card & Floating Window
 - **Non-Invasive Mounting**: Injects overlays cleanly in memory over local CDP — **never modifies** the host `app.asar` bundle.
-- **Customizable Capsule & Hover Card**: Configure 1–5 topbar capsule slots (default: **Live Speed (`tok/s`) | TTFT | Context Ring %**; optional Live Cache Hit, Cost, etc.); hover for a customizable 4-card snapshot (default: **Live Speed, TTFT, Session Speed, Step Cost**) and context channel bar, click to toggle the 3-tab popover, or right-click to refresh.
+- **Customizable Capsule & Hover Card**: Configure 1–5 topbar capsule slots (speed, TTFT, cache hit, cost, context ring, etc.); hover for a customizable 4-card snapshot and context channel bar, click to toggle the 3-tab popover, or right-click to refresh.
 - **In-Page Floating Window & Pill Badge**: Pin the full 3-tab panel directly inside the page with titlebar dragging, edge/corner resizing, position & size lock/reset, and one-click collapse into a draggable floating pill showing live status, speed, and context usage.
 
 ### 2. Live Monitor: Pure Decode TPS, Context Channels & 2×2 Trend Switch
-- **Pure Decode TPS & Median Aggregation**: Excludes native TTFT, `< 0.1s` decode windows, buffered bursts (including adaptive 3× long-wait bursts), and `> 10,000 tok/s` outliers, aggregating valid steps via **median** alongside TTFT, cache hit rate, and estimated cost with subordinate unit typography.
+- **Pure Decode TPS & Median Aggregation**: Excludes native TTFT, ultra-short decodes, buffered bursts, and extreme outliers, aggregating valid steps via **median** alongside TTFT, cache hit rate, and estimated cost.
 - **10-Channel Context Window**: Visualizes how context capacity is divided across model replies, tool outputs, user turns, subagent notices, compaction summaries, system prompts, system tools, MCP tools, skills, and user rules — with interactive hover dimming and inline readout pill.
-- **Call Details & 2×2 Trend Switch (`List / Dots / Curve`)**: Defaults to the full sortable step list (with an `HH:MM:SS` clock-time first column, filtering, sorting, and `.xlsx` / Markdown export) and switches seamlessly to synchronized 2×2 dot-matrix charts or smooth Bezier curves (Speed, TTFT, Cache %, Cost with median-anchored P85 soft-capping and 4-cell hover scrubbing).
+- **Call Details & 2×2 Trend Switch (`List / Dots / Curve`)**: Defaults to a sortable step table (with filtering, sorting, and `.xlsx` / Markdown export) and switches seamlessly to synchronized 2×2 dot-matrix or curve trends for the latest 24 steps.
 - **Version-First Compact Model Labels**: Cleaner short identifiers like `4-hydrogen-high` and `4-neon-high`.
 
 ### 3. Analytics: Trends, Full-Fit 6-Month Heatmap & Leaderboards
 - **Preset & Custom Windows**: Inspect **Today**, **24h**, **7d**, **14d**, **30d**, **All**, or custom date spans.
 - **Token Composition & Breakdown Bar**: Input, cache read, and output totals paired with color-coded legend dots and a proportional segment bar.
-- **Full-Fit 6-Month Calendar Heatmap**: Selecting **All** renders a 26-week daily activity heatmap scaled cleanly to the panel width with zero edge clipping or horizontal scrolling; shorter windows display smooth cubic Bezier trend curves.
+- **Full-Fit 6-Month Calendar Heatmap**: Selecting **All** renders a 26-week daily activity heatmap scaled cleanly to the panel width with zero edge clipping or horizontal scrolling; shorter windows display smooth trend curves with peak callouts.
 - **Multi-Dimensional Rankings**: Compare usage, estimated USD cost, cache hit %, speed, and TTFT across models, project workspaces, and sessions, with `.xlsx` and Markdown export support.
 
 ### 4. Streamlined Single-Page Preferences
@@ -109,11 +109,11 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
 
 ## Client Support
 
-| Client / Environment | Status Bar / Capsule | Monitor Panel | Offline Logs & SQLite | Modifies `app.asar` |
+| Client / Environment | Status Bar / Capsule | Monitor Panel | Offline History | Modifies `app.asar` |
 | :--- | :---: | :---: | :---: | :---: |
 | **Antigravity 2.0 Desktop** | Titlebar / Composer | Hover Popover + Auxiliary Pane | Yes | No |
 | **Antigravity IDE** | Titlebar / Composer | Capsule Popover | Yes | No |
-| **Antigravity CLI (`agy`) / ACP (incl. T3 Code)** | Terminal `statusLine` | Standalone Web (`--port`) | Yes (SQLite + `.pbtxt`) | No |
+| **Antigravity CLI (`agy`) / ACP** | Terminal `statusLine` | Standalone Web (`--port`) | Yes | No |
 | **SSH Remote / Headless** | Isolated per endpoint | Popover / `--token` Web UI | Yes | No |
 
 ---
