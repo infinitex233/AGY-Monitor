@@ -136,6 +136,7 @@ export const I18N_MESSAGES_EN_US = Object.freeze({
 
   // Overview Matrix Metric Options & Cells
   'ovMetric.tps': 'Live Speed',
+  'ovMetric.tpsRecent': 'Recent',
   'ovMetric.ttft': 'First Token',
   'ovMetric.avg_tps': 'Avg Speed',
   'ovMetric.avg_ttft': 'Avg First Token',

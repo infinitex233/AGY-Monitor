@@ -56,9 +56,11 @@ import {
   loadSettings,
   normalizeCliStatusLineSlots,
   resolveEffectiveCliStatusLineSlots,
+  roundMetric,
   saveJson,
 } from './backend/config.mjs';
 import { computeStepCost, createStepModelResolver } from './backend/model-pricing.mjs';
+import { findRecentStepTokPerSec } from './shared/telemetry-display-rules.mjs';
 import { normalizePathForWorkspaceMatch } from './shared/workspace-uri.mjs';
 
 const CLI_RUNNING_STALE_MS = 10 * 60 * 1000;
@@ -412,7 +414,7 @@ export function resolveCliLocalSessionMetrics({
     }
   }
 
-  const targetMemoKey = combinedSig ? `v1::${targetCid}::${combinedSig}` : '';
+  const targetMemoKey = combinedSig ? `v2::${targetCid}::${combinedSig}` : '';
   if (
     targetMemoKey &&
     prevMemo?.targetKey === targetMemoKey &&
@@ -576,7 +578,6 @@ export function resolveCliLocalSessionMetrics({
   let latestContextTokens = 0;
   let latestLimitTokens = 0;
   let hasReportedLimit = false;
-  let latestTps = null;
   let latestTtft = null;
   let sessionAnomalyCount = 0;
   let latestAnomaly = null;
@@ -631,14 +632,8 @@ export function resolveCliLocalSessionMetrics({
       latestLimitTokens = Number(step.maxContextBudgetTokens);
     }
 
-    if (!step.isCompactionStep) {
-      const sm = speedMetric(step);
-      if (sm.value !== null && Number.isFinite(sm.value)) {
-        latestTps = +sm.value.toFixed(1);
-      }
-      if (step.ttftSec !== null && Number.isFinite(step.ttftSec) && step.ttftSec >= 0) {
-        latestTtft = step.ttftSec;
-      }
+    if (!step.isCompactionStep && Number.isFinite(step.ttftSec) && step.ttftSec >= 0) {
+      latestTtft = step.ttftSec;
     }
   }
 
@@ -652,6 +647,8 @@ export function resolveCliLocalSessionMetrics({
     };
   }
 
+  const latestMetricIndex = steps.findLastIndex((step) => !step.isCompactionStep);
+  const latestTps = roundMetric(findRecentStepTokPerSec(steps, (step) => speedMetric(step).value, latestMetricIndex));
   const speedSum = summarizeSpeed(steps);
   const ttftSum = summarizeTtft(steps);
   const totalPromptAll = totalInputTokens + totalCacheReadTokens;
@@ -920,12 +917,21 @@ export function buildMergedCliCapsuleContext({
       ? Math.max(0, (Number.isFinite(stdinInTok) ? stdinInTok : 0) + (Number.isFinite(stdinOutTok) ? stdinOutTok : 0))
       : null;
 
+  const targetCid =
+    localMetrics?.cascadeId ||
+    stdinData?.cascade_id ||
+    stdinData?.conversation_id ||
+    stdinData?.session_id ||
+    '';
   const snapActive =
     snapLiveFresh &&
     snapshot?.activeConversation &&
-    (!localMetrics?.cascadeId || snapshot.activeConversation.cascadeId === localMetrics.cascadeId)
+    (!targetCid || snapshot.activeConversation.cascadeId === targetCid)
       ? snapshot.activeConversation
       : null;
+  const snapTps = localMetrics?.found && localDbNewerThanSnap
+    ? null
+    : snapActive?.latestTokPerSec ?? snapActive?.lastKnownTokPerSec ?? null;
 
   const hasTelemetry = Boolean(
     stdinData || localMetrics?.found || snapActive
@@ -946,7 +952,7 @@ export function buildMergedCliCapsuleContext({
     runningCount,
     runningSubCount,
     usedPct,
-    tps: localMetrics?.tps ?? snapActive?.latestTokPerSec ?? null,
+    tps: localMetrics?.tps ?? snapTps,
     avgTps: localMetrics?.avgTps ?? snapActive?.avgTokPerSec ?? null,
     ttft: localMetrics?.ttft ?? snapActive?.latestTtftSec ?? null,
     stepCost: localMetrics?.stepCost ?? snapActive?.latestStepCostUsd ?? null,

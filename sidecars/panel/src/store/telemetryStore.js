@@ -703,6 +703,7 @@ export function isEquivalentTelemetry(prev, next) {
   if (pAct?.aggregated?.activeAgentId !== nAct?.aggregated?.activeAgentId) return false;
   if (pAct?.aggregated?.activeAgentBadge !== nAct?.aggregated?.activeAgentBadge) return false;
   if (pAct?.aggregated?.latestTokPerSec !== nAct?.aggregated?.latestTokPerSec) return false;
+  if (pAct?.aggregated?.lastKnownTokPerSec !== nAct?.aggregated?.lastKnownTokPerSec) return false;
   if (pAct?.aggregated?.latestTtftSec !== nAct?.aggregated?.latestTtftSec) return false;
   if (pAct?.aggregated?.lastKnownTtftSec !== nAct?.aggregated?.lastKnownTtftSec) return false;
   if (pAct?.aggregated?.avgTokPerSec !== nAct?.aggregated?.avgTokPerSec) return false;
@@ -715,6 +716,7 @@ export function isEquivalentTelemetry(prev, next) {
   if (pAct?.aggregated?.latestCacheHitPct !== nAct?.aggregated?.latestCacheHitPct) return false;
   if (pAct?.aggregated?.latestSpeedReason !== nAct?.aggregated?.latestSpeedReason) return false;
   if (pAct?.latestTokPerSec !== nAct?.latestTokPerSec) return false;
+  if (pAct?.lastKnownTokPerSec !== nAct?.lastKnownTokPerSec) return false;
   if (pAct?.latestTtftSec !== nAct?.latestTtftSec) return false;
   if (pAct?.lastKnownTtftSec !== nAct?.lastKnownTtftSec) return false;
   if (pAct?.avgTokPerSec !== nAct?.avgTokPerSec) return false;
@@ -754,6 +756,7 @@ export function isEquivalentTelemetry(prev, next) {
       pa?.isRunning !== na?.isRunning ||
       pa?.liveActivity?.signature !== na?.liveActivity?.signature ||
       pa?.latestTokPerSec !== na?.latestTokPerSec ||
+      pa?.lastKnownTokPerSec !== na?.lastKnownTokPerSec ||
       pa?.latestTtftSec !== na?.latestTtftSec ||
       pa?.lastKnownTtftSec !== na?.lastKnownTtftSec ||
       pa?.avgTokPerSec !== na?.avgTokPerSec ||
@@ -1071,6 +1074,8 @@ export function isEquivalentTelemetry(prev, next) {
       pr?.subagentCount !== nr?.subagentCount ||
       (pr?.swarmCount || 0) !== (nr?.swarmCount || 0) ||
       pr?.runningSubagentCount !== nr?.runningSubagentCount ||
+      pr?.latestTokPerSec !== nr?.latestTokPerSec ||
+      pr?.lastKnownTokPerSec !== nr?.lastKnownTokPerSec ||
       (pr?.runningSwarmCount || 0) !== (nr?.runningSwarmCount || 0) ||
       pr?.mainActivity?.signature !== nr?.mainActivity?.signature ||
       pr?.mainActivity?.startedAtMs !== nr?.mainActivity?.startedAtMs

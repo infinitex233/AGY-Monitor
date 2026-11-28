@@ -1869,7 +1869,7 @@ export function mountWindowOverlay() {
     } = resolveMultiSessionCapsuleState(telemetry, {
       agents,
       aggregated,
-      latestTokPerSec: overviewActive.latestTokPerSec ?? null,
+      latestTokPerSec: overviewActive.latestTokPerSec ?? overviewActive.lastKnownTokPerSec ?? null,
       contextUsedPct: slotCtx.usedPct,
     });
 

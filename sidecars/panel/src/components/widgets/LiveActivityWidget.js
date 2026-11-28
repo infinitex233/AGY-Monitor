@@ -461,7 +461,7 @@ export const LiveActivityWidget = defineComponent({
                 `${s.cascadeId}:${s.isRunning}:${s.swarmState || ''}:${s.stepCount}:${s.liveActivity?.signature || ''}:${s.liveActivity?.startedAtMs || 0}`
             )
             .join('|');
-          return `${locale}:${item.cascadeId}:${item.title}:${isHere}:${item.isMainRunning}:${item.subagentCount}:${item.swarmCount || 0}:${item.runningSubagentCount}:${isExp}:${item.latestTokPerSec ?? ''}:${item.contextUsedPct ?? ''}:${item.mainActivity?.signature || ''}:${item.mainActivity?.startedAtMs || 0}:${subSig}`;
+          return `${locale}:${item.cascadeId}:${item.title}:${isHere}:${item.isMainRunning}:${item.subagentCount}:${item.swarmCount || 0}:${item.runningSubagentCount}:${isExp}:${item.latestTokPerSec ?? ''}:${item.lastKnownTokPerSec ?? ''}:${item.contextUsedPct ?? ''}:${item.mainActivity?.signature || ''}:${item.mainActivity?.startedAtMs || 0}:${subSig}`;
         },
         createRow: createLiveTaskCard,
         updateRow: (refs, item) => {
@@ -515,9 +515,15 @@ export const LiveActivityWidget = defineComponent({
             patchAttr(refs.hereTagEl, 'hidden', !isHere);
 
             const metricParts = [];
-            if (Number.isFinite(item.latestTokPerSec) && item.latestTokPerSec > 0) {
+            const displayTps =
+              Number.isFinite(item.latestTokPerSec) && item.latestTokPerSec > 0
+                ? item.latestTokPerSec
+                : Number.isFinite(item.lastKnownTokPerSec) && item.lastKnownTokPerSec > 0
+                  ? item.lastKnownTokPerSec
+                  : null;
+            if (displayTps != null) {
               metricParts.push(
-                `${item.latestTokPerSec >= 100 ? Math.round(item.latestTokPerSec) : item.latestTokPerSec.toFixed(1)} t/s`
+                `${displayTps >= 100 ? Math.round(displayTps) : displayTps.toFixed(1)} t/s`
               );
             }
             if (item.contextUsedPct != null && Number.isFinite(Number(item.contextUsedPct))) {

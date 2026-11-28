@@ -11,7 +11,10 @@
 
 import { isDeepStrictEqual } from 'node:util';
 import { LOCAL_ENDPOINT_ID } from '../shared/window-bridge-protocol.mjs';
-import { scaleBucketsExact } from '../shared/telemetry-display-rules.mjs';
+import {
+  findRecentStepTokPerSec,
+  scaleBucketsExact,
+} from '../shared/telemetry-display-rules.mjs';
 import {
   extractLiveActivity,
   parseSwarmWorkerRole,
@@ -315,12 +318,14 @@ function enrichActiveConversationSteps(
 
   const latestEnriched =
     enrichedActiveSteps.length > 0 ? enrichedActiveSteps[enrichedActiveSteps.length - 1] : null;
+  const lastKnownTokPerSec = findRecentValidStepTokPerSec(enrichedActiveSteps);
   const lastKnownTtftSec = findLastValidStepTtft(enrichedActiveSteps);
   const sessionAvgTokPerSec = roundMetric(sessionSpeed.avgTokPerSec);
 
   return {
     enrichedActiveSteps,
     latestEnriched,
+    lastKnownTokPerSec,
     lastKnownTtftSec,
     sessionSpeed,
     sessionTtft,
@@ -331,6 +336,10 @@ function enrichActiveConversationSteps(
     sessionCacheReadTokens,
     sessionOutputTokens,
   };
+}
+
+function findRecentValidStepTokPerSec(steps) {
+  return roundMetric(findRecentStepTokPerSec(steps, (step) => step.tokPerSec));
 }
 
 function findLastValidStepTtft(steps) {
@@ -872,6 +881,7 @@ export function buildAgentUnitTelemetry({
       liveActivity: resolvedLiveActivity,
       stepCount: taggedSteps.length,
       latestTokPerSec: enrichedRes.latestEnriched?.tokPerSec ?? null,
+      lastKnownTokPerSec: enrichedRes.lastKnownTokPerSec ?? null,
       latestTtftSec: enrichedRes.latestEnriched?.ttftSec ?? null,
       lastKnownTtftSec: enrichedRes.lastKnownTtftSec ?? null,
       latestSpeedReason: enrichedRes.latestEnriched?.selectedSpeedReason ?? null,
@@ -1438,6 +1448,7 @@ function buildActiveConversationAssembly({
       liveActivity: aggregatedLiveActivity,
       stepCount: allCombinedEnrichedSteps.length,
       latestTokPerSec: latestMetricAgent.latestTokPerSec,
+      lastKnownTokPerSec: latestMetricAgent.lastKnownTokPerSec ?? null,
       latestTtftSec: latestMetricAgent.latestTtftSec,
       lastKnownTtftSec: combinedLastKnownTtftSec,
       latestSpeedReason: latestMetricAgent.latestSpeedReason,
@@ -1488,6 +1499,7 @@ function buildActiveConversationAssembly({
       ? allCombinedEnrichedSteps.length
       : enrichedActiveSteps.length,
     latestTokPerSec: latestEnriched?.tokPerSec ?? null,
+    lastKnownTokPerSec: mainAgentTelemetry.lastKnownTokPerSec ?? null,
     latestTtftSec: latestEnriched?.ttftSec ?? null,
     lastKnownTtftSec:
       mainAgentTelemetry.lastKnownTtftSec ?? findLastValidStepTtft(enrichedActiveSteps),
@@ -1678,6 +1690,7 @@ export async function buildTelemetryPayloadInternal(
 
     const lastRootStep = rootSteps.length > 0 ? rootSteps[rootSteps.length - 1] : null;
     let bestMetricStep = lastRootStep;
+    let bestMetricSteps = rootSteps;
     let bestMetricRunning = rootConv?.status === 'CASCADE_RUN_STATUS_RUNNING' && Boolean(lastRootStep);
 
     for (const subSum of rawSubs) {
@@ -1694,6 +1707,7 @@ export async function buildTelemetryPayloadInternal(
           (lastSub.createdAtMs || 0) >= (bestMetricStep.createdAtMs || 0))
       ) {
         bestMetricStep = lastSub;
+        bestMetricSteps = subSteps;
         bestMetricRunning = subRunning;
       }
     }
@@ -1727,11 +1741,15 @@ export async function buildTelemetryPayloadInternal(
       modelUpstream = formatUpstreamModelId(rawQuickUpstream, mInfo);
       latestTokPerSec = roundMetric(speedMetric(bestMetricStep).value);
     }
+    const lastKnownTokPerSec = bestMetricStep
+      ? roundMetric(findRecentStepTokPerSec(bestMetricSteps, (step) => speedMetric(step).value))
+      : null;
 
     const stats = {
       modelShort,
       modelUpstream,
       latestTokPerSec,
+      lastKnownTokPerSec,
       contextUsedPct,
       sessionCostUsd: roundSessionCost(totalCost),
       sessionUnpricedCalls: unpricedCalls,
@@ -1954,6 +1972,7 @@ export async function buildTelemetryPayloadInternal(
       modelShort: qStats.modelShort,
       modelUpstream: qStats.modelUpstream,
       latestTokPerSec: qStats.latestTokPerSec,
+      lastKnownTokPerSec: qStats.lastKnownTokPerSec,
       contextUsedPct: qStats.contextUsedPct,
       sessionCostUsd: qStats.sessionCostUsd,
       sessionUnpricedCalls: qStats.sessionUnpricedCalls,
@@ -2023,6 +2042,7 @@ export async function buildTelemetryPayloadInternal(
               modelShort: qStats.modelShort,
               modelUpstream: qStats.modelUpstream,
               latestTokPerSec: qStats.latestTokPerSec,
+              lastKnownTokPerSec: qStats.lastKnownTokPerSec,
               contextUsedPct: qStats.contextUsedPct,
               sessionCostUsd: qStats.sessionCostUsd,
               sessionUnpricedCalls: qStats.sessionUnpricedCalls,
@@ -2324,6 +2344,10 @@ function tryBuildConsumptionPresetsPayload(filterOpts = {}) {
 export function buildCliStatusSnapshot(finalPayload, updatedAtMs = Date.now()) {
   const ac = finalPayload?.activeConversation || {};
   const capSource = ac.aggregated || ac;
+  const {
+    latestTokPerSec = ac.latestTokPerSec ?? null,
+    lastKnownTokPerSec = ac.lastKnownTokPerSec ?? null,
+  } = capSource;
   const ctx = ac.context || {};
   const limitTok = Number(ctx.compactionLimitTokens || ctx.limitTokens || 256000);
   const totalTok = Number(ctx.totalTokens || 0);
@@ -2376,7 +2400,8 @@ export function buildCliStatusSnapshot(finalPayload, updatedAtMs = Date.now()) {
       isRunning: Boolean(capSource.isRunning || ac.isRunning),
       stepCount: Number(capSource.stepCount ?? ac.stepCount ?? 0),
       usedPct: usedPctVal,
-      latestTokPerSec: capSource.latestTokPerSec ?? ac.latestTokPerSec ?? null,
+      latestTokPerSec,
+      lastKnownTokPerSec,
       avgTokPerSec: capSource.avgTokPerSec ?? ac.avgTokPerSec ?? null,
       latestTtftSec: capSource.latestTtftSec ?? ac.latestTtftSec ?? null,
       lastKnownTtftSec: capSource.lastKnownTtftSec ?? ac.lastKnownTtftSec ?? null,

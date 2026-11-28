@@ -49,7 +49,7 @@ Run from `sidecars/panel/`:
 1. Bump version consistently in `plugin.json`, `sidecars/panel/package.json`, `pricing-catalog.json` (`latestPluginVersion`), and `CHANGELOG.md`.
 2. Run `cd sidecars/panel && npm run build && npm test && npm run pack:release`.
 3. Commit to `main`, create and push tag `vX.Y.Z` — `.github/workflows/release.yml` runs tests on `ubuntu-latest` and publishes `dist/agy-monitor.zip` to GitHub Releases.
-4. **Release Notes & Changelog Style**: Write bilingual notes in both `CHANGELOG.md` and the GitHub Release (replacing the CI auto-generated body via `gh release edit vX.Y.Z` after `release.yml` completes). Use `### 更新内容` (never `### 简体中文更新说明`) for Chinese and `### English` for English, keeping bullets factual and concise, plus brief installation/verification notes and the `Full Changelog` compare link.
+4. **Release Title & Notes Style**: Set the GitHub Release title strictly to `vX.Y.Z` (never prefix with a project name or subtitle). Write bilingual notes in both `CHANGELOG.md` and the GitHub Release (via `gh release edit vX.Y.Z --title "vX.Y.Z"` after `release.yml` completes), using `### 更新内容` (never `### 简体中文更新说明`) for Chinese and `### English` for English, with concise factual bullets, brief installation/verification notes, and the `Full Changelog` compare link.
 5. To sync model pricing from upstream without pulling upstream version metadata, run the `Sync Upstream Pricing Catalog` workflow (`workflow_dispatch`) in GitHub Actions.
 
 ### Local Antigravity Desktop Testing Paths

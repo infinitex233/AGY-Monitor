@@ -235,6 +235,10 @@ export function buildCapsuleSlotContext(
       findFallbackRecentStepTtft(activeConv.recentSteps);
   const resolvedTtft = isValidTtftSec(fallbackTtft) ? Number(fallbackTtft) : null;
 
+  const { latestTokPerSec, lastKnownTokPerSec } = capActive;
+  const hasLatestTps = Number.isFinite(latestTokPerSec) && latestTokPerSec > 0;
+  const tpsIsCarried = !hasLatestTps && Number.isFinite(lastKnownTokPerSec) && lastKnownTokPerSec > 0;
+
   const capInTok = Math.max(0, Number(capActive.inputTokens || 0));
   const capCacheTok = Math.max(0, Number(capActive.cacheReadTokens || 0));
   const capOutTok = Math.max(0, Number(capActive.outputTokens || 0));
@@ -252,7 +256,8 @@ export function buildCapsuleSlotContext(
     usedPct,
     dashOffset,
     isRunning,
-    tps: scopedConv?.latestTokPerSec ?? aggregated?.latestTokPerSec ?? activeConv.latestTokPerSec ?? null,
+    tps: hasLatestTps ? latestTokPerSec : tpsIsCarried ? lastKnownTokPerSec : null,
+    tpsIsCarried,
     avgTps: scopedConv?.avgTokPerSec ?? aggregated?.avgTokPerSec ?? activeConv.avgTokPerSec ?? null,
     ttft: resolvedTtft,
     stepCost:
@@ -426,6 +431,7 @@ export function syncCapsuleSlotNodes(capsuleSlots, capsuleSeps, slotKeys, slotCt
     patchAttr(slot.el, 'hidden', false);
     patchAttr(slot.el, 'data-metric', pres.metric);
     patchAttr(slot.el, 'data-vis-rank', String(visRank));
+    patchAttr(slot.el, 'title', pres.title || null);
 
     if (pres.showRing && !slot.ringMounted) {
       slot.el.insertBefore(slot.ringSvg, slot.el.firstChild || slot.textSpan);

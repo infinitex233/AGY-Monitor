@@ -136,6 +136,7 @@ export const I18N_MESSAGES_ZH_CN = Object.freeze({
 
   // Overview Matrix Metric Options & Cells
   'ovMetric.tps': '实时速度',
+  'ovMetric.tpsRecent': '沿用最近有效',
   'ovMetric.ttft': '首字延迟',
   'ovMetric.avg_tps': '平均速度',
   'ovMetric.avg_ttft': '平均首字',

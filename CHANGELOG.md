@@ -2,6 +2,22 @@
 
 All notable changes to **AGY Monitor** are documented in this file.
 
+## [1.2.3] - 2026-11
+
+### 更新内容
+- **实时 TPS 120s 同模型短期沿用（`lastKnownTokPerSec`）**：
+  - 新增 `findRecentStepTokPerSec`，当最新一步因缓冲突发或解码窗口过短（`held_burst` / `short_decode`）无法测出纯解码速度时，仅在 **同会话、同代理、同模型（同时校验 `responseModel` 与 `modelKey`）且时间间隔 ≤ 120s** 内沿用最近一次有效纯解码速率；切模型、缺时间戳或超时即清零。
+  - `latestTokPerSec` 语义保持严格绑定最新一步，独立透出 `lastKnownTokPerSec` 供顶栏胶囊（悬浮标注「沿用最近有效」）、实时概览卡片、运行中任务列表与 CLI 状态栏使用，解决短工具调用后实时速度频繁闪成 `--` 的问题；明细表继续忠实显示 `—` 与排除原因，v7 纯解码中位数聚合口径不变。
+  - 修正 CLI 状态栏在本地未解析到 `cascadeId` 时未校验 stdin 会话 ID 导致可能串读其他会话快照 TPS 的问题。
+- **文档同步**：更新双语 README 副标题与 v1.2.2 特性说明，并在 `AGENTS.md` 中规范发行标题（严格使用 `vX.Y.Z`）与双语更新说明格式。
+
+### English
+- **120s Same-Model Live TPS Carry-Over (`lastKnownTokPerSec`)**:
+  - Added `findRecentStepTokPerSec` to hold the most recent valid pure-decode rate when the newest step is unmeasurable (`held_burst` / `short_decode`), strictly scoped to the same conversation, agent, and model (checking both `responseModel` and `modelKey`) within a 120-second timestamp window; clears immediately on model change, missing timestamps, or timeout.
+  - Kept `latestTokPerSec` strictly tied to the newest step and exposed `lastKnownTokPerSec` separately for the topbar capsule (with a `"Recent"` hover tooltip), Live Overview speed tile, running-sessions list, and CLI statusline — eliminating `--` flicker after short tool calls while leaving step-table `—` rows and v7 median aggregation untouched.
+  - Fixed CLI statusline snapshot matching to validate stdin session IDs when local lookup has no `cascadeId`, preventing cross-session TPS bleed.
+- **Documentation**: Synced bilingual README tagline & v1.2.2 features and documented release title (`vX.Y.Z`) and bilingual release-note conventions in `AGENTS.md`.
+
 ## [1.2.2] - 2026-11
 
 ### 更新内容

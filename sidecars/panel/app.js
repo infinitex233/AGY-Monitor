@@ -579,7 +579,7 @@ return { SUPPORTED_LANGUAGES, THEME_ACCENT_KEYS, UI_THEME_KEYS, DEFAULT_UI_THEME
 })();
 
 // --- shared/telemetry-display-rules.mjs ---
-const { speedRateBin, medianSpeed, mergeSpeedRateBins, classifySpeedTier, classifyCacheTier, classifyStepCostTier, classifyTtftTier, formatCompactTokens, formatCompactCapsuleCost, formatCompactCapsuleTtft, scaleBucketsExact } = (() => {
+const { findRecentStepTokPerSec, speedRateBin, medianSpeed, mergeSpeedRateBins, classifySpeedTier, classifyCacheTier, classifyStepCostTier, classifyTtftTier, formatCompactTokens, formatCompactCapsuleCost, formatCompactCapsuleTtft, scaleBucketsExact } = (() => {
 /**
  * @fileoverview 跨 Backend / Frontend / CLI 共用的纯展示阈值、紧凑格式化与精确整数缩放规则。
  */
@@ -587,6 +587,47 @@ const { speedRateBin, medianSpeed, mergeSpeedRateBins, classifySpeedTier, classi
 // Magpie's logarithmic bins place 1 tok/s in bin 400.
 const SPEED_HIST_ZERO = 400;
 const SPEED_HIST_LOG = Math.log(1.02);
+const TPS_CARRY_WINDOW_MS = 120_000;
+
+function normalizeCarryModelId(value) {
+  return value && !/^(?:0|unknown|MODEL_(?:UNSPECIFIED|UNKNOWN)|模型未知)$/i.test(value) ? value : '';
+}
+
+function getTpsCarryModel(step) {
+  return [step.responseModel, step.baseModelUpstream, step.modelKey, step.baseModelLabel, step.modelDisplayName]
+    .map(normalizeCarryModelId)
+    .find(Boolean) || '';
+}
+
+function isSameCarryModel(latest, candidate) {
+  const latestModel = getTpsCarryModel(latest);
+  const candModel = getTpsCarryModel(candidate);
+  if (!latestModel || latestModel !== candModel) return false;
+  const latestKey = normalizeCarryModelId(latest.modelKey);
+  const candKey = normalizeCarryModelId(candidate.modelKey);
+  return !latestKey || !candKey || latestKey === candKey;
+}
+
+/** Read decode speed from the latest step or a nearby step of the same model and agent. */
+function findRecentStepTokPerSec(steps, readSpeed, latestIndex = steps.length - 1) {
+  const latest = steps[latestIndex];
+  if (!latest) return null;
+  const latestSpeed = readSpeed(latest);
+  if (Number.isFinite(latestSpeed) && latestSpeed > 0) return latestSpeed;
+
+  if (!getTpsCarryModel(latest) || !(latest.createdAtMs > 0)) return null;
+  for (let i = latestIndex - 1; i >= 0; i--) {
+    const step = steps[i];
+    if (step.isCompactionStep || step.isImageGenStep) continue;
+    if (!isSameCarryModel(latest, step)) return null;
+    if (!(step.createdAtMs > 0) || latest.createdAtMs - step.createdAtMs > TPS_CARRY_WINDOW_MS) {
+      return null;
+    }
+    const speed = readSpeed(step);
+    if (Number.isFinite(speed) && speed > 0) return speed;
+  }
+  return null;
+}
 
 function speedRateBin(rate) {
   return Math.max(0, Math.floor(Math.log(rate) / SPEED_HIST_LOG) + SPEED_HIST_ZERO);
@@ -773,7 +814,7 @@ function scaleBucketsExact(buckets, keys, targetTotal) {
   }
   return out;
 }
-return { speedRateBin, medianSpeed, mergeSpeedRateBins, classifySpeedTier, classifyCacheTier, classifyStepCostTier, classifyTtftTier, formatCompactTokens, formatCompactCapsuleCost, formatCompactCapsuleTtft, scaleBucketsExact };
+return { findRecentStepTokPerSec, speedRateBin, medianSpeed, mergeSpeedRateBins, classifySpeedTier, classifyCacheTier, classifyStepCostTier, classifyTtftTier, formatCompactTokens, formatCompactCapsuleCost, formatCompactCapsuleTtft, scaleBucketsExact };
 })();
 
 // --- shared/window-bridge-protocol.mjs ---
@@ -1369,6 +1410,7 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
 
   // Overview Matrix Metric Options & Cells
   'ovMetric.tps': '实时速度',
+  'ovMetric.tpsRecent': '沿用最近有效',
   'ovMetric.ttft': '首字延迟',
   'ovMetric.avg_tps': '平均速度',
   'ovMetric.avg_ttft': '平均首字',
@@ -1934,6 +1976,7 @@ const I18N_MESSAGES_EN_US = Object.freeze({
 
   // Overview Matrix Metric Options & Cells
   'ovMetric.tps': 'Live Speed',
+  'ovMetric.tpsRecent': 'Recent',
   'ovMetric.ttft': 'First Token',
   'ovMetric.avg_tps': 'Avg Speed',
   'ovMetric.avg_ttft': 'Avg First Token',
@@ -8847,6 +8890,7 @@ function isEquivalentTelemetry(prev, next) {
   if (pAct?.aggregated?.activeAgentId !== nAct?.aggregated?.activeAgentId) return false;
   if (pAct?.aggregated?.activeAgentBadge !== nAct?.aggregated?.activeAgentBadge) return false;
   if (pAct?.aggregated?.latestTokPerSec !== nAct?.aggregated?.latestTokPerSec) return false;
+  if (pAct?.aggregated?.lastKnownTokPerSec !== nAct?.aggregated?.lastKnownTokPerSec) return false;
   if (pAct?.aggregated?.latestTtftSec !== nAct?.aggregated?.latestTtftSec) return false;
   if (pAct?.aggregated?.lastKnownTtftSec !== nAct?.aggregated?.lastKnownTtftSec) return false;
   if (pAct?.aggregated?.avgTokPerSec !== nAct?.aggregated?.avgTokPerSec) return false;
@@ -8859,6 +8903,7 @@ function isEquivalentTelemetry(prev, next) {
   if (pAct?.aggregated?.latestCacheHitPct !== nAct?.aggregated?.latestCacheHitPct) return false;
   if (pAct?.aggregated?.latestSpeedReason !== nAct?.aggregated?.latestSpeedReason) return false;
   if (pAct?.latestTokPerSec !== nAct?.latestTokPerSec) return false;
+  if (pAct?.lastKnownTokPerSec !== nAct?.lastKnownTokPerSec) return false;
   if (pAct?.latestTtftSec !== nAct?.latestTtftSec) return false;
   if (pAct?.lastKnownTtftSec !== nAct?.lastKnownTtftSec) return false;
   if (pAct?.avgTokPerSec !== nAct?.avgTokPerSec) return false;
@@ -8898,6 +8943,7 @@ function isEquivalentTelemetry(prev, next) {
       pa?.isRunning !== na?.isRunning ||
       pa?.liveActivity?.signature !== na?.liveActivity?.signature ||
       pa?.latestTokPerSec !== na?.latestTokPerSec ||
+      pa?.lastKnownTokPerSec !== na?.lastKnownTokPerSec ||
       pa?.latestTtftSec !== na?.latestTtftSec ||
       pa?.lastKnownTtftSec !== na?.lastKnownTtftSec ||
       pa?.avgTokPerSec !== na?.avgTokPerSec ||
@@ -9215,6 +9261,8 @@ function isEquivalentTelemetry(prev, next) {
       pr?.subagentCount !== nr?.subagentCount ||
       (pr?.swarmCount || 0) !== (nr?.swarmCount || 0) ||
       pr?.runningSubagentCount !== nr?.runningSubagentCount ||
+      pr?.latestTokPerSec !== nr?.latestTokPerSec ||
+      pr?.lastKnownTokPerSec !== nr?.lastKnownTokPerSec ||
       (pr?.runningSwarmCount || 0) !== (nr?.runningSwarmCount || 0) ||
       pr?.mainActivity?.signature !== nr?.mainActivity?.signature ||
       pr?.mainActivity?.startedAtMs !== nr?.mainActivity?.startedAtMs
@@ -16030,6 +16078,7 @@ function resolveCapsuleMetricPresentation(metricKey, slotCtx, ringCircumference)
       showRing: false,
       dashOffset: ringCircumference,
       text: tpsText,
+      title: hasValidTps && slotCtx.tpsIsCarried ? t('ovMetric.tpsRecent') : null,
       toneClass,
       running: Boolean(slotCtx.isRunning),
       warn: toneClass === 'tone-warn',
@@ -16187,21 +16236,21 @@ function resolveOverviewMetricCell(metricKey, cellCtx = {}) {
     const badgeStr = resolveActiveBadgeText(active);
     const modelAndAgent =
       hasSubagents && badgeStr ? `[${badgeStr}] ${activeModelDisplay}` : activeModelDisplay;
-    const hasSpeed = Number.isFinite(active.latestTokPerSec) && Number(active.latestTokPerSec) > 0;
-    const speedTone = hasAnySteps && hasSpeed ? getSpeedToneClass(active.latestTokPerSec) : '';
+    const hasSpeed = Number.isFinite(active.latestTokPerSec) && active.latestTokPerSec > 0;
+    const isCarried = !hasSpeed && Number.isFinite(active.lastKnownTokPerSec) && active.lastKnownTokPerSec > 0;
+    const speed = hasSpeed ? active.latestTokPerSec : isCarried ? active.lastKnownTokPerSec : null;
+    const speedTone = hasAnySteps && speed != null ? getSpeedToneClass(speed) : '';
+    const detail = hasSpeed ? [modelAndAgent, reason] : [reason, modelAndAgent];
+    if (isCarried) detail.unshift(t('ovMetric.tpsRecent'));
     return {
       key: 'tps',
       label: t('ovMetric.tps'),
       icon: 'dot',
       iconSize: 10,
       isPulsing: Boolean(active.isRunning),
-      valueText: formatMetric(active.latestTokPerSec, ' tok/s'),
+      valueText: formatMetric(speed, ' tok/s'),
       valueClass: speedTone ? `cell-value ${speedTone}` : 'cell-value',
-      subText: reason
-        ? !hasSpeed
-          ? `${reason} · ${modelAndAgent}`
-          : `${modelAndAgent} · ${reason}`
-        : modelAndAgent,
+      subText: detail.filter(Boolean).join(' · '),
       subClass: 'cell-sub',
     };
   }
@@ -17714,7 +17763,7 @@ const LiveActivityWidget = defineComponent({
                 `${s.cascadeId}:${s.isRunning}:${s.swarmState || ''}:${s.stepCount}:${s.liveActivity?.signature || ''}:${s.liveActivity?.startedAtMs || 0}`
             )
             .join('|');
-          return `${locale}:${item.cascadeId}:${item.title}:${isHere}:${item.isMainRunning}:${item.subagentCount}:${item.swarmCount || 0}:${item.runningSubagentCount}:${isExp}:${item.latestTokPerSec ?? ''}:${item.contextUsedPct ?? ''}:${item.mainActivity?.signature || ''}:${item.mainActivity?.startedAtMs || 0}:${subSig}`;
+          return `${locale}:${item.cascadeId}:${item.title}:${isHere}:${item.isMainRunning}:${item.subagentCount}:${item.swarmCount || 0}:${item.runningSubagentCount}:${isExp}:${item.latestTokPerSec ?? ''}:${item.lastKnownTokPerSec ?? ''}:${item.contextUsedPct ?? ''}:${item.mainActivity?.signature || ''}:${item.mainActivity?.startedAtMs || 0}:${subSig}`;
         },
         createRow: createLiveTaskCard,
         updateRow: (refs, item) => {
@@ -17768,9 +17817,15 @@ const LiveActivityWidget = defineComponent({
             patchAttr(refs.hereTagEl, 'hidden', !isHere);
 
             const metricParts = [];
-            if (Number.isFinite(item.latestTokPerSec) && item.latestTokPerSec > 0) {
+            const displayTps =
+              Number.isFinite(item.latestTokPerSec) && item.latestTokPerSec > 0
+                ? item.latestTokPerSec
+                : Number.isFinite(item.lastKnownTokPerSec) && item.lastKnownTokPerSec > 0
+                  ? item.lastKnownTokPerSec
+                  : null;
+            if (displayTps != null) {
               metricParts.push(
-                `${item.latestTokPerSec >= 100 ? Math.round(item.latestTokPerSec) : item.latestTokPerSec.toFixed(1)} t/s`
+                `${displayTps >= 100 ? Math.round(displayTps) : displayTps.toFixed(1)} t/s`
               );
             }
             if (item.contextUsedPct != null && Number.isFinite(Number(item.contextUsedPct))) {
@@ -19141,6 +19196,10 @@ function buildCapsuleSlotContext(
       findFallbackRecentStepTtft(activeConv.recentSteps);
   const resolvedTtft = isValidTtftSec(fallbackTtft) ? Number(fallbackTtft) : null;
 
+  const { latestTokPerSec, lastKnownTokPerSec } = capActive;
+  const hasLatestTps = Number.isFinite(latestTokPerSec) && latestTokPerSec > 0;
+  const tpsIsCarried = !hasLatestTps && Number.isFinite(lastKnownTokPerSec) && lastKnownTokPerSec > 0;
+
   const capInTok = Math.max(0, Number(capActive.inputTokens || 0));
   const capCacheTok = Math.max(0, Number(capActive.cacheReadTokens || 0));
   const capOutTok = Math.max(0, Number(capActive.outputTokens || 0));
@@ -19158,7 +19217,8 @@ function buildCapsuleSlotContext(
     usedPct,
     dashOffset,
     isRunning,
-    tps: scopedConv?.latestTokPerSec ?? aggregated?.latestTokPerSec ?? activeConv.latestTokPerSec ?? null,
+    tps: hasLatestTps ? latestTokPerSec : tpsIsCarried ? lastKnownTokPerSec : null,
+    tpsIsCarried,
     avgTps: scopedConv?.avgTokPerSec ?? aggregated?.avgTokPerSec ?? activeConv.avgTokPerSec ?? null,
     ttft: resolvedTtft,
     stepCost:
@@ -19332,6 +19392,7 @@ function syncCapsuleSlotNodes(capsuleSlots, capsuleSeps, slotKeys, slotCtx) {
     patchAttr(slot.el, 'hidden', false);
     patchAttr(slot.el, 'data-metric', pres.metric);
     patchAttr(slot.el, 'data-vis-rank', String(visRank));
+    patchAttr(slot.el, 'title', pres.title || null);
 
     if (pres.showRing && !slot.ringMounted) {
       slot.el.insertBefore(slot.ringSvg, slot.el.firstChild || slot.textSpan);
@@ -28163,7 +28224,7 @@ function mountWindowOverlay() {
     } = resolveMultiSessionCapsuleState(telemetry, {
       agents,
       aggregated,
-      latestTokPerSec: overviewActive.latestTokPerSec ?? null,
+      latestTokPerSec: overviewActive.latestTokPerSec ?? overviewActive.lastKnownTokPerSec ?? null,
       contextUsedPct: slotCtx.usedPct,
     });
 

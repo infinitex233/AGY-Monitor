@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {computeDecodeDurationSec, extractContextBreakdown, extractLiveActivity, extractModelSteps, normalizeCachedStep, speedMetric, summarizeSpeed, summarizeTtft} from '../trajectory-metrics.mjs';
+import { findRecentStepTokPerSec } from '../shared/telemetry-display-rules.mjs';
+import { buildCapsuleSlotContext } from '../src/components/widgets/CapsuleBarWidget.js';
+import {
+  resolveCapsuleMetricPresentation,
+  resolveOverviewMetricCell,
+} from '../src/registries/metricRegistry.js';
+import { isEquivalentTelemetry } from '../src/store/telemetryStore.js';
+import { i18nStore, setI18nLanguage } from '../src/i18n/index.js';
+import { backendHarness } from './backend-harness.mjs';
 
 function sample({total=12,ttft='2s',stream='10s',output=1100,thinking=100,response=1000,
   thinkingDuration='4s',tools=false,text=true,status='CORTEX_STEP_STATUS_DONE'}={}) {
@@ -500,4 +509,139 @@ test('extractContextBreakdown parses split top-level SKILLS, RULES, SUBAGENTS, a
   assert.equal(breakdown.toolResultsTokens, 105867);
   assert.equal(breakdown.messagesTokens, 126431);
   assert.equal(breakdown.totalTokens, 148852);
+});
+
+test('findRecentStepTokPerSec carries same-model speed within 120 s and clears on model change or timeout', () => {
+  const t0 = 1_700_000_000_000;
+  const read = (st) => st.tokPerSec;
+  assert.equal(
+    findRecentStepTokPerSec(
+      [
+        { modelKey: 'MODEL_A', tokPerSec: 185, createdAtMs: t0 },
+        { modelKey: 'MODEL_A', tokPerSec: null, isCompactionStep: true, createdAtMs: t0 + 30_000 },
+        { modelKey: 'MODEL_A', tokPerSec: null, createdAtMs: t0 + 120_000 },
+      ],
+      read
+    ),
+    185
+  );
+  assert.equal(
+    findRecentStepTokPerSec(
+      [
+        { modelKey: 'MODEL_A', tokPerSec: 185, createdAtMs: t0 },
+        { modelKey: 'MODEL_A', tokPerSec: null, createdAtMs: t0 + 120_001 },
+      ],
+      read
+    ),
+    null
+  );
+  assert.equal(
+    findRecentStepTokPerSec(
+      [
+        { modelKey: 'MODEL_A', tokPerSec: 185, createdAtMs: t0 },
+        { modelKey: 'MODEL_B', tokPerSec: null, createdAtMs: t0 + 5_000 },
+      ],
+      read
+    ),
+    null
+  );
+  assert.equal(
+    findRecentStepTokPerSec(
+      [
+        { modelKey: 'MODEL_SHARED', responseModel: 'gemini-4-neon', tokPerSec: 185, createdAtMs: t0 },
+        { modelKey: 'MODEL_SHARED', responseModel: 'gemini-4-hydrogen', tokPerSec: null, createdAtMs: t0 + 5_000 },
+      ],
+      read
+    ),
+    null
+  );
+  assert.equal(
+    findRecentStepTokPerSec(
+      [
+        { modelKey: 'MODEL_A', tokPerSec: 185, createdAtMs: 0 },
+        { modelKey: 'MODEL_A', tokPerSec: null, createdAtMs: t0 + 5_000 },
+      ],
+      read
+    ),
+    null
+  );
+  assert.equal(
+    findRecentStepTokPerSec(
+      [
+        { modelKey: 'MODEL_A', tokPerSec: 185, createdAtMs: t0 },
+        { modelKey: 'MODEL_A', tokPerSec: 210, createdAtMs: t0 + 5_000 },
+      ],
+      read
+    ),
+    210
+  );
+});
+
+test('live capsule, overview metric, and telemetry equivalence honor carried lastKnownTokPerSec', async (t) => {
+  const prevLocale = i18nStore.getState().locale;
+  t.after(() => setI18nLanguage(prevLocale));
+
+  const mkStep = (idx, startSec, totalSec, ttft, model) => ({
+    status: 'CORTEX_STEP_STATUS_DONE',
+    type: 'CORTEX_STEP_TYPE_PLANNER_RESPONSE',
+    metadata: {
+      sourceTrajectoryStepInfo: { stepIndex: idx },
+      createdAt: new Date(Date.parse('2026-01-01T00:00:00Z') + startSec * 1000).toISOString(),
+      finishedGeneratingAt: new Date(Date.parse('2026-01-01T00:00:00Z') + (startSec + totalSec) * 1000).toISOString(),
+      modelUsage: { model, inputTokens: '500', cacheReadTokens: '2000', outputTokens: '500' },
+    },
+    plannerResponse: { response: 'ok' },
+  });
+
+  const h = backendHarness({
+    summaries: {
+      test: {
+        stepCount: 2,
+        lastModifiedTime: '2026-01-01T00:00:36Z',
+        status: 'CASCADE_RUN_STATUS_RUNNING',
+      },
+    },
+    trajectories: {
+      test: {
+        trajectory: {
+          steps: [
+            mkStep(0, 0, 7, '2s', 'MODEL_NEON'),
+            mkStep(1, 30, 5.4, '5.0s', 'MODEL_NEON'), // decode 0.4s, ttft 5.0s -> held_burst
+          ],
+          generatorMetadata: [
+            { stepIndices: [0], chatModel: { timeToFirstToken: '2s' } },
+            { stepIndices: [1], chatModel: { timeToFirstToken: '5s' } },
+          ],
+        },
+      },
+    },
+  });
+  const payload = await h.buildTelemetryPayloadInternal('test');
+  assert.equal(payload.activeConversation.latestTokPerSec, null);
+  assert.equal(payload.activeConversation.lastKnownTokPerSec, 100);
+  assert.equal(payload.activeConversation.latestSpeedReason, 'held_burst');
+  assert.equal(payload.runningConversations[0].latestTokPerSec, null);
+  assert.equal(payload.runningConversations[0].lastKnownTokPerSec, 100);
+
+  const slotCtx = buildCapsuleSlotContext(payload);
+  assert.equal(slotCtx.tps, 100);
+  assert.equal(slotCtx.tpsIsCarried, true);
+
+  setI18nLanguage('zh-CN');
+  assert.equal(resolveCapsuleMetricPresentation('tps', slotCtx, 44).title, '沿用最近有效');
+  const zhCell = resolveOverviewMetricCell('tps', { active: payload.activeConversation });
+  assert.equal(zhCell.valueText, '100 tok/s');
+  assert.match(zhCell.subText, /沿用最近有效/);
+  assert.match(zhCell.subText, /缓冲突发/);
+
+  setI18nLanguage('en-US');
+  assert.equal(resolveCapsuleMetricPresentation('tps', slotCtx, 44).title, 'Recent');
+  const enCell = resolveOverviewMetricCell('tps', { active: payload.activeConversation });
+  assert.equal(enCell.valueText, '100 tok/s');
+  assert.match(enCell.subText, /Recent/);
+  assert.match(enCell.subText, /Buffered burst/);
+
+  const changed = structuredClone(payload);
+  changed.activeConversation.lastKnownTokPerSec = 140;
+  assert.equal(isEquivalentTelemetry(payload, changed), false);
 });

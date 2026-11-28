@@ -136,6 +136,7 @@ export function resolveCapsuleMetricPresentation(metricKey, slotCtx, ringCircumf
       showRing: false,
       dashOffset: ringCircumference,
       text: tpsText,
+      title: hasValidTps && slotCtx.tpsIsCarried ? t('ovMetric.tpsRecent') : null,
       toneClass,
       running: Boolean(slotCtx.isRunning),
       warn: toneClass === 'tone-warn',
@@ -293,21 +294,21 @@ export function resolveOverviewMetricCell(metricKey, cellCtx = {}) {
     const badgeStr = resolveActiveBadgeText(active);
     const modelAndAgent =
       hasSubagents && badgeStr ? `[${badgeStr}] ${activeModelDisplay}` : activeModelDisplay;
-    const hasSpeed = Number.isFinite(active.latestTokPerSec) && Number(active.latestTokPerSec) > 0;
-    const speedTone = hasAnySteps && hasSpeed ? getSpeedToneClass(active.latestTokPerSec) : '';
+    const hasSpeed = Number.isFinite(active.latestTokPerSec) && active.latestTokPerSec > 0;
+    const isCarried = !hasSpeed && Number.isFinite(active.lastKnownTokPerSec) && active.lastKnownTokPerSec > 0;
+    const speed = hasSpeed ? active.latestTokPerSec : isCarried ? active.lastKnownTokPerSec : null;
+    const speedTone = hasAnySteps && speed != null ? getSpeedToneClass(speed) : '';
+    const detail = hasSpeed ? [modelAndAgent, reason] : [reason, modelAndAgent];
+    if (isCarried) detail.unshift(t('ovMetric.tpsRecent'));
     return {
       key: 'tps',
       label: t('ovMetric.tps'),
       icon: 'dot',
       iconSize: 10,
       isPulsing: Boolean(active.isRunning),
-      valueText: formatMetric(active.latestTokPerSec, ' tok/s'),
+      valueText: formatMetric(speed, ' tok/s'),
       valueClass: speedTone ? `cell-value ${speedTone}` : 'cell-value',
-      subText: reason
-        ? !hasSpeed
-          ? `${reason} · ${modelAndAgent}`
-          : `${modelAndAgent} · ${reason}`
-        : modelAndAgent,
+      subText: detail.filter(Boolean).join(' · '),
       subClass: 'cell-sub',
     };
   }

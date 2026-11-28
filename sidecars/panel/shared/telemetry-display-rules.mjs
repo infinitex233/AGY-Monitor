@@ -5,6 +5,47 @@
 // Magpie's logarithmic bins place 1 tok/s in bin 400.
 const SPEED_HIST_ZERO = 400;
 const SPEED_HIST_LOG = Math.log(1.02);
+const TPS_CARRY_WINDOW_MS = 120_000;
+
+function normalizeCarryModelId(value) {
+  return value && !/^(?:0|unknown|MODEL_(?:UNSPECIFIED|UNKNOWN)|模型未知)$/i.test(value) ? value : '';
+}
+
+function getTpsCarryModel(step) {
+  return [step.responseModel, step.baseModelUpstream, step.modelKey, step.baseModelLabel, step.modelDisplayName]
+    .map(normalizeCarryModelId)
+    .find(Boolean) || '';
+}
+
+function isSameCarryModel(latest, candidate) {
+  const latestModel = getTpsCarryModel(latest);
+  const candModel = getTpsCarryModel(candidate);
+  if (!latestModel || latestModel !== candModel) return false;
+  const latestKey = normalizeCarryModelId(latest.modelKey);
+  const candKey = normalizeCarryModelId(candidate.modelKey);
+  return !latestKey || !candKey || latestKey === candKey;
+}
+
+/** Read decode speed from the latest step or a nearby step of the same model and agent. */
+export function findRecentStepTokPerSec(steps, readSpeed, latestIndex = steps.length - 1) {
+  const latest = steps[latestIndex];
+  if (!latest) return null;
+  const latestSpeed = readSpeed(latest);
+  if (Number.isFinite(latestSpeed) && latestSpeed > 0) return latestSpeed;
+
+  if (!getTpsCarryModel(latest) || !(latest.createdAtMs > 0)) return null;
+  for (let i = latestIndex - 1; i >= 0; i--) {
+    const step = steps[i];
+    if (step.isCompactionStep || step.isImageGenStep) continue;
+    if (!isSameCarryModel(latest, step)) return null;
+    if (!(step.createdAtMs > 0) || latest.createdAtMs - step.createdAtMs > TPS_CARRY_WINDOW_MS) {
+      return null;
+    }
+    const speed = readSpeed(step);
+    if (Number.isFinite(speed) && speed > 0) return speed;
+  }
+  return null;
+}
 
 export function speedRateBin(rate) {
   return Math.max(0, Math.floor(Math.log(rate) / SPEED_HIST_LOG) + SPEED_HIST_ZERO);
