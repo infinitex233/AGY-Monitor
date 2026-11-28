@@ -58,7 +58,7 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
     <td align="center" width="50%">
       <img src="assets/screenshots/popover-live.png" alt="Live Monitor Popover" width="100%" />
       <br />
-      <b>Live Monitor (Liquid Glass Popover)</b>
+      <b>Live Monitor Popover</b>
       <br />
       <sub>Pure Decode TPS, 10-channel context bar, active task status, and table / dot-matrix / curve switch</sub>
     </td>
@@ -76,7 +76,7 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
       <br />
       <b>Auxiliary Sidebar View</b>
       <br />
-      <sub>Full-height sidebar layout with 2×2 synchronized dot-matrix trends and full step diagnostics</sub>
+      <sub>Full-height sidebar layout showing session overview, context breakdown, and full step details (with 2×2 dot-matrix / curve switch)</sub>
     </td>
   </tr>
 </table>

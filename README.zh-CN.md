@@ -58,7 +58,7 @@
     <td align="center" width="50%">
       <img src="assets/screenshots/popover-live.png" alt="实时监控浮窗" width="100%" />
       <br />
-      <b>实时监控（Liquid Glass 悬浮浮窗）</b>
+      <b>实时监控浮窗</b>
       <br />
       <sub>纯吐字 TPS、10 通道上下文条、活跃任务状态与列表 / 点阵 / 曲线三态切换</sub>
     </td>
@@ -76,7 +76,7 @@
       <br />
       <b>右侧辅助栏视图</b>
       <br />
-      <sub>宽屏辅助栏常驻监控，完整呈现 2×2 四维同步点阵与步骤明细</sub>
+      <sub>宽屏辅助栏常驻监控，完整呈现会话总览、上下文分布与步骤明细（支持一键切换 2×2 点阵 / 曲线）</sub>
     </td>
   </tr>
 </table>
