@@ -4,9 +4,9 @@
 
 # AGY Monitor
 
-**Apple Liquid Glass 质感 · Google Antigravity 本地实时性能监控与 Token 分析插件**
+**Google Antigravity 本地实时性能监控与 Token 分析插件**
 
-支持液态玻璃 / 默认经典双主题热切换 · 2×2 四维点阵/曲线趋势 · 纯吐字 TPS · 零外部依赖 · 零账号凭证触碰
+支持默认 / 液态玻璃双主题热切换 · 2×2 四维点阵/曲线趋势 · 纯吐字 TPS · 零外部依赖 · 零账号凭证触碰
 
 [![Release](https://img.shields.io/github/v/release/infinitex233/AGY-Monitor?style=flat-square&color=007aff&label=release)](https://github.com/infinitex233/AGY-Monitor/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/infinitex233/AGY-Monitor/total?style=flat-square&color=0ea5e9)](https://github.com/infinitex233/AGY-Monitor/releases)
@@ -26,7 +26,7 @@
 
 <br />
 
-[下载最新版本 (`v1.2.0`)](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [直接下载 `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
+[下载最新版本](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [直接下载 `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
 
 </div>
 
@@ -53,14 +53,14 @@
       <br />
       <b>顶栏胶囊与悬浮速览</b>
       <br />
-      <sub>顶栏直显「实时速度 | 首字延迟 | 实时缓存 | 上下文」，悬停即见四项核心指标与本次费用</sub>
+      <sub>支持自定义顶栏胶囊槽位（实时速度 / 首字延迟 / 实时缓存 / 上下文等），悬停即见核心指标与上下文分布</sub>
     </td>
     <td align="center" width="50%">
       <img src="assets/screenshots/popover-live.png" alt="实时监控浮窗" width="100%" />
       <br />
       <b>实时监控（Liquid Glass 悬浮浮窗）</b>
       <br />
-      <sub>纯吐字 TPS、10 通道上下文条、活跃任务状态与 2×2 四维点阵 / 曲线 / 列表三态切换</sub>
+      <sub>纯吐字 TPS、10 通道上下文条、活跃任务状态与列表 / 点阵 / 曲线三态切换</sub>
     </td>
   </tr>
   <tr>
@@ -85,14 +85,15 @@
 
 ## 核心能力
 
-### 1. 顶栏状态胶囊与悬浮速览
+### 1. 顶栏状态胶囊、悬浮速览与页内悬浮窗
 - **无侵入轻量挂载**：通过本地 CDP 在内存层渲染，**绝不修改**宿主 `app.asar` 安装包。
-- **一眼掌握关键状态**：顶栏默认展示 **实时速度（`tok/s`）| 首字延迟（`TTFT`）| 实时缓存命中率 | 上下文环形占比**；鼠标悬停展开四卡速览（实时速度、首字延迟、实时缓存、本次费用）与上下文通道分布，点击开启完整面板，右键快速刷新。
+- **可定制顶栏胶囊与悬浮速览**：顶栏支持自定义 1–5 个指标槽位（默认展示 **实时速度（`tok/s`）| 首字延迟（`TTFT`）| 上下文环形占比**，可选实时缓存命中率、单步/会话费用等）；鼠标悬停展开四卡速览（默认实时速度、首字延迟、会话均速、本次费用，支持自定义）与上下文通道分布，点击开启完整面板，右键快速刷新。
+- **页内悬浮窗与迷你浮标**：支持将完整三栏面板固定为页内悬浮窗，支持拖拽移动、边缘缩放、位置尺寸锁定/还原，以及一键收起为可拖拽迷你浮标（持续显示状态、实时速度与上下文占比）。
 
 ### 2. 「实时监控」：纯吐字 TPS + 上下文拆解 + 2×2 四维趋势
-- **纯吐字速度与四合一总览**：自动剔除首字排队/预填充等待（`outputTokens / max(totalDuration - TTFT, 50ms)`），真实反映模型生成吞吐，同时汇总平均首字延迟、缓存命中率与累计预估费用。
+- **纯吐字速度与中位数聚合**：扣除原生 TTFT 并剔除 `< 0.1s` 解码窗口、缓冲突发（含同会话同模型中位数 3× 以上的长等待突发）及 `> 10,000 tok/s` 异常高值，以有效单步速率的**中位数**真实反映模型生成吞吐，同时汇总首字延迟、缓存命中率与预估费用。
 - **10 类上下文窗口构成**：清晰拆分模型回复、工具结果、用户消息、子代理通知、压缩摘要、系统提示词、系统工具、MCP 工具、Skill 与用户规则，悬停任意分段即时高亮读数，支持主代理与子代理/蜂群切换查看。
-- **2×2 四维趋势与明细三态切换（点阵 / 曲线 / 列表）**：默认以 2×2 纯色点阵同屏呈现最近 24 步的速度、首字、缓存与费用（支持平滑曲线与完整明细表一键切换）；内置中位数锚定 P85 静默封顶与四格同步 Hover 联动，列表模式下保留筛选、排序与多表 Excel（`.xlsx`）/ Markdown 导出。
+- **调用明细三态切换（列表 / 点阵 / 曲线）**：默认展示可排序调用明细表（首列为 `HH:MM:SS` 时钟时间，支持筛选、排序与多表 Excel `.xlsx` / Markdown 导出），并可一键切换至最近 24 步的 2×2 同步点阵或平滑曲线（内置中位数锚定 P85 静默封顶与四格同步 Hover 联动）。
 - **更直观的模型代号**：精简模式采用版本号前置命名（例如 `4-hydrogen-high`、`4-neon-high`），符合 Gemini 模型识别直觉。
 
 ### 3. 「用量统计」：时间趋势 + 半年热力图 + 多维排行
@@ -113,7 +114,7 @@
 | :--- | :---: | :---: | :---: | :---: |
 | **Antigravity 2.0 桌面端** | 顶栏 / 输入框胶囊 | 悬浮窗 + 右侧辅助栏 | 支持 | 否 |
 | **Antigravity IDE** | 顶栏 / 输入框胶囊 | 点击胶囊展开 | 支持 | 否 |
-| **Antigravity CLI (`agy`)** | 终端 `statusLine` | 独立 Web（`--port`） | 支持（SQLite + `.pbtxt`） | 否 |
+| **Antigravity CLI (`agy`) / ACP（含 T3 Code）** | 终端 `statusLine` | 独立 Web（`--port`） | 支持（SQLite + `.pbtxt`） | 否 |
 | **SSH 远程 / 无头服务器** | 按远端窗口独立隔离 | 悬浮窗 / 带鉴权独立 Web | 支持 | 否 |
 
 ---

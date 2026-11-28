@@ -4,9 +4,9 @@
 
 # AGY Monitor
 
-**Apple Liquid Glass local telemetry & token analytics plugin for Google Antigravity**
+**Local real-time telemetry & token analytics plugin for Google Antigravity**
 
-Switchable Liquid Glass & Classic UI · 2×2 four-metric live trends · Pure Decode TPS · Zero npm dependencies · Zero credential access
+Switchable Default & Liquid Glass UI · 2×2 four-metric live trends · Pure Decode TPS · Zero npm dependencies · Zero credential access
 
 [![Release](https://img.shields.io/github/v/release/infinitex233/AGY-Monitor?style=flat-square&color=007aff&label=release)](https://github.com/infinitex233/AGY-Monitor/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/infinitex233/AGY-Monitor/total?style=flat-square&color=0ea5e9)](https://github.com/infinitex233/AGY-Monitor/releases)
@@ -26,7 +26,7 @@ Switchable Liquid Glass & Classic UI · 2×2 four-metric live trends · Pure Dec
 
 <br />
 
-[Latest Release (`v1.2.0`)](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [Download `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
+[Latest Release](https://github.com/infinitex233/AGY-Monitor/releases/latest) · [Download `agy-monitor.zip`](https://github.com/infinitex233/AGY-Monitor/releases/latest/download/agy-monitor.zip)
 
 </div>
 
@@ -53,14 +53,14 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
       <br />
       <b>Topbar Capsule &amp; Hover Card</b>
       <br />
-      <sub>Live Speed, TTFT, Live Cache Hit, and Context Ring in the bar — plus Step Cost on hover</sub>
+      <sub>Customizable topbar capsule slots (Live Speed, TTFT, Live Cache Hit, Context Ring, etc.) — plus core KPIs &amp; context breakdown on hover</sub>
     </td>
     <td align="center" width="50%">
       <img src="assets/screenshots/popover-live.png" alt="Live Monitor Popover" width="100%" />
       <br />
       <b>Live Monitor (Liquid Glass Popover)</b>
       <br />
-      <sub>Pure Decode TPS, 10-channel context bar, active task status, and synchronized 2×2 four-metric dot-matrix / curve / table switch</sub>
+      <sub>Pure Decode TPS, 10-channel context bar, active task status, and table / dot-matrix / curve switch</sub>
     </td>
   </tr>
   <tr>
@@ -85,14 +85,15 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
 
 ## Features
 
-### 1. Topbar Capsule & Quick Hover Card
+### 1. Topbar Capsule, Quick Hover Card & Floating Window
 - **Non-Invasive Mounting**: Injects overlays cleanly in memory over local CDP — **never modifies** the host `app.asar` bundle.
-- **Instant Telemetry at a Glance**: Displays **Live Speed (`tok/s`) | TTFT | Live Cache Hit | Context Ring %** right in the titlebar; hover for a 4-card snapshot (**Live Speed, TTFT, Live Cache, Step Cost**) and context channel bar, click to toggle the 3-tab popover, or right-click to refresh.
+- **Customizable Capsule & Hover Card**: Configure 1–5 topbar capsule slots (default: **Live Speed (`tok/s`) | TTFT | Context Ring %**; optional Live Cache Hit, Cost, etc.); hover for a customizable 4-card snapshot (default: **Live Speed, TTFT, Session Speed, Step Cost**) and context channel bar, click to toggle the 3-tab popover, or right-click to refresh.
+- **In-Page Floating Window & Pill Badge**: Pin the full 3-tab panel directly inside the page with titlebar dragging, edge/corner resizing, position & size lock/reset, and one-click collapse into a draggable floating pill showing live status, speed, and context usage.
 
 ### 2. Live Monitor: Pure Decode TPS, Context Channels & 2×2 Trend Switch
-- **Pure Decode TPS & Session Overview**: Measures true model output throughput (`outputTokens / max(totalDuration - TTFT, 50ms)`) alongside average TTFT, cache hit rate, and cumulative estimated cost with subordinate unit typography.
+- **Pure Decode TPS & Median Aggregation**: Excludes native TTFT, `< 0.1s` decode windows, buffered bursts (including adaptive 3× long-wait bursts), and `> 10,000 tok/s` outliers, aggregating valid steps via **median** alongside TTFT, cache hit rate, and estimated cost with subordinate unit typography.
 - **10-Channel Context Window**: Visualizes how context capacity is divided across model replies, tool outputs, user turns, subagent notices, compaction summaries, system prompts, system tools, MCP tools, skills, and user rules — with interactive hover dimming and inline readout pill.
-- **2×2 Four-Metric Trends & Call Details (`Dots / Curve / List`)**: Switch effortlessly between synchronized 2×2 dot-matrix charts, smooth Bezier curves (Speed, TTFT, Cache %, Cost with silent P85 outlier soft-capping and 4-cell hover scrubbing), and the full sortable step table with `.xlsx` and Markdown export.
+- **Call Details & 2×2 Trend Switch (`List / Dots / Curve`)**: Defaults to the full sortable step list (with an `HH:MM:SS` clock-time first column, filtering, sorting, and `.xlsx` / Markdown export) and switches seamlessly to synchronized 2×2 dot-matrix charts or smooth Bezier curves (Speed, TTFT, Cache %, Cost with median-anchored P85 soft-capping and 4-cell hover scrubbing).
 - **Version-First Compact Model Labels**: Cleaner short identifiers like `4-hydrogen-high` and `4-neon-high`.
 
 ### 3. Analytics: Trends, Full-Fit 6-Month Heatmap & Leaderboards
@@ -112,7 +113,7 @@ When working inside Antigravity, two questions matter most: **how fast is the cu
 | :--- | :---: | :---: | :---: | :---: |
 | **Antigravity 2.0 Desktop** | Titlebar / Composer | Hover Popover + Auxiliary Pane | Yes | No |
 | **Antigravity IDE** | Titlebar / Composer | Capsule Popover | Yes | No |
-| **Antigravity CLI (`agy`)** | Terminal `statusLine` | Standalone Web (`--port`) | Yes (SQLite + `.pbtxt`) | No |
+| **Antigravity CLI (`agy`) / ACP (incl. T3 Code)** | Terminal `statusLine` | Standalone Web (`--port`) | Yes (SQLite + `.pbtxt`) | No |
 | **SSH Remote / Headless** | Isolated per endpoint | Popover / `--token` Web UI | Yes | No |
 
 ---
