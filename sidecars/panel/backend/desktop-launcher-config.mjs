@@ -13,7 +13,7 @@
  *      `readOnlyPaths` 供用户点击重启按钮时按需触发 UAC 一次性修补（不在桌面制造双份重影图标）；
  *    - Linux：自动在 `~/.local/share/applications/antigravity.desktop` 与 `~/.config/autostart/antigravity.desktop`
  *      的 `Exec=`（兼容 `env` 前缀与 `.AppImage`）中补齐 `--remote-debugging-port=0`；
- *    - 当用户切回「仅侧边栏」且无上下文窗口覆写时，干净剥离本插件托管的 `--remote-debugging-port=0`，保留用户自定义端口；
+ *    - 当用户切回「仅侧边栏」时，干净剥离本插件托管的 `--remote-debugging-port=0`，保留用户自定义端口；
  * 2. 当下裸启动会话一键重拉层 (`triggerDesktopHostRelaunch`)：
  *    - Windows 自适应当前权限层级（已提权走 WMI `Win32_Process.Create` 保权脱离 Job Object；普通权限走 `Shell.Application`
  *      并回退 WMI；若存在公共只读快捷方式或已提权的旧宿主进程驻留，则在用户点击重启后请求一次 `-Verb RunAs` UAC 授权完成修补与关闭，

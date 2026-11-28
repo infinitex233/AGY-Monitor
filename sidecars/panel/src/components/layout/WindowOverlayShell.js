@@ -356,8 +356,8 @@ export function mountWindowOverlay() {
     createCapsuleSlotNode(4, 'none'),
   ];
   const capsuleSeps = [
-    h('span', { className: 'wm-sep wm-sep-speed', 'data-sep-for-rank': '2' }),
-    h('span', { className: 'wm-sep wm-sep-quota', 'data-sep-for-rank': '3' }),
+    h('span', { className: 'wm-sep', 'data-sep-for-rank': '2' }),
+    h('span', { className: 'wm-sep', 'data-sep-for-rank': '3' }),
     h('span', { className: 'wm-sep', 'data-sep-for-rank': '', hidden: true }),
     h('span', { className: 'wm-sep', 'data-sep-for-rank': '', hidden: true }),
   ];

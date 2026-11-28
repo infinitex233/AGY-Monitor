@@ -715,15 +715,9 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
     weeklyLimitMode: 'official',
     weeklyTokenBudget: 150000000,
     weeklyCostBudget: 100,
-    contextWindowRiskAccepted: false,
-    modelContextWindows: {},
   };
   const mockSettings = { ...defaultMockSettings };
   let cacheRebuildCalls = 0;
-  let selectedEmail = '';
-  let browserAccountAdded = false;
-  let browserLoginStarts = 0;
-  const accountRequests = [];
 
   const mockWindow = {
     innerWidth: 1440,
@@ -751,28 +745,6 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
       const urlStr = String(url);
       fetchedUrls.push(urlStr);
       fetchedHeaders.push(opts.headers || {});
-      if (urlStr.endsWith('/api/accounts') || urlStr.endsWith('/api/accounts/update')) {
-        if (opts.method === 'POST') {
-          const update = JSON.parse(opts.body);
-          accountRequests.push(update);
-          if (update.action === 'loginStart') {
-            browserLoginStarts += 1;
-            if (browserLoginStarts > 1) {
-              browserAccountAdded = true;
-              return { ok: true, status: 200, json: async () => ({ supported: true, login: { id: 'browser-login', status: 'success', email: 'browser@example.com' } }) };
-            }
-            return { ok: true, status: 200, json: async () => ({ supported: true, login: { id: 'browser-login', status: 'waiting', url: 'https://accounts.google.com/o/oauth2/v2/auth?state=synthetic', opened: true } }) };
-          }
-          if (update.action === 'loginCancel') {
-            return { ok: true, status: 200, json: async () => ({ supported: true, login: { id: update.id, status: 'cancelled' } }) };
-          }
-          if (update.action === 'quota') {
-            return { ok: true, status: 200, json: async () => ({ email: update.email, pools: [{ poolKey: 'Gemini', remainingPct: 70 }] }) };
-          }
-          if (update.action === 'switch') selectedEmail = update.email;
-        }
-        return { ok: true, status: 200, json: async () => ({ supported: true, accounts: browserAccountAdded ? ['next@example.com', 'browser@example.com'] : ['next@example.com'], selectedEmail, restarting: opts.method === 'POST' && JSON.parse(opts.body).action === 'switch' }) };
-      }
       if (urlStr.includes('/api/settings/reset') && String(opts.method || '').toUpperCase() === 'POST') {
         for (const k of Object.keys(mockSettings)) delete mockSettings[k];
         Object.assign(mockSettings, {
@@ -797,14 +769,6 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
           json: async () => ({ ok: true, clearedEntries: 12 }),
         };
       }
-      if (urlStr.includes('/api/context-window') && opts.method === 'POST') {
-        const { modelId, option } = JSON.parse(opts.body);
-        const modelContextWindows = { ...mockSettings.modelContextWindows };
-        if (option === null) delete modelContextWindows[modelId];
-        else modelContextWindows[modelId] = option;
-        mockSettings.modelContextWindows = modelContextWindows;
-        return { ok: true, status: 200, json: async () => ({ modelContextWindows }) };
-      }
       if (urlStr.includes('/api/settings') && String(opts.method || '').toUpperCase() === 'POST') {
         const patch = opts.body ? JSON.parse(opts.body) : {};
         Object.assign(mockSettings, patch);
@@ -826,12 +790,6 @@ test('Compiled app.js mounts dual Shadow DOM hosts, tracks /c/<uuid> routes, pro
         json: async () => ({
           uiBundleVersion: currentBundleVer,
           settings: { ...mockSettings },
-          contextWindowModels: [
-            { id: 'model:gemini-4-argon', label: 'Argon', members: ['MODEL_PLACEHOLDER_M430', 'MODEL_PLACEHOLDER_M417'],
-              reportedLimitTokens: 256000, options: [{ name: '512000', tokens: 512000 }] },
-            { id: 'model:gemini-3.8-flash', label: 'Flash', options: [{ name: '256K' }] },
-            { id: 'MODEL_PLACEHOLDER_M432', label: 'Other', options: [] },
-          ],
           cloudStatus: { updateAvailable: true, currentPluginVersion: '1.4.2', latestPluginVersion: '1.5.0' },
           account: { status: 'signedIn', email: currentAccountEmail, tierName: 'Google AI Ultra', planName: 'Pro', totalConversations: 5 },
           runningConversations: [
@@ -2184,13 +2142,10 @@ test('Multi-port CDP discovery tolerates stale 2.0 DevToolsActivePort while inje
   jetskiObj.globalThis = jetskiObj;
   const jetskiVm = vm.createContext(jetskiObj);
 
-  const modelId = 'MODEL_PLACEHOLDER_M430';
+  const chatFetch = async () => ({ ok: true });
   const chat = {
     location: new URL('http://127.0.0.1:50234/?extensionView=true'),
-    __APP_CONFIG__: { csrfToken: 'chat-test' },
-    fetch: async () => ({ ok: true, json: async () => ({ userStatus: { cascadeModelConfigData: {
-      clientModelConfigs: [{ modelOrAlias: { model: modelId }, contextWindowOptions: [{ name: '900K' }] }],
-    } } }) }),
+    fetch: chatFetch,
   };
   chat.window = chat;
   const chatVm = vm.createContext({ ...chat, window: chat, TextEncoder, TextDecoder, AbortSignal, setTimeout, clearTimeout });
@@ -2272,7 +2227,6 @@ test('Multi-port CDP discovery tolerates stale 2.0 DevToolsActivePort while inje
   );
 
   const prefetchedConvIds = [];
-  const settings = { enableWindowOverlay: true, modelContextWindows: { [modelId]: '900K' } };
   const mockAppJs = `
     (() => {
       const br = window.__AGUsageMonitorBridge;
@@ -2293,7 +2247,7 @@ test('Multi-port CDP discovery tolerates stale 2.0 DevToolsActivePort while inje
       return { status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) };
     },
     readAssetFn: async (rel) => (rel === 'styles.css' ? ':host{}' : mockAppJs),
-    getSettingsFn: () => settings,
+    getSettingsFn: () => ({ enableWindowOverlay: true }),
     getBundleVersionFn: () => 'ide-v1',
     env: { APPDATA: roamingDir, LOCALAPPDATA: localDir },
     platform: 'win32',
@@ -2306,8 +2260,7 @@ test('Multi-port CDP discovery tolerates stale 2.0 DevToolsActivePort while inje
     assert.equal(syncRes.ok, true, 'Stale 2.0 port did not block live Antigravity IDE port');
     assert.equal(syncRes.targets, 2, 'Matched workbench.html and workbench-jetski-agent.html while excluding sharedProcess.html');
     assert.equal(syncRes.injected, 2);
-    assert.equal(chat.__AGUsageMonitorContextWindows?.rules[modelId], '900K');
-    assert.equal(ideContextObj.__AGUsageMonitorContextWindows, undefined);
+    assert.equal(chat.fetch, chatFetch);
     assert.ok(
       prefetchedConvIds.includes('99999999-aaaa-bbbb-cccc-888888888888'),
       'Initial telemetry prefetch extracted active IDE conversation UUID from DOM'
@@ -2322,10 +2275,6 @@ test('Multi-port CDP discovery tolerates stale 2.0 DevToolsActivePort while inje
       },
     });
     assert.equal(ideOriginRes.status, 200);
-
-    settings.modelContextWindows = {};
-    await controller.syncAllWindows();
-    assert.equal(chat.__AGUsageMonitorContextWindows, undefined);
   } finally {
     await controller.stop({ disposeWindows: true });
     await new Promise((resolve) => ideCdpServer.close(resolve));
@@ -4802,7 +4751,6 @@ test('Issue #26: Antigravity Desktop 2.33.0+ automatic shortcut/launcher provisi
     let currentMountSettings = {
       windowMountMode: 'dual',
       enableWindowOverlay: true,
-      modelContextWindows: {},
     };
     const ctrlWin = createWindowBridgeController({
       handleApiRequest: async () => ({ status: 200, body: '{}' }),
@@ -4841,7 +4789,6 @@ test('Issue #26: Antigravity Desktop 2.33.0+ automatic shortcut/launcher provisi
     currentMountSettings = {
       windowMountMode: 'sidebar',
       enableWindowOverlay: false,
-      modelContextWindows: {},
     };
     await ctrlWin.notifySettingChanged(false);
     await new Promise((r) => setTimeout(r, 10));

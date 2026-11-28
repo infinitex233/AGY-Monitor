@@ -4,9 +4,7 @@
  * 核心能力与多重防御不变量：
  * 1. `syncCloudCatalog`：定期或手动从 GitHub 主干拉取最新 `pricing-catalog.json`，
  *    经 Schema 与可信域名白名单清洗后落盘至 `DATA_DIR/remote_pricing_cache.json` 并热更新内存价格字典；
- * 2. `performPluginUpdate` 严格执行以下防降级与防损坏门禁：
- *    - 开发仓库自动更新隔离：非 `.gemini/config/plugins/` 目录一律禁止后台自动更新（`dev_repo_auto_disabled`），
- *      且若手动更新撞上正在进行的后台自动检查，等待自动检查结束后再执行手动更新；
+ * 2. `performPluginUpdate`（仅由用户手动点击触发，绝不后台静默自更新）严格执行以下防降级与防损坏门禁：
  *    - 全量工作区干净度门禁（含未跟踪文件）：执行 `git status --porcelain`（不带 `--untracked-files=no`），
  *      只要存在任何已修改或未跟踪文件（`??`），立即终止（`dirty_worktree`），绝不执行 `git stash`；
  *    - 分支门禁：仅允许 `main` 或 `release/*` 发布分支执行快进更新（`not_on_main_branch`），防止污染特性分支或游离 HEAD；
@@ -43,7 +41,6 @@ import {
   cloudSyncState,
   computeRuntimeCodeVersion,
   loadJson,
-  loadSettings,
   lsRuntimeEndpoint,
   pluginUpdateState,
   saveJson,
@@ -299,24 +296,15 @@ async function verifyPluginJsSyntax(rootDir) {
 }
 
 /**
- * 执行插件本体更新（支持手动一键更新与后台静默更新）。
+ * 执行插件本体更新（仅手动一键触发）。
  *
- * @param {{ isAuto?: boolean }} [options]
  * @returns {Promise<object>} 更新结果对象
  */
-export async function performPluginUpdate({ isAuto = false } = {}) {
+export async function performPluginUpdate() {
   if (pluginUpdateState.inFlight) {
-    if (isAuto || !pluginUpdateState.inFlightIsAuto) {
-      return pluginUpdateState.inFlight;
-    }
-    // 若用户点击手动更新时恰好有一轮后台自动更新检查正在运行，等待其收尾后再按手动模式继续执行
-    await pluginUpdateState.inFlight.catch(() => {});
-    if (pluginUpdateState.inFlight) {
-      return pluginUpdateState.inFlight;
-    }
+    return pluginUpdateState.inFlight;
   }
 
-  pluginUpdateState.inFlightIsAuto = Boolean(isAuto);
   pluginUpdateState.inFlight = (async () => {
     pluginUpdateState.isUpdating = true;
     pluginUpdateState.lastError = null;
@@ -327,23 +315,6 @@ export async function performPluginUpdate({ isAuto = false } = {}) {
 
     try {
       if (hasGit) {
-        // 0. 开发仓库（非 ~/.gemini/config/plugins/）一律禁止后台自动更新
-        if (isAuto && !isInstalledPluginDir) {
-          const msg = '当前处于本地开发仓库，已自动禁用后台静默更新';
-          const result = {
-            ok: false,
-            skipped: true,
-            mode: 'git',
-            reason: 'dev_repo_auto_disabled',
-            previousVersion,
-            currentVersion: previousVersion,
-            message: msg,
-            updatedAtMs: Date.now(),
-          };
-          pluginUpdateState.lastResult = result;
-          return result;
-        }
-
         // 1. 全量工作区检查（包含未跟踪文件 ??）：只要存在任何未提交改动或新增未跟踪文件，立即中止
         const statusRes = await runExecFile('git', ['-C', PLUGIN_ROOT, 'status', '--porcelain']);
         const isDirty = statusRes.stdout.trim().length > 0;
@@ -351,7 +322,7 @@ export async function performPluginUpdate({ isAuto = false } = {}) {
           const msg = isInstalledPluginDir
             ? '本地文件有改动，已跳过覆盖更新'
             : '开发目录有未提交修改，已跳过更新';
-          pluginUpdateState.lastError = isAuto ? null : msg;
+          pluginUpdateState.lastError = msg;
           pluginUpdateState.lastResult = {
             ok: false,
             skipped: true,
@@ -380,7 +351,7 @@ export async function performPluginUpdate({ isAuto = false } = {}) {
           /^release\/[0-9A-Za-z._-]+$/.test(currentBranch);
         if (!isAllowedBranch) {
           const msg = `当前分支为 ${currentBranch}，已跳过更新`;
-          pluginUpdateState.lastError = isAuto ? null : msg;
+          pluginUpdateState.lastError = msg;
           pluginUpdateState.lastResult = {
             ok: false,
             skipped: true,
@@ -474,7 +445,7 @@ export async function performPluginUpdate({ isAuto = false } = {}) {
           ]);
         } catch {
           const msg = '本地分支存在未推送提交，已跳过更新';
-          pluginUpdateState.lastError = isAuto ? null : msg;
+          pluginUpdateState.lastError = msg;
           pluginUpdateState.lastResult = {
             ok: false,
             skipped: true,
@@ -674,7 +645,6 @@ export async function performPluginUpdate({ isAuto = false } = {}) {
       return result;
     } finally {
       pluginUpdateState.isUpdating = false;
-      pluginUpdateState.inFlightIsAuto = false;
       pluginUpdateState.inFlight = null;
     }
   })();
@@ -682,7 +652,7 @@ export async function performPluginUpdate({ isAuto = false } = {}) {
 }
 
 /**
- * 同步云端 `pricing-catalog.json` 目录并在满足条件时触发插件自动更新。
+ * 同步云端 `pricing-catalog.json` 目录（仅只读更新模型价格与最新版本号提示，不触发后台自动更新）。
  *
  * @param {{ force?: boolean, urls?: string[] }} [options]
  * @returns {Promise<ReturnType<typeof getCloudStatus>>}
@@ -737,23 +707,7 @@ export async function syncCloudCatalog({ force = false, urls = CLOUD_CATALOG_URL
           cloudSyncState.sourceUrl = url;
           cloudSyncState.lastError = null;
           rebuildActiveCatalog();
-
-          const statusAfter = getCloudStatus();
-          const settings = loadSettings();
-          const allowAutoUpdate =
-            settings.pluginUpdateMode !== undefined
-              ? settings.pluginUpdateMode === 'auto'
-              : Boolean(settings.autoUpdatePlugin);
-          if (
-            statusAfter.updateAvailable &&
-            allowAutoUpdate &&
-            !pluginUpdateState.isUpdating &&
-            pluginUpdateState.lastAutoAttemptVersion !== statusAfter.latestPluginVersion
-          ) {
-            pluginUpdateState.lastAutoAttemptVersion = statusAfter.latestPluginVersion;
-            performPluginUpdate({ isAuto: true }).catch(() => {});
-          }
-          return statusAfter;
+          return getCloudStatus();
         } catch (err) {
           lastErr = err;
         }

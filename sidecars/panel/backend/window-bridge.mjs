@@ -22,7 +22,6 @@ import { dirname, join } from 'node:path';
 import { writeTextFileAtomicSync } from './fs-atomic.mjs';
 import {
   BRIDGE_API_PATHS,
-  CONTEXT_WINDOWS_GLOBAL_KEY,
   LOCAL_ENDPOINT_ID,
   WINDOW_BRIDGE_ENDPOINT_HEADER,
   WINDOW_BRIDGE_ENDPOINT_KEY,
@@ -41,16 +40,10 @@ import {
   saveJson,
 } from './config.mjs';
 import {
-  createContextWindowSyncExpression,
-  getContextWindowModels,
-  resolveContextWindowRules,
-} from './context-windows.mjs';
-import {
   ensureDesktopLaunchEntriesConfigured,
   resolveDesktopHostExecutable,
 } from './desktop-launcher-config.mjs';
 import {
-  getRegisteredRemoteEndpoint,
   getRemoteEndpointTargetWsUrls,
   normalizeEndpointId,
   pruneStaleRemoteEndpoints,
@@ -58,13 +51,11 @@ import {
   setRemoteWindowRpcInvoker,
 } from './endpoint-registry.mjs';
 import { getLocalHubPorts } from './ls-discovery.mjs';
-import { callLsRpc, getContextModelCatalog } from './ls-rpc.mjs';
+import { isReadOnlyLsMethod } from './ls-rpc.mjs';
 import { compareSemver } from './pricing-catalog.mjs';
-import { getDefaultCloudCodeProxy } from './cloudcode-proxy.mjs';
 
 const windowBridgeRef = `window[${JSON.stringify(WINDOW_BRIDGE_KEY)}]`;
 const windowOverlayRef = `window[${JSON.stringify(WINDOW_OVERLAY_KEY)}]`;
-const windowContextWindowsRef = `window[${JSON.stringify(CONTEXT_WINDOWS_GLOBAL_KEY)}]`;
 const windowBridgeRouteKey = JSON.stringify(WINDOW_BRIDGE_ROUTE_KEY);
 const windowBridgeEndpointKey = JSON.stringify(WINDOW_BRIDGE_ENDPOINT_KEY);
 const overlayMethods = Object.fromEntries(
@@ -836,7 +827,7 @@ export function extractRemoteHostMetadata(appConfig, title = '') {
  *
  * @param {{
  *   target: object,
- *   probedInfo?: { origin?: string, csrfToken?: string, observedCsrfToken?: string, appConfig?: object, title?: string }|null,
+ *   probedInfo?: { origin?: string, csrfToken?: string, appConfig?: object, title?: string }|null,
  *   localHubInfo?: { allPorts?: Set<number>, httpsPorts?: Set<number>, csrfTokens?: Set<string> }|null,
  *   confirmedLocalPorts?: Set<number>|null,
  * }} params
@@ -877,7 +868,7 @@ export function classifyWindowTargetEndpoint({
   const localCsrfTokens = localHubInfo?.csrfTokens instanceof Set ? localHubInfo.csrfTokens : new Set();
   const knownLocalPorts = confirmedLocalPorts instanceof Set ? confirmedLocalPorts : new Set();
 
-  const csrfToken = String(probedInfo?.csrfToken || probedInfo?.observedCsrfToken || '').trim();
+  const csrfToken = String(probedInfo?.csrfToken || '').trim();
   const remoteMeta = extractRemoteHostMetadata(probedInfo?.appConfig, probedInfo?.title || target.title || '');
 
   // 1. 明确命中本机特征（端口或 CSRF 令牌匹配本机 Hub）且无显式远程标记 -> 本地窗口
@@ -940,9 +931,12 @@ export function classifyWindowTargetEndpoint({
  * @returns {string}
  */
 export function buildWindowRemoteRpcExpression(method, body = {}, timeoutMs = 5000) {
+  if (!isReadOnlyLsMethod(method)) {
+    throw new Error(`RPC method ${method} is not allowed on remote endpoints`);
+  }
   const safeTimeout = Math.max(1000, Math.min(30000, Number(timeoutMs) || 5000));
   return `(async () => {
-    const methodName = ${JSON.stringify(String(method || ''))};
+    const methodName = ${JSON.stringify(method)};
     const payloadObj = ${JSON.stringify(body && typeof body === 'object' ? body : {})};
     const timeoutMs = ${JSON.stringify(safeTimeout)};
     const servicePath = '/exa.language_server_pb.LanguageServerService/';
@@ -951,11 +945,7 @@ export function buildWindowRemoteRpcExpression(method, body = {}, timeoutMs = 50
     if (!origin || !/^https?:\\/\\/(127\\.0\\.0\\.1|localhost|\\[::1\\]):\\d+$/i.test(origin)) {
       return { ok: false, status: 0, error: 'Non-loopback window origin' };
     }
-    const csrfToken = String(
-      window.__APP_CONFIG__?.csrfToken ||
-      window[${JSON.stringify(CONTEXT_WINDOWS_GLOBAL_KEY)}]?.observedCsrfToken ||
-      ''
-    ).trim();
+    const csrfToken = String(window.__APP_CONFIG__?.csrfToken || '').trim();
     const deadlineMs = Date.now() + timeoutMs;
 
     let fetchErrMsg = '';
@@ -968,6 +958,7 @@ export function buildWindowRemoteRpcExpression(method, body = {}, timeoutMs = 50
         const init = {
           method: 'POST',
           credentials: 'same-origin',
+          redirect: 'error',
           headers,
           body: JSON.stringify(payloadObj),
         };
@@ -1198,13 +1189,7 @@ export function createWindowBridgeController(options) {
     WebSocketImpl = globalThis.WebSocket,
     bindRemoteRpcInvoker = false,
     getLocalHubPortsFn = getLocalHubPorts,
-    cloudCodeProxy = null,
-    manageCloudCodeProxy = false,
-    resolveLocalContextRulesFn = null,
   } = options || {};
-
-  const activeCloudCodeProxy =
-    cloudCodeProxy || (manageCloudCodeProxy ? getDefaultCloudCodeProxy() : null);
 
   function hasDiskVersionDrifted() {
     if (!bootBundleVersion) return false;
@@ -1265,9 +1250,6 @@ export function createWindowBridgeController(options) {
     canRelaunch,
     updatedAtMs: 0,
   };
-  let hadContextWindows = false;
-  let contextWindowBootId = `${process.pid}:${Date.now()}`;
-  const cachedBackendCtxModelsByEndpoint = new Map();
   const targetClassifyCache = new Map();
   let nodeDepsPromise = null;
   const allowedDynamicOrigins = new Set();
@@ -1847,74 +1829,6 @@ export function createWindowBridgeController(options) {
     return hostLauncherPromise;
   }
 
-  async function resolveFallbackRulesForEndpoint(endpointId, contextWindows) {
-    if (!contextWindows || !Object.keys(contextWindows).length) {
-      return { verified: false, rules: {}, catalog: null };
-    }
-    const epObj =
-      endpointId && endpointId !== LOCAL_ENDPOINT_ID
-        ? getRegisteredRemoteEndpoint(endpointId)
-        : null;
-    if (!epObj && typeof resolveLocalContextRulesFn === 'function') {
-      try {
-        const custom = await resolveLocalContextRulesFn(contextWindows);
-        if (custom && typeof custom === 'object') {
-          return {
-            verified: custom.verified !== false,
-            rules: custom.rules && typeof custom.rules === 'object' ? custom.rules : {},
-            catalog: custom.catalog || null,
-          };
-        }
-      } catch {
-        return { verified: false, rules: {}, catalog: null };
-      }
-    }
-    if (!epObj && (!lsRuntimeEndpoint.baseUrl || lsRuntimeEndpoint.addr === 'test.invalid')) {
-      return { verified: false, rules: {}, catalog: null };
-    }
-    const cacheKey = epObj ? epObj.id : LOCAL_ENDPOINT_ID;
-    let cached = cachedBackendCtxModelsByEndpoint.get(cacheKey) || {
-      expiresAt: 0,
-      verified: false,
-      models: [],
-      catalog: null,
-    };
-    if (Date.now() >= cached.expiresAt) {
-      try {
-        const [stRes, cat] = await Promise.all([
-          callLsRpc('GetUserStatus', {}, 2000, epObj),
-          getContextModelCatalog(epObj),
-        ]);
-        const cfgs = stRes?.userStatus?.cascadeModelConfigData?.clientModelConfigs;
-        if (Array.isArray(cfgs)) {
-          cached = {
-            expiresAt: Date.now() + 10_000,
-            verified: true,
-            models: getContextWindowModels(cfgs, cat),
-            catalog: cat || null,
-          };
-          cachedBackendCtxModelsByEndpoint.delete(cacheKey);
-          if (cachedBackendCtxModelsByEndpoint.size >= 16) {
-            const oldestKey = cachedBackendCtxModelsByEndpoint.keys().next().value;
-            if (oldestKey !== undefined) cachedBackendCtxModelsByEndpoint.delete(oldestKey);
-          }
-          cachedBackendCtxModelsByEndpoint.set(cacheKey, cached);
-        }
-      } catch {
-        // 忽略瞬态 LS 查询失败，保留上次缓存或交由调用方回退
-      }
-    }
-    if (cached.verified) {
-      return {
-        verified: true,
-        rules:
-          cached.models.length > 0 ? resolveContextWindowRules(cached.models, contextWindows) : {},
-        catalog: cached.catalog || null,
-      };
-    }
-    return { verified: false, rules: {}, catalog: null };
-  }
-
   async function runSyncInternal({ forceReinject = false } = {}) {
     if (stopped) return { ok: false, reason: 'stopped' };
     const bundleVersion = String(getBundleVersionFn() || '');
@@ -1929,21 +1843,9 @@ export function createWindowBridgeController(options) {
       curSettings.enableWindowOverlay
     );
     const enabled = Boolean(curSettings.enableWindowOverlay !== false && mountMode !== 'sidebar');
-    const contextWindows = curSettings.modelContextWindows || {};
-    const hasContextWindows = Object.keys(contextWindows).length > 0;
-    const ctxMainEnabled = curSettings.contextWindowMainEnabled !== false;
-    const ctxSwarmEnabled = curSettings.contextWindowSwarmEnabled === true;
-    const needsMainCdpContext = hasContextWindows && ctxMainEnabled;
-    const needsCloudCodeProxy = hasContextWindows && ctxSwarmEnabled;
-    const needsAnyCdpContext = hasContextWindows && (ctxMainEnabled || ctxSwarmEnabled);
-
     let leasedBySelf = false;
     let currentLease = null;
-    if (
-      (enabled || needsAnyCdpContext || needsCloudCodeProxy) &&
-      leaseFilePath &&
-      !forceReinject
-    ) {
+    if (enabled && leaseFilePath && !forceReinject) {
       const lease = loadJson(leaseFilePath, null);
       currentLease = lease;
       const leasePid = Number(lease?.pid || 0);
@@ -1999,25 +1901,8 @@ export function createWindowBridgeController(options) {
       });
     }
 
-    let preResolvedLocalCtx = null;
-    if (activeCloudCodeProxy) {
-      if (needsCloudCodeProxy) {
-        preResolvedLocalCtx = await resolveFallbackRulesForEndpoint(
-          LOCAL_ENDPOINT_ID,
-          contextWindows
-        );
-        await activeCloudCodeProxy.reconcile({
-          enabled: true,
-          rulesByModelId: preResolvedLocalCtx.rules,
-          initialCatalogModels: preResolvedLocalCtx.catalog,
-        });
-      } else {
-        await activeCloudCodeProxy.reconcile({ enabled: false, rulesByModelId: {} });
-      }
-    }
-
     const shouldCheckLaunchers =
-      (enabled || needsMainCdpContext) &&
+      enabled &&
       autoConfigureIdeArgv &&
       (lastLauncherProvisionAtMs === 0 ||
         Date.now() - lastLauncherProvisionAtMs >= launcherRecheckIntervalMs);
@@ -2033,7 +1918,7 @@ export function createWindowBridgeController(options) {
         await provPending.catch(() => {});
       }
       updateBridgeStatus(
-        enabled || needsMainCdpContext ? 'no_devtools_port' : 'disabled',
+        enabled ? 'no_devtools_port' : 'disabled',
         {
           enabled,
           leasedBySelf,
@@ -2054,7 +1939,7 @@ export function createWindowBridgeController(options) {
         await provPending.catch(() => {});
       }
       updateBridgeStatus(
-        enabled || needsMainCdpContext ? 'cdp_unreachable' : 'disabled',
+        enabled ? 'cdp_unreachable' : 'disabled',
         {
           enabled,
           leasedBySelf,
@@ -2080,14 +1965,7 @@ export function createWindowBridgeController(options) {
       return { ok: true, enabled, reason: 'no_targets', injected: 0 };
     }
 
-    if (
-      !enabled &&
-      !needsAnyCdpContext &&
-      !hadContextWindows &&
-      !hadInjectedTargets &&
-      !hadInjectedChatFrames &&
-      !forceReinject
-    ) {
+    if (!enabled && !hadInjectedTargets && !hadInjectedChatFrames && !forceReinject) {
       pruneStaleRemoteEndpoints(new Set());
       updateBridgeStatus('disabled', {
         enabled: false,
@@ -2104,14 +1982,10 @@ export function createWindowBridgeController(options) {
         const cfg = typeof window !== 'undefined' && window.__APP_CONFIG__ && typeof window.__APP_CONFIG__ === 'object'
           ? window.__APP_CONFIG__
           : null;
-        const observedCsrf = String(
-          (typeof window !== 'undefined' && window[${JSON.stringify(CONTEXT_WINDOWS_GLOBAL_KEY)}]?.observedCsrfToken) || ''
-        ).trim();
         return {
           origin: String((typeof window !== 'undefined' && window.location?.origin) || '').trim(),
           title: String((typeof document !== 'undefined' && document?.title) || '').trim(),
           csrfToken: String(cfg?.csrfToken || '').trim(),
-          observedCsrfToken: observedCsrf,
           appConfig: cfg ? {
             isRemoteControl: cfg.isRemoteControl === true,
             isRemote: cfg.isRemote === true,
@@ -2128,7 +2002,7 @@ export function createWindowBridgeController(options) {
           } : null,
         };
       } catch {
-        return { origin: '', title: '', csrfToken: '', observedCsrfToken: '', appConfig: null };
+        return { origin: '', title: '', csrfToken: '', appConfig: null };
       }
     })()`;
 
@@ -2220,107 +2094,6 @@ export function createWindowBridgeController(options) {
         target.isRemoteEndpoint = false;
         target.endpointLabel = '';
       }
-    }
-
-    if (needsAnyCdpContext || hadContextWindows) {
-      const localFallbackRes = needsAnyCdpContext
-        ? preResolvedLocalCtx ||
-          (await resolveFallbackRulesForEndpoint(LOCAL_ENDPOINT_ID, contextWindows))
-        : { verified: false, rules: {}, catalog: null };
-      const localFallbackRules = localFallbackRes.rules;
-      const pinMainBackToDefaults = needsCloudCodeProxy && !ctxMainEnabled;
-      const pinBackRules = {};
-      if (pinMainBackToDefaults) {
-        const upstreamDefaults = activeCloudCodeProxy?.getUpstreamDefaults?.() || {};
-        for (const modelId of Object.keys(localFallbackRules)) {
-          const defaultLimit = Number(upstreamDefaults[modelId]);
-          if (Number.isSafeInteger(defaultLimit) && defaultLimit > 0) {
-            pinBackRules[modelId] = defaultLimit;
-          }
-        }
-      }
-
-      const remoteFallbackRulesById = new Map();
-      const uniqueRemoteIds = new Set(
-        targets
-          .filter((t) => !t.isIdeWorkbench && t.isRemoteEndpoint && t.endpointId)
-          .map((t) => t.endpointId)
-      );
-      for (const cachedKey of Array.from(cachedBackendCtxModelsByEndpoint.keys())) {
-        if (cachedKey !== LOCAL_ENDPOINT_ID && !getRegisteredRemoteEndpoint(cachedKey)) {
-          cachedBackendCtxModelsByEndpoint.delete(cachedKey);
-        }
-      }
-      if (needsMainCdpContext) {
-        await Promise.allSettled(
-          Array.from(uniqueRemoteIds).map(async (epId) => {
-            const res = await resolveFallbackRulesForEndpoint(epId, contextWindows);
-            // 仅在远端未能验证模型目录时安全回退本机规则；远端已验证但返回空规则时绝不套用本机高配规则
-            remoteFallbackRulesById.set(epId, res.verified ? res.rules : localFallbackRules);
-          })
-        );
-      }
-
-      const ctxEvalTasks = [];
-      const seenCtxUrls = new Set();
-      for (const target of targets) {
-        if (target.isIdeWorkbench) continue;
-        const wsUrl = String(target.webSocketDebuggerUrl || '').trim();
-        if (!wsUrl || seenCtxUrls.has(wsUrl)) continue;
-        seenCtxUrls.add(wsUrl);
-        let expr;
-        if (!needsAnyCdpContext) {
-          expr = createContextWindowSyncExpression({}, contextWindowBootId, {}, true, null);
-        } else if (pinMainBackToDefaults) {
-          // 仅启用子代理与蜂群时：本地主窗口显式回填上游默认上限把主代理钉回默认；远端主窗口不注入覆盖
-          expr = target.isRemoteEndpoint
-            ? createContextWindowSyncExpression({}, contextWindowBootId, {}, true, null)
-            : createContextWindowSyncExpression(
-                contextWindows,
-                contextWindowBootId,
-                pinBackRules,
-                true,
-                pinBackRules
-              );
-        } else {
-          const epFallback =
-            target.isRemoteEndpoint && target.endpointId
-              ? remoteFallbackRulesById.get(target.endpointId) || localFallbackRules
-              : localFallbackRules;
-          expr = createContextWindowSyncExpression(
-            contextWindows,
-            contextWindowBootId,
-            epFallback,
-            true,
-            null
-          );
-        }
-        ctxEvalTasks.push(evaluateOnTarget(wsUrl, expr));
-      }
-      const ideChatExpr = !needsAnyCdpContext
-        ? createContextWindowSyncExpression({}, contextWindowBootId, {}, false, null)
-        : pinMainBackToDefaults
-          ? createContextWindowSyncExpression(
-              contextWindows,
-              contextWindowBootId,
-              pinBackRules,
-              false,
-              pinBackRules
-            )
-          : createContextWindowSyncExpression(
-              contextWindows,
-              contextWindowBootId,
-              localFallbackRules,
-              false,
-              null
-            );
-      for (const chatUrl of collectAllChatDebuggerUrls(targets)) {
-        if (!chatUrl || seenCtxUrls.has(chatUrl)) continue;
-        seenCtxUrls.add(chatUrl);
-        ctxEvalTasks.push(evaluateOnTarget(chatUrl, ideChatExpr));
-      }
-      await Promise.allSettled(ctxEvalTasks);
-      hadContextWindows = needsAnyCdpContext;
     }
 
     const disposeExpr = `(() => {
@@ -2817,7 +2590,6 @@ export function createWindowBridgeController(options) {
 
   function start() {
     stopped = false;
-    contextWindowBootId = `${process.pid}:${Date.now()}`;
     if (bindRemoteRpcInvoker) {
       setRemoteWindowRpcInvoker(invokeRemoteWindowRpc);
     }
@@ -2855,10 +2627,7 @@ export function createWindowBridgeController(options) {
       clearTimeout(pollTimer);
       pollTimer = null;
     }
-    if (
-      disposeWindows &&
-      (hadInjectedTargets || hadInjectedChatFrames || hadContextWindows)
-    ) {
+    if (disposeWindows && (hadInjectedTargets || hadInjectedChatFrames)) {
       const prevStopped = stopped;
       stopped = false;
       try {
@@ -2869,7 +2638,6 @@ export function createWindowBridgeController(options) {
           }));
           const disposeExpr = `(() => {
             try {
-              ${windowContextWindowsRef}?.dispose?.();
               ${windowOverlayRef}?.[${overlayMethods.dispose}]?.();
               delete ${windowOverlayRef};
               delete ${windowBridgeRef};
@@ -2893,10 +2661,6 @@ export function createWindowBridgeController(options) {
     stopped = true;
     hadInjectedTargets = false;
     hadInjectedChatFrames = false;
-    hadContextWindows = false;
-    if (activeCloudCodeProxy) {
-      await activeCloudCodeProxy.stop().catch(() => {});
-    }
     if (bindRemoteRpcInvoker) {
       setRemoteWindowRpcInvoker(null);
     }
@@ -2912,11 +2676,7 @@ export function createWindowBridgeController(options) {
     if (!enabled) {
       hadInjectedTargets = true;
       hadInjectedChatFrames = true;
-      const cur = getSettingsFn() || {};
-      const hasCtx =
-        Object.keys(cur.modelContextWindows || {}).length > 0 &&
-        cur.contextWindowMainEnabled !== false;
-      if (!hasCtx && autoConfigureIdeArgv) {
+      if (autoConfigureIdeArgv) {
         launcherConfigured = false;
         hasReadOnlyShortcuts = false;
         lastLauncherProvisionAtMs = 0;
@@ -2937,38 +2697,11 @@ export function createWindowBridgeController(options) {
     return syncAllWindows({ forceReinject: false }).catch(() => ({ ok: false }));
   }
 
-  function notifyContextWindowsChanged() {
-    const cur = getSettingsFn() || {};
-    const mountMode = normalizeWindowMountMode(cur.windowMountMode, cur.enableWindowOverlay);
-    const overlayOn = Boolean(cur.enableWindowOverlay !== false && mountMode !== 'sidebar');
-    const hasCtx =
-      Object.keys(cur.modelContextWindows || {}).length > 0 &&
-      cur.contextWindowMainEnabled !== false;
-    if (hasCtx) {
-      lastLauncherProvisionAtMs = 0;
-    } else if (!overlayOn && autoConfigureIdeArgv) {
-      launcherConfigured = false;
-      hasReadOnlyShortcuts = false;
-      lastLauncherProvisionAtMs = 0;
-      void ensureDesktopLaunchEntriesConfigured({
-        enabled: false,
-        env,
-        platform,
-        homeDir,
-        execFileFn: launcherExecFileFn,
-        fsOps: launcherFsOps,
-        allowInTest: allowDesktopLauncherInTest,
-      }).catch(() => {});
-    }
-    return syncAllWindows({ forceReinject: false }).catch(() => ({ ok: false }));
-  }
-
   return {
     ensureBridgeServer,
     syncAllWindows,
     invokeRemoteWindowRpc,
     notifySettingChanged,
-    notifyContextWindowsChanged,
     start,
     stop,
     getBridgeInfo: () => ({ port: bridgePort, token: bridgeToken, running: Boolean(server) }),
@@ -3011,7 +2744,6 @@ export function startDefaultWindowBridge(options) {
     defaultBridgeController = createWindowBridgeController({
       leaseFilePath: join(DATA_DIR, 'window-bridge-lease.json'),
       bindRemoteRpcInvoker: true,
-      manageCloudCodeProxy: true,
       ...options,
     });
     defaultBridgeController.start();
@@ -3027,9 +2759,4 @@ export function startDefaultWindowBridge(options) {
 export function notifyWindowOverlaySetting(enabled) {
   if (!defaultBridgeController) return Promise.resolve({ ok: false });
   return defaultBridgeController.notifySettingChanged(enabled);
-}
-
-export function notifyModelContextWindowsChanged() {
-  if (!defaultBridgeController) return Promise.resolve({ ok: false });
-  return defaultBridgeController.notifyContextWindowsChanged();
 }

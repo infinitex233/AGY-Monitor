@@ -4,7 +4,6 @@
  * 所有跨端通用枚举与单项纯函数归一化规则统一源自 `../shared/settings-normalization.mjs`。
  */
 
-import { isContextWindowSettingId, isContextWindowOption } from './context-windows.mjs';
 import {
   CLI_STATUSLINE_PRESETS,
   CONTEXT_AGENT_MODES,
@@ -117,14 +116,6 @@ function isSchemaPlainObject(v) {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 }
 
-export function normalizeModelContextWindows(value) {
-  return Object.fromEntries(
-    Object.entries(isSchemaPlainObject(value) ? value : {}).filter(
-      ([id, option]) => isContextWindowSettingId(id) && isContextWindowOption(option)
-    )
-  );
-}
-
 export const DEFAULT_SETTINGS_SCHEMA = Object.freeze({
   language: 'auto',
   uiTheme: DEFAULT_UI_THEME,
@@ -156,10 +147,6 @@ export const DEFAULT_SETTINGS_SCHEMA = Object.freeze({
   showStepFilterToolbar: false,
   stepTokenComboFormat: DEFAULT_STEP_TOKEN_COMBO_FORMAT,
   stepTableColumns: DEFAULT_STEP_TABLE_COLUMNS,
-  contextWindowRiskAccepted: false,
-  contextWindowMainEnabled: true,
-  contextWindowSwarmEnabled: false,
-  modelContextWindows: Object.freeze({}),
 });
 
 /**
@@ -173,7 +160,6 @@ export function createDefaultSettingsObject() {
     overviewModules: [...DEFAULT_OVERVIEW_MODULES],
     overviewMetrics: [...DEFAULT_OVERVIEW_METRICS],
     stepTableColumns: [...DEFAULT_STEP_TABLE_COLUMNS],
-    modelContextWindows: {},
   };
 }
 
@@ -184,10 +170,7 @@ export function createDefaultSettingsObject() {
  */
 export function normalizeFullSettings(rawInput) {
   const safeRaw = isSchemaPlainObject(rawInput) ? rawInput : {};
-  const pluginUpdateMode = normalizePluginUpdateMode(
-    safeRaw.pluginUpdateMode,
-    safeRaw.autoUpdatePlugin
-  );
+  const pluginUpdateMode = normalizePluginUpdateMode(safeRaw.pluginUpdateMode);
   const windowMountMode = normalizeWindowMountMode(
     safeRaw.windowMountMode,
     safeRaw.enableWindowOverlay
@@ -209,7 +192,7 @@ export function normalizeFullSettings(rawInput) {
     showUpstreamModel: modelDisplayMode !== 'short',
     orchestratorIdMode: normalizeOrchestratorIdMode(safeRaw.orchestratorIdMode),
     pluginUpdateMode,
-    autoUpdatePlugin: pluginUpdateMode === 'auto',
+    autoUpdatePlugin: false,
     windowMountMode,
     enableWindowOverlay: windowMountMode !== 'sidebar',
     popoverWidthMode: normalizePopoverWidthMode(safeRaw.popoverWidthMode),
@@ -229,9 +212,5 @@ export function normalizeFullSettings(rawInput) {
     showStepFilterToolbar: safeRaw.showStepFilterToolbar === true,
     stepTokenComboFormat: normalizeStepTokenComboFormat(safeRaw.stepTokenComboFormat),
     stepTableColumns: normalizeStepTableColumns(safeRaw.stepTableColumns),
-    contextWindowRiskAccepted: safeRaw.contextWindowRiskAccepted === true,
-    contextWindowMainEnabled: safeRaw.contextWindowMainEnabled !== false,
-    contextWindowSwarmEnabled: safeRaw.contextWindowSwarmEnabled === true,
-    modelContextWindows: normalizeModelContextWindows(safeRaw.modelContextWindows),
   };
 }

@@ -88,9 +88,6 @@
   --metric-danger: hsl(4 78% 55%);
   --metric-danger-soft: color-mix(in srgb, var(--metric-danger) 14%, transparent);
 
-  --quota-reserved: hsl(262 76% 58%);
-  --quota-reserved-soft: color-mix(in srgb, var(--quota-reserved) 13%, transparent);
-  --quota-reserved-border: color-mix(in srgb, var(--quota-reserved) 34%, transparent);
 
   /* Context Window 10-Channel Palette (Harmonious Apple System Tones) */
   --ctx-assistant: #007aff;
@@ -240,7 +237,6 @@
 :root[data-color-scheme="dark"],
 :host([data-color-scheme="dark"]),
 [data-color-scheme="dark"] {
-  --quota-reserved: #bf5af2;
   --ctx-assistant: #0a84ff;
   --ctx-tool-results: #40c8e0;
   --ctx-user-input: #5e5ce6;

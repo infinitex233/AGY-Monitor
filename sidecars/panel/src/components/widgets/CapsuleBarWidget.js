@@ -347,7 +347,6 @@ export function createCapsuleSlotNode(slotIndex, initialMetric) {
 
   const isNone = initialMetric === 'none';
   const isCtx = initialMetric === 'context';
-  const prefixSpan = h('span', { className: 'wm-slot-prefix' });
   const textSpan = h('span', {
     className: isCtx ? 'wm-slot-text wm-ctx-pct' : 'wm-slot-text',
     text: isNone
@@ -371,7 +370,7 @@ export function createCapsuleSlotNode(slotIndex, initialMetric) {
             ? 'wm-cap-slot wm-seg-speed'
             : initialMetric === 'ttft'
               ? 'wm-cap-slot wm-seg-metric'
-              : 'wm-cap-slot wm-seg-quota',
+              : 'wm-cap-slot',
       hidden: isNone,
       'data-slot-idx': String(slotIndex),
       'data-metric': initialMetric,
@@ -384,10 +383,8 @@ export function createCapsuleSlotNode(slotIndex, initialMetric) {
     el,
     ringSvg,
     ringFill,
-    prefixSpan,
     textSpan,
     ringMounted: isCtx,
-    prefixMounted: false,
     heldTtft: null,
   };
 }
@@ -441,18 +438,6 @@ export function syncCapsuleSlotNodes(capsuleSlots, capsuleSeps, slotKeys, slotCt
       slot.ringMounted = false;
     }
 
-    const prefixText = String(pres.prefix || '');
-    if (prefixText) {
-      patchText(slot.prefixSpan, prefixText);
-      if (!slot.prefixMounted) {
-        slot.el.insertBefore(slot.prefixSpan, slot.textSpan);
-        slot.prefixMounted = true;
-      }
-    } else if (slot.prefixMounted) {
-      slot.prefixSpan.remove();
-      slot.prefixMounted = false;
-    }
-
     const toneCls =
       pres.toneClass || (pres.danger ? 'tone-danger' : pres.warn ? 'tone-warn' : '');
     const fullSegClass = `${pres.segClass}${pres.running ? ' state-running' : ''}${toneCls ? ` ${toneCls}` : ''}`;
@@ -464,7 +449,6 @@ export function syncCapsuleSlotNodes(capsuleSlots, capsuleSeps, slotKeys, slotCt
     if (pres.showRing) {
       slot.ringFill.setAttribute('stroke-dashoffset', String(pres.dashOffset));
       patchClasses(slot.ringFill, {
-        'is-quota': pres.ringKind === 'quota',
         'is-empty': pres.ringEmpty === true,
         'tone-warn': pres.warn,
         'tone-danger': pres.danger,

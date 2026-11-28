@@ -2,7 +2,7 @@
  * @fileoverview 遥测载荷组装器与并发请求合并入口。
  *
  * 将遥测构建拆解为清晰的子阶段：
- * 1. 拉取本地型号目录与轨迹摘要（零账号身份、零订阅配额 RPC）；
+ * 1. 拉取模型配置与轨迹摘要（零账号身份、零订阅配额 RPC）；
  * 2. 调用 `buildDynamicModelMap` 构建动态模型映射表；
  * 3. 调用 `enumerateAndSyncConversations` 枚举会话并增量更新轨迹缓存；
  * 4. 调用 `enrichActiveConversationSteps` 与 `extractActiveContextTelemetry` 计算当前活跃会话指标与 10 通道上下文拆解；
@@ -32,12 +32,11 @@ import {
   saveJson,
 } from './config.mjs';
 import { getEndpointCacheStore } from './endpoint-registry.mjs';
-import { getContextWindowGroups, getContextWindowModels } from './context-windows.mjs';
 import { getCliStatusLineRuntimeStatus } from './cli-statusline-config.mjs';
 import { readLocalSummarySnapshot } from './cli-sqlite-reader.mjs';
 import { enumerateAndSyncConversations } from './local-scanner.mjs';
 import { ensureLsEndpointDiscovered } from './ls-discovery.mjs';
-import { callLsRpc, getContextModelCatalog } from './ls-rpc.mjs';
+import { callLsRpc } from './ls-rpc.mjs';
 import {
   buildDynamicModelMap,
   computeStepCost,
@@ -45,7 +44,6 @@ import {
   formatUpstreamModelId,
 } from './model-pricing.mjs';
 import { getCloudStatus, getPricingPhaseEpoch, pricingCatalogRevision } from './pricing-catalog.mjs';
-import { getDefaultCloudCodeProxyStatus } from './cloudcode-proxy.mjs';
 import { getDefaultWindowBridgeStatus } from './window-bridge.mjs';
 import {
   aggregateConsumptionPresetBundle,
@@ -112,20 +110,11 @@ function findTrajectoryCacheEntry(cascadeId, cacheStore = null, { hydrate = fals
   return null;
 }
 
-function rememberModelContextLimit(limits, step) {
-  const previous = limits.get(step.modelKey);
-  if (!previous || step.createdAtMs > previous.at) {
-    limits.set(step.modelKey, { tokens: step.reportedContextLimitTokens, at: step.createdAtMs });
-  }
-}
-
 function readTrajectoryModelFacts(steps) {
   const cached = trajectoryModelFacts.get(steps);
   if (cached) return cached;
   const upstream = new Map();
-  const limits = new Map();
   const fallbackModelKeys = new Set();
-  let sortableLimits = true;
   for (const step of steps) {
     if (step?.modelKey && step.modelKey !== 'unknown') {
       if (step.responseModel) {
@@ -134,47 +123,19 @@ function readTrajectoryModelFacts(steps) {
         fallbackModelKeys.add(step.modelKey);
       }
     }
-    if (!step?.isCompactionStep && !step?.isImageGenStep && step?.reportedContextLimitTokens > 0) {
-      sortableLimits &&= Number.isFinite(step.createdAtMs);
-      rememberModelContextLimit(limits, step);
-    }
   }
-  const result = { upstream, limits: sortableLimits ? limits : null, fallbackModelKeys };
+  const result = { upstream, fallbackModelKeys };
   trajectoryModelFacts.set(steps, result);
   return result;
 }
 
-/** 合并各会话的上游模型与上下文上限，步骤数组更新后重新提取对应会话的数据。 */
-function buildKnownUpstreamModelMap(contextLimits, cacheStore = null) {
-  const store = cacheStore || getEndpointCacheStore(null);
+/** 合并各会话的上游模型，步骤数组更新后重新提取对应会话的数据。 */
+function buildKnownUpstreamModelMap(cacheStore) {
   const knownUpstreamByModelKey = new Map();
-  for (const [, entry] of store.listCachedTrajectoryEntries()) {
+  for (const [, entry] of cacheStore.listCachedTrajectoryEntries()) {
     if (!entry?.steps?.length) continue;
     const facts = readTrajectoryModelFacts(entry.steps);
     for (const [key, model] of facts.upstream) knownUpstreamByModelKey.set(key, model);
-    if (entry.subagentSpec) continue;
-    if (Array.isArray(entry._stepFlags?.modelLimits) && entry._stepFlags.modelLimits.length > 0) {
-      for (const [key, tokens, at] of entry._stepFlags.modelLimits) {
-        if (!key || !(tokens > 0)) continue;
-        const previous = contextLimits.get(key);
-        if (!previous || at > previous.at) {
-          contextLimits.set(key, { tokens, at });
-        }
-      }
-      continue;
-    }
-    if (facts.limits) {
-      for (const [key, limit] of facts.limits) {
-        const previous = contextLimits.get(key);
-        if (!previous || limit.at > previous.at) contextLimits.set(key, limit);
-      }
-    } else {
-      for (const step of entry.steps) {
-        if (!step?.isCompactionStep && step?.reportedContextLimitTokens > 0) {
-          rememberModelContextLimit(contextLimits, step);
-        }
-      }
-    }
   }
   return knownUpstreamByModelKey;
 }
@@ -246,6 +207,7 @@ function enrichActiveConversationSteps(
       : annotatedUpstreamModel;
 
     const {
+      accountName: _accountName,
       viewableDelaySec: _viewableDelaySec,
       ttftSource: _ttftSource,
       speedBasis: _speedBasis,
@@ -1564,7 +1526,7 @@ function buildActiveConversationAssembly({
  * 构建完整的前端遥测载荷（核心内部实现，直接供单元测试沙箱调用）。
  *
  * @param {string} requestedConvId 请求指定的会话 ID（为空时自动选定最近活跃会话）
- * @param {boolean} [forceRefresh=false] 是否强制穿透本地轨迹/目录缓存
+ * @param {boolean} [forceRefresh=false] 是否强制穿透本地轨迹缓存
  * @param {{ range?: string, startMs?: number, endMs?: number, endpoint?: object|null }} [filterOpts={}] 时间范围筛选选项与可选远端端点
  * @returns {Promise<object>}
  */
@@ -1606,20 +1568,17 @@ export async function buildTelemetryPayloadInternal(
   }
   // 仅读取静态模型配置列表用于占位符名称映射（绝不提取用户身份或订阅配额信息）
   const clientConfigs = userStatus?.cascadeModelConfigData?.clientModelConfigs || [];
-  const [sessions, contextModelCatalog] = await Promise.all([
-    getTelemetrySources(requestedConvId, forceRefresh, endpoint),
-    Array.isArray(clientConfigs) && clientConfigs.length
-      ? getContextModelCatalog(endpoint, { allowStale: !forceRefresh, forceRefresh })
-      : null,
-  ]);
-  const { conversations, activeConvSummary, activeCascadeId } = sessions;
+  const { conversations, activeConvSummary, activeCascadeId } = await getTelemetrySources(
+    requestedConvId,
+    forceRefresh,
+    endpoint
+  );
   const dynamicModelMap = buildDynamicModelMap(clientConfigs);
 
   const resolveStepModel = createStepModelResolver(dynamicModelMap);
 
   // 3. 计算当前活跃根会话及其子代理的步骤指标、10 通道上下文拆解与按模型汇总
-  const reportedContextLimits = new Map();
-  const knownUpstreamByModelKey = buildKnownUpstreamModelMap(reportedContextLimits, cacheStore);
+  const knownUpstreamByModelKey = buildKnownUpstreamModelMap(cacheStore);
   const activeEntry = findTrajectoryCacheEntry(activeCascadeId, cacheStore, { hydrate: true });
   const modelInputs = {
     catalogRevision: pricingCatalogRevision,
@@ -1989,18 +1948,8 @@ export async function buildTelemetryPayloadInternal(
     },
     uiBundleVersion,
     windowBridge: getDefaultWindowBridgeStatus(),
-    cloudCodeProxy: getDefaultCloudCodeProxyStatus(),
     cliStatusLine: getCliStatusLineRuntimeStatus({ maxAgeMs: forceRefresh ? 0 : 30_000 }),
     settings,
-    contextWindowModels: getContextWindowGroups(
-      getContextWindowModels(clientConfigs, contextModelCatalog)
-    ).map((group) => {
-      const latest = group.members.reduce((previous, id) => {
-        const reported = reportedContextLimits.get(id);
-        return reported && (!previous || reported.at > previous.at) ? reported : previous;
-      }, null);
-      return { ...group, reportedLimitTokens: latest?.tokens ?? null };
-    }),
     cloudStatus: getCloudStatus(),
     totalConversations: conversations.length,
     runningConversations,

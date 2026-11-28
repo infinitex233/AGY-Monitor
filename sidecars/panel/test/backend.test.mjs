@@ -1077,7 +1077,6 @@ test('preferences schema defaults match pre-refactor UI, migrate legacy none slo
   assert.equal(def.showStepSpeedColor, false);
   assert.equal(def.showStepFilterToolbar, false);
   assert.deepEqual([...def.stepTableColumns], ['time', 'model', 'tps', 'ttft', 'cache', 'cost']);
-  assert.deepEqual({ ...def.modelContextWindows }, {});
 
   // 2. Legacy 3-slot ['context', 'none', 'quota_auto'] strips removed quota & none slots to ['context']
   assert.deepEqual(
@@ -1100,8 +1099,16 @@ test('preferences schema defaults match pre-refactor UI, migrate legacy none slo
   assert.equal(hDefault.normalizeContextAgentMode('main'), 'main');
   assert.equal(hDefault.normalizeContextAgentMode('unknown'), 'main');
 
-  // 4. Updating preferences must not apply legacy global limits or bulk model updates
+  // 4. Ignore removed overrides when saving preferences or loading old settings
+  const legacyOverrides = {
+    contextLimitOverrideTokens: 128000,
+    modelContextWindows: { MODEL_PLACEHOLDER_M418: '900K' },
+    contextWindowRiskAccepted: true,
+    contextWindowMainEnabled: false,
+    contextWindowSwarmEnabled: true,
+  };
   const saveRes = hDefault.executeSettingsAction({
+    ...legacyOverrides,
     language: 'en-US',
     themeAccent: 'emerald',
     fontScale: 'lg',
@@ -1116,8 +1123,6 @@ test('preferences schema defaults match pre-refactor UI, migrate legacy none slo
     showStepSpeedColor: true,
     showStepFilterToolbar: true,
     stepTableColumns: ['step', 'time', 'model', 'duration', 'input_tokens', 'output_tokens', 'cost'],
-    contextLimitOverrideTokens: 128000,
-    modelContextWindows: { MODEL_PLACEHOLDER_M418: '900K' },
   });
   assert.equal(saveRes.ok, true);
   assert.equal(saveRes.updated.language, 'en-US');
@@ -1133,14 +1138,9 @@ test('preferences schema defaults match pre-refactor UI, migrate legacy none slo
   assert.equal(saveRes.updated.showStepAgentBadge, false);
   assert.equal(saveRes.updated.showStepSpeedColor, true);
   assert.equal(saveRes.updated.showStepFilterToolbar, true);
-  assert.equal(saveRes.updated.contextLimitOverrideTokens, undefined);
-  assert.deepEqual({ ...saveRes.updated.modelContextWindows }, {});
 
   const hWithSteps = backendHarness({
-    settings: {
-      contextLimitOverrideTokens: 128000,
-      modelContextWindows: { MODEL_PLACEHOLDER_M418: '900K' },
-    },
+    settings: { ...legacyOverrides, contextAgentMode: 'auto' },
     cache: { c1: old },
     trajectories: { c1: raw },
     summaries: { c1: { stepCount: 1, lastModifiedTime: '2026-01-01T00:00:10Z', status: 'IDLE' } },
@@ -1148,6 +1148,14 @@ test('preferences schema defaults match pre-refactor UI, migrate legacy none slo
   const telemetry = await hWithSteps.buildTelemetryPayloadInternal('c1');
   assert.equal(telemetry.activeConversation.context.compactionLimitTokens, 256000);
   assert.equal(telemetry.activeConversation.context.limitTokens, 256000);
+  assert.equal(telemetry.settings.contextAgentMode, 'auto');
+  for (const key of Object.keys(legacyOverrides)) {
+    assert.equal(Object.hasOwn(saveRes.updated, key), false);
+    assert.equal(Object.hasOwn(hDefault.state.settings, key), false);
+    assert.equal(Object.hasOwn(telemetry.settings, key), false);
+  }
+  const removedRoute = await hWithSteps.dispatchBridgeApiRequest('/api/context-window', 'POST', {});
+  assert.equal(removedRoute.status, 404);
 
   // 5. executeRebuildCacheAction clears trajectoryCache & writes empty cache object
   const rebuildRes = hWithSteps.executeRebuildCacheAction();
@@ -2097,6 +2105,7 @@ test('provisions Antigravity CLI statusLine safely and renders live capsule from
     const statusLineScript = fileURLToPath(new URL('../cli-statusline.mjs', import.meta.url));
     const installEnv = {
       ...process.env,
+      NO_COLOR: '',
       ANTIGRAVITY_GEMINI_DIR: tempRoot,
       ANTIGRAVITY_APP_DATA_DIR: '',
       USAGE_MONITOR_APP_DATA_DIR: '',
@@ -2829,12 +2838,10 @@ test('v1.5 feedback settings schema: custom token combo DSL, 3-way model display
   assert.equal(h.normalizeModelDisplayMode(undefined, true), 'upstream');
   assert.equal(h.normalizeModelDisplayMode(undefined, false), 'short');
 
-  assert.equal(h.loadSettings().contextWindowRiskAccepted, false);
   const compactRes = h.executeSettingsAction({
     modelDisplayMode: 'upstream_compact',
     popoverWidthMode: 'custom',
     popoverWidth: 1500,
-    contextWindowRiskAccepted: true,
     stepTokenComboFormat: 'in:out:cache',
     stepTableColumns: ['step', 'model', 'tokens_io_cache', 'tokens_custom', 'cost'],
   });
@@ -2843,7 +2850,6 @@ test('v1.5 feedback settings schema: custom token combo DSL, 3-way model display
   assert.equal(compactRes.updated.showUpstreamModel, true);
   assert.equal(compactRes.updated.popoverWidthMode, 'custom');
   assert.equal(compactRes.updated.popoverWidth, 1080, 'Clamped to MAX_POPOVER_WIDTH 1080');
-  assert.equal(compactRes.updated.contextWindowRiskAccepted, true);
   assert.equal(compactRes.updated.stepTokenComboFormat, 'in:out:cache');
   assert.deepEqual([...compactRes.updated.stepTableColumns], [
     'step',

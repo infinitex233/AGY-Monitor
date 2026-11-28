@@ -5,12 +5,12 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import vm from 'node:vm';
-import { createContextWindowSyncExpression } from '../backend/context-windows.mjs';
 import {
   clearRemoteEndpointRegistry,
   getRegisteredRemoteEndpoint,
   registerRemoteEndpoint,
 } from '../backend/endpoint-registry.mjs';
+import { callLsRpc } from '../backend/ls-rpc.mjs';
 import {
   buildWindowRemoteRpcExpression,
   classifyWindowTargetEndpoint,
@@ -156,7 +156,6 @@ test('Per-endpoint backend isolation keeps local and multiple SSH windows comple
       if (method === 'GetUserStatus') {
         return { userStatus: { email: 'remote-a@example.com', userTier: { name: 'Google AI Ultra' } } };
       }
-      if (method === 'GetAvailableModels') return { response: { models: {} } };
       if (method === 'RetrieveUserQuotaSummary') return { response: { groups: [] } };
       if (method === 'GetAllCascadeTrajectories') {
         return {
@@ -191,7 +190,6 @@ test('Per-endpoint backend isolation keeps local and multiple SSH windows comple
       if (method === 'GetUserStatus') {
         return { userStatus: { email: 'remote-b@example.com', userTier: { name: 'Google AI Pro' } } };
       }
-      if (method === 'GetAvailableModels') return { response: { models: {} } };
       if (method === 'RetrieveUserQuotaSummary') return { response: { groups: [] } };
       if (method === 'GetAllCascadeTrajectories') {
         return {
@@ -323,7 +321,6 @@ test('Tier-1 loopback HTTPS falls back with 60s circuit breaker to Tier-2 window
     if (method === 'GetUserStatus') return { userStatus: { email: 'tier2@example.com' } };
     if (method === 'GetAllCascadeTrajectories') return { trajectorySummaries: {} };
     if (method === 'RetrieveUserQuotaSummary') return { response: { groups: [] } };
-    if (method === 'GetAvailableModels') return { response: { models: {} } };
     return {};
   });
 
@@ -394,72 +391,7 @@ test('Tier-1 loopback HTTPS falls back with 60s circuit breaker to Tier-2 window
   assert.equal(sentFrame.procedure, '/exa.language_server_pb.LanguageServerService/GetUserStatus');
 });
 
-test('Context window overrides activate in SSH windows when allowRemoteHost=true and stay disabled when allowRemoteHost=false', async () => {
-  const sendPath = '/exa.language_server_pb.LanguageServerService/SendUserCascadeMessage';
-  const carbon = 'MODEL_PLACEHOLDER_M427';
-  const host = 'https://127.0.0.1:55190';
-  const nativeFetch = async (_url, init) => init;
-  class MockWS {
-    constructor(url) { this.url = url; }
-    send(data) { return data; }
-  }
-  const win = {
-    location: new URL(host),
-    fetch: nativeFetch,
-    WebSocket: MockWS,
-    __APP_CONFIG__: { isRemoteControl: true, sshHost: 'fuxi-office-4090-test' },
-  };
-  const ctx = vm.createContext({
-    window: win,
-    URL,
-    TextEncoder,
-    TextDecoder,
-    Headers,
-    Uint8Array,
-    AbortSignal,
-    setTimeout,
-    clearTimeout,
-  });
-
-  const prefs = { 'model:gemini-4-carbon': '256000' };
-  const fallbackRules = { [carbon]: 256000 };
-
-  // Default allowRemoteHost=false keeps legacy skip behavior for isRemoteControl
-  const skipped = await vm.runInContext(
-    createContextWindowSyncExpression(prefs, 'boot-ssh-1', fallbackRules, false),
-    ctx
-  );
-  assert.equal(skipped.attached, false);
-  assert.equal(win.fetch, nativeFetch);
-
-  // Desktop SSH loopback window with allowRemoteHost=true attaches, rewrites, and passively observes CSRF
-  const attached = await vm.runInContext(
-    createContextWindowSyncExpression(prefs, 'boot-ssh-1', fallbackRules, true),
-    ctx
-  );
-  assert.equal(attached.attached, true);
-  assert.equal(attached.ruleCount, 1);
-
-  const payload = {
-    cascadeConfig: {
-      plannerConfig: { planModel: carbon },
-      checkpointConfig: { maxTokenLimit: 512000 },
-    },
-  };
-  const out = await win.fetch(host + sendPath, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-codeium-csrf-token': 'observed-ssh-csrf' },
-    body: JSON.stringify(payload),
-  });
-  assert.equal(JSON.parse(out.body).cascadeConfig.checkpointConfig.maxTokenLimit, 256000);
-  assert.equal(win.__AGUsageMonitorContextWindows.observedCsrfToken, 'observed-ssh-csrf');
-
-  // Clean dispose restores exact nativeFetch reference
-  await vm.runInContext(createContextWindowSyncExpression({}, 'boot-ssh-1', {}, true), ctx);
-  assert.equal(win.fetch, nativeFetch);
-});
-
-test('CDP bridge classifies local + SSH windows simultaneously, prefetches per-endpoint initialTelemetry, routes X-Usage-Monitor-Endpoint header, and supports SSH context windows in sidebar mode', async () => {
+test('CDP bridge classifies local + SSH windows simultaneously, prefetches per-endpoint initialTelemetry, routes X-Usage-Monitor-Endpoint header', async () => {
   clearRemoteEndpointRegistry();
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ag-wm-ssh-cdp-'));
   const portFile = path.join(tmpDir, 'DevToolsActivePort');
@@ -579,7 +511,6 @@ test('CDP bridge classifies local + SSH windows simultaneously, prefetches per-e
     getSettingsFn: () => ({
       enableWindowOverlay: overlayEnabled,
       windowMountMode: overlayEnabled ? 'dual' : 'sidebar',
-      modelContextWindows: { 'model:gemini-4-carbon': '256000' },
     }),
     getBundleVersionFn: () => 'v-ssh-1',
     env: { ANTIGRAVITY_DEVTOOLS_PORT_FILE: portFile },
@@ -593,9 +524,9 @@ test('CDP bridge classifies local + SSH windows simultaneously, prefetches per-e
   });
 
   try {
-    // 1. Even in sidebar-only mode, SSH endpoint is classified & registered before early return
     const sidebarSync = await controller.syncAllWindows();
     assert.equal(sidebarSync.enabled, false);
+    assert.equal(sidebarSync.removed, 0);
 
     // 2. Enable overlay mode -> injects both windows with separate endpointIds & initialTelemetry
     overlayEnabled = true;
@@ -670,86 +601,14 @@ test('httpClient attaches X-Usage-Monitor-Endpoint and does NOT downgrade to CDP
   }
 });
 
-test('Remote executeModelContextWindowAction enforces strict endpoint boundaries', async () => {
-  const carbon = 'MODEL_PLACEHOLDER_M427';
-  const h = backendHarness({
-    availableModels: {
-      'gemini-4-carbon-high': { model: carbon, maxTokens: 1048576, maxOutputTokens: 262144 },
-    },
-    userStatus: {
-      cascadeModelConfigData: {
-        clientModelConfigs: [
-          {
-            label: 'Gemini 4 Carbon (High)',
-            modelId: 'gemini-4-carbon-high',
-            modelOrAlias: { model: carbon },
-            contextWindowOptions: [{ name: '256K' }, { name: '900K' }],
-          },
-        ],
-      },
-    },
-  });
-
+test('An authoritative local endpoint cannot be spoofed by a remote endpoint field in telemetry requests', async () => {
+  const h = backendHarness({});
   const ep = h.registerRemoteEndpoint({
     origin: 'https://127.0.0.1:56101',
-    wsUrl: 'ws://127.0.0.1:9222/devtools/page/ssh-ctx',
+    wsUrl: 'ws://127.0.0.1:9222/devtools/page/ssh-telemetry',
     label: 'strict-remote',
     stableHostKey: 'strict-remote',
   });
-
-  let remoteShouldThrow = false;
-  h.setRemoteWindowRpcInvoker(async (_endpoint, method) => {
-    if (remoteShouldThrow) throw new Error('remote offline');
-    if (method === 'GetUserStatus') {
-      return {
-        userStatus: {
-          cascadeModelConfigData: {
-            clientModelConfigs: [
-              {
-                label: 'Gemini 4 Carbon (High)',
-                modelId: 'gemini-4-carbon-high',
-                modelOrAlias: { model: carbon },
-                contextWindowOptions: [{ name: '256K' }], // Remote does NOT allow 900K!
-              },
-            ],
-          },
-        },
-      };
-    }
-    if (method === 'GetAvailableModels') return { response: { models: {} } };
-    return {};
-  });
-
-  // 1. Remote accepts supported 256K
-  const okRes = await h.executeModelContextWindowAction(
-    { modelId: 'model:gemini-4-carbon', option: '256K' },
-    { endpointId: ep.id }
-  );
-  assert.equal(okRes.status, 200);
-
-  // 2. Remote rejects 900K -> MUST return 400 and NEVER fall back to more permissive local config
-  const rejectedRes = await h.executeModelContextWindowAction(
-    { modelId: 'model:gemini-4-carbon', option: '900K' },
-    { endpointId: ep.id }
-  );
-  assert.equal(rejectedRes.status, 400);
-
-  // 3. When remote RPC fails/throws, falls back safely to local validation
-  remoteShouldThrow = true;
-  const fallbackRes = await h.executeModelContextWindowAction(
-    { modelId: 'model:gemini-4-carbon', option: '900K' },
-    { endpointId: ep.id }
-  );
-  assert.equal(fallbackRes.status, 200);
-
-  // 4. Unregistered endpoint on modelContextWindow -> 503 (zero local leak)
-  const pendingCtx = await h.executeModelContextWindowAction(
-    { modelId: 'model:gemini-4-carbon', option: '256K' },
-    { endpointId: 'remote:ssh-missing-1111' }
-  );
-  assert.equal(pendingCtx.status, 503);
-
-  // 5. Authoritative 'local' in opts cannot be spoofed by body/query endpointId
   const spoofedRes = await h.dispatchBridgeApiRequest(
     '/api/telemetry',
     'GET',
@@ -823,7 +682,7 @@ test('Multi-window same-SSH-host preserves Tier-2 circuit breaker, clears stale 
   assert.equal(h.getRegisteredRemoteEndpoint(ep1.id), null);
 });
 
-test('ls-rpc security & transport guards: rejects non-allowlisted remote RPC, non-loopback HTTPS, oversized Tier-1 responses, and avoids circuit-breaking on GetCascadeTrajectory 404', async () => {
+test('ls-rpc security & transport guards: rejects non-allowlisted RPCs, non-loopback HTTPS, oversized Tier-1 responses, and avoids circuit-breaking on GetCascadeTrajectory 404', async () => {
   const h = backendHarness({});
   const ep = h.registerRemoteEndpoint({
     origin: 'https://127.0.0.1:58101',
@@ -839,6 +698,68 @@ test('ls-rpc security & transport guards: rejects non-allowlisted remote RPC, no
     () => h.callLsRpc('SendUserCascadeMessage', {}, 1000, ep),
     /not allowed on remote endpoints/i
   );
+
+  await assert.rejects(
+    () => h.callLsRpc('SendUserCascadeMessage'),
+    /not allowed on the local endpoint/i
+  );
+  assert.throws(
+    () => buildWindowRemoteRpcExpression('SendUserCascadeMessage'),
+    /not allowed on remote endpoints/i
+  );
+  assert.equal(h.state.calls.length, 0);
+
+  // 1b. Read-only RPC transports disable HTTP redirects so 307/308 cannot escape the allowlist
+  const windowFetchInits = [];
+  const winRedirectCtx = vm.createContext({
+    window: {
+      location: { origin: 'http://127.0.0.1:58102', host: '127.0.0.1:58102', protocol: 'http:' },
+      __APP_CONFIG__: { csrfToken: 'tok-redirect' },
+      fetch: async (_url, init) => {
+        windowFetchInits.push(init);
+        return { ok: true, status: 200, json: async () => ({ userStatus: {} }) };
+      },
+    },
+    AbortSignal,
+  });
+  const winRpcRes = await vm.runInContext(
+    buildWindowRemoteRpcExpression('GetUserStatus', {}, 2000),
+    winRedirectCtx
+  );
+  assert.equal(winRpcRes.ok, true);
+  assert.equal(windowFetchInits.length, 1);
+  assert.equal(windowFetchInits[0].redirect, 'error');
+
+  const redirectReceivedPaths = [];
+  const redirectServer = http.createServer((req, res) => {
+    redirectReceivedPaths.push(req.url);
+    res.writeHead(307, {
+      Location: '/exa.language_server_pb.LanguageServerService/SendUserCascadeMessage',
+    });
+    res.end();
+  });
+  await new Promise((resolve) => redirectServer.listen(0, '127.0.0.1', resolve));
+  try {
+    const { port: redirectPort } = redirectServer.address();
+    const redirectEp = registerRemoteEndpoint({
+      origin: `http://127.0.0.1:${redirectPort}`,
+      baseUrl: `http://127.0.0.1:${redirectPort}`,
+      csrfToken: 'tok-redirect',
+      wsUrl: `ws://127.0.0.1:9222/devtools/page/redirect-${redirectPort}`,
+      label: 'redirect-host',
+      stableHostKey: `redirect-${redirectPort}`,
+    });
+    await assert.rejects(
+      () => callLsRpc('GetUserStatus', {}, 2000, redirectEp),
+      /redirect|fetch failed/i
+    );
+    assert.deepEqual(redirectReceivedPaths, [
+      '/exa.language_server_pb.LanguageServerService/GetUserStatus',
+    ]);
+  } finally {
+    clearRemoteEndpointRegistry();
+    await new Promise((resolve) => redirectServer.close(resolve));
+  }
 
   // 2. GetCascadeTrajectory 404 does NOT trip Tier-2 circuit breaker
   let tier2Invoked = false;
@@ -1090,118 +1011,6 @@ test('WindowOverlayShell updateBridge rejects stale CDP rpcQueue on endpoint swi
   assert.equal(sshBadge.getAttribute('title'), 'SSH · gpu-4090');
 
   overlay.dispose();
-});
-
-test('window-bridge does NOT leak localFallbackRules into SSH window when remote host verifies its models and rejects the override', async () => {
-  clearRemoteEndpointRegistry();
-  const { setRemoteWindowRpcInvoker } = await import('../backend/endpoint-registry.mjs');
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ag-wm-ssh-ctx-iso-'));
-  const portFile = path.join(tmpDir, 'DevToolsActivePort');
-  const carbon = 'MODEL_PLACEHOLDER_M427';
-
-  const sshWinObj = {
-    location: new URL('https://127.0.0.1:63001/c/cccccccc-cccc-cccc-cccc-cccccccccccc'),
-    __APP_CONFIG__: { isRemoteControl: true, sshHost: 'small-tier-ssh' },
-    fetch: async (_u, init) => init,
-    WebSocket: class { constructor(u) { this.url = u; } send(d) { return d; } },
-    URL, TextEncoder, TextDecoder, Headers, Uint8Array, AbortSignal, setTimeout, clearTimeout,
-  };
-  sshWinObj.window = sshWinObj;
-  sshWinObj.globalThis = sshWinObj;
-  const sshCtx = vm.createContext(sshWinObj);
-
-  class MockWS {
-    constructor(url) {
-      this.url = url;
-      this.listeners = new Map();
-      queueMicrotask(() => this._emit('open', {}));
-    }
-    addEventListener(type, fn) {
-      if (!this.listeners.has(type)) this.listeners.set(type, []);
-      this.listeners.get(type).push(fn);
-    }
-    send(raw) {
-      const msg = JSON.parse(raw);
-      const value = vm.runInContext(msg.params.expression, sshCtx);
-      Promise.resolve(value).then((result) =>
-        this._emit('message', {
-          data: JSON.stringify({ id: msg.id, result: { result: { value: result } } }),
-        })
-      );
-    }
-    close() {}
-    _emit(type, ev) {
-      for (const fn of this.listeners.get(type) || []) fn(ev);
-    }
-  }
-
-  const cdpServer = http.createServer((req, res) => {
-    if (req.url === '/json/list') {
-      const p = cdpServer.address().port;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify([
-          {
-            id: 'ssh-small',
-            type: 'page',
-            url: 'https://127.0.0.1:63001/c/cccccccc-cccc-cccc-cccc-cccccccccccc',
-            webSocketDebuggerUrl: `ws://127.0.0.1:${p}/devtools/page/ssh-small`,
-          },
-        ])
-      );
-      return;
-    }
-    res.writeHead(404);
-    res.end();
-  });
-  await new Promise((resolve) => cdpServer.listen(0, '127.0.0.1', resolve));
-  fs.writeFileSync(portFile, `${cdpServer.address().port}\n/devtools/browser/mock`, 'utf8');
-
-  // Remote host returns valid configs that do NOT include 900K option -> verified empty rules {}
-  setRemoteWindowRpcInvoker(async (_ep, method) => {
-    if (method === 'GetUserStatus') {
-      return {
-        userStatus: {
-          cascadeModelConfigData: {
-            clientModelConfigs: [
-              {
-                label: 'Gemini 4 Carbon (High)',
-                modelId: 'gemini-4-carbon-high',
-                modelOrAlias: { model: carbon },
-                contextWindowOptions: [{ name: '256K' }],
-              },
-            ],
-          },
-        },
-      };
-    }
-    return { response: { models: {} } };
-  });
-
-  const controller = createWindowBridgeController({
-    handleApiRequest: async () => ({ status: 200, body: '{}' }),
-    readAssetFn: async () => '',
-    getSettingsFn: () => ({
-      enableWindowOverlay: false,
-      windowMountMode: 'sidebar',
-      modelContextWindows: { 'model:gemini-4-carbon': '900K' },
-    }),
-    getBundleVersionFn: () => 'v-iso',
-    env: { ANTIGRAVITY_DEVTOOLS_PORT_FILE: portFile },
-    WebSocketImpl: MockWS,
-  });
-
-  try {
-    await controller.syncAllWindows();
-    // Because remote verified its models and rejected 900K, fallbackRules is {} and no override is attached
-    assert.equal(sshWinObj.__AGUsageMonitorContextWindows, undefined);
-  } finally {
-    setRemoteWindowRpcInvoker(null);
-    await controller.stop();
-    clearRemoteEndpointRegistry();
-    cdpServer.close();
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
 });
 
 test('SSH remote endpoints isolate v1.5.2 fast paths (scope=consumption, consumption-presets cold/warm, conversation) and local Swarm manifests/transcripts', async () => {
@@ -1525,9 +1334,9 @@ test('httpClient does NOT replay rejected or timed-out CDP requests over HTTP af
     // Case 2: Even if a CDP request times out (plain Error) after endpoint changed, fallbackViaCdpWithRecovery must NOT replay over HTTP
     bridge.transportMode = 'cdp';
     bridge[WINDOW_BRIDGE_ENDPOINT_KEY] = 'remote:ssh-old-2';
-    const timeoutPromise = callSidecarApi('/api/context-window', {
+    const timeoutPromise = callSidecarApi('/api/cache/rebuild', {
       method: 'POST',
-      body: { modelId: 'm1', option: '500K' },
+      body: {},
       cdpTimeoutMs: 30,
     });
     bridge[WINDOW_BRIDGE_ENDPOINT_KEY] = LOCAL_ENDPOINT_ID;

@@ -225,10 +225,6 @@ test('Hybrid SQLite+WAL mode skips trajectory RPCs for local DBs, falls back to 
         res.end(JSON.stringify({ response: { groups: [] } }));
         return;
       }
-      if (method === 'GetAvailableModels') {
-        res.end(JSON.stringify({ response: { models: {} } }));
-        return;
-      }
       if (method === 'GetCascadeTrajectory' && body.cascadeId === rpcOnlyCid) {
         res.end(
           JSON.stringify({
@@ -1224,10 +1220,6 @@ test('Empty-shell .db + encrypted .pb fallback recovers CLI conversation steps, 
       }
       if (method === 'RetrieveUserQuotaSummary') {
         res.end(JSON.stringify({ response: { groups: [] } }));
-        return;
-      }
-      if (method === 'GetAvailableModels') {
-        res.end(JSON.stringify({ response: { models: {} } }));
         return;
       }
       if (method === 'GetCascadeTrajectory') {

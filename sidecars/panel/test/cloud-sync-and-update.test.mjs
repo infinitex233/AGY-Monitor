@@ -544,14 +544,14 @@ test('repository decoupling: ignores foreign upstream catalog latestPluginVersio
   assert.equal(gitCalls.some((args) => args.includes('set-url')), false);
 });
 
-test('pluginUpdateMode supports manual (default), auto, and off with legacy autoUpdatePlugin compatibility', async () => {
+test('pluginUpdateMode supports manual (default) and off, normalizes legacy auto to manual, and syncCloudCatalog never triggers background auto-update', async () => {
   const defaultH = backendHarness();
   assert.equal(defaultH.loadSettings().pluginUpdateMode, 'manual');
   assert.equal(defaultH.loadSettings().autoUpdatePlugin, false);
 
-  const legacyAutoH = backendHarness({ settings: { autoUpdatePlugin: true } });
-  assert.equal(legacyAutoH.loadSettings().pluginUpdateMode, 'auto');
-  assert.equal(legacyAutoH.loadSettings().autoUpdatePlugin, true);
+  const legacyAutoH = backendHarness({ settings: { autoUpdatePlugin: true, pluginUpdateMode: 'auto' } });
+  assert.equal(legacyAutoH.loadSettings().pluginUpdateMode, 'manual');
+  assert.equal(legacyAutoH.loadSettings().autoUpdatePlugin, false);
 
   const offSettings = {};
   let gitTriggered = false;
@@ -588,14 +588,14 @@ test('pluginUpdateMode supports manual (default), auto, and off with legacy auto
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(gitTriggered, false, 'pluginUpdateMode=off must never trigger auto update');
 
-  const saveAuto = offH.executeSettingsAction({ pluginUpdateMode: 'auto' }).updated;
-  assert.equal(saveAuto.pluginUpdateMode, 'auto');
-  assert.equal(saveAuto.autoUpdatePlugin, true);
-  Object.assign(offSettings, saveAuto);
+  const saveLegacyAuto = offH.executeSettingsAction({ pluginUpdateMode: 'auto', autoUpdatePlugin: true }).updated;
+  assert.equal(saveLegacyAuto.pluginUpdateMode, 'manual');
+  assert.equal(saveLegacyAuto.autoUpdatePlugin, false);
+  Object.assign(offSettings, saveLegacyAuto);
 
   await offH.syncCloudCatalog({ force: true });
   await new Promise((r) => setTimeout(r, 20));
-  assert.equal(gitTriggered, true, 'pluginUpdateMode=auto triggers background update check');
+  assert.equal(gitTriggered, false, 'syncCloudCatalog must never trigger background auto update');
 });
 
 test('argon-b / argon-trial deployment shards resolve phased pricing without wildcarding unknown single-letter suffixes, and custom Git forks suppress upstream update badges', async () => {

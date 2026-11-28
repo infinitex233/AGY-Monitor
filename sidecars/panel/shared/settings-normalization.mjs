@@ -295,16 +295,14 @@ export function normalizeStepTokenComboFormat(raw) {
 }
 
 /**
- * 归一化插件更新策略枚举（兼容历史 `autoUpdatePlugin` 布尔开关，默认 `'manual'`）。
+ * 归一化插件更新策略枚举（仅支持 `'manual'` 与 `'off'`，历史 `'auto'` / `autoUpdatePlugin` 统一收敛为 `'manual'`）。
  *
  * @param {unknown} mode
- * @param {unknown} [legacyAutoUpdate]
- * @returns {'off'|'manual'|'auto'}
+ * @returns {'off'|'manual'}
  */
-export function normalizePluginUpdateMode(mode, legacyAutoUpdate) {
+export function normalizePluginUpdateMode(mode) {
   const m = String(mode ?? '').trim().toLowerCase();
-  if (m === 'off' || m === 'manual' || m === 'auto') return m;
-  if (legacyAutoUpdate === true) return 'auto';
+  if (m === 'off') return 'off';
   return 'manual';
 }
 

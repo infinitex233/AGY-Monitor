@@ -168,7 +168,7 @@ function readConversationMtime(files = []) {
  * 加载并解析跨端（IDE / Standalone / JetBrains）写入的 `.deep_stats_cache.json` 缓存。
  * 使用文件签名 (`mtimeMs + size`) 进行 Memoize，文件未变化时直接返回内存 Map。
  *
- * @returns {Map<string, {cascadeId: string, appSource: string, accountName: string, title: string, lastModifiedMs: number, steps: object[]}>}
+ * @returns {Map<string, {cascadeId: string, appSource: string, title: string, lastModifiedMs: number, steps: object[]}>}
  */
 export function loadExternalDeepStatsCache() {
   const sigParts = [];
@@ -197,7 +197,6 @@ export function loadExternalDeepStatsCache() {
   for (const filePath of existingFiles) {
     const raw = loadJson(filePath, null);
     if (!raw || typeof raw.perConvo !== 'object' || !raw.perConvo) continue;
-    const fileAccountName = String(raw.accountName || raw.email || '').trim();
 
     for (const item of Object.values(raw.perConvo)) {
       for (const e of item?.entries || []) {
@@ -239,10 +238,6 @@ export function loadExternalDeepStatsCache() {
       const mapKey = `${appSource}:${cascadeId}`;
       const existing = convos.get(mapKey);
       if (existing && existing.steps.length >= rawEntries.length) continue;
-
-      const itemAccountName = String(
-        item?.accountName || item?.email || fileAccountName || ''
-      ).trim();
 
       const steps = [];
       let lastModifiedMs = 0;
@@ -304,7 +299,6 @@ export function loadExternalDeepStatsCache() {
         convos.set(mapKey, {
           cascadeId,
           appSource,
-          accountName: itemAccountName,
           title: titleMap[fullKey] || titleMap[cascadeId] || cascadeId.slice(0, 8),
           lastModifiedMs,
           steps,
@@ -322,15 +316,6 @@ const MAX_CONCURRENT_RPC = 4;
 const LEGACY_MIGRATION_BATCH_SIZE = 8;
 const stepFieldChecks = new WeakMap();
 
-function normalizeOwnerAccount(value) {
-  return typeof value === 'string' ? value.trim().toLowerCase() : '';
-}
-
-/**
- * 为会话步骤维护细粒度账号归属：
- * - 已存在于旧缓存中的历史步骤保留原归属账号（兼容跨账号续聊同一会话）；
- * - 切换账号后在该会话中新产生的步骤写入当前活跃账号 `step.accountName`，仅供「可用额度」按账号隔离统计。
- */
 const MAX_PRESERVED_BREAKDOWN_STEPS = 64;
 
 function extractStaticContextFromStep(st) {
@@ -471,58 +456,6 @@ function preserveCachedContextTelemetry(steps, prev) {
   return { steps: preservedSteps, lastKnownStaticContext };
 }
 
-function attachStepAccountOwners(steps, prev, currentAccountName, entryAccountName) {
-  if (!Array.isArray(steps) || steps.length === 0) return steps;
-  const activeOwner = normalizeOwnerAccount(currentAccountName);
-  const entryOwner = normalizeOwnerAccount(entryAccountName);
-  const prevOwner = normalizeOwnerAccount(prev?.accountName);
-  const prevSteps = Array.isArray(prev?.steps) ? prev.steps : [];
-
-  if (prevSteps.length === 0) {
-    const initialOwner = prevOwner || activeOwner || entryOwner;
-    if (!initialOwner || initialOwner === entryOwner) return steps;
-    return steps.map((s) => ({ ...s, accountName: initialOwner }));
-  }
-
-  const prevByIndex = new Map();
-  let maxPrevStepIndex = -1;
-  let maxPrevCreatedAtMs = 0;
-  for (const ps of prevSteps) {
-    if (!ps || typeof ps !== 'object') continue;
-    const idx = Number(ps.stepIndex);
-    if (Number.isFinite(idx)) {
-      prevByIndex.set(idx, ps);
-      if (idx > maxPrevStepIndex) maxPrevStepIndex = idx;
-    }
-    const cMs = Number(ps.createdAtMs || 0);
-    if (cMs > maxPrevCreatedAtMs) maxPrevCreatedAtMs = cMs;
-  }
-
-  let mutated = false;
-  const out = steps.map((s) => {
-    const idx = Number(s?.stepIndex);
-    const matchedPrev = Number.isFinite(idx) ? prevByIndex.get(idx) : null;
-    let stepOwner = '';
-    if (matchedPrev) {
-      stepOwner = normalizeOwnerAccount(matchedPrev.accountName) || prevOwner;
-    } else {
-      const cMs = Number(s?.createdAtMs || 0);
-      const isHistoricalBackfill =
-        (Number.isFinite(idx) && maxPrevStepIndex >= 0 && idx <= maxPrevStepIndex) ||
-        (cMs > 0 && maxPrevCreatedAtMs > 0 && cMs <= maxPrevCreatedAtMs);
-      stepOwner = isHistoricalBackfill ? prevOwner || activeOwner : activeOwner || prevOwner;
-    }
-    const storedAccount = stepOwner && stepOwner !== entryOwner ? stepOwner : undefined;
-    if (s?.accountName === storedAccount) return s;
-    mutated = true;
-    if (storedAccount) {
-      return { ...s, accountName: storedAccount };
-    }
-    const { accountName: _removed, ...rest } = s;
-    return rest;
-  });
-  return mutated ? out : steps;
-}
 /**
  * 将旧版缓存签名中 0 字节 `.db-wal` 的非零 mtime 规范化为 `|0:0`（仅当主库签名和 `walSize=0` 完全一致时生效），
  * 避免从 PR #38 前升级后把数百个未变更的本地 SQLite 历史库一次性全部重扫。
@@ -1490,7 +1423,6 @@ function loadOfflineTranscriptConversation(
     steps,
     fromSqlite,
     title: resolvedTitle,
-    accountName: extMatch?.accountName || '',
     appSource: inferConversationAppSource(diskFiles, extMatch),
     parentConversationId,
     rootConversationId,
@@ -1812,7 +1744,6 @@ function extractTrajectorySubagentMeta(trajRes, fallback = {}) {
  *
  * @param {{
  *   summariesObj?: Record<string, object>,
- *   currentAccountName?: string|null,
  *   requestedConvId?: string,
  *   forceRefresh?: boolean
  * }} params
@@ -1826,7 +1757,6 @@ export async function enumerateAndSyncConversations({
   summariesObj = {},
   summariesFromLocalDb = false,
   sideQuestionParents = {},
-  currentAccountName = '',
   requestedConvId = '',
   forceRefresh = false,
   endpoint = null,
@@ -1993,7 +1923,6 @@ export async function enumerateAndSyncConversations({
       lastKnownLocalLiveCascadeIds = observedLiveIds;
     }
   }
-  const normalizedPollAccount = normalizeOwnerAccount(currentAccountName);
   const STALE_LOCAL_RUNNING_MAX_AGE_MS = 10 * 60_000;
   const reqLower = String(requestedConvId || '').trim().toLowerCase();
   const rawConversations = [];
@@ -2578,22 +2507,14 @@ export async function enumerateAndSyncConversations({
               activeLiveActivityMemo.delete(cidLower);
             }
 
-            const entryAccountName = prev?.accountName || currentAccountName || '';
             const contextPreserved = preserveCachedContextTelemetry(steps, prev);
-            const stepsWithOwners = attachStepAccountOwners(
-              contextPreserved.steps,
-              prev,
-              currentAccountName,
-              entryAccountName
-            );
             const cacheEntry = {
               signature: finalSig,
-              accountName: entryAccountName,
               title: conv.title,
               lastModifiedMs: resolvedLastModMs,
               diskMtimeMs:
                 conv.diskMtimeMs ?? readConversationMtime(diskConvMap.get(cidLower)),
-              rawStepCount: conv.rawStepCount ?? stepsWithOwners.length,
+              rawStepCount: conv.rawStepCount ?? contextPreserved.steps.length,
               wasRunning: conv.status === 'CASCADE_RUN_STATUS_RUNNING',
               contextLimitTelemetry: true,
               speedClearedTelemetry: true,
@@ -2602,7 +2523,7 @@ export async function enumerateAndSyncConversations({
               contextGroupsTelemetry: 3,
               anomalyTelemetry: 1,
               imageGenTelemetry: 1,
-              steps: stepsWithOwners,
+              steps: contextPreserved.steps,
               ...(contextPreserved.lastKnownStaticContext
                 ? { lastKnownStaticContext: contextPreserved.lastKnownStaticContext }
                 : {}),
@@ -2650,7 +2571,7 @@ export async function enumerateAndSyncConversations({
               !prev.anomalyTelemetry ||
               !prev.imageGenTelemetry ||
               metaChanged ||
-              !isDeepStrictEqual(prev.steps, stepsWithOwners);
+              !isDeepStrictEqual(prev.steps, cacheEntry.steps);
 
             if (!stepsChanged) cacheEntry.steps = prev.steps;
             setEntry(conv.cascadeId, cacheEntry);
@@ -2696,25 +2617,16 @@ export async function enumerateAndSyncConversations({
                   Boolean(conv.parentConversationId) ||
                   Boolean(conv.rootConversationId && conv.rootConversationId !== cidLower);
                 const resolvedDiskMtime = conv.diskMtimeMs ?? readConversationMtime(diskFiles);
-                const offlineAccountName =
-                  prev?.accountName || offlineFallback.accountName || currentAccountName || '';
                 const offlinePreserved = preserveCachedContextTelemetry(offlineFallback.steps, prev);
-                const offlineStepsWithOwners = attachStepAccountOwners(
-                  offlinePreserved.steps,
-                  prev,
-                  offlineFallback.accountName || currentAccountName,
-                  offlineAccountName
-                );
                 const offlineEntry = {
                   signature: sig,
-                  accountName: offlineAccountName,
                   title: offlineFallback.title,
                   ...(offlineFallback.appSource ? { appSource: offlineFallback.appSource } : {}),
                   ...(conv.workspaceUri ? { workspaceUri: conv.workspaceUri } : {}),
                   ...(conv.diskFileSig ? { diskFileSig: conv.diskFileSig } : {}),
                   lastModifiedMs: offlineFallback.lastModifiedMs,
                   diskMtimeMs: resolvedDiskMtime,
-                  rawStepCount: conv.rawStepCount ?? offlineStepsWithOwners.length,
+                  rawStepCount: conv.rawStepCount ?? offlinePreserved.steps.length,
                   wasRunning: isRunning,
                   offlineTranscriptFallback: true,
                   ...(offlineFallback.fromSqlite ? { offlineSqliteTelemetry: true } : {}),
@@ -2724,7 +2636,7 @@ export async function enumerateAndSyncConversations({
                   wakeupTurnTelemetry: true,
                   contextGroupsTelemetry: 3,
                   anomalyTelemetry: 1,
-                  steps: offlineStepsWithOwners,
+                  steps: offlinePreserved.steps,
                   ...(offlinePreserved.lastKnownStaticContext
                     ? { lastKnownStaticContext: offlinePreserved.lastKnownStaticContext }
                     : {}),
@@ -2922,14 +2834,11 @@ export async function enumerateAndSyncConversations({
         return false;
       }
       if (hasAuthoritativeSourceSnapshot) {
-        const cachedOwner = normalizeOwnerAccount(cached.accountName);
-        const sameOrUnknownAccount =
-          !normalizedPollAccount || !cachedOwner || cachedOwner === normalizedPollAccount;
         const parentRefLower = String(
           conv.rootConversationId || conv.parentConversationId || ''
         ).toLowerCase();
         const linkedToLiveParent = Boolean(parentRefLower && observedLiveIds.has(parentRefLower));
-        if (sameOrUnknownAccount && !linkedToLiveParent) {
+        if (!linkedToLiveParent) {
           setEntry(conv.cascadeId, { ...cached, archived: true });
           cacheDirty = true;
           return false;

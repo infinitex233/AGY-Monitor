@@ -46,7 +46,7 @@ const RUNTIME_SUBDIRS = Object.freeze([
 
 const ALLOWED_SUBDIR_EXT_RE = /\.(?:mjs|ps1|sh|json)$/i;
 const FORBIDDEN_PATH_RE =
-  /(?:^|\/)(?:\.git|\.data|node_modules|plan|dist|src|test|scripts)(?:\/|$)|\.png$|\.jpg$|\.jpeg$|\.webp$|\.log$|\.dpapi$/i;
+  /(?:^|\/)(?:\.git|\.data|node_modules|plan|dist|src|test|scripts)(?:\/|$)|(?:^|\/)(?:cloudcode-proxy|context-windows|quota-pools|quota-reservation|session-migrator)\.mjs$|\.png$|\.jpg$|\.jpeg$|\.webp$|\.log$|\.dpapi$/i;
 
 const CRC32_TABLE = (() => {
   const table = new Uint32Array(256);

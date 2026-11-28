@@ -9,6 +9,7 @@ Guidance for AI coding agents working in `infinitex233/AGY-Monitor`.
 - **Non-Goals (Do Not Reintroduce)**:
   - No Google OAuth flows, account switching, or PowerShell/DPAPI credential scripts.
   - No subscription quota UI cards/bars or quota reservation heuristics.
+  - No CloudCode MITM proxy or monkey-patching to intercept host requests.
   - No host UI translation injection (`host-i18n`) or cross-client session migration tools.
   - Never modify host installation binaries or `app.asar`; desktop/IDE overlays must stay in-memory via CDP.
 
@@ -17,7 +18,7 @@ Guidance for AI coding agents working in `infinitex233/AGY-Monitor`.
 - **`sidecars/panel/`**:
   - `main.mjs`, `sidecar.json`, `package.json`, `index.html`, `app.js` (generated), `styles.css` (generated).
   - Entrypoints: `mcp-entry.mjs` (0-tool MCP keepalive & shortcut bootstrap), `bridge-daemon.mjs`, `standalone.mjs` (headless web server; non-loopback requires `--token` or `USAGE_MONITOR_STANDALONE_TOKEN`), `cli-statusline.mjs`, `trajectory-metrics.mjs`.
-  - `backend/`: Telemetry & storage (`telemetry-builder.mjs`, `usage-aggregator.mjs`, `trajectory-sqlite-ledger.mjs`, `trajectory-cache-store.mjs`, `cli-sqlite-reader.mjs`, `ls-rpc.mjs`, `ls-discovery.mjs`, `endpoint-registry.mjs`), config/updates (`config.mjs`, `settings-schema.mjs`, `pricing-catalog.mjs`, `plugin-updater.mjs`), host integration (`window-bridge.mjs`, `context-windows.mjs`, `cloudcode-proxy.mjs`, `desktop-launcher-config.mjs`, `cli-statusline-config.mjs`), and exports (`api-actions.mjs`, `file-exporter.mjs`, `fs-atomic.mjs`).
+  - `backend/`: Telemetry & storage (`telemetry-builder.mjs`, `usage-aggregator.mjs`, `trajectory-sqlite-ledger.mjs`, `trajectory-cache-store.mjs`, `cli-sqlite-reader.mjs`, `ls-rpc.mjs`, `ls-discovery.mjs`, `endpoint-registry.mjs`), config/updates (`config.mjs`, `settings-schema.mjs`, `pricing-catalog.mjs`, `plugin-updater.mjs`), host integration (`window-bridge.mjs`, `desktop-launcher-config.mjs`, `cli-statusline-config.mjs`), and exports (`api-actions.mjs`, `file-exporter.mjs`, `fs-atomic.mjs`).
   - `shared/`: `window-bridge-protocol.mjs`, `settings-normalization.mjs`, `telemetry-display-rules.mjs`, `prompt-clean.mjs`, `workspace-uri.mjs`.
   - `src/`:
     - 3-tab UI: `views/LiveOverviewView.js` (mounts metrics, 10-channel context bar, active tasks + embedded `StepsDetailView.js`), `views/ConsumptionView.js` (`Today`, `24h`, `7d`, `14d`, `30d`, `All` 26-week full-fit heatmap, `Custom`), and single-page `views/SettingsView.js`.

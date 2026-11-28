@@ -2,6 +2,28 @@
 
 All notable changes to **AGY Monitor** are documented in this file.
 
+## [1.2.5] - 2026-11
+
+### 更新内容
+- **彻底清除宿主反代与请求拦截残留**：
+  - 删除无 UI 入口的 `cloudcode-proxy.mjs`（本地 `SetCloudCodeURL` 透明反代）与 `context-windows.mjs`（通过 CDP 劫持宿主 `window.fetch` / `WebSocket.prototype.send` 改写对话请求参数），移除 `/api/context-window` 路由、废弃上下文覆写设置项（旧 `settings.json` 自动忽略兼容）及未用 `GetAvailableModels` RPC 与缓存。
+  - 将本地与 SSH 远端 Language Server RPC 统一锁定至 3 个只读方法白名单（`GetUserStatus`、`GetAllCascadeTrajectories`、`GetCascadeTrajectory`），并在 Node 与窗口 `fetch` 传输层禁用 HTTP 重定向（`redirect: 'error'`），防止 307/308 重定向逃逸。
+  - 移除废弃的 `/api/accounts` 路由处理、扫描器遗留的 `accountName` 归属追踪与残留配额样式，并在遥测步骤序列化中显式剥离旧版 SQLite/缓存可能携带的 `accountName` 字段（同时保留 SQLite v1 元组槽位兼容）。
+- **移除后台静默自更新路径**：
+  - 删除 `syncCloudCatalog` 自动触发后台下载更新的 `auto` 静默路径（历史 `auto` 配置统一收敛为 `manual`），确保插件仅在用户主动点击升级按钮时拉包覆盖，现有手动 Git / Release ZIP 一键热重载体验保持不变。
+- **防回流静态审计与打包守卫**：
+  - 扩展运行时与发布包测试，覆盖全部打包产物与 `src/` JS/CSS，禁止反代、请求劫持、账号与配额残留重新进入代码或 `agy-monitor.zip`。
+
+### English
+- **Removed Residual Host Proxy & Request Interception Code**:
+  - Deleted the UI-less `cloudcode-proxy.mjs` (local `SetCloudCodeURL` MITM proxy) and `context-windows.mjs` (CDP `window.fetch` / `WebSocket.prototype.send` monkey-patching), along with `/api/context-window`, obsolete context-window override settings (legacy keys in existing `settings.json` are ignored cleanly), and the unused `GetAvailableModels` RPC & cache.
+  - Enforced a shared 3-method read-only Language Server RPC allowlist (`GetUserStatus`, `GetAllCascadeTrajectories`, `GetCascadeTrajectory`) across both local and SSH remote transports, and disabled HTTP redirects (`redirect: 'error'`) on Node and window `fetch` paths to block 307/308 allowlist escapes.
+  - Cleaned up obsolete `/api/accounts` handlers, scanner `accountName` attribution, and legacy quota CSS/slot classes, and explicitly stripped legacy `accountName` fields during step serialization while preserving SQLite v1 tuple compatibility.
+- **Removed Background Auto-Update Path**:
+  - Removed the dead `auto` silent self-update trigger from `syncCloudCatalog` (normalizing legacy `auto` / `autoUpdatePlugin` settings to `manual`), ensuring updates only download and apply when explicitly clicked by the user while preserving the existing one-click Git / Release ZIP hot-reload flow.
+- **Static Audit & Release Packager Guards**:
+  - Expanded runtime, CSS, and release-ZIP regression tests and packager blocklists so proxy, request-interception, quota, and account remnants cannot re-enter the repository or `agy-monitor.zip`.
+
 ## [1.2.4] - 2026-11
 
 ### 更新内容

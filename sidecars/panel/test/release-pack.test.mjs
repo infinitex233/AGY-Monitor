@@ -50,6 +50,8 @@ test('pack-release-zip ships only runtime-essential files, excludes dev bloat, a
     assert.doesNotMatch(rel, /(?:^|\/)(?:\.git|\.data|node_modules|plan|dist)(?:\/|$)/);
   }
   assert.equal(relFiles.includes('sidecars/panel/package.json'), false);
+  assert.equal(relFiles.includes('sidecars/panel/backend/cloudcode-proxy.mjs'), false);
+  assert.equal(relFiles.includes('sidecars/panel/backend/context-windows.mjs'), false);
 
   const workDir = mkdtempSync(join(tmpdir(), 'ag-um-pack-test-'));
   t.after(() => {

@@ -1073,7 +1073,7 @@ test('P1 audit fixes: route single-source and pure frozen resolveScopedConversat
 
   assert.equal(normalizeI18nLanguage('system'), 'auto');
   assert.equal(typeof isEquivalentTelemetry, 'function');
-  assert.equal(BRIDGE_API_ROUTE_DEFS.length, 10);
+  assert.equal(BRIDGE_API_ROUTE_DEFS.length, 9);
   assert.ok(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/bridge/relaunch'));
   assert.ok(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/export-file'));
   assert.ok(BRIDGE_API_ROUTE_DEFS.some((r) => r.path === '/api/reveal-file'));

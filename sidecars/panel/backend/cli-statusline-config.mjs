@@ -975,7 +975,6 @@ function cliRenderSingleSlot(
  *   cacheHitPct?: number|null,
  *   latestPromptTokens?: number|null,
  *   sessionTokens?: number|null,
- *   quotas?: object|null,
  * }} slotCtx
  * @param {{
  *   slots?: string[],

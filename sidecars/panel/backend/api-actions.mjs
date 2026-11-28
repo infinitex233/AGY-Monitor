@@ -38,15 +38,7 @@ import {
   normalizeWindowMountMode,
   saveJson,
 } from './config.mjs';
-import {
-  getContextWindowModels,
-  getContextWindowGroups,
-  isContextWindowSettingId,
-  isContextWindowOption,
-  resolveContextWindowOption,
-} from './context-windows.mjs';
 import { ensureLsEndpointDiscovered } from './ls-discovery.mjs';
-import { callLsRpc, getContextModelCatalog } from './ls-rpc.mjs';
 import {
   performPluginUpdate,
   scheduleSidecarRestart,
@@ -62,7 +54,6 @@ import {
 import {
   ensureIdeRemoteDebuggingArgv,
   getDefaultWindowBridgeStatus,
-  notifyModelContextWindowsChanged,
   notifyWindowOverlaySetting,
   resolveDevToolsPortCandidates,
   startDefaultWindowBridge,
@@ -317,11 +308,7 @@ export function executeSettingsAction(data) {
   const nextPluginUpdateMode =
     payload.pluginUpdateMode !== undefined
       ? normalizePluginUpdateMode(payload.pluginUpdateMode)
-      : typeof payload.autoUpdatePlugin === 'boolean'
-        ? payload.autoUpdatePlugin
-          ? 'auto'
-          : 'manual'
-        : normalizePluginUpdateMode(current.pluginUpdateMode, current.autoUpdatePlugin);
+      : normalizePluginUpdateMode(current.pluginUpdateMode);
   const prevMountMode = normalizeWindowMountMode(current.windowMountMode, current.enableWindowOverlay);
   const nextWindowMountMode =
     payload.windowMountMode !== undefined
@@ -349,7 +336,6 @@ export function executeSettingsAction(data) {
     ...current,
     ...payload,
     modernUi: nextModernUi,
-    modelContextWindows: current.modelContextWindows,
     modelDisplayMode: nextModelDisplayMode,
     pluginUpdateMode: nextPluginUpdateMode,
     windowMountMode: nextWindowMountMode,
@@ -363,24 +349,11 @@ export function executeSettingsAction(data) {
       body: JSON.stringify({ ok: false, error: 'Failed to persist settings' }),
     };
   }
-  const contextWindowScopeChanged =
-    (updated.contextWindowMainEnabled !== false) !== (current.contextWindowMainEnabled !== false) ||
-    (updated.contextWindowSwarmEnabled === true) !== (current.contextWindowSwarmEnabled === true);
-  const affectsBackendTelemetry =
-    updated.enableWindowOverlay !== (current.enableWindowOverlay !== false) ||
-    updated.windowMountMode !== prevMountMode ||
-    contextWindowScopeChanged;
+  const windowMountChanged = updated.windowMountMode !== prevMountMode;
   inFlightRequests.clear();
-  if (affectsBackendTelemetry) {
+  if (windowMountChanged) {
     clearTelemetryBuilderMemo();
-  }
-  if (
-    updated.enableWindowOverlay !== (current.enableWindowOverlay !== false) ||
-    updated.windowMountMode !== prevMountMode
-  ) {
     void notifyWindowOverlaySetting(updated.enableWindowOverlay);
-  } else if (contextWindowScopeChanged) {
-    void notifyModelContextWindowsChanged();
   }
   if ((updated.enableCliStatusLine !== false) !== (current.enableCliStatusLine !== false)) {
     ensureCliStatusLineConfigured({ enabled: updated.enableCliStatusLine !== false });
@@ -405,82 +378,6 @@ export function executeSettingsAction(data) {
   };
 }
 
-export async function executeModelContextWindowAction(data, opts = {}) {
-  const epCtx = resolveActionEndpoint(data, opts);
-  if (!epCtx.ok) {
-    return buildEndpointErrorResponse(epCtx);
-  }
-  const { modelId, option } = data || {};
-  const respond = (status, payload) => ({
-    status,
-    contentType: 'application/json',
-    headers: { 'Cache-Control': 'no-store' },
-    body: JSON.stringify(payload),
-  });
-  if (!isContextWindowSettingId(modelId) || (option !== null && !isContextWindowOption(option))) {
-    return respond(400, { error: 'Invalid model context window' });
-  }
-
-  async function loadGroupsForEndpoint(targetEndpoint) {
-    const [{ userStatus }, catalog] = await Promise.all([
-      callLsRpc('GetUserStatus', {}, 5000, targetEndpoint),
-      getContextModelCatalog(targetEndpoint),
-    ]);
-    const configs = userStatus?.cascadeModelConfigData?.clientModelConfigs;
-    if (!Array.isArray(configs) || configs.length === 0) return null;
-    const models = getContextWindowModels(configs, catalog);
-    return getContextWindowGroups(models);
-  }
-
-  let group;
-  let verifiedHostConfigs = false;
-  trackEndpointRequestStart(epCtx.endpoint);
-  try {
-    let groups = null;
-    try {
-      groups = await loadGroupsForEndpoint(epCtx.endpoint);
-    } catch {
-      groups = null;
-    }
-    if (epCtx.isRemote && !groups) {
-      // 仅在远端 RPC 异常或未返回模型配置时安全回退本机校验；远端已成功返回时绝不放宽其档位限制
-      try {
-        groups = await loadGroupsForEndpoint(null);
-      } catch {
-        groups = null;
-      }
-    }
-    if (Array.isArray(groups)) {
-      verifiedHostConfigs = true;
-      group = groups.find(({ id }) => id === modelId);
-    }
-  } finally {
-    trackEndpointRequestEnd(epCtx.endpoint);
-  }
-  if (!verifiedHostConfigs) {
-    if (option !== null || modelId.startsWith('model:')) {
-      return respond(503, { error: 'Unable to verify the host model configuration' });
-    }
-  }
-  if (option !== null && (!group || resolveContextWindowOption(group, option) === null)) {
-    return respond(400, { error: 'This context window is not available for the selected model' });
-  }
-  const current = loadSettings();
-  for (const id of group?.members || []) delete current.modelContextWindows[id];
-  if (option === null) {
-    delete current.modelContextWindows[modelId];
-  } else {
-    current.modelContextWindows[modelId] = option;
-  }
-  if (!saveJson(SETTINGS_FILE, current)) {
-    return respond(500, { error: 'Failed to persist model context window' });
-  }
-  inFlightRequests.clear();
-  clearTelemetryBuilderMemo();
-  void notifyModelContextWindowsChanged();
-  return respond(200, { modelContextWindows: current.modelContextWindows });
-}
-
 export function executeResetSettingsAction() {
   const current = loadSettings();
   const updated = createDefaultSettingsObject();
@@ -499,17 +396,8 @@ export function executeResetSettingsAction() {
     current.windowMountMode,
     current.enableWindowOverlay
   );
-  if (
-    updated.enableWindowOverlay !== (current.enableWindowOverlay !== false) ||
-    updated.windowMountMode !== prevMountMode
-  ) {
+  if (updated.windowMountMode !== prevMountMode) {
     void notifyWindowOverlaySetting(updated.enableWindowOverlay);
-  } else if (
-    Object.keys(current.modelContextWindows).length ||
-    current.contextWindowMainEnabled === false ||
-    current.contextWindowSwarmEnabled === true
-  ) {
-    void notifyModelContextWindowsChanged();
   }
   if ((updated.enableCliStatusLine !== false) !== (current.enableCliStatusLine !== false)) {
     ensureCliStatusLineConfigured({ enabled: updated.enableCliStatusLine !== false });
@@ -583,7 +471,7 @@ export async function executeCloudSyncAction() {
 }
 
 export async function executePluginUpdateAction() {
-  const result = await performPluginUpdate({ isAuto: false });
+  const result = await performPluginUpdate();
   return {
     status: 200,
     contentType: 'application/json',
@@ -702,8 +590,6 @@ export async function dispatchBridgeApiRequest(pathname, method, data, opts = un
         return executeRevealFileAction(data.payload || data, opts);
       }
       return executeSettingsAction(data);
-    case 'context_window':
-      return executeModelContextWindowAction(data, opts);
     case 'settings_reset':
       return executeResetSettingsAction();
     case 'cache_rebuild':

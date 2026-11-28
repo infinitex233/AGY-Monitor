@@ -262,10 +262,6 @@
     stroke var(--dur-fast) var(--ease-fast);
 }
 
-.wm-ring-fill.is-quota {
-  stroke: var(--metric-ok);
-}
-
 .wm-ring-fill.is-empty {
   stroke: transparent;
 }
@@ -330,27 +326,6 @@
   text-align: center;
   color: var(--text-primary);
   font-weight: 500;
-}
-
-/* 配额槽位（环形剩余进度圈 + 池/窗口短标 + 清晰百分比，零嵌套边框） */
-.wm-seg-quota {
-  justify-content: center;
-  gap: 4px;
-  width: auto;
-  min-width: 68px;
-  padding: 0 2px;
-}
-
-.wm-slot-prefix {
-  display: inline-block;
-  font-size: inherit;
-  font-weight: 500;
-  color: var(--text-secondary);
-  line-height: 18px;
-  letter-spacing: 0.015em;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 
 /* 缓存命中率槽位（固定预占宽度 44px 居中对齐） */
@@ -523,7 +498,6 @@
 :host(.wm-capsule-host[data-layout="ring-only"]) .wm-sep[data-sep-for-rank="4"],
 :host(.wm-capsule-host[data-layout="ring-only"]) .wm-sep[data-sep-for-rank="5"],
 :host(.wm-capsule-host[data-layout="ring-only"]) .wm-cap-slot[data-vis-rank="1"] .wm-ctx-pct,
-:host(.wm-capsule-host[data-layout="ring-only"]) .wm-cap-slot[data-vis-rank="1"] .wm-slot-prefix,
 :host(.wm-capsule-host[data-layout="ring-only"]) .wm-multi-label {
   display: none !important;
 }
@@ -532,8 +506,7 @@
   padding: 0 6px;
 }
 
-:host(.wm-capsule-host[data-layout="ring-only"]) .wm-cap-slot[data-vis-rank="1"].wm-ctx-seg,
-:host(.wm-capsule-host[data-layout="ring-only"]) .wm-cap-slot[data-vis-rank="1"].wm-seg-quota {
+:host(.wm-capsule-host[data-layout="ring-only"]) .wm-cap-slot[data-vis-rank="1"].wm-ctx-seg {
   width: 14px;
   min-width: 14px;
   padding: 0;

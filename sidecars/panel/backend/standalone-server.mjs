@@ -512,19 +512,6 @@ export function createStandaloneWebServer(options = {}) {
       }
 
       if (pathname.startsWith('/api/')) {
-        if (pathname === '/api/accounts' || pathname === '/api/accounts/update') {
-          sendResponse(
-            res,
-            403,
-            'application/json; charset=utf-8',
-            JSON.stringify({
-              supported: false,
-              accounts: [],
-              error: 'unsupported',
-            })
-          );
-          return;
-        }
         if (pathname === '/api/export-file' || pathname === '/api/reveal-file') {
           sendResponse(
             res,

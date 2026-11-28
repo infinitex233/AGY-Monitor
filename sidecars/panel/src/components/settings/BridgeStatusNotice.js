@@ -20,7 +20,6 @@ const LAUNCH_FLAG_TEXT = '--remote-debugging-port=0';
 export const BridgeStatusNotice = defineComponent({
   name: 'BridgeStatusNotice',
   setup({ props, onCleanup }) {
-    let contextMode = Boolean(props?.contextMode);
     const dismissible = Boolean(props?.dismissible);
     let lastPayload = {
       visible: false,
@@ -223,26 +222,18 @@ export const BridgeStatusNotice = defineComponent({
       let titleText = '';
       let bodyText = '';
       if (hasReadOnlyShortcuts) {
-        titleText = contextMode
-          ? t('settings.bridge.ctxReadOnlyTitle')
-          : t('settings.bridge.readOnlyTitle');
+        titleText = t('settings.bridge.readOnlyTitle');
         bodyText = t('settings.bridge.readOnlyBody');
       } else if (isMacDesktop) {
-        titleText = contextMode
-          ? t('settings.bridge.ctxMacTitle')
-          : t('settings.bridge.macTitle');
+        titleText = t('settings.bridge.macTitle');
         bodyText = t('settings.bridge.guideMac');
       } else if (isAutoConfigured) {
-        titleText = contextMode
-          ? t('settings.bridge.ctxRestartTitle')
-          : t('settings.bridge.restartTitle');
+        titleText = t('settings.bridge.restartTitle');
         bodyText = t('settings.bridge.restartBody');
       } else {
-        titleText = contextMode
-          ? t('settings.bridge.ctxTitle')
-          : state === 'cdp_unreachable'
-            ? t('settings.bridge.unreachableTitle')
-            : t('settings.bridge.noPortTitle');
+        titleText = state === 'cdp_unreachable'
+          ? t('settings.bridge.unreachableTitle')
+          : t('settings.bridge.noPortTitle');
         bodyText = plat === 'linux' ? t('settings.bridge.guideLinux') : t('settings.bridge.guideWin');
       }
 
@@ -252,9 +243,6 @@ export const BridgeStatusNotice = defineComponent({
     }
 
     function update(next = {}) {
-      if (typeof next.contextMode === 'boolean') {
-        contextMode = next.contextMode;
-      }
       lastPayload = {
         ...lastPayload,
         ...next,

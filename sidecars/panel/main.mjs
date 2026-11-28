@@ -175,18 +175,6 @@ async function handleProtectedApi(pathname, method, data, req) {
       contentType: 'application/json',
     });
   }
-  if (
-    !isTestHarnessEnv &&
-    pathname === '/api/accounts/update' &&
-    req?.headers &&
-    !req.headers.origin &&
-    !req.headers['sec-fetch-site']
-  ) {
-    return new Response(JSON.stringify({ error: 'Forbidden non-webview account mutation' }), {
-      status: 403,
-      contentType: 'application/json',
-    });
-  }
   const out = await forwardApiCall(pathname, method, data);
   return new Response(out.body, {
     status: out.status,

@@ -2,12 +2,11 @@
  * @fileoverview Antigravity Language Server Connect RPC 客户端 (`ls-rpc.mjs`)。
  *
  * 负责：
- * 1. 向本地或 SSH 远端窗口对应的 Language Server 发起带 CSRF 鉴权与超时保护的 Connect RPC 调用 (`callLsRpc`)；
+ * 1. 向本地或 SSH 远端窗口对应的 Language Server 发起带 CSRF 鉴权与超时保护的只读 Connect RPC 调用 (`callLsRpc`)；
  * 2. 对远端 SSH 端点采用双层传输：
  *    - Tier-1：严格限定回环地址 (`127.0.0.1`/`localhost`/`::1`) 的 HTTP/HTTPS 直连（HTTPS 仅对回环允许宿主自签证书）；
  *    - Tier-2：Tier-1 不可用或鉴权依赖 Electron Partition Cookie / 2.33.0+ 省略 `csrfToken` 时，
- *      自动熔断并回退至窗口内同源 `window.fetch` / `/connect-websocket`（通过 CDP 按需执行）；
- * 3. 按端点隔离缓存 `GetAvailableModels` 模型目录（不采集账号或订阅配额数据）。
+ *      自动熔断并回退至窗口内同源 `window.fetch` / `/connect-websocket`（通过 CDP 按需执行）。
  */
 
 import { lsRuntimeEndpoint } from './config.mjs';
@@ -19,16 +18,18 @@ import {
 import { ensureLsEndpointDiscovered } from './ls-discovery.mjs';
 
 const REMOTE_HTTPS_MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
-const REMOTE_ALLOWED_LS_METHODS = new Set([
+const READ_ONLY_LS_METHODS = new Set([
   'GetUserStatus',
-  'GetAvailableModels',
   'GetAllCascadeTrajectories',
   'GetCascadeTrajectory',
 ]);
 
-let contextModelCatalog = null;
 let loopbackHttpsModulePromise = null;
 let customLoopbackHttpsRequester = null;
+
+export function isReadOnlyLsMethod(method) {
+  return READ_ONLY_LS_METHODS.has(method);
+}
 
 export function setLoopbackHttpsRequester(requester) {
   customLoopbackHttpsRequester = typeof requester === 'function' ? requester : null;
@@ -157,65 +158,10 @@ async function postLoopbackHttpsJson(urlStr, csrfToken, bodyText, timeoutMs) {
   });
 }
 
-export function getContextModelCatalog(
-  endpoint = null,
-  { allowStale = false, forceRefresh = false } = {}
-) {
-  const isRemote = Boolean(endpoint && endpoint.isRemote);
-  const baseUrl = isRemote ? endpoint.baseUrl || endpoint.origin || '' : lsRuntimeEndpoint.baseUrl;
-  const csrfToken = isRemote ? endpoint.csrfToken || '' : lsRuntimeEndpoint.csrfToken;
-  const now = Date.now();
-  let cached = isRemote ? endpoint.contextModelCatalog : contextModelCatalog;
-  const sameEndpoint = cached && cached.baseUrl === baseUrl && cached.csrfToken === csrfToken;
-  const isExpired =
-    !sameEndpoint ||
-    now < (cached.fetchedAtMs ?? 0) ||
-    now >= cached.expiresAt ||
-    (forceRefresh && !cached.inFlight) ||
-    (!allowStale && cached.failed && !cached.inFlight && now >= (cached.retryAfterMs ?? 0));
-  if (isExpired) {
-    const prevGoodModels = sameEndpoint && cached.models !== undefined ? cached.models : undefined;
-    const next = {
-      baseUrl,
-      csrfToken,
-      fetchedAtMs: now,
-      expiresAt: now + 30_000,
-      retryAfterMs: 0,
-      failed: false,
-      inFlight: true,
-      models: prevGoodModels,
-      promise: null,
-    };
-    next.promise = callLsRpc('GetAvailableModels', {}, isRemote ? 2500 : 1500, endpoint)
-      .then((data) => {
-        const models = data?.response?.models ?? null;
-        next.models = models;
-        next.failed = false;
-        next.inFlight = false;
-        return models;
-      })
-      .catch(() => {
-        const failNow = Date.now();
-        next.failed = true;
-        next.inFlight = false;
-        next.retryAfterMs = failNow + 2000;
-        next.expiresAt = Math.min(next.expiresAt, failNow + 2000);
-        if (next.models === undefined) {
-          next.models = null;
-        }
-        return next.models;
-      });
-    if (isRemote) endpoint.contextModelCatalog = next;
-    else contextModelCatalog = next;
-    cached = next;
-  }
-  // Telemetry can report a previous result while strict callers wait for the refresh.
-  return allowStale && cached.models !== undefined ? Promise.resolve(cached.models) : cached.promise;
-}
-
 async function postLsRpcOnce(baseUrl, csrfToken, method, body, timeoutMs) {
   return fetch(`${baseUrl}/exa.language_server_pb.LanguageServerService/${method}`, {
     method: 'POST',
+    redirect: 'error',
     headers: {
       'Content-Type': 'application/json',
       'x-codeium-csrf-token': csrfToken || '',
@@ -228,9 +174,6 @@ async function postLsRpcOnce(baseUrl, csrfToken, method, body, timeoutMs) {
 const REMOTE_TIER2_MIN_REMAINING_MS = 1500;
 
 async function callRemoteEndpointLsRpc(endpoint, method, body, timeoutMs) {
-  if (!REMOTE_ALLOWED_LS_METHODS.has(method)) {
-    throw new Error(`RPC method ${method} is not allowed on remote endpoints`);
-  }
   const safeTimeoutMs = Math.max(1000, Number(timeoutMs) || 5000);
   const deadlineMs = Date.now() + safeTimeoutMs;
   const baseUrl = String(endpoint.baseUrl || endpoint.origin || '').trim().replace(/\/+$/, '');
@@ -304,6 +247,10 @@ async function callRemoteEndpointLsRpc(endpoint, method, body, timeoutMs) {
  * @returns {Promise<object>}
  */
 export async function callLsRpc(method, body = {}, timeoutMs = 5000, endpoint = null) {
+  if (!isReadOnlyLsMethod(method)) {
+    const connection = endpoint?.isRemote ? 'remote endpoints' : 'the local endpoint';
+    throw new Error(`RPC method ${method} is not allowed on ${connection}`);
+  }
   if (endpoint && endpoint.isRemote) {
     return callRemoteEndpointLsRpc(endpoint, method, body, timeoutMs);
   }

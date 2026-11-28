@@ -531,29 +531,6 @@ export function isEquivalentTelemetry(prev, next) {
   ) {
     return false;
   }
-  if (Boolean(pSet?.contextWindowRiskAccepted) !== Boolean(nSet?.contextWindowRiskAccepted)) {
-    return false;
-  }
-  if (
-    (pSet?.contextWindowMainEnabled !== false) !== (nSet?.contextWindowMainEnabled !== false) ||
-    Boolean(pSet?.contextWindowSwarmEnabled) !== Boolean(nSet?.contextWindowSwarmEnabled)
-  ) {
-    return false;
-  }
-  if (
-    (prev.cloudCodeProxy?.state || 'disabled') !== (next.cloudCodeProxy?.state || 'disabled') ||
-    Number(prev.cloudCodeProxy?.ruleCount || 0) !== Number(next.cloudCodeProxy?.ruleCount || 0) ||
-    String(prev.cloudCodeProxy?.error || '') !== String(next.cloudCodeProxy?.error || '') ||
-    Number(prev.cloudCodeProxy?.syncedAtMs || 0) !== Number(next.cloudCodeProxy?.syncedAtMs || 0)
-  ) {
-    return false;
-  }
-  if (
-    JSON.stringify(pSet?.modelContextWindows) !== JSON.stringify(nSet?.modelContextWindows) ||
-    JSON.stringify(prev.contextWindowModels) !== JSON.stringify(next.contextWindowModels)
-  ) {
-    return false;
-  }
   if (
     normalizeModelDisplayMode(pSet?.modelDisplayMode, pSet?.showUpstreamModel) !==
     normalizeModelDisplayMode(nSet?.modelDisplayMode, nSet?.showUpstreamModel)
@@ -1792,15 +1769,6 @@ export async function saveSettingsPatch(patch) {
   if (Object.prototype.hasOwnProperty.call(safePatch, 'popoverWidth')) {
     safePatch.popoverWidth = normalizeClientPopoverWidth(safePatch.popoverWidth);
   }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'contextWindowRiskAccepted')) {
-    safePatch.contextWindowRiskAccepted = Boolean(safePatch.contextWindowRiskAccepted);
-  }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'contextWindowMainEnabled')) {
-    safePatch.contextWindowMainEnabled = Boolean(safePatch.contextWindowMainEnabled);
-  }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'contextWindowSwarmEnabled')) {
-    safePatch.contextWindowSwarmEnabled = Boolean(safePatch.contextWindowSwarmEnabled);
-  }
   if (Object.prototype.hasOwnProperty.call(safePatch, 'orchestratorIdMode')) {
     safePatch.orchestratorIdMode = normalizeClientOrchestratorIdMode(safePatch.orchestratorIdMode);
   }
@@ -1913,33 +1881,6 @@ export async function saveSettingsPatch(patch) {
     inFlightTelemetryPoll = null;
     void fetchTelemetry({ force: false });
   }
-}
-
-export async function saveModelContextWindow(modelId, option) {
-  const myRev = ++settingsRevision;
-  const result = await enqueueSettingsWrite(() =>
-    callSidecarApi('/api/context-window', {
-      method: 'POST',
-      body: { modelId, option },
-    })
-  );
-  const committedRev = ++settingsRevision;
-  if (result?.modelContextWindows) {
-    recentCommittedSettings.set('modelContextWindows', {
-      rev: Math.max(myRev, committedRev),
-      value: result.modelContextWindows,
-    });
-  }
-  const telemetry = telemetryStore.getState().telemetry;
-  if (telemetry?.settings) {
-    telemetryStore.setState({
-      telemetry: {
-        ...telemetry,
-        settings: { ...telemetry.settings, modelContextWindows: result.modelContextWindows },
-      },
-    });
-  }
-  return result.modelContextWindows;
 }
 
 export async function resetAllSettings() {

@@ -78,8 +78,8 @@ function tslCreateInternPool() {
 }
 
 /**
- * Computes conversation-level `O(1)` step completeness and model-limit metadata
- * so scanner `toFetch` checks and `buildKnownUpstreamModelMap` never need to hydrate cold `detail_json`.
+ * Computes conversation-level step completeness flags for scanner `toFetch` checks
+ * without hydrating cold `detail_json`.
  *
  * @param {object[]} steps
  * @returns {{
@@ -87,7 +87,6 @@ function tslCreateInternPool() {
  *   hasMissingTurnRailFields: boolean,
  *   hasAnyTurnIndex: boolean,
  *   hasIncompleteTiming: boolean,
- *   modelLimits: Array<[string, number, number]>,
  * }}
  */
 export function computePrecomputedStepFlags(steps) {
@@ -99,7 +98,6 @@ export function computePrecomputedStepFlags(steps) {
       hasAnyTurnIndex: false,
       hasAnyContextBreakdown: false,
       hasIncompleteTiming: false,
-      modelLimits: [],
     };
   }
   const lastStep = list[list.length - 1];
@@ -115,7 +113,6 @@ export function computePrecomputedStepFlags(steps) {
   let hasAnyTurnIndex = false;
   let hasAnyContextBreakdown = false;
   let hasIncompleteTiming = false;
-  const limitsMap = new Map();
 
   for (let i = list.length - 1; i >= 0; i -= 1) {
     const st = list[i];
@@ -139,27 +136,6 @@ export function computePrecomputedStepFlags(steps) {
     if (st.speedReason === 'incomplete_or_invalid_timing') {
       hasIncompleteTiming = true;
     }
-    if (
-      !st.isCompactionStep &&
-      !st.isImageGenStep &&
-      Number(st.reportedContextLimitTokens) > 0 &&
-      st.modelKey &&
-      st.modelKey !== 'unknown'
-    ) {
-      const atMs = Number.isFinite(Number(st.createdAtMs)) ? Number(st.createdAtMs) : 0;
-      const prev = limitsMap.get(st.modelKey);
-      if (!prev || atMs > prev.at) {
-        limitsMap.set(st.modelKey, {
-          tokens: Number(st.reportedContextLimitTokens),
-          at: atMs,
-        });
-      }
-    }
-  }
-
-  const modelLimits = [];
-  for (const [modelKey, info] of limitsMap.entries()) {
-    modelLimits.push([modelKey, info.tokens, info.at]);
   }
 
   return {
@@ -168,7 +144,6 @@ export function computePrecomputedStepFlags(steps) {
     hasAnyTurnIndex,
     hasAnyContextBreakdown,
     hasIncompleteTiming,
-    modelLimits,
   };
 }
 

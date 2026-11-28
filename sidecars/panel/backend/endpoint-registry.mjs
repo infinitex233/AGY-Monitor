@@ -187,7 +187,6 @@ export function registerRemoteEndpoint(info = {}) {
       preferTier2UntilMs: 0,
       inFlightCount: 0,
       store: createRemoteEndpointStore(cacheFilePath, sqliteFilePath),
-      contextModelCatalog: null,
       failedFetchCooldownMap: new Map(),
       liveActivityMemo: new Map(),
       lastKnownLiveCascadeIds: null,
@@ -340,7 +339,6 @@ export function clearRemoteEndpointCaches(endpointId, options = {}) {
   ep.failedFetchCooldownMap.clear();
   ep.liveActivityMemo.clear();
   ep.lastKnownLiveCascadeIds = null;
-  ep.contextModelCatalog = null;
   return true;
 }
 

@@ -76,16 +76,10 @@ export const App = defineComponent({
       const mountMode = settings
         ? normalizeClientWindowMountMode(settings.windowMountMode, settings.enableWindowOverlay)
         : 'sidebar';
-      const hasCtxOverrides = Boolean(
-        settings?.modelContextWindows && Object.keys(settings.modelContextWindows).length > 0
-      );
       const shouldOfferGlobal =
-        !isWindowOverlayMode() &&
-        activeView !== 'settings' &&
-        (mountMode !== 'sidebar' || hasCtxOverrides);
+        !isWindowOverlayMode() && activeView !== 'settings' && mountMode !== 'sidebar';
       globalBridgeNotice.refs.update({
         visible: shouldOfferGlobal,
-        contextMode: mountMode === 'sidebar' && hasCtxOverrides,
         windowBridge: telemetry?.windowBridge || null,
         hostPlatform: telemetry?.hostPlatform || 'win32',
       });
@@ -300,7 +294,6 @@ export const App = defineComponent({
         windowMountMode: st.telemetry?.settings?.windowMountMode,
         enableWindowOverlay: st.telemetry?.settings?.enableWindowOverlay,
         contextAgentMode: st.telemetry?.settings?.contextAgentMode,
-        modelContextWindows: st.telemetry?.settings?.modelContextWindows,
         windowBridge: st.telemetry?.windowBridge,
         hostPlatform: st.telemetry?.hostPlatform,
       }),

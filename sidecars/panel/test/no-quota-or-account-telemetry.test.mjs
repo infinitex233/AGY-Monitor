@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { collectReleaseRuntimeFiles, DEFAULT_REPO_ROOT } from '../scripts/pack-release-zip.mjs';
 import { backendHarness } from './backend-harness.mjs';
 
 test('zero-quota & zero-account telemetry: no RetrieveUserQuotaSummary calls, no user PII leakage, consumption.account preserved', async () => {
@@ -126,26 +127,73 @@ test('zero-quota & zero-account telemetry: no RetrieveUserQuotaSummary calls, no
   // Local consumption.account aggregate bucket remains intact
   assert.equal(fullPayload.consumption.account.calls, 1);
   assert.equal(fullPayload.consumption.account.totalTokens, 16_600);
+
+  // Legacy cached step.accountName PII from older schema-v1 SQLite/JSON caches must never leak into telemetry
+  const legacyHarness = backendHarness({
+    clock: () => nowMs,
+    cache: {
+      'conv-legacy': {
+        signature: `1:${completedAt}`,
+        accountName: 'legacy-pii@example.com',
+        title: 'Legacy cached session',
+        lastModifiedMs: nowMs - 2_000,
+        rawStepCount: 1,
+        contextLimitTelemetry: true,
+        speedClearedTelemetry: true,
+        timingTelemetry: true,
+        wakeupTurnTelemetry: true,
+        contextGroupsTelemetry: 3,
+        anomalyTelemetry: 1,
+        imageGenTelemetry: 1,
+        steps: [
+          {
+            stepIndex: 1,
+            createdAtMs: nowMs - 8_000,
+            isComplete: true,
+            modelKey: 'MODEL_PLACEHOLDER_M999',
+            inputTokens: 12_000,
+            cacheReadTokens: 4_000,
+            outputTokens: 600,
+            accountName: 'legacy-pii@example.com',
+          },
+        ],
+      },
+    },
+    summaries: {
+      'conv-legacy': {
+        stepCount: 1,
+        lastModifiedTime: completedAt,
+        status: 'CASCADE_RUN_STATUS_IDLE',
+      },
+    },
+  });
+  const legacyFull = await legacyHarness.buildTelemetryPayloadInternal('conv-legacy', false, { range: 'today' });
+  const legacyConvRes = await legacyHarness.executeTelemetryAction({
+    conversationId: 'conv-legacy',
+    scope: 'conversation',
+    range: 'today',
+  });
+  assert.equal(JSON.stringify(legacyFull).includes('legacy-pii@example.com'), false);
+  assert.equal(legacyConvRes.body.includes('legacy-pii@example.com'), false);
+  assert.equal(Object.hasOwn(legacyFull.activeConversation.recentSteps[0], 'accountName'), false);
 });
 
-test('static runtime audit: zero quota RPC, credential store, or account UI tokens and 100% i18n parity', async () => {
+test('static runtime audit excludes removed interception, quota and account features and checks i18n parity', async () => {
   const panelRoot = fileURLToPath(new URL('..', import.meta.url));
-  const targetFiles = [
-    join(panelRoot, 'main.mjs'),
-    join(panelRoot, 'standalone.mjs'),
-    join(panelRoot, 'bridge-daemon.mjs'),
-    join(panelRoot, 'cli-statusline.mjs'),
-  ];
-  const walkJs = (dir) => {
+  const srcJsFiles = [];
+  const srcCssFiles = [];
+  const walkSrc = (dir) => {
     for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = join(dir, ent.name);
-      if (ent.isDirectory()) walkJs(p);
-      else if (ent.name.endsWith('.js') || ent.name.endsWith('.mjs')) targetFiles.push(p);
+      if (ent.isDirectory()) walkSrc(p);
+      else if (ent.name.endsWith('.js') || ent.name.endsWith('.mjs')) srcJsFiles.push(p);
+      else if (ent.name.endsWith('.css')) srcCssFiles.push(p);
     }
   };
-  walkJs(join(panelRoot, 'backend'));
-  walkJs(join(panelRoot, 'shared'));
-  walkJs(join(panelRoot, 'src'));
+  walkSrc(join(panelRoot, 'src'));
+  const runtimeFiles = collectReleaseRuntimeFiles(DEFAULT_REPO_ROOT).map((rel) =>
+    join(DEFAULT_REPO_ROOT, rel)
+  );
 
   const bannedRuntimeTokens = [
     'RetrieveUserQuotaSummary',
@@ -155,12 +203,27 @@ test('static runtime audit: zero quota RPC, credential store, or account UI toke
     'state.vscdb',
     'DPAPI',
     'settings.account.',
+    '/api/accounts',
+    'cloudcode-proxy.mjs',
+    'SetCloudCodeURL',
+    'context-windows.mjs',
+    '/api/context-window',
+    'fetchWithContextWindow',
+    'sendWithContextWindow',
+    'syncHostContextWindows',
+    'modelContextWindows',
+    'cloudCodeProxy',
+    'GetAvailableModels',
+    '__AGUsageMonitorContextWindows',
+    'wm-seg-quota',
+    'wm-sep-quota',
+    '--quota-reserved',
   ];
-  for (const filePath of targetFiles) {
+  for (const filePath of [...runtimeFiles, ...srcJsFiles, ...srcCssFiles]) {
     const content = fs.readFileSync(filePath, 'utf8');
     for (const token of bannedRuntimeTokens) {
       assert.equal(
-        content.includes(token),
+        filePath.includes(token) || content.includes(token),
         false,
         `Runtime file ${filePath} must not contain "${token}"`
       );
@@ -174,16 +237,7 @@ test('static runtime audit: zero quota RPC, credential store, or account UI toke
   assert.deepEqual([...zhKeys].filter((k) => !enKeys.has(k)), []);
   assert.deepEqual([...enKeys].filter((k) => !zhKeys.has(k)), []);
 
-  const srcFiles = [];
-  const walkSrc = (dir) => {
-    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-      const p = join(dir, ent.name);
-      if (ent.isDirectory()) walkSrc(p);
-      else if (ent.name.endsWith('.js') || ent.name.endsWith('.mjs')) srcFiles.push(p);
-    }
-  };
-  walkSrc(join(panelRoot, 'src'));
-  for (const filePath of srcFiles) {
+  for (const filePath of srcJsFiles) {
     const text = fs.readFileSync(filePath, 'utf8');
     const re = /(?<![.\w])t\(\s*(['"])([^'"]+)\1/g;
     let m;

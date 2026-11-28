@@ -300,16 +300,14 @@ function normalizeStepTokenComboFormat(raw) {
 }
 
 /**
- * 归一化插件更新策略枚举（兼容历史 `autoUpdatePlugin` 布尔开关，默认 `'manual'`）。
+ * 归一化插件更新策略枚举（仅支持 `'manual'` 与 `'off'`，历史 `'auto'` / `autoUpdatePlugin` 统一收敛为 `'manual'`）。
  *
  * @param {unknown} mode
- * @param {unknown} [legacyAutoUpdate]
- * @returns {'off'|'manual'|'auto'}
+ * @returns {'off'|'manual'}
  */
-function normalizePluginUpdateMode(mode, legacyAutoUpdate) {
+function normalizePluginUpdateMode(mode) {
   const m = String(mode ?? '').trim().toLowerCase();
-  if (m === 'off' || m === 'manual' || m === 'auto') return m;
-  if (legacyAutoUpdate === true) return 'auto';
+  if (m === 'off') return 'off';
   return 'manual';
 }
 
@@ -818,14 +816,13 @@ return { findRecentStepTokPerSec, speedRateBin, medianSpeed, mergeSpeedRateBins,
 })();
 
 // --- shared/window-bridge-protocol.mjs ---
-const { WINDOW_BRIDGE_KEY, WINDOW_BRIDGE_ROUTE_KEY, WINDOW_BRIDGE_ENDPOINT_KEY, WINDOW_BRIDGE_ENDPOINT_HEADER, LOCAL_ENDPOINT_ID, WINDOW_OVERLAY_KEY, CONTEXT_WINDOWS_GLOBAL_KEY, WINDOW_OVERLAY_METHODS, BRIDGE_API_ROUTE_DEFS, BRIDGE_API_PATHS, readInjectedWindowBridge } = (() => {
+const { WINDOW_BRIDGE_KEY, WINDOW_BRIDGE_ROUTE_KEY, WINDOW_BRIDGE_ENDPOINT_KEY, WINDOW_BRIDGE_ENDPOINT_HEADER, LOCAL_ENDPOINT_ID, WINDOW_OVERLAY_KEY, WINDOW_OVERLAY_METHODS, BRIDGE_API_ROUTE_DEFS, BRIDGE_API_PATHS, readInjectedWindowBridge } = (() => {
 const WINDOW_BRIDGE_KEY = '__AGUsageMonitorBridge';
 const WINDOW_BRIDGE_ROUTE_KEY = 'hostRouteCascadeId';
 const WINDOW_BRIDGE_ENDPOINT_KEY = 'endpointId';
 const WINDOW_BRIDGE_ENDPOINT_HEADER = 'X-Usage-Monitor-Endpoint';
 const LOCAL_ENDPOINT_ID = 'local';
 const WINDOW_OVERLAY_KEY = '__AGUsageMonitorOverlay';
-const CONTEXT_WINDOWS_GLOBAL_KEY = '__AGUsageMonitorContextWindows';
 
 const WINDOW_OVERLAY_METHODS = Object.freeze({
   ensureAlive: 'ensureAlive',
@@ -841,7 +838,6 @@ const WINDOW_OVERLAY_METHODS = Object.freeze({
 const BRIDGE_API_ROUTE_DEFS = Object.freeze([
   Object.freeze({ path: '/api/telemetry', method: 'GET', action: 'telemetry' }),
   Object.freeze({ path: '/api/settings', method: 'POST', action: 'settings' }),
-  Object.freeze({ path: '/api/context-window', method: 'POST', action: 'context_window' }),
   Object.freeze({ path: '/api/settings/reset', method: 'POST', action: 'settings_reset' }),
   Object.freeze({ path: '/api/cache/rebuild', method: 'POST', action: 'cache_rebuild' }),
   Object.freeze({ path: '/api/cloud-sync', method: 'POST', action: 'cloud_sync' }),
@@ -856,7 +852,7 @@ const BRIDGE_API_PATHS = Object.freeze(BRIDGE_API_ROUTE_DEFS.map((r) => r.path))
 function readInjectedWindowBridge() {
   return typeof window === 'undefined' ? undefined : window[WINDOW_BRIDGE_KEY];
 }
-return { WINDOW_BRIDGE_KEY, WINDOW_BRIDGE_ROUTE_KEY, WINDOW_BRIDGE_ENDPOINT_KEY, WINDOW_BRIDGE_ENDPOINT_HEADER, LOCAL_ENDPOINT_ID, WINDOW_OVERLAY_KEY, CONTEXT_WINDOWS_GLOBAL_KEY, WINDOW_OVERLAY_METHODS, BRIDGE_API_ROUTE_DEFS, BRIDGE_API_PATHS, readInjectedWindowBridge };
+return { WINDOW_BRIDGE_KEY, WINDOW_BRIDGE_ROUTE_KEY, WINDOW_BRIDGE_ENDPOINT_KEY, WINDOW_BRIDGE_ENDPOINT_HEADER, LOCAL_ENDPOINT_ID, WINDOW_OVERLAY_KEY, WINDOW_OVERLAY_METHODS, BRIDGE_API_ROUTE_DEFS, BRIDGE_API_PATHS, readInjectedWindowBridge };
 })();
 
 // --- src/icons/svgRegistry.js ---
@@ -1720,16 +1716,12 @@ const I18N_MESSAGES_ZH_CN = Object.freeze({
   'settings.str.mountFloating': '悬浮窗挂载 (页内悬浮 + 侧边栏)',
   'settings.str.mountSidebar': '仅侧边栏',
   'settings.bridge.restartTitle': '已自动补齐启动参数，重启一次即可启用悬浮胶囊',
-  'settings.bridge.ctxRestartTitle': '已自动补齐启动参数，重启一次即可激活上下文覆写',
   'settings.bridge.restartBody': '已自动为快捷方式、自启项及协议关联写入 --remote-debugging-port=0（后续通过常规快捷方式打开均自动生效）。点击下方按钮即可退出后台进程并立即生效。',
   'settings.bridge.readOnlyTitle': '公共桌面快捷方式受权限保护，授权重启即可生效',
-  'settings.bridge.ctxReadOnlyTitle': '公共桌面快捷方式受权限保护，授权重启即可激活上下文覆写',
   'settings.bridge.readOnlyBody': '个人启动项已配好，但公共桌面或开始菜单快捷方式需管理员权限修改。点击下方按钮并在系统弹窗中确认授权，即可一次性修补公共图标并带参重开（后续日常打开均自动生效）。',
   'settings.bridge.macTitle': '当前会话未开启调试端口，一键重开即可启用挂载',
-  'settings.bridge.ctxMacTitle': '当前会话未开启调试端口，一键重开即可激活上下文覆写',
   'settings.bridge.noPortTitle': '未检测到本地调试端口，主窗口挂载暂未生效',
   'settings.bridge.unreachableTitle': '本地调试端口未就绪，主窗口挂载暂未生效',
-  'settings.bridge.ctxTitle': '未连通本地调试通道，上下文窗口覆写暂未注入',
   'settings.bridge.guideWin': 'Antigravity 2.33.0+ 默认不再开启调试端口。点击「立即重启并启用挂载」即可自动补齐快捷方式参数、退出托盘后台并带参重启生效。',
   'settings.bridge.guideMac': '受 macOS 应用签名限制，从 Dock 直接冷启动默认不带调试端口参数。点击下方按钮即可一键带参重开恢复（日常仅关窗不完全退出 Cmd+Q 则持续有效）。',
   'settings.bridge.guideLinux': 'Antigravity 2.33.0+ 默认不再开启调试端口。点击「立即重启并启用挂载」即可自动写入 .desktop 启动器并重启生效。',
@@ -2286,16 +2278,12 @@ const I18N_MESSAGES_EN_US = Object.freeze({
   'settings.str.mountFloating': 'Floating Window (In-Page + Sidebar)',
   'settings.str.mountSidebar': 'Sidebar Only',
   'settings.bridge.restartTitle': 'Launch Flag Auto-Configured — Restart Once to Activate',
-  'settings.bridge.ctxRestartTitle': 'Launch Flag Auto-Configured — Restart Once for Context Override',
   'settings.bridge.restartBody': 'Automatically added --remote-debugging-port=0 to your shortcuts, startup entries, and protocol handlers (subsequent shortcut launches mount automatically). Click below to close background processes and relaunch now.',
   'settings.bridge.readOnlyTitle': 'Public Shortcut Protected — Authorize & Relaunch to Activate',
-  'settings.bridge.ctxReadOnlyTitle': 'Public Shortcut Protected — Authorize & Relaunch for Context Override',
   'settings.bridge.readOnlyBody': 'Personal launch entries are configured, but public shortcuts require administrator permission. Click below and approve the system prompt to patch public shortcuts once and relaunch.',
   'settings.bridge.macTitle': 'Debug Port Inactive — One-Click Relaunch to Enable Mount',
-  'settings.bridge.ctxMacTitle': 'Debug Port Inactive — One-Click Relaunch for Context Override',
   'settings.bridge.noPortTitle': 'Local Debug Port Missing — Window Mount Inactive',
   'settings.bridge.unreachableTitle': 'Local Debug Port Not Ready — Window Mount Inactive',
-  'settings.bridge.ctxTitle': 'Local Debug Port Inactive — Context Override Pending',
   'settings.bridge.guideWin': 'Antigravity 2.33.0+ no longer opens a debug port by default. Click "Relaunch & Enable Mount" to auto-configure shortcuts, close tray background processes, and relaunch.',
   'settings.bridge.guideMac': 'Due to macOS app code signing, cold launches from Dock omit the debug port flag. Click below to relaunch with the flag in one click (stays active until you fully Quit via Cmd+Q).',
   'settings.bridge.guideLinux': 'Antigravity 2.33.0+ no longer opens a debug port by default. Click "Relaunch & Enable Mount" to update your .desktop launcher and relaunch.',
@@ -8248,7 +8236,7 @@ return { revealExportedFile, exportTextFileWithFeedback, exportBinaryFileWithFee
 })();
 
 // --- src/store/telemetryStore.js ---
-const { extractHostRouteCascadeId, telemetryStore, clearConsumptionRangeCache, clearConversationViewCache, CLIENT_TOPBAR_SLOT_KEYS, DEFAULT_CLIENT_TOPBAR_SLOTS, DEFAULT_CLIENT_CONTEXT_AGENT_MODE, CLIENT_CLI_STATUSLINE_PRESETS, DEFAULT_CLIENT_CLI_STATUSLINE_SLOTS, CLIENT_OVERVIEW_MODULE_KEYS, DEFAULT_CLIENT_OVERVIEW_MODULES, DEFAULT_CLIENT_HOVER_MODULES, CLIENT_OVERVIEW_METRIC_KEYS, DEFAULT_CLIENT_OVERVIEW_METRICS, CLIENT_STEP_COLUMN_KEYS, DEFAULT_CLIENT_STEP_COLUMNS, DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT, MIN_CLIENT_POPOVER_WIDTH, MAX_CLIENT_POPOVER_WIDTH, DEFAULT_CLIENT_POPOVER_WIDTH, parseClientStepTokenComboSegments, normalizeClientStepTokenComboFormat, normalizeClientPopoverWidthMode, normalizeClientPopoverWidth, normalizeClientModelDisplayMode, normalizeClientTopbarSlots, normalizeClientContextAgentMode, normalizeClientCliStatusLineSlots, getDefaultCtxInspectorAgentId, resolveOverlayCtxInspectorAgentId, resolveEffectiveClientCliStatusLineSlots, normalizeClientHoverModules, normalizeClientOverviewModules, normalizeClientOverviewMetrics, normalizeClientStepColumns, normalizeClientUpdateMode, normalizeClientOrchestratorIdMode, normalizeClientWindowMountMode, isEquivalentTelemetry, resetTelemetryForEndpointSwitch, fetchTelemetry, selectConversation, selectConsumptionTimeRange, prefetchConsumptionPresets, saveSettingsPatch, saveModelContextWindow, resetAllSettings, rebuildTrajectoryCache, triggerCloudSync, triggerBridgeHostRelaunch, triggerCliStatusLineAction, triggerPluginUpdate, startAsyncTelemetryLoop, stopAsyncTelemetryLoop, resolveHostRouteMatch, resolveScopedConversation, isMacHostPlatform } = (() => {
+const { extractHostRouteCascadeId, telemetryStore, clearConsumptionRangeCache, clearConversationViewCache, CLIENT_TOPBAR_SLOT_KEYS, DEFAULT_CLIENT_TOPBAR_SLOTS, DEFAULT_CLIENT_CONTEXT_AGENT_MODE, CLIENT_CLI_STATUSLINE_PRESETS, DEFAULT_CLIENT_CLI_STATUSLINE_SLOTS, CLIENT_OVERVIEW_MODULE_KEYS, DEFAULT_CLIENT_OVERVIEW_MODULES, DEFAULT_CLIENT_HOVER_MODULES, CLIENT_OVERVIEW_METRIC_KEYS, DEFAULT_CLIENT_OVERVIEW_METRICS, CLIENT_STEP_COLUMN_KEYS, DEFAULT_CLIENT_STEP_COLUMNS, DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT, MIN_CLIENT_POPOVER_WIDTH, MAX_CLIENT_POPOVER_WIDTH, DEFAULT_CLIENT_POPOVER_WIDTH, parseClientStepTokenComboSegments, normalizeClientStepTokenComboFormat, normalizeClientPopoverWidthMode, normalizeClientPopoverWidth, normalizeClientModelDisplayMode, normalizeClientTopbarSlots, normalizeClientContextAgentMode, normalizeClientCliStatusLineSlots, getDefaultCtxInspectorAgentId, resolveOverlayCtxInspectorAgentId, resolveEffectiveClientCliStatusLineSlots, normalizeClientHoverModules, normalizeClientOverviewModules, normalizeClientOverviewMetrics, normalizeClientStepColumns, normalizeClientUpdateMode, normalizeClientOrchestratorIdMode, normalizeClientWindowMountMode, isEquivalentTelemetry, resetTelemetryForEndpointSwitch, fetchTelemetry, selectConversation, selectConsumptionTimeRange, prefetchConsumptionPresets, saveSettingsPatch, resetAllSettings, rebuildTrajectoryCache, triggerCloudSync, triggerBridgeHostRelaunch, triggerCliStatusLineAction, triggerPluginUpdate, startAsyncTelemetryLoop, stopAsyncTelemetryLoop, resolveHostRouteMatch, resolveScopedConversation, isMacHostPlatform } = (() => {
 /**
  * @fileoverview Reactive telemetry store with async non-overlapping poll scheduler
  * and granular slice updates.
@@ -8715,29 +8703,6 @@ function isEquivalentTelemetry(prev, next) {
     (prev.endpoint?.id || LOCAL_ENDPOINT_ID) !== (next.endpoint?.id || LOCAL_ENDPOINT_ID) ||
     Boolean(prev.endpoint?.isRemote) !== Boolean(next.endpoint?.isRemote) ||
     (prev.endpoint?.label || '') !== (next.endpoint?.label || '')
-  ) {
-    return false;
-  }
-  if (Boolean(pSet?.contextWindowRiskAccepted) !== Boolean(nSet?.contextWindowRiskAccepted)) {
-    return false;
-  }
-  if (
-    (pSet?.contextWindowMainEnabled !== false) !== (nSet?.contextWindowMainEnabled !== false) ||
-    Boolean(pSet?.contextWindowSwarmEnabled) !== Boolean(nSet?.contextWindowSwarmEnabled)
-  ) {
-    return false;
-  }
-  if (
-    (prev.cloudCodeProxy?.state || 'disabled') !== (next.cloudCodeProxy?.state || 'disabled') ||
-    Number(prev.cloudCodeProxy?.ruleCount || 0) !== Number(next.cloudCodeProxy?.ruleCount || 0) ||
-    String(prev.cloudCodeProxy?.error || '') !== String(next.cloudCodeProxy?.error || '') ||
-    Number(prev.cloudCodeProxy?.syncedAtMs || 0) !== Number(next.cloudCodeProxy?.syncedAtMs || 0)
-  ) {
-    return false;
-  }
-  if (
-    JSON.stringify(pSet?.modelContextWindows) !== JSON.stringify(nSet?.modelContextWindows) ||
-    JSON.stringify(prev.contextWindowModels) !== JSON.stringify(next.contextWindowModels)
   ) {
     return false;
   }
@@ -9979,15 +9944,6 @@ async function saveSettingsPatch(patch) {
   if (Object.prototype.hasOwnProperty.call(safePatch, 'popoverWidth')) {
     safePatch.popoverWidth = normalizeClientPopoverWidth(safePatch.popoverWidth);
   }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'contextWindowRiskAccepted')) {
-    safePatch.contextWindowRiskAccepted = Boolean(safePatch.contextWindowRiskAccepted);
-  }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'contextWindowMainEnabled')) {
-    safePatch.contextWindowMainEnabled = Boolean(safePatch.contextWindowMainEnabled);
-  }
-  if (Object.prototype.hasOwnProperty.call(safePatch, 'contextWindowSwarmEnabled')) {
-    safePatch.contextWindowSwarmEnabled = Boolean(safePatch.contextWindowSwarmEnabled);
-  }
   if (Object.prototype.hasOwnProperty.call(safePatch, 'orchestratorIdMode')) {
     safePatch.orchestratorIdMode = normalizeClientOrchestratorIdMode(safePatch.orchestratorIdMode);
   }
@@ -10100,33 +10056,6 @@ async function saveSettingsPatch(patch) {
     inFlightTelemetryPoll = null;
     void fetchTelemetry({ force: false });
   }
-}
-
-async function saveModelContextWindow(modelId, option) {
-  const myRev = ++settingsRevision;
-  const result = await enqueueSettingsWrite(() =>
-    callSidecarApi('/api/context-window', {
-      method: 'POST',
-      body: { modelId, option },
-    })
-  );
-  const committedRev = ++settingsRevision;
-  if (result?.modelContextWindows) {
-    recentCommittedSettings.set('modelContextWindows', {
-      rev: Math.max(myRev, committedRev),
-      value: result.modelContextWindows,
-    });
-  }
-  const telemetry = telemetryStore.getState().telemetry;
-  if (telemetry?.settings) {
-    telemetryStore.setState({
-      telemetry: {
-        ...telemetry,
-        settings: { ...telemetry.settings, modelContextWindows: result.modelContextWindows },
-      },
-    });
-  }
-  return result.modelContextWindows;
 }
 
 async function resetAllSettings() {
@@ -10468,7 +10397,7 @@ function isMacHostPlatform(telemetry) {
   }
   return false;
 }
-return { extractHostRouteCascadeId, telemetryStore, clearConsumptionRangeCache, clearConversationViewCache, CLIENT_TOPBAR_SLOT_KEYS, DEFAULT_CLIENT_TOPBAR_SLOTS, DEFAULT_CLIENT_CONTEXT_AGENT_MODE, CLIENT_CLI_STATUSLINE_PRESETS, DEFAULT_CLIENT_CLI_STATUSLINE_SLOTS, CLIENT_OVERVIEW_MODULE_KEYS, DEFAULT_CLIENT_OVERVIEW_MODULES, DEFAULT_CLIENT_HOVER_MODULES, CLIENT_OVERVIEW_METRIC_KEYS, DEFAULT_CLIENT_OVERVIEW_METRICS, CLIENT_STEP_COLUMN_KEYS, DEFAULT_CLIENT_STEP_COLUMNS, DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT, MIN_CLIENT_POPOVER_WIDTH, MAX_CLIENT_POPOVER_WIDTH, DEFAULT_CLIENT_POPOVER_WIDTH, parseClientStepTokenComboSegments, normalizeClientStepTokenComboFormat, normalizeClientPopoverWidthMode, normalizeClientPopoverWidth, normalizeClientModelDisplayMode, normalizeClientTopbarSlots, normalizeClientContextAgentMode, normalizeClientCliStatusLineSlots, getDefaultCtxInspectorAgentId, resolveOverlayCtxInspectorAgentId, resolveEffectiveClientCliStatusLineSlots, normalizeClientHoverModules, normalizeClientOverviewModules, normalizeClientOverviewMetrics, normalizeClientStepColumns, normalizeClientUpdateMode, normalizeClientOrchestratorIdMode, normalizeClientWindowMountMode, isEquivalentTelemetry, resetTelemetryForEndpointSwitch, fetchTelemetry, selectConversation, selectConsumptionTimeRange, prefetchConsumptionPresets, saveSettingsPatch, saveModelContextWindow, resetAllSettings, rebuildTrajectoryCache, triggerCloudSync, triggerBridgeHostRelaunch, triggerCliStatusLineAction, triggerPluginUpdate, startAsyncTelemetryLoop, stopAsyncTelemetryLoop, resolveHostRouteMatch, resolveScopedConversation, isMacHostPlatform };
+return { extractHostRouteCascadeId, telemetryStore, clearConsumptionRangeCache, clearConversationViewCache, CLIENT_TOPBAR_SLOT_KEYS, DEFAULT_CLIENT_TOPBAR_SLOTS, DEFAULT_CLIENT_CONTEXT_AGENT_MODE, CLIENT_CLI_STATUSLINE_PRESETS, DEFAULT_CLIENT_CLI_STATUSLINE_SLOTS, CLIENT_OVERVIEW_MODULE_KEYS, DEFAULT_CLIENT_OVERVIEW_MODULES, DEFAULT_CLIENT_HOVER_MODULES, CLIENT_OVERVIEW_METRIC_KEYS, DEFAULT_CLIENT_OVERVIEW_METRICS, CLIENT_STEP_COLUMN_KEYS, DEFAULT_CLIENT_STEP_COLUMNS, DEFAULT_CLIENT_STEP_TOKEN_COMBO_FORMAT, MIN_CLIENT_POPOVER_WIDTH, MAX_CLIENT_POPOVER_WIDTH, DEFAULT_CLIENT_POPOVER_WIDTH, parseClientStepTokenComboSegments, normalizeClientStepTokenComboFormat, normalizeClientPopoverWidthMode, normalizeClientPopoverWidth, normalizeClientModelDisplayMode, normalizeClientTopbarSlots, normalizeClientContextAgentMode, normalizeClientCliStatusLineSlots, getDefaultCtxInspectorAgentId, resolveOverlayCtxInspectorAgentId, resolveEffectiveClientCliStatusLineSlots, normalizeClientHoverModules, normalizeClientOverviewModules, normalizeClientOverviewMetrics, normalizeClientStepColumns, normalizeClientUpdateMode, normalizeClientOrchestratorIdMode, normalizeClientWindowMountMode, isEquivalentTelemetry, resetTelemetryForEndpointSwitch, fetchTelemetry, selectConversation, selectConsumptionTimeRange, prefetchConsumptionPresets, saveSettingsPatch, resetAllSettings, rebuildTrajectoryCache, triggerCloudSync, triggerBridgeHostRelaunch, triggerCliStatusLineAction, triggerPluginUpdate, startAsyncTelemetryLoop, stopAsyncTelemetryLoop, resolveHostRouteMatch, resolveScopedConversation, isMacHostPlatform };
 })();
 
 // --- src/components/ui/TopLongPillNav.js ---
@@ -10597,7 +10526,7 @@ return { TopLongPillNav };
 const { createSearchInput } = (() => {
 /**
  * @fileoverview Shared compact search input bar (`SearchInput.js`) with leading search icon
- * and conditional clear button, reused across `CustomSelect`, `StepsDetailView`, and `SessionMigrationCard`.
+ * and conditional clear button, reused in `CustomSelect` and `StepsDetailView`.
  */
 
 
@@ -19308,7 +19237,6 @@ function createCapsuleSlotNode(slotIndex, initialMetric) {
 
   const isNone = initialMetric === 'none';
   const isCtx = initialMetric === 'context';
-  const prefixSpan = h('span', { className: 'wm-slot-prefix' });
   const textSpan = h('span', {
     className: isCtx ? 'wm-slot-text wm-ctx-pct' : 'wm-slot-text',
     text: isNone
@@ -19332,7 +19260,7 @@ function createCapsuleSlotNode(slotIndex, initialMetric) {
             ? 'wm-cap-slot wm-seg-speed'
             : initialMetric === 'ttft'
               ? 'wm-cap-slot wm-seg-metric'
-              : 'wm-cap-slot wm-seg-quota',
+              : 'wm-cap-slot',
       hidden: isNone,
       'data-slot-idx': String(slotIndex),
       'data-metric': initialMetric,
@@ -19345,10 +19273,8 @@ function createCapsuleSlotNode(slotIndex, initialMetric) {
     el,
     ringSvg,
     ringFill,
-    prefixSpan,
     textSpan,
     ringMounted: isCtx,
-    prefixMounted: false,
     heldTtft: null,
   };
 }
@@ -19402,18 +19328,6 @@ function syncCapsuleSlotNodes(capsuleSlots, capsuleSeps, slotKeys, slotCtx) {
       slot.ringMounted = false;
     }
 
-    const prefixText = String(pres.prefix || '');
-    if (prefixText) {
-      patchText(slot.prefixSpan, prefixText);
-      if (!slot.prefixMounted) {
-        slot.el.insertBefore(slot.prefixSpan, slot.textSpan);
-        slot.prefixMounted = true;
-      }
-    } else if (slot.prefixMounted) {
-      slot.prefixSpan.remove();
-      slot.prefixMounted = false;
-    }
-
     const toneCls =
       pres.toneClass || (pres.danger ? 'tone-danger' : pres.warn ? 'tone-warn' : '');
     const fullSegClass = `${pres.segClass}${pres.running ? ' state-running' : ''}${toneCls ? ` ${toneCls}` : ''}`;
@@ -19425,7 +19339,6 @@ function syncCapsuleSlotNodes(capsuleSlots, capsuleSeps, slotKeys, slotCtx) {
     if (pres.showRing) {
       slot.ringFill.setAttribute('stroke-dashoffset', String(pres.dashOffset));
       patchClasses(slot.ringFill, {
-        'is-quota': pres.ringKind === 'quota',
         'is-empty': pres.ringEmpty === true,
         'tone-warn': pres.warn,
         'tone-danger': pres.danger,
@@ -21578,7 +21491,6 @@ const LAUNCH_FLAG_TEXT = '--remote-debugging-port=0';
 const BridgeStatusNotice = defineComponent({
   name: 'BridgeStatusNotice',
   setup({ props, onCleanup }) {
-    let contextMode = Boolean(props?.contextMode);
     const dismissible = Boolean(props?.dismissible);
     let lastPayload = {
       visible: false,
@@ -21781,26 +21693,18 @@ const BridgeStatusNotice = defineComponent({
       let titleText = '';
       let bodyText = '';
       if (hasReadOnlyShortcuts) {
-        titleText = contextMode
-          ? t('settings.bridge.ctxReadOnlyTitle')
-          : t('settings.bridge.readOnlyTitle');
+        titleText = t('settings.bridge.readOnlyTitle');
         bodyText = t('settings.bridge.readOnlyBody');
       } else if (isMacDesktop) {
-        titleText = contextMode
-          ? t('settings.bridge.ctxMacTitle')
-          : t('settings.bridge.macTitle');
+        titleText = t('settings.bridge.macTitle');
         bodyText = t('settings.bridge.guideMac');
       } else if (isAutoConfigured) {
-        titleText = contextMode
-          ? t('settings.bridge.ctxRestartTitle')
-          : t('settings.bridge.restartTitle');
+        titleText = t('settings.bridge.restartTitle');
         bodyText = t('settings.bridge.restartBody');
       } else {
-        titleText = contextMode
-          ? t('settings.bridge.ctxTitle')
-          : state === 'cdp_unreachable'
-            ? t('settings.bridge.unreachableTitle')
-            : t('settings.bridge.noPortTitle');
+        titleText = state === 'cdp_unreachable'
+          ? t('settings.bridge.unreachableTitle')
+          : t('settings.bridge.noPortTitle');
         bodyText = plat === 'linux' ? t('settings.bridge.guideLinux') : t('settings.bridge.guideWin');
       }
 
@@ -21810,9 +21714,6 @@ const BridgeStatusNotice = defineComponent({
     }
 
     function update(next = {}) {
-      if (typeof next.contextMode === 'boolean') {
-        contextMode = next.contextMode;
-      }
       lastPayload = {
         ...lastPayload,
         ...next,
@@ -24975,16 +24876,10 @@ const App = defineComponent({
       const mountMode = settings
         ? normalizeClientWindowMountMode(settings.windowMountMode, settings.enableWindowOverlay)
         : 'sidebar';
-      const hasCtxOverrides = Boolean(
-        settings?.modelContextWindows && Object.keys(settings.modelContextWindows).length > 0
-      );
       const shouldOfferGlobal =
-        !isWindowOverlayMode() &&
-        activeView !== 'settings' &&
-        (mountMode !== 'sidebar' || hasCtxOverrides);
+        !isWindowOverlayMode() && activeView !== 'settings' && mountMode !== 'sidebar';
       globalBridgeNotice.refs.update({
         visible: shouldOfferGlobal,
-        contextMode: mountMode === 'sidebar' && hasCtxOverrides,
         windowBridge: telemetry?.windowBridge || null,
         hostPlatform: telemetry?.hostPlatform || 'win32',
       });
@@ -25199,7 +25094,6 @@ const App = defineComponent({
         windowMountMode: st.telemetry?.settings?.windowMountMode,
         enableWindowOverlay: st.telemetry?.settings?.enableWindowOverlay,
         contextAgentMode: st.telemetry?.settings?.contextAgentMode,
-        modelContextWindows: st.telemetry?.settings?.modelContextWindows,
         windowBridge: st.telemetry?.windowBridge,
         hostPlatform: st.telemetry?.hostPlatform,
       }),
@@ -26719,8 +26613,8 @@ function mountWindowOverlay() {
     createCapsuleSlotNode(4, 'none'),
   ];
   const capsuleSeps = [
-    h('span', { className: 'wm-sep wm-sep-speed', 'data-sep-for-rank': '2' }),
-    h('span', { className: 'wm-sep wm-sep-quota', 'data-sep-for-rank': '3' }),
+    h('span', { className: 'wm-sep', 'data-sep-for-rank': '2' }),
+    h('span', { className: 'wm-sep', 'data-sep-for-rank': '3' }),
     h('span', { className: 'wm-sep', 'data-sep-for-rank': '', hidden: true }),
     h('span', { className: 'wm-sep', 'data-sep-for-rank': '', hidden: true }),
   ];

@@ -2731,8 +2731,6 @@ test('Feature 16: P3 extracted sub-modules (overlayHostAnchors, ConsumptionBreak
       );
     }
     for (const requiredModule of [
-      'cloudcode-proxy.mjs',
-      'quota-reservation.mjs',
       'fs-atomic.mjs',
       'trajectory-cache-store.mjs',
       '.xlsx',

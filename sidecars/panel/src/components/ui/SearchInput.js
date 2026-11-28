@@ -1,6 +1,6 @@
 /**
  * @fileoverview Shared compact search input bar (`SearchInput.js`) with leading search icon
- * and conditional clear button, reused across `CustomSelect`, `StepsDetailView`, and `SessionMigrationCard`.
+ * and conditional clear button, reused in `CustomSelect` and `StepsDetailView`.
  */
 
 import { h, patchAttr } from '../../core/domPatch.js';

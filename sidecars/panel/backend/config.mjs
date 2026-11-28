@@ -595,11 +595,9 @@ export const cloudSyncState = {
   inFlight: null,
 };
 
-/** 插件自更新执行状态。 */
+/** 插件更新执行状态。 */
 export const pluginUpdateState = {
   isUpdating: false,
-  inFlightIsAuto: false,
-  lastAutoAttemptVersion: '',
   lastResult: null,
   lastError: null,
   inFlight: null,

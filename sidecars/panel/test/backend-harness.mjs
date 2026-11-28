@@ -32,7 +32,6 @@ const BACKEND_MODULE_FILES = [
   '../shared/workspace-uri.mjs',
   '../shared/prompt-clean.mjs',
   '../backend/fs-atomic.mjs',
-  '../backend/context-windows.mjs',
   '../backend/http-helpers.mjs',
   '../backend/settings-schema.mjs',
   '../backend/sqlite-client.mjs',
@@ -47,7 +46,6 @@ const BACKEND_MODULE_FILES = [
   '../backend/pricing-catalog.mjs',
   '../backend/plugin-updater.mjs',
   '../backend/ls-rpc.mjs',
-  '../backend/cloudcode-proxy.mjs',
   '../backend/model-pricing.mjs',
   '../backend/transcript-fallback.mjs',
   '../backend/local-scanner.mjs',
@@ -79,7 +77,6 @@ export function backendHarness({
   trajectories={},
   summaries={},
   userStatus={},
-  availableModels={},
   localCatalog=DEFAULT_BUNDLED_CATALOG,
   remoteCatalog=null,
   pluginManifest=null,
@@ -235,10 +232,10 @@ export function backendHarness({
       if(method==='RetrieveUserQuotaSummary') {
         return {ok:true,json:async()=>({response:{groups:[]}})};
       }
-      const data={GetUserStatus:{userStatus:state.userStatus},GetAvailableModels:{response:{models:availableModels}},GetAllCascadeTrajectories:{trajectorySummaries:state.summaries}}[method];
+      const data={GetUserStatus:{userStatus:state.userStatus},GetAllCascadeTrajectories:{trajectorySummaries:state.summaries}}[method];
       return {ok:true,json:async()=>data};
     },
   };
-  vm.runInNewContext(source+'\n globalThis.api={buildTelemetryPayloadInternal,executeTelemetryAction,dispatchBridgeApiRequest,callLsRpc,getDefaultCloudCodeProxyStatus,computeStepCost,resolveModelInfo,resolvePricingAt,inferFamilyFromProviderOrKey,isNeonModelIdentifier,isArgonModelIdentifier,isCarbonModelIdentifier,getBaseModelLabel,formatUpstreamModelId,PLACEHOLDER_MAP,buildDynamicModelMap,resolveTimeWindow,sanitizeCatalogPayload,rebuildActiveCatalog,getPricingPhaseEpoch,detectCustomGitForkRepo,persistTrajectoryCacheIfNeeded,flushTrajectoryCacheNow,getCachedTrajectory,listCachedTrajectoryEntries,hasPendingTrajectoryCacheSave,syncCloudCatalog,getCloudStatus,isValidSemver,compareSemver,performPluginUpdate,resolveMigratedGitRemoteUrl,loadSettings,executeSettingsAction,executeModelContextWindowAction,executeResetSettingsAction,executeRebuildCacheAction,clearRuntimeCaches,normalizeTopbarCapsuleSlots,normalizeContextAgentMode,normalizeCliStatusLineSlots,resolveEffectiveCliStatusLineSlots,normalizeHoverModules,normalizeOverviewModules,normalizeOverviewMetrics,normalizeStepTableColumns,normalizeStepTokenComboFormat,parseStepTokenComboSegments,normalizeModelDisplayMode,normalizePopoverWidthMode,normalizePopoverWidth,normalizeStandalonePort,setStandalonePortListener,parseAnnotationPbtxtTitle,readLocalSummarySnapshot,readLocalSqliteTrajectory,computeSqliteWalSig,buildCliStatusSnapshot,buildCliStatusLineCommand,isManagedCliStatusLineCommand,extractManagedCliStatusLineFlags,getCliStatusLineRuntimeStatus,applyCliStatusLineToSettingsObject,cliDisplayWidth,parseCliModelAndEffort,formatCliStatusLineCapsule,registerRemoteEndpoint,getRegisteredRemoteEndpoint,resolveEndpointContext,clearRemoteEndpointCaches,clearRemoteEndpointRegistry,setRemoteWindowRpcInvoker,setLoopbackHttpsRequester,getEndpointCacheStore,pruneStaleRemoteEndpoints,trackEndpointRequestStart,trackEndpointRequestEnd,shouldRemoteEndpointPreferTier2,markRemoteEndpointPreferTier2};',ctx);
+  vm.runInNewContext(source+'\n globalThis.api={buildTelemetryPayloadInternal,executeTelemetryAction,dispatchBridgeApiRequest,callLsRpc,computeStepCost,resolveModelInfo,resolvePricingAt,inferFamilyFromProviderOrKey,isNeonModelIdentifier,isArgonModelIdentifier,isCarbonModelIdentifier,getBaseModelLabel,formatUpstreamModelId,PLACEHOLDER_MAP,buildDynamicModelMap,resolveTimeWindow,sanitizeCatalogPayload,rebuildActiveCatalog,getPricingPhaseEpoch,detectCustomGitForkRepo,persistTrajectoryCacheIfNeeded,flushTrajectoryCacheNow,getCachedTrajectory,listCachedTrajectoryEntries,hasPendingTrajectoryCacheSave,syncCloudCatalog,getCloudStatus,isValidSemver,compareSemver,performPluginUpdate,resolveMigratedGitRemoteUrl,loadSettings,executeSettingsAction,executeResetSettingsAction,executeRebuildCacheAction,clearRuntimeCaches,normalizeTopbarCapsuleSlots,normalizeContextAgentMode,normalizeCliStatusLineSlots,resolveEffectiveCliStatusLineSlots,normalizeHoverModules,normalizeOverviewModules,normalizeOverviewMetrics,normalizeStepTableColumns,normalizeStepTokenComboFormat,parseStepTokenComboSegments,normalizeModelDisplayMode,normalizePopoverWidthMode,normalizePopoverWidth,normalizeStandalonePort,setStandalonePortListener,parseAnnotationPbtxtTitle,readLocalSummarySnapshot,readLocalSqliteTrajectory,computeSqliteWalSig,buildCliStatusSnapshot,buildCliStatusLineCommand,isManagedCliStatusLineCommand,extractManagedCliStatusLineFlags,getCliStatusLineRuntimeStatus,applyCliStatusLineToSettingsObject,cliDisplayWidth,parseCliModelAndEffort,formatCliStatusLineCapsule,registerRemoteEndpoint,getRegisteredRemoteEndpoint,resolveEndpointContext,clearRemoteEndpointCaches,clearRemoteEndpointRegistry,setRemoteWindowRpcInvoker,setLoopbackHttpsRequester,getEndpointCacheStore,pruneStaleRemoteEndpoints,trackEndpointRequestStart,trackEndpointRequestEnd,shouldRemoteEndpointPreferTier2,markRemoteEndpointPreferTier2};',ctx);
   return {...ctx.api,state};
 }
