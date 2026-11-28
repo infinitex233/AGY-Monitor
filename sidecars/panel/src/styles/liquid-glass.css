@@ -10,7 +10,13 @@
 /* --- 1. Root & Atmospheric Liquid Glass Canvas --- */
 :root[data-ui-theme="liquid-glass"],
 :host([data-ui-theme="liquid-glass"]),
-[data-ui-theme="liquid-glass"] {
+[data-ui-theme="liquid-glass"],
+:root[data-modern-ui="true"][data-ui-theme="liquid-glass"],
+:host([data-modern-ui="true"][data-ui-theme="liquid-glass"]),
+[data-modern-ui="true"][data-ui-theme="liquid-glass"] {
+  --text-primary: var(--lg-ink-1);
+  --text-secondary: var(--lg-ink-2);
+  --text-muted: var(--lg-ink-3);
   --accent-primary: var(--lg-accent);
   --accent-primary-soft: var(--lg-accent-soft);
   --accent-primary-border: var(--lg-accent-ring);
@@ -27,9 +33,13 @@
   --border-hairline: var(--lg-divider);
   --surface-hover: var(--lg-row-hover);
   --surface-track: var(--lg-track);
+  --lg-control-hover: color-mix(in srgb, var(--lg-ink-2) 18%, transparent);
+  --modern-surface-subtle: var(--lg-seg-bg);
   --modern-surface-hover: var(--lg-row-hover);
+  --modern-pill-select-open: var(--lg-card-active);
   --modern-progress-track: var(--lg-track);
   --modern-stripe-bg: var(--lg-row-stripe);
+  --cons-other-seg: color-mix(in srgb, var(--lg-ink-2) 42%, transparent);
   --shadow-popover: var(--lg-shadow-popover);
   --shadow-overlay: var(--lg-shadow-overlay);
 }
@@ -818,17 +828,42 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   color: var(--lg-ink-3);
 }
 
-/* Sticky header MUST have an opaque frosted fill so scrolled rows never bleed through behind th text */
-[data-ui-theme="liquid-glass"] .data-table th {
-  background: var(--lg-sticky-th-bg);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  color: var(--lg-ink-3);
-  font-weight: 500;
-  border-bottom: 1px solid var(--lg-divider);
-  padding-top: 5px;
-  padding-bottom: 7px;
+/* Keep the header divider visible as the row sticks to the scrollport. */
+[data-ui-theme="liquid-glass"] .data-table thead {
+  position: sticky;
+  top: 0;
   z-index: 4;
+}
+
+[data-ui-theme="liquid-glass"] .data-table thead::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  box-shadow: inset 0 -1px 0 var(--lg-divider);
+}
+
+[data-ui-theme="liquid-glass"] .table-viewport.is-scrolled .data-table thead::before {
+  background: var(--lg-seg-bg);
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+/* The body starts below the header. Clip by the scroll offset to keep it there. */
+[data-ui-theme="liquid-glass"] .table-viewport.is-scrolled .data-table tbody {
+  clip-path: inset(var(--step-scroll-top, 0px) 0 0);
+}
+
+[data-ui-theme="liquid-glass"] .data-table th {
+  position: static;
+  background: transparent;
+  border-bottom: none;
+  color: var(--lg-ink-2);
+}
+
+[data-ui-theme="liquid-glass"] .data-table th.is-sorted {
+  color: var(--lg-accent);
 }
 
 [data-ui-theme="liquid-glass"] .data-table td {
@@ -896,6 +931,32 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   border-bottom-right-radius: 9px;
 }
 
+[data-ui-theme="liquid-glass"] .turn-rail.is-latest {
+  --rail-line: color-mix(in srgb, var(--lg-accent) 62%, transparent);
+}
+
+[data-ui-theme="liquid-glass"] .steps-data-table tbody tr:hover .turn-rail {
+  --rail-line: color-mix(in srgb, var(--lg-accent) 78%, transparent);
+}
+
+/* Cut the connector out of the hollow origin so the card shows through it. */
+[data-ui-theme="liquid-glass"] .turn-rail.is-origin:not(.is-latest) {
+  mask-image: radial-gradient(circle, transparent 1.5px, black 1.5px);
+}
+
+[data-ui-theme="liquid-glass"] .turn-rail.is-origin::after {
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-ui-theme="liquid-glass"] .turn-rail.is-latest.is-origin::after {
+  background: var(--rail-dot);
+}
+
+[data-ui-theme="liquid-glass"] .steps-anomaly-filterbar {
+  background: var(--lg-amber-soft);
+}
+
 /* --- 9. Usage Analytics View (Restrained Monochrome KPIs + Apple Blue Trend Curve) --- */
 [data-ui-theme="liquid-glass"] .cons-split-4 {
   gap: 10px;
@@ -955,8 +1016,13 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   color: var(--lg-ink-1);
 }
 
+[data-ui-theme="liquid-glass"] .trend-heatmap-stage {
+  --hm-level-base: transparent;
+  --hm-month-edge: var(--lg-rim-side);
+}
+
 [data-ui-theme="liquid-glass"] .cons-models-table thead th {
-  color: var(--lg-ink-3);
+  color: var(--lg-ink-2);
   border-bottom-color: var(--lg-divider);
 }
 
@@ -986,6 +1052,14 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
   padding-bottom: 2px;
 }
 
+[data-ui-theme="liquid-glass"] .settings-bridge-notice {
+  background: var(--lg-amber-soft);
+}
+
+[data-ui-theme="liquid-glass"] .settings-bridge-notice.is-restart {
+  background: var(--metric-info-soft);
+}
+
 [data-ui-theme="liquid-glass"] .btn-primary {
   border-radius: var(--radius-pill);
   background: var(--lg-accent);
@@ -1004,6 +1078,12 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
 [data-ui-theme="liquid-glass"] .btn-secondary:hover:not(:disabled) {
   background: var(--lg-card-hover);
   border: 1px solid var(--lg-rim-edge);
+}
+
+[data-ui-theme="liquid-glass"] .steps-chip-btn:not(.is-active):hover,
+[data-ui-theme="liquid-glass"] .btn-ghost-sm:hover:not(:disabled),
+[data-ui-theme="liquid-glass"] .theme-host-chip:not(.is-active):hover {
+  background: var(--lg-control-hover);
 }
 
 [data-ui-theme="liquid-glass"] .btn-danger-confirm {
@@ -1146,14 +1226,27 @@ html[data-standalone="true"][data-ui-theme="liquid-glass"] #app-root,
 
 [data-ui-theme="liquid-glass"].wm-multi-panel,
 :host([data-ui-theme="liquid-glass"]) .wm-multi-panel {
+  --text-muted: var(--lg-ink-2);
   border-radius: 22px;
-  background-color: var(--lg-popover-bg);
+  background-color: color-mix(in srgb, var(--lg-popover-bg) 90%, transparent);
   background-image: var(--lg-overlay-sheen);
   backdrop-filter: blur(12px) saturate(185%);
   -webkit-backdrop-filter: blur(12px) saturate(185%);
   border: 1px solid var(--lg-rim-edge);
   box-shadow: var(--lg-shadow-popover);
   animation: anim-lg-spring-pop 260ms var(--lg-spring-bounce);
+}
+
+[data-ui-theme="liquid-glass"].wm-multi-panel .live-task-card,
+:host([data-ui-theme="liquid-glass"]) .wm-multi-panel .live-task-card {
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+[data-ui-theme="liquid-glass"].wm-multi-panel .live-task-card::after,
+:host([data-ui-theme="liquid-glass"]) .wm-multi-panel .live-task-card::after {
+  display: none;
 }
 
 [data-ui-theme="liquid-glass"].wm-multi-panel.is-above,

@@ -11,6 +11,7 @@ import {
   patchAttr,
   patchClasses,
   patchKeyedList,
+  patchStyleVar,
   patchText,
 } from '../../core/domPatch.js';
 import {
@@ -1111,7 +1112,7 @@ export const StepTableWidget = defineComponent({
       let bottomSpacerH = 0;
 
       if (isVirtualized) {
-        const scrollTop = Math.max(0, Number(stepsTablePane.scrollTop || 0));
+        const scrollTop = syncScrollHeaderState();
         const rawClientH = Number(stepsTablePane.clientHeight || 0);
         const viewportH = rawClientH > 0 ? rawClientH : FALLBACK_VIEWPORT_H;
         const rawTheadH = Number(
@@ -1634,13 +1635,18 @@ export const StepTableWidget = defineComponent({
       renderedTopSpacerH = topSpacerH;
       renderedBottomSpacerH = bottomSpacerH;
 
+      // Replacing rows or spacers can clamp scrollTop before a scroll event arrives.
+      syncScrollHeaderState();
       if (isVirtualized) {
         scheduleCalibrateRowHeights();
       }
     }
 
     function refreshViewport() {
-      if (!activeDataset?.isVirtualized) return;
+      if (!activeDataset?.isVirtualized) {
+        syncScrollHeaderState();
+        return;
+      }
       const scaleChanged = syncFontScaleIfChanged();
       const paneW = Number(stepsTablePane.clientWidth || 0);
       if (lockedColKey && paneW > 0 && Math.abs(paneW - lockedPaneWidth) >= 1) {
@@ -1650,7 +1656,15 @@ export const StepTableWidget = defineComponent({
       scheduleCalibrateRowHeights();
     }
 
+    function syncScrollHeaderState() {
+      const scrollTop = Math.max(0, stepsTablePane.scrollTop || 0);
+      patchClasses(stepsTablePane, { 'is-scrolled': scrollTop > 0 });
+      patchStyleVar(stepsTbody, '--step-scroll-top', scrollTop > 0 ? `${scrollTop}px` : null);
+      return scrollTop;
+    }
+
     function onPaneScroll() {
+      syncScrollHeaderState();
       hideTurnTip();
       hideAnomalyTip();
       if (!activeDataset?.isVirtualized) return;
@@ -1675,10 +1689,7 @@ export const StepTableWidget = defineComponent({
 
     let paneResizeObs = null;
     if (typeof ResizeObserver === 'function') {
-      paneResizeObs = new ResizeObserver(() => {
-        if (!activeDataset?.isVirtualized) return;
-        refreshViewport();
-      });
+      paneResizeObs = new ResizeObserver(refreshViewport);
       paneResizeObs.observe(stepsTablePane);
     }
 
@@ -1779,9 +1790,7 @@ export const StepTableWidget = defineComponent({
           (lastRenderedRows.length === tableSteps.length &&
             tableSteps.every((step, i) => step === lastRenderedRows[i])))
       ) {
-        if (activeDataset?.isVirtualized) {
-          refreshViewport();
-        }
+        refreshViewport();
         return;
       }
 

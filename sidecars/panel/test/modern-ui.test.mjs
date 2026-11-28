@@ -932,6 +932,8 @@ test('StepTableWidget virtualizes large sessions (>80 rows) with exact turn-rail
   const returnedSpacers = stepsTbody.children.filter((tr) => tr.classList.contains('step-vspacer'));
   assert.equal(returnedSpacers.length, 1, 'Returning to scrollTop=0 must drop top spacer immediately');
   assert.equal(returnedRealRows[0].children[0].textContent, '#1722');
+  assert.equal(stepsTablePane.classList.contains('is-scrolled'), false);
+  assert.equal(stepsTbody.style.getPropertyValue('--step-scroll-top') || '', '');
 
   // 5. Live new step prepended at top animates ONLY the new row even when virtualized
   const nextBigSteps = [makeStep(1723, { isLatestTurn: true }), ...bigSteps];
@@ -1306,6 +1308,104 @@ test('uiTheme setting defaults to default, switches cleanly to liquid_glass, and
   }
 });
 
+test('StepTableWidget syncs the sticky header on scroll, viewport refresh, and row replacement', (t) => {
+  const prevDoc = globalThis.document;
+  globalThis.document = createMockDom().document;
+  t.after(() => {
+    globalThis.document = prevDoc;
+  });
+
+  for (const standalone of [false, true]) {
+    const widget = StepTableWidget({ standalone });
+    const { stepsTablePane: pane, stepsTbody: body, renderStepTable, refreshViewport } = widget.refs;
+    const rows = [{ stepIndex: 2 }, { stepIndex: 1 }];
+    const cols = ['step'];
+    const isScrolled = () => pane.classList.contains('is-scrolled');
+    const clipOffset = () => body.style.getPropertyValue('--step-scroll-top') || '';
+
+    renderStepTable(rows, 'cid-header', cols, 'en-US');
+
+    assert.equal(isScrolled(), false);
+    pane.scrollTop = 0;
+    pane.scrollLeft = 32;
+    pane.dispatchEvent({ type: 'scroll' });
+    assert.equal(isScrolled(), false, 'horizontal scroll keeps the header clear');
+
+    pane.scrollTop = 0.5;
+    pane.dispatchEvent({ type: 'scroll' });
+    assert.equal(isScrolled(), true, 'the sticky surface appears as soon as rows move');
+    assert.equal(clipOffset(), '0.5px');
+
+    pane.scrollTop = 0;
+    pane.dispatchEvent({ type: 'scroll' });
+    assert.equal(isScrolled(), false, 'returning to the top clears the sticky surface');
+    assert.equal(clipOffset(), '');
+
+    pane.scrollTop = 18;
+    refreshViewport();
+    assert.equal(isScrolled(), true, 'refresh reads the scroll position without a scroll event');
+    assert.equal(clipOffset(), '18px');
+
+    pane.scrollTop = 0;
+    renderStepTable(rows, 'cid-header', cols, 'en-US');
+    assert.equal(isScrolled(), false, 'rendering identical rows refreshes the header');
+    assert.equal(clipOffset(), '');
+
+    pane.scrollTop = 18;
+    pane.dispatchEvent({ type: 'scroll' });
+    const removeRow = body.removeChild.bind(body);
+    body.removeChild = (row) => {
+      // Model the browser clamping scrollTop when the shortened table fits.
+      pane.scrollTop = 0;
+      return removeRow(row);
+    };
+    renderStepTable(rows.slice(0, 1), 'cid-header', cols, 'en-US');
+    assert.equal(isScrolled(), false, 'the header reflects clamping during row replacement');
+    assert.equal(clipOffset(), '');
+
+    widget.destroy();
+    pane.scrollTop = 12;
+    pane.dispatchEvent({ type: 'scroll' });
+    assert.equal(isScrolled(), false, 'destroy removes the scroll listener');
+  }
+});
+
+test('StepTableWidget syncs the clip offset after row height calibration adjusts scrollTop', (t) => {
+  const prevDoc = globalThis.document;
+  const prevRaf = globalThis.requestAnimationFrame;
+  globalThis.document = createMockDom().document;
+  const frames = [];
+  globalThis.requestAnimationFrame = (callback) => frames.push(callback);
+  t.after(() => {
+    globalThis.document = prevDoc;
+    globalThis.requestAnimationFrame = prevRaf;
+  });
+
+  const widget = StepTableWidget({});
+  t.after(() => widget.destroy());
+  const { stepsTablePane: pane, stepsTbody: body, renderStepTable } = widget.refs;
+  pane.clientHeight = 300;
+  pane.clientWidth = 520;
+  pane.scrollTop = 1800;
+  pane.dispatchEvent({ type: 'scroll' });
+  const rows = Array.from({ length: 120 }, (_, i) => ({ stepIndex: i + 1 }));
+  renderStepTable(rows, 'cid-calibration', ['step'], 'en-US');
+
+  const renderedRows = body.children.filter((tr) =>
+    !tr.classList.contains('step-vspacer') && !tr.classList.contains('step-vsizer')
+  );
+  for (const [index, row] of renderedRows.entries()) {
+    row.setRect({ top: index * 40, bottom: (index + 1) * 40, height: 40 });
+  }
+  assert.equal(frames.length, 1, 'the initial virtual render schedules calibration');
+  assert.equal(body.style.getPropertyValue('--step-scroll-top'), '1800px');
+
+  frames.shift()();
+  assert.ok(pane.scrollTop > 1800, 'larger measured rows shift the scroll anchor down');
+  assert.equal(pane.classList.contains('is-scrolled'), true);
+  assert.equal(body.style.getPropertyValue('--step-scroll-top'), `${pane.scrollTop}px`);
+});
+
 test('StepTrendChart computes robust 4-metric scales and StepsDetailView switches dots/curve/table cleanly', async (t) => {
   const { computeStepTrendScales } = await import('../src/components/charts/StepTrendChart.js');
   const { formatStepClockTime } = await import('../src/registries/stepColumnRegistry.js');
@@ -1543,6 +1643,58 @@ test('Liquid Glass theme preserves semantic green/teal/amber tiers across capsul
     stylesCss,
     /\[data-ui-theme="liquid-glass"\] \.wm-cap-slot\.tone-info[\s\S]*?color:\s*var\(--lg-teal-text\)/
   );
+});
+
+test('Liquid Glass uses a stronger fill for hovered controls and keeps the subtle row hover', () => {
+  const stylesCss = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.match(stylesCss, /--lg-control-hover:\s*color-mix\(in srgb, var\(--lg-ink-2\) 18%, transparent\);/);
+  assert.match(stylesCss, /--modern-surface-subtle:\s*var\(--lg-seg-bg\);\s*--modern-surface-hover:\s*var\(--lg-row-hover\);/);
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\] \.steps-chip-btn:not\(\.is-active\):hover,\s*\[data-ui-theme="liquid-glass"\] \.btn-ghost-sm:hover:not\(:disabled\),\s*\[data-ui-theme="liquid-glass"\] \.theme-host-chip:not\(\.is-active\):hover\s*\{\s*background: var\(--lg-control-hover\);/
+  );
+});
+
+test('Liquid Glass table headers share readable ink and the sticky divider appears only at rest', () => {
+  const stylesCss = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\] \.data-table thead::before\s*\{[^}]*box-shadow: inset 0 -1px 0 var\(--lg-divider\);/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\] \.table-viewport\.is-scrolled \.data-table thead::before\s*\{[^}]*border-radius: 9px;\s*box-shadow: none;/
+  );
+  assert.match(stylesCss, /\[data-ui-theme="liquid-glass"\] \.data-table th\s*\{[^}]*color: var\(--lg-ink-2\);/);
+  assert.match(stylesCss, /\[data-ui-theme="liquid-glass"\] \.cons-models-table thead th\s*\{[^}]*color: var\(--lg-ink-2\);/);
+  assert.match(stylesCss, /\[data-ui-theme="liquid-glass"\] \.data-table th\.is-sorted\s*\{\s*color: var\(--lg-accent\);/);
+});
+
+test('Liquid Glass gives the multi-session overlay a stronger tint and flat rows in both mount paths', () => {
+  const stylesCss = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\]\.wm-multi-panel,\s*:host\(\[data-ui-theme="liquid-glass"\]\) \.wm-multi-panel\s*\{\s*--text-muted: var\(--lg-ink-2\);[^}]*background-color: color-mix\(in srgb, var\(--lg-popover-bg\) 90%, transparent\);/
+  );
+  assert.match(
+    stylesCss,
+    /\[data-ui-theme="liquid-glass"\]\.wm-multi-panel \.live-task-card::after,\s*:host\(\[data-ui-theme="liquid-glass"\]\) \.wm-multi-panel \.live-task-card::after\s*\{\s*display: none;/
+  );
+});
+
+test('Liquid Glass root, host, and container get theme tokens with or without modern UI', () => {
+  const stylesCss = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const theme = '[data-ui-theme="liquid-glass"]';
+  const modern = '[data-modern-ui="true"]';
+  const tokenBlock = stylesCss.match(/([^{}]+)\{\s*--text-primary: var\(--lg-ink-1\);([^}]*)\}/);
+  assert.ok(tokenBlock, 'the Liquid Glass token block ships in the bundle');
+  const selectors = tokenBlock[1].replace(/\/\*[\s\S]*?\*\//g, '').trim().split(/,\s*/);
+  for (const attrs of [theme, modern + theme]) {
+    for (const selector of [`:root${attrs}`, `:host(${attrs})`, attrs]) {
+      assert.ok(selectors.includes(selector), `${selector} selects the Liquid Glass tokens`);
+    }
+  }
+  assert.match(tokenBlock[2], /--cons-other-seg:\s*color-mix\(in srgb, var\(--lg-ink-2\) 42%, transparent\);/);
 });
 
 test('Step time column formats local system time and multiple timezones accurately, and migrates legacy default step column', async (t) => {

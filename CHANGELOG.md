@@ -2,6 +2,24 @@
 
 All notable changes to **AGY Monitor** are documented in this file.
 
+## [1.2.4] - 2026-11
+
+### 更新内容
+- **液态玻璃主题表头与全界面表面穿透修复**：
+  - 修复深色与浅色液态玻璃（Liquid Glass）下「明细」表格粘性表头（`时间 / 模型 / 速度 / 首字 / 缓存命中率 / 费用`）因高不透明度 `--lg-sticky-th-bg` 产生尖角硬色块的问题：静止态完全透明融入玻璃卡片并保留底部分割线，垂直滚动时切换为圆角半透底色，并通过 `tbody` 的 `clip-path: inset(var(--step-scroll-top, 0px) 0 0)` 防止滚动行文字透底；同时在滚动、视口刷新、行高重校准及数据重渲染后实时同步裁剪状态，避免缩表或切换会话后残留误裁剪。
+  - 修复液态玻璃下展开态下拉框、搜索框、日期时间控件与表格预览混入不透明现代主题色值的问题；补齐根/Shadow Host 主题选择器与文字墨色变量，并为填充型芯片/幽灵按钮/主题色卡提供更清晰的悬停提亮（`--lg-control-hover`），统一调用明细与模型用量双表头字色（`--lg-ink-2`）。
+  - 修复对话轮次导轨空心起点圆点遮盖底色（改为 `mask-image` 透出玻璃卡片）、异常筛选条与桥接提示条背景、用量热力图色阶/月界线及「其他」分段（`--cons-other-seg`）混入不透明 `--surface-panel` 的问题。
+  - 优化多会话实时看板浮层（`.wm-multi-panel`）：移除内部任务行双层模糊与 hover 矩形高光残留，强化磨砂底色与次级文字对比度。
+- **文档与预览图**：精简中英 README 预览图说明并修正实时预览截图中异常 TPS 示例值。
+
+### English
+- **Liquid Glass Table Header & Surface Bleed Fixes**:
+  - Fixed the dark/light Liquid Glass Steps Detail sticky header (`Time / Model / Speed / TTFT / Cache Hit / Cost`) rendering as a stark opaque rectangle (`--lg-sticky-th-bg`): removed the opaque header fill token so the header blends seamlessly into glass cards at rest with a hairline divider, switches to a clean rounded frosted bar on vertical scroll, and clips `tbody` via `clip-path: inset(var(--step-scroll-top, 0px) 0 0)` to prevent scrolled rows from showing through; synchronized scroll/clip state across scroll events, viewport refresh, height calibration, and row re-renders.
+  - Fixed opaque Modern UI fills leaking into open Liquid Glass dropdowns, search inputs, date/time controls, and table previews; expanded root/Shadow Host token selectors, added stronger hover elevation (`--lg-control-hover`) for filled chips and ghost buttons while preserving subtle row hover, and unified table header ink (`--lg-ink-2`) with accent ink on sorted columns.
+  - Fixed remaining `--surface-panel` leaks in the hollow turn-rail origin dot (now masked so the card shows through), anomaly filter bar, bridge notices, usage heatmap levels/month edges, and the `"Other"` consumption breakdown segment (`--cons-other-seg`).
+  - Refined the multi-session overlay (`.wm-multi-panel`) to eliminate nested blur and stray hover sheen on flat task rows while improving frosted contrast for muted text.
+- **Documentation**: Simplified bilingual README preview captions and corrected outlier TPS values in preview screenshots.
+
 ## [1.2.3] - 2026-11
 
 ### 更新内容

@@ -168,7 +168,6 @@
     rgba(255, 255, 255, 0.54) 100%
   );
   --lg-popover-bg: rgba(255, 255, 255, 0.96);
-  --lg-sticky-th-bg: rgba(250, 251, 253, 0.94);
   --lg-rim-top: rgba(255, 255, 255, 0.96);
   --lg-rim-side: rgba(255, 255, 255, 0.56);
   --lg-rim-bottom: rgba(255, 255, 255, 0.38);
@@ -316,7 +315,6 @@
     rgba(255, 255, 255, 0.09) 100%
   );
   --lg-popover-bg: rgba(28, 30, 36, 0.95);
-  --lg-sticky-th-bg: rgba(26, 28, 34, 0.94);
   --lg-rim-top: rgba(255, 255, 255, 0.26);
   --lg-rim-side: rgba(255, 255, 255, 0.12);
   --lg-rim-bottom: rgba(255, 255, 255, 0.06);

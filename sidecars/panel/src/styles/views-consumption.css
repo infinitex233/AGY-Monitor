@@ -458,6 +458,8 @@
 
 /* --- 历史用量热力图 --- */
 .trend-heatmap-stage {
+  --hm-level-base: var(--surface-panel);
+  --hm-month-edge: color-mix(in srgb, var(--surface-panel) 55%, transparent);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -566,28 +568,28 @@
 
 .trend-hm-cell.lv-0,
 .trend-hm-swatch.lv-0 {
-  background: color-mix(in srgb, var(--text-primary) 6.5%, var(--surface-panel));
+  background: color-mix(in srgb, var(--text-primary) 6.5%, var(--hm-level-base));
   border: 1px solid color-mix(in srgb, var(--border-hairline) 55%, transparent);
 }
 
 .trend-hm-cell.lv-1,
 .trend-hm-swatch.lv-1 {
-  background: color-mix(in srgb, var(--ctx-cached) 24%, var(--surface-panel));
+  background: color-mix(in srgb, var(--ctx-cached) 24%, var(--hm-level-base));
 }
 
 .trend-hm-cell.lv-2,
 .trend-hm-swatch.lv-2 {
-  background: color-mix(in srgb, var(--ctx-cached) 46%, var(--surface-panel));
+  background: color-mix(in srgb, var(--ctx-cached) 46%, var(--hm-level-base));
 }
 
 .trend-hm-cell.lv-3,
 .trend-hm-swatch.lv-3 {
-  background: color-mix(in srgb, var(--ctx-cached) 70%, var(--surface-panel));
+  background: color-mix(in srgb, var(--ctx-cached) 70%, var(--hm-level-base));
 }
 
 .trend-hm-cell.lv-4,
 .trend-hm-swatch.lv-4 {
-  background: color-mix(in srgb, var(--ctx-cached) 94%, var(--surface-panel));
+  background: color-mix(in srgb, var(--ctx-cached) 94%, var(--hm-level-base));
 }
 
 .trend-hm-cell.is-hovered {
@@ -603,7 +605,7 @@
 }
 
 .trend-hm-cell.is-month-edge:not(.lv-0) {
-  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--surface-panel) 55%, transparent);
+  box-shadow: inset 1px 0 0 var(--hm-month-edge);
 }
 
 .trend-hm-cell.is-month-edge.is-bar-hovered:not(.lv-0) {
